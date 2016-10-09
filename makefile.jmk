@@ -72,10 +72,16 @@ jar = "jedit.jar";
         "org/gjt/sp/jedit/default.abbrevs"
         "org/gjt/sp/jedit/actions.xml"
         "org/gjt/sp/jedit/actions.dtd"
+<<<<<<< HEAD
         "org/gjt/sp/jedit/catalog.dtd"
         "org/gjt/sp/jedit/xmode.dtd"
         "bsh/lib/defaultImports"
         "bsh/lib/javaPackages");
+=======
+        "org/gjt/sp/jedit/xmode.dtd"
+	"bsh/lib/defaultImports"
+	"bsh/lib/javaPackages");
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 }
 
 "%.class" : "%.java";

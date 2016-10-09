@@ -35,6 +35,19 @@ list that is very low traffic, a general discussion list, and a
 development discussion list. To subscribe, unsubscribe or view list
 archives, visit <http://www.sourceforge.net/mail/?group_id=588>.
 
+<<<<<<< HEAD
+=======
+The preferred way to report bugs is to use our bug tracker;
+<http://www.sourceforge.net/bugs/?groups_id=588>. When writing a bug
+report, please try to be as specific as possible. You should specify
+your jEdit version, Java version, operating system, any relevant output
+from the activity log, and an e-mail address, in case we need further
+information to fix the bug.
+
+The preferred way to suggest features is to post a message to the
+jEdit-users or jEdit-devel mailing list.
+
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 If you would like to discuss the BeanShell scripting language,
 subscribe to one of the BeanShell mailing lists by visiting
 <http://www.beanshell.org/contact.html>.
@@ -77,16 +90,33 @@ actually a Java bug, or a well-known problem.
   - On Windows, edit the `jEdit.bat' file and change the line that looks
     like so:
 
+<<<<<<< HEAD
     set JAVA_HEAP_SIZE=32
+=======
+    set JAVA_HEAP_SIZE=16
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
   - On Unix, edit the `jedit' shell script and change the line that
     looks like so:
 
+<<<<<<< HEAD
     JAVA_HEAP_SIZE=32
 
   In both cases, replace `32' with the desired heap size, in megabytes.
   For best results, use a heap size of about 2.5 times the largest file
   size you plan to edit.
+=======
+    JAVA_HEAP_SIZE=16
+
+  In both cases, replace `16' with the desired heap size, in megabytes.
+  For best results, use a heap size of about 2.5 times the largest file
+  size you plan to edit.
+
+- You must rebuild the mode cache with the `Utilities->Reload Edit Modes'
+  command after adding or removing edit modes, otherwise jEdit will not
+  notice the changes. Note that the mode cache is automatically rebuilt
+  after a new jEdit version is installed.
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
 - Printing doesn't work very well, especially on Java 2. There isn't
   much I can do about this until Sun fixes several outstanding bugs in

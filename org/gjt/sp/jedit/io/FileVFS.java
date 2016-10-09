@@ -30,7 +30,11 @@ import org.gjt.sp.util.Log;
 /**
  * Local filesystem VFS.
  * @author Slava Pestov
+<<<<<<< HEAD
  * @version $Id: FileVFS.java,v 1.33 2001/02/28 10:38:53 sp Exp $
+=======
+ * @version $Id: FileVFS.java,v 1.29 2001/01/22 05:35:08 sp Exp $
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  */
 public class FileVFS extends VFS
 {
@@ -433,6 +437,7 @@ public class FileVFS extends VFS
 		}
 	}
 
+<<<<<<< HEAD
 	/** Code borrowed from j text editor (http://www.armedbear.org) */
 	/** I made some changes to make it support suid, sgid and sticky files */
 	private int getPermissions(String path)
@@ -531,3 +536,48 @@ public class FileVFS extends VFS
 		}
 	}
 }
+=======
+/*
+ * ChangeLog:
+ * $Log: FileVFS.java,v $
+ * Revision 1.29  2001/01/22 05:35:08  sp
+ * bug fixes galore
+ *
+ * Revision 1.28  2000/12/02 02:44:41  sp
+ * Documentation updates, complete icon set now included
+ *
+ * Revision 1.27  2000/11/11 02:59:30  sp
+ * FTP support moved out of the core into a plugin
+ *
+ * Revision 1.26  2000/11/07 10:08:32  sp
+ * Options dialog improvements, documentation changes, bug fixes
+ *
+ * Revision 1.25  2000/11/02 09:19:33  sp
+ * more features
+ *
+ * Revision 1.24  2000/10/12 09:28:27  sp
+ * debugging and polish
+ *
+ * Revision 1.23  2000/09/26 10:19:47  sp
+ * Bug fixes, spit and polish
+ *
+ * Revision 1.22  2000/08/31 02:54:00  sp
+ * Improved activity log, bug fixes
+ *
+ * Revision 1.21  2000/08/29 07:47:13  sp
+ * Improved complete word, type-select in VFS browser, bug fixes
+ *
+ * Revision 1.20  2000/08/27 02:06:52  sp
+ * Filter combo box changed to a text field in VFS browser, passive mode FTP toggle
+ *
+ * Revision 1.19  2000/08/23 09:51:48  sp
+ * Documentation updates, abbrev updates, bug fixes
+ *
+ * Revision 1.18  2000/08/22 07:25:01  sp
+ * Improved abbrevs, bug fixes
+ *
+ * Revision 1.17  2000/08/20 07:29:31  sp
+ * I/O and VFS browser improvements
+ *
+ */
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5

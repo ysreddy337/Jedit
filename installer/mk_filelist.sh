@@ -11,7 +11,10 @@ echo jars/PluginManager.jar >> installer/jedit-program
 echo jars/LatestVersion.jar >> installer/jedit-program
 echo site-props/*.props >> installer/jedit-program
 find modes -name \*.xml >> installer/jedit-program
+<<<<<<< HEAD
 echo modes/catalog >> installer/jedit-program
+=======
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 find doc -type f -name \*.txt >> installer/jedit-program
 echo doc/welcome.html >> installer/jedit-program
 find macros -name \*.bsh >> installer/jedit-program

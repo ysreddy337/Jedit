@@ -34,7 +34,11 @@ import org.gjt.sp.util.Log;
  * Class that implements regular expression and literal search within
  * jEdit buffers.
  * @author Slava Pestov
+<<<<<<< HEAD
  * @version $Id: SearchAndReplace.java,v 1.49 2001/04/18 03:09:45 sp Exp $
+=======
+ * @version $Id: SearchAndReplace.java,v 1.47 2001/01/22 05:35:08 sp Exp $
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  */
 public class SearchAndReplace
 {

@@ -39,7 +39,11 @@ import org.gjt.sp.util.Log;
 /**
  * The main class of the jEdit text editor.
  * @author Slava Pestov
+<<<<<<< HEAD
  * @version $Id: jEdit.java,v 1.321 2001/04/19 08:07:25 sp Exp $
+=======
+ * @version $Id: jEdit.java,v 1.308 2001/01/22 10:39:26 sp Exp $
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  */
 public class jEdit
 {
@@ -58,7 +62,11 @@ public class jEdit
 	public static String getBuild()
 	{
 		// (major).(minor).(<99 = preX, 99 = final).(bug fix)
+<<<<<<< HEAD
 		return "03.01.99.00";
+=======
+		return "03.00.99.01";
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 	}
 
 	/**
@@ -880,7 +888,11 @@ public class jEdit
 		Log.log(Log.NOTICE,jEdit.class,"Loading edit mode " + fileName);
 
 		XmlParser parser = new XmlParser();
+<<<<<<< HEAD
 		XModeHandler xmh = new XModeHandler(parser,mode.getName(),fileName);
+=======
+		XModeHandler xmh = new XModeHandler(parser,fileName);
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 		parser.setHandler(xmh);
 		try
 		{

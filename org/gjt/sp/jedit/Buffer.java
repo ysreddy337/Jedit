@@ -55,7 +55,11 @@ import org.gjt.sp.util.Log;
  * Various other properties are also used by jEdit and plugin actions.
  *
  * @author Slava Pestov
+<<<<<<< HEAD
  * @version $Id: Buffer.java,v 1.218 2001/04/19 08:07:25 sp Exp $
+=======
+ * @version $Id: Buffer.java,v 1.197 2001/01/22 10:39:25 sp Exp $
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  */
 public class Buffer extends PlainDocument implements EBComponent
 {
@@ -2009,8 +2013,17 @@ public class Buffer extends PlainDocument implements EBComponent
 		{
 			boolean changed = false;
 
+<<<<<<< HEAD
 			// make this configurable!
 			int tabSize = getTabSize();
+=======
+		Mode defaultMode = jEdit.getMode(jEdit.getProperty("buffer.defaultMode"));
+		if(defaultMode == null)
+			defaultMode = jEdit.getMode("text");
+		setMode(defaultMode);
+
+		setPath(path);
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
 			Element lineElement = getDefaultRootElement()
 				.getElement(line);
@@ -3395,6 +3408,73 @@ loop:				for(int i = 0; i < count; i++)
 	}
 
 	class SaveUndo implements UndoableEdit
+<<<<<<< HEAD
+=======
+	{
+		boolean dead;
+
+		public void undo()
+		{
+			//System.err.println("dirty false");
+			//if(!dead)
+			//	setDirty(false);
+		}
+
+		public boolean canUndo()
+		{
+			return true;
+		}
+
+		public void redo()
+		{
+			undo();
+		}
+
+		public boolean canRedo()
+		{
+			return true;
+		}
+
+		public boolean isSignificant()
+		{
+			return false;
+		}
+
+		public void die()
+		{
+			dead = true;
+		}
+
+		public boolean addEdit(UndoableEdit edit)
+		{
+			return false;
+		}
+
+		public boolean replaceEdit(UndoableEdit edit)
+		{
+			return false;
+		}
+
+		public String getPresentationName()
+		{
+			return null;
+		}
+
+		public String getUndoPresentationName()
+		{
+			return null;
+		}
+
+		public String getRedoPresentationName()
+		{
+			return null;
+		}
+	}
+
+	// event handlers
+	class UndoHandler
+	implements UndoableEditListener
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 	{
 		boolean dead;
 

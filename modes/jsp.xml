@@ -41,12 +41,15 @@
 			<END>&lt;/STYLE&gt;</END>
 		</SPAN>
 
+<<<<<<< HEAD
 		<!-- DTD instructions -->
 		<SPAN TYPE="KEYWORD2" DELEGATE="xml::DTD-TAGS">
 			<BEGIN>&lt;!</BEGIN>
 			<END>&gt;</END>
 		</SPAN>
 
+=======
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 		<SPAN TYPE="MARKUP" DELEGATE="xml::TAGS">
 			<BEGIN>&lt;</BEGIN>
 			<END>&gt;</END>

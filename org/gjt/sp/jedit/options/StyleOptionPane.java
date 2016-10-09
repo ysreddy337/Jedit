@@ -34,7 +34,11 @@ import org.gjt.sp.jedit.*;
 /**
  * Style option pane.
  * @author Slava Pestov
+<<<<<<< HEAD
  * @version $Id: StyleOptionPane.java,v 1.27 2001/02/05 09:15:30 sp Exp $
+=======
+ * @version $Id: StyleOptionPane.java,v 1.26 2001/01/22 05:35:08 sp Exp $
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  */
 public class StyleOptionPane extends AbstractOptionPane
 {
@@ -237,6 +241,10 @@ class StyleTableModel extends AbstractTableModel
 						jEdit.getProperty("view.bgColor")));
 				}
 				setFont(style.getStyledFont(originalFont));
+<<<<<<< HEAD
+=======
+				System.err.println(style + ":" + getFont());
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 			}
 
 			setBorder((cellHasFocus) ? UIManager.getBorder(
@@ -372,9 +380,12 @@ class StyleEditor extends EnhancedDialog implements ActionListener
 /*
  * Change Log:
  * $Log: StyleOptionPane.java,v $
+<<<<<<< HEAD
  * Revision 1.27  2001/02/05 09:15:30  sp
  * Improved shortcut option pane, various other 31337 stuff
  *
+=======
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  * Revision 1.26  2001/01/22 05:35:08  sp
  * bug fixes galore
  *

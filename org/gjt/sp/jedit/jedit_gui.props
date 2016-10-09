@@ -820,6 +820,7 @@ add-abbrev.caption=Enter an expansion for abbreviation "{0}":
 add-abbrev.mode=Add mode-specific
 add-abbrev.global=Add global
 
+<<<<<<< HEAD
 # Edit abbrev dialog
 edit-abbrev.title=Edit Abbreviation
 edit-abbrev.caption=Enter an expansion for abbreviation "{0}":
@@ -828,6 +829,8 @@ edit-abbrev.caption=Enter an expansion for abbreviation "{0}":
 abbrev-editor.before=Text to insert before caret:
 abbrev-editor.after=Text to insert after caret:
 
+=======
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 # XMode errors
 xmode-error.title=XML Parse Error
 # {2} is the column number, but it's not too useful so we don't show it

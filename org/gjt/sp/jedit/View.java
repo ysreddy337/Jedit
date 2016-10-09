@@ -41,7 +41,11 @@ import org.gjt.sp.util.Log;
  * class.
  *
  * @author Slava Pestov
+<<<<<<< HEAD
  * @version $Id: View.java,v 1.220 2001/04/18 03:09:44 sp Exp $
+=======
+ * @version $Id: View.java,v 1.216 2001/01/22 10:39:26 sp Exp $
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  */
 public class View extends JFrame implements EBComponent
 {
@@ -679,10 +683,15 @@ public class View extends JFrame implements EBComponent
 		help = GUIUtilities.loadMenu(this,"help-menu");
 		plugins = GUIUtilities.loadMenu(this,"plugins");
 
+<<<<<<< HEAD
 		// finish persistent splits later
 		Component comp = restoreSplitConfig(buffer,"+");
 			/* jEdit.getProperty("view.splits") */;
 		dockableWindowManager.add(comp);
+=======
+		editPane = createEditPane(null,buffer);
+		dockableWindowManager.add(editPane);
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
 		updateMarkerMenus();
 		updateMacrosMenu();

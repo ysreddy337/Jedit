@@ -111,7 +111,14 @@ public class SwingInstall extends JFrame
 		InstallWizard(ChooseDirectory chooseDirectory,
 			SelectComponents selectComponents)
 		{
+<<<<<<< HEAD
 			super("Cancel","Previous","Next","Install");
+=======
+			super(new Color(0xccccff),
+				new ImageIcon(InstallWizard.class.getResource(
+				installer.getProperty("app.logo"))),
+				"Cancel","Previous","Next","Install");
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 			setPages(new Component[] { new About(), chooseDirectory,
 				selectComponents });
 		}

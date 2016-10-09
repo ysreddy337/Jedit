@@ -1,6 +1,66 @@
 JEDIT 3.1 VERSION HISTORY
 
+<<<<<<< HEAD
 * Version 3.1final
+=======
+* Version 3.0.2
+
++ Bug Fixes
+
+- The installer didn't compile with some versions of javac
+- The installer created an invalid batch file for starting jEdit on Windows
+- 'Remove Trailing Whitespace' command didn't work
+- If word wrap was disabled, a tooltip with the text "0" would be displayed
+  on the left of the text area
+
+* Version 3.0.1
+
++ Enhancements
+
+- 'Favorites' is now an option for the 'default path' option in the
+  'File System Browser' option pane
+- Mode parser is more resistent to errors and no longer throws various
+  exceptions with malformed mode files
+- The JSP mode in jEdit 2.5.1 was better than the 2.6/3.0 one, so it is
+  included again
+
++ Neutral
+
+- Default install directory is now /usr/share/jedit/<version> on Unix.
+  It used to be /usr/share/jedit-<version>
+- xmode.dtd moved from modes directory to jedit.jar
+
++ Bug Fixes
+
+- DocBook abbrevs are now defined in XML and SGML mode, not just XML
+  mode
+- Fixed typo in actions.dtd
+- 'Browse Directory' macro would fail if the file system browser was not
+  open
+- .xsl files were being opened in XML, rather than XSL, mode. The only
+  workaround I could think of was to disable XML mode's firstlineGlob;
+  no longer will all files that start with "<?xml ... ?>" be opened in
+  XML mode. Instead, the list of extensions must be specified manually.
+- FileVFS.getParentOfPath() no longer calls
+  FileSystemView.getFileRoots(), which is a performance bottleneck on
+  Java 1.1 and Windows
+- The 'Find' command was recorded incorrectly in macros
+- It is no longer possible to resize docking areas so that they cover
+  the text area or overlap
+- Improved 'Run java' macro
+- The batch file created on Windows, and the shell script created on
+  Unix by the installer now make it easier to change the Java heap size
+- The 'Style' option pane displayed syntax styles incorrectly on Java 2
+- Untitled files always used the default undo queue size (100) instead
+  of the value specified in the Global Options dialog box
+- The 'default edit mode' setting was not respected in all cases
+- The feature that cleared the dirty flag when all edits up to a save were
+  undone had a bug where the flag would sometimes be cleared at the wrong
+  time. A proper fix for the problem will be added in jEdit 3.1; in the
+  meantime, the feature has been disabled.
+
+* Version 3.0final
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
 + Enhancements
 
@@ -23,10 +83,30 @@ JEDIT 3.1 VERSION HISTORY
 
 + API Changes
 
+<<<<<<< HEAD
 - BufferUpdate.getView() method added. This may return null.
 - Macros.input(View, String prompt, String defaultValue) method added
 
 * Version 3.1pre5
+=======
+- Saving a new file didn't refresh file system browsers that were
+  viewing the directory where the file was saved
+- Enabling or disabling the search bar didn't take effect in currently
+  opened views if the tool bar was also enabled
+- UDP edit server had a number of problems, so I've reverted to the old
+  TCP edit server. I'll debug the UDP server in jEdit 3.1
+- The installer created an invalid batch file on Windows
+- Adding macros to the context menu and tool bar hasn't worked since
+  2.7pre2. Bugs like this make me wonder if anyone actually USES
+  jEdit...
+- Complete word popup would be offset horizontally a little if the
+  gutter was visible
+- Recorded search and replace actions didn't work
+- Specifying an icon loaded from an external file in the tool bar editor
+  didn't work
+
+* Version 3.0pre5
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
 + New Features
 

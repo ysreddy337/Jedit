@@ -29,8 +29,14 @@ import java.awt.*;
  */
 public abstract class Wizard extends JPanel
 {
+<<<<<<< HEAD
 	public Wizard(String cancelButtonLabel, String prevButtonLabel,
 		String nextButtonLabel, String finishButtonLabel)
+=======
+	public Wizard(Color highlight, Icon logo, String cancelButtonLabel,
+		String prevButtonLabel, String nextButtonLabel,
+		String finishButtonLabel)
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 	{
 		ActionHandler actionHandler = new ActionHandler();
 
@@ -50,6 +56,20 @@ public abstract class Wizard extends JPanel
 		add(cancelButton);
 		add(prevButton);
 		add(nextButton);
+<<<<<<< HEAD
+=======
+	}
+
+	public void setPages(Component[] pages)
+	{
+		this.pages = pages;
+		for(int i = 0; i < pages.length; i++)
+		{
+			add(pages[i]);
+		}
+
+		pageChanged();
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 	}
 
 	public void setPages(Component[] pages)

@@ -7,6 +7,19 @@
 		<PROPERTY NAME="commentStart" VALUE="&lt;!--" />
 		<PROPERTY NAME="commentEnd" VALUE="--&gt;" />
 		<PROPERTY NAME="boxComment" VALUE="--" />
+<<<<<<< HEAD
+=======
+		<PROPERTY NAME="filenameGlob" VALUE="*.xml" />
+
+<!--		Because jEdit checks files against modes in alphabetical order,
+		XSL files are erronously recognized as XML because they begin
+		with <?xml...?>. The only workaround I can think of right now is
+		to *not* open all files that start with <?xml...?> in XML mode,
+		and instead hardcode the relevant extensions in the
+		filenameGlob. Better suggestions welcome. -->
+
+<!--		<PROPERTY NAME="firstlineGlob" VALUE="*&lt;\?xml*" /> -->
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 	</PROPS>
 	<RULES>
 		<!-- whitespace: (space and tab) -->

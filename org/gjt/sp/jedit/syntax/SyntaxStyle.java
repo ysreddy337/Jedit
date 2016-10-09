@@ -27,7 +27,11 @@ import org.gjt.sp.util.Log;
  * A simple text style class. It can specify the color, italic flag,
  * and bold flag of a run of text.
  * @author Slava Pestov
+<<<<<<< HEAD
  * @version $Id: SyntaxStyle.java,v 1.9 2001/01/29 09:19:34 sp Exp $
+=======
+ * @version $Id: SyntaxStyle.java,v 1.8 2001/01/22 05:35:08 sp Exp $
+>>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  */
 public class SyntaxStyle
 {
