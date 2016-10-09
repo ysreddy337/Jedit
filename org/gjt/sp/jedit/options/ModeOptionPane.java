@@ -1,6 +1,9 @@
 /*
  * ModeOptionPane.java - Mode-specific options panel
- * Copyright (C) 1998, 1999, 2000 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 1998, 1999, 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,19 +22,23 @@
 
 package org.gjt.sp.jedit.options;
 
+//{{{ Imports
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.buffer.FoldHandler;
+//}}}
 
 public class ModeOptionPane extends AbstractOptionPane
 {
+	//{{{ ModeOptionPane constructor
 	public ModeOptionPane()
 	{
 		super("mode");
-	}
+	} //}}}
 
-	// protected members
+	//{{{ _init() method
 	protected void _init()
 	{
 		Mode[] modes = jEdit.getModes();
@@ -57,6 +64,29 @@ public class ModeOptionPane extends AbstractOptionPane
 		addComponent(jEdit.getProperty("options.mode.firstlineGlob"),
 			firstlineGlob = new JTextField());
 
+		addComponent(jEdit.getProperty("options.editing.noWordSep"),
+			noWordSep = new JTextField());
+
+		String[] foldModes = FoldHandler.getFoldModes();
+		addComponent(jEdit.getProperty("options.editing.folding"),
+			folding = new JComboBox(foldModes));
+
+		addComponent(jEdit.getProperty("options.editing.collapseFolds"),
+			collapseFolds = new JTextField());
+
+		String[] wrapModes = {
+			"none",
+			"soft",
+			"hard"
+		};
+		addComponent(jEdit.getProperty("options.editing.wrap"),
+			wrap = new JComboBox(wrapModes));
+
+		String[] lineLens = { "0", "72", "76", "80" };
+		addComponent(jEdit.getProperty("options.editing.maxLineLen"),
+			maxLineLen = new JComboBox(lineLens));
+		maxLineLen.setEditable(true);
+
 		String[] tabSizes = { "2", "4", "8" };
 		addComponent(jEdit.getProperty("options.editing.tabSize"),
 			tabSize = new JComboBox(tabSizes));
@@ -66,31 +96,8 @@ public class ModeOptionPane extends AbstractOptionPane
 			indentSize = new JComboBox(tabSizes));
 		indentSize.setEditable(true);
 
-		String[] lineLens = { "0", "72", "76", "80" };
-		addComponent(jEdit.getProperty("options.editing.maxLineLen"),
-			maxLineLen = new JComboBox(lineLens));
-		maxLineLen.setEditable(true);
-
-		addComponent(jEdit.getProperty("options.editing.wordBreakChars"),
-			wordBreakChars = new JTextField());
-
-		addComponent(jEdit.getProperty("options.mode.commentStart"),
-			commentStart = new JTextField());
-
-		addComponent(jEdit.getProperty("options.mode.commentEnd"),
-			commentEnd = new JTextField());
-
-		addComponent(jEdit.getProperty("options.mode.lineComment"),
-			lineComment = new JTextField());
-
-		addComponent(jEdit.getProperty("options.mode.noWordSep"),
-			noWordSep = new JTextField());
-
-		addComponent(jEdit.getProperty("options.editing.collapseFolds"),
-			collapseFolds = new JTextField());
-
-		addComponent(syntax = new JCheckBox(jEdit.getProperty(
-			"options.editing.syntax")));
+		addComponent(noTabs = new JCheckBox(jEdit.getProperty(
+			"options.editing.noTabs")));
 
 		addComponent(indentOnTab = new JCheckBox(jEdit.getProperty(
 			"options.editing.indentOnTab")));
@@ -98,12 +105,10 @@ public class ModeOptionPane extends AbstractOptionPane
 		addComponent(indentOnEnter = new JCheckBox(jEdit.getProperty(
 			"options.editing.indentOnEnter")));
 
-		addComponent(noTabs = new JCheckBox(jEdit.getProperty(
-			"options.editing.noTabs")));
-
 		selectMode();
-	}
+	} //}}}
 
+	//{{{ _save() method
 	protected void _save()
 	{
 		saveMode();
@@ -112,49 +117,48 @@ public class ModeOptionPane extends AbstractOptionPane
 		{
 			modeProps[i].save();
 		}
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+
+	//{{{ Instance variables
 	private ModeProperties[] modeProps;
 	private ModeProperties current;
 	private JComboBox mode;
 	private JCheckBox useDefaults;
 	private JTextField filenameGlob;
 	private JTextField firstlineGlob;
+	private JTextField noWordSep;
+	private JComboBox folding;
+	private JTextField collapseFolds;
+	private JComboBox wrap;
+	private JComboBox maxLineLen;
 	private JComboBox tabSize;
 	private JComboBox indentSize;
-	private JComboBox maxLineLen;
-	private JTextField wordBreakChars;
-	private JTextField commentStart;
-	private JTextField commentEnd;
-	private JTextField lineComment;
-	private JTextField noWordSep;
-	private JTextField collapseFolds;
 	private JCheckBox noTabs;
 	private JCheckBox indentOnTab;
 	private JCheckBox indentOnEnter;
-	private JCheckBox syntax;
+	//}}}
 
+	//{{{ saveMode() method
 	private void saveMode()
 	{
 		current.useDefaults = useDefaults.isSelected();
 		current.filenameGlob = filenameGlob.getText();
 		current.firstlineGlob = firstlineGlob.getText();
+		current.noWordSep = noWordSep.getText();
+		current.folding = (String)folding.getSelectedItem();
+		current.collapseFolds = collapseFolds.getText();
+		current.wrap = (String)wrap.getSelectedItem();
+		current.maxLineLen = (String)maxLineLen.getSelectedItem();
 		current.tabSize = (String)tabSize.getSelectedItem();
 		current.indentSize = (String)indentSize.getSelectedItem();
-		current.maxLineLen = (String)maxLineLen.getSelectedItem();
-		current.wordBreakChars = wordBreakChars.getText();
-		current.commentStart = commentStart.getText();
-		current.commentEnd = commentEnd.getText();
-		current.lineComment = lineComment.getText();
-		current.noWordSep = noWordSep.getText();
-		current.collapseFolds = collapseFolds.getText();
 		current.noTabs = noTabs.isSelected();
 		current.indentOnEnter = indentOnEnter.isSelected();
 		current.indentOnTab = indentOnTab.isSelected();
-		current.syntax = syntax.isSelected();
-	}
+	} //}}}
 
+	//{{{ selectMode() method
 	private void selectMode()
 	{
 		current = modeProps[mode.getSelectedIndex()];
@@ -164,43 +168,41 @@ public class ModeOptionPane extends AbstractOptionPane
 		useDefaults.setSelected(current.useDefaults);
 		filenameGlob.setText(current.filenameGlob);
 		firstlineGlob.setText(current.firstlineGlob);
+		noWordSep.setText(current.noWordSep);
+		folding.setSelectedItem(current.folding);
+		collapseFolds.setText(current.collapseFolds);
+		wrap.setSelectedItem(current.wrap);
+		maxLineLen.setSelectedItem(current.maxLineLen);
 		tabSize.setSelectedItem(current.tabSize);
 		indentSize.setSelectedItem(current.indentSize);
-		maxLineLen.setSelectedItem(current.maxLineLen);
-		wordBreakChars.setText(current.wordBreakChars);
-		commentStart.setText(current.commentStart);
-		commentEnd.setText(current.commentEnd);
-		lineComment.setText(current.lineComment);
-		noWordSep.setText(current.noWordSep);
-		collapseFolds.setText(current.collapseFolds);
 		noTabs.setSelected(current.noTabs);
 		indentOnTab.setSelected(current.indentOnTab);
 		indentOnEnter.setSelected(current.indentOnEnter);
-		syntax.setSelected(current.syntax);
 
 		updateEnabled();
-	}
+	} //}}}
 
+	//{{{ updateEnabled() method
 	private void updateEnabled()
 	{
 		boolean enabled = !modeProps[mode.getSelectedIndex()].useDefaults;
 		filenameGlob.setEnabled(enabled);
 		firstlineGlob.setEnabled(enabled);
+		noWordSep.setEnabled(enabled);
+		folding.setEnabled(enabled);
+		collapseFolds.setEnabled(enabled);
+		wrap.setEnabled(enabled);
+		maxLineLen.setEnabled(enabled);
 		tabSize.setEnabled(enabled);
 		indentSize.setEnabled(enabled);
-		maxLineLen.setEnabled(enabled);
-		wordBreakChars.setEnabled(enabled);
-		commentStart.setEnabled(enabled);
-		commentEnd.setEnabled(enabled);
-		lineComment.setEnabled(enabled);
-		noWordSep.setEnabled(enabled);
-		collapseFolds.setEnabled(enabled);
 		noTabs.setEnabled(enabled);
 		indentOnTab.setEnabled(enabled);
 		indentOnEnter.setEnabled(enabled);
-		syntax.setEnabled(enabled);
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ ActionHandler class
 	class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
@@ -217,10 +219,12 @@ public class ModeOptionPane extends AbstractOptionPane
 				updateEnabled();
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ ModeProperties class
 	class ModeProperties
 	{
+		//{{{ Instance variables
 		Mode mode;
 		boolean edited;
 		boolean loaded;
@@ -228,25 +232,25 @@ public class ModeOptionPane extends AbstractOptionPane
 		boolean useDefaults;
 		String filenameGlob;
 		String firstlineGlob;
+		String noWordSep;
+		String folding;
+		String collapseFolds;
+		String wrap;
+		String maxLineLen;
 		String tabSize;
 		String indentSize;
-		String maxLineLen;
-		String wordBreakChars;
-		String commentStart;
-		String commentEnd;
-		String lineComment;
-		String noWordSep;
-		String collapseFolds;
 		boolean noTabs;
 		boolean indentOnTab;
 		boolean indentOnEnter;
-		boolean syntax;
+		//}}}
 
+		//{{{ ModeProperties constructor
 		ModeProperties(Mode mode)
 		{
 			this.mode = mode;
-		}
+		} //}}}
 
+		//{{{ load() method
 		void load()
 		{
 			if(loaded)
@@ -260,21 +264,19 @@ public class ModeOptionPane extends AbstractOptionPane
 				+ mode.getName() + ".customSettings");
 			filenameGlob = (String)mode.getProperty("filenameGlob");
 			firstlineGlob = (String)mode.getProperty("firstlineGlob");
+			noWordSep = (String)mode.getProperty("noWordSep");
+			folding = mode.getProperty("folding").toString();
+			collapseFolds = mode.getProperty("collapseFolds").toString();
+			wrap = mode.getProperty("wrap").toString();
+			maxLineLen = mode.getProperty("maxLineLen").toString();
 			tabSize = mode.getProperty("tabSize").toString();
 			indentSize = mode.getProperty("indentSize").toString();
-			maxLineLen = mode.getProperty("maxLineLen").toString();
-			wordBreakChars = (String)mode.getProperty("wordBreakChars");
-			commentStart = (String)mode.getProperty("commentStart");
-			commentEnd = (String)mode.getProperty("commentEnd");
-			lineComment = (String)mode.getProperty("lineComment");
-			noWordSep = (String)mode.getProperty("noWordSep");
-			collapseFolds = mode.getProperty("collapseFolds").toString();
 			noTabs = mode.getBooleanProperty("noTabs");
 			indentOnTab = mode.getBooleanProperty("indentOnTab");
 			indentOnEnter = mode.getBooleanProperty("indentOnEnter");
-			syntax = mode.getBooleanProperty("syntax");
-		}
+		} //}}}
 
+		//{{{ save() method
 		void save()
 		{
 			// don't do anything if the user didn't change
@@ -289,38 +291,32 @@ public class ModeOptionPane extends AbstractOptionPane
 			{
 				jEdit.resetProperty(prefix + "filenameGlob");
 				jEdit.resetProperty(prefix + "firstlineGlob");
+				jEdit.resetProperty(prefix + "noWordSep");
+				jEdit.resetProperty(prefix + "folding");
+				jEdit.resetProperty(prefix + "collapseFolds");
+				jEdit.resetProperty(prefix + "wrap");
+				jEdit.resetProperty(prefix + "maxLineLen");
 				jEdit.resetProperty(prefix + "tabSize");
 				jEdit.resetProperty(prefix + "indentSize");
-				jEdit.resetProperty(prefix + "maxLineLen");
-				jEdit.resetProperty(prefix + "wordBreakChars");
-				jEdit.resetProperty(prefix + "commentStart");
-				jEdit.resetProperty(prefix + "commentEnd");
-				jEdit.resetProperty(prefix + "lineComment");
-				jEdit.resetProperty(prefix + "noWordSep");
-				jEdit.resetProperty(prefix + "collapseFolds");
 				jEdit.resetProperty(prefix + "noTabs");
 				jEdit.resetProperty(prefix + "indentOnTab");
 				jEdit.resetProperty(prefix + "indentOnEnter");
-				jEdit.resetProperty(prefix + "syntax");
 			}
 			else
 			{
 				jEdit.setProperty(prefix + "filenameGlob",filenameGlob);
 				jEdit.setProperty(prefix + "firstlineGlob",firstlineGlob);
+				jEdit.setProperty(prefix + "noWordSep",noWordSep);
+				jEdit.setProperty(prefix + "folding",folding);
+				jEdit.setProperty(prefix + "collapseFolds",collapseFolds);
+				jEdit.setProperty(prefix + "wrap",wrap);
+				jEdit.setProperty(prefix + "maxLineLen",maxLineLen);
 				jEdit.setProperty(prefix + "tabSize",tabSize);
 				jEdit.setProperty(prefix + "indentSize",indentSize);
-				jEdit.setProperty(prefix + "maxLineLen",maxLineLen);
-				jEdit.setProperty(prefix + "wordBreakChars",wordBreakChars);
-				jEdit.setProperty(prefix + "commentStart",commentStart);
-				jEdit.setProperty(prefix + "commentEnd",commentEnd);
-				jEdit.setProperty(prefix + "lineComment",lineComment);
-				jEdit.setProperty(prefix + "noWordSep",noWordSep);
-				jEdit.setProperty(prefix + "collapseFolds",collapseFolds);
 				jEdit.setBooleanProperty(prefix + "noTabs",noTabs);
 				jEdit.setBooleanProperty(prefix + "indentOnTab",indentOnTab);
 				jEdit.setBooleanProperty(prefix + "indentOnEnter",indentOnEnter);
-				jEdit.setBooleanProperty(prefix + "syntax",syntax);
 			}
-		}
-	}
+		} //}}}
+	} //}}}
 }

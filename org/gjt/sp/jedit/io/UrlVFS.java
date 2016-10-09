@@ -1,5 +1,8 @@
 /*
- * UrlVFS.java - Url VFS
+ * UrlVFS.java - URL VFS
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 2000 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,42 +22,43 @@
 
 package org.gjt.sp.jedit.io;
 
+//{{{ Imports
 import java.awt.Component;
 import java.io.*;
 import java.net.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * URL VFS.
  * @author Slava Pestov
- * @version $Id: UrlVFS.java,v 1.1.1.1 2001/09/02 05:38:17 spestov Exp $
+ * @version $Id: UrlVFS.java,v 1.4 2002/02/05 22:14:05 spestov Exp $
  */
 public class UrlVFS extends VFS
 {
+	//{{{ UrlVFS constructor
 	public UrlVFS()
 	{
 		super("url");
-	}
+	} //}}}
 
+	//{{{ getCapabilities() method
 	public int getCapabilities()
 	{
 		return READ_CAP | WRITE_CAP;
-	}
+	} //}}}
 
+	//{{{ constructPath() method
 	public String constructPath(String parent, String path)
 	{
 		if(parent.endsWith("/"))
 			return parent + path;
 		else
 			return parent + '/' + path;
-	}
+	} //}}}
 
-	public String getParentOfPath(String path)
-	{
-		return MiscUtilities.getParentOfPath(path);
-	}
-
+	//{{{ _createInputStream() method
 	public InputStream _createInputStream(Object session,
 		String path, boolean ignoreErrors, Component comp)
 		throws IOException
@@ -66,12 +70,13 @@ public class UrlVFS extends VFS
 		catch(MalformedURLException mu)
 		{
 			Log.log(Log.ERROR,this,mu);
-			String[] args = { path, mu.getMessage() };
-			VFSManager.error(comp,"badurl",args);
+			String[] args = { mu.getMessage() };
+			VFSManager.error(comp,path,"ioerror.badurl",args);
 			return null;
 		}
-	}
+	} //}}}
 
+	//{{{ _createOutputStream() method
 	public OutputStream _createOutputStream(Object session, String path,
 		Component comp) throws IOException
 	{
@@ -83,9 +88,9 @@ public class UrlVFS extends VFS
 		catch(MalformedURLException mu)
 		{
 			Log.log(Log.ERROR,this,mu);
-			String[] args = { path };
-			VFSManager.error(comp,"badurl",args);
+			String[] args = { mu.getMessage() };
+			VFSManager.error(comp,path,"ioerror.badurl",args);
 			return null;
 		}
-	}
+	} //}}}
 }

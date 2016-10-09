@@ -25,7 +25,7 @@ import java.awt.Color;
  * A simple text style class. It can specify the color, italic flag,
  * and bold flag of a run of text.
  * @author Slava Pestov
- * @version $Id: SyntaxStyle.java,v 1.1.1.1 2001/09/02 05:38:02 spestov Exp $
+ * @version $Id: SyntaxStyle.java,v 1.3 2001/12/24 03:21:25 spestov Exp $
  */
 public class SyntaxStyle
 {

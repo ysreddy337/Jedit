@@ -33,9 +33,9 @@ import org.gjt.sp.util.Log;
 
 public class PluginManager extends JDialog
 {
-	public PluginManager(View view)
+	public PluginManager(Frame frame)
 	{
-		super(view,jEdit.getProperty("plugin-manager.title"),true);
+		super(frame,jEdit.getProperty("plugin-manager.title"),true);
 
 		JPanel content = new JPanel(new BorderLayout());
 		content.setBorder(new EmptyBorder(12,12,12,12));
@@ -110,7 +110,7 @@ public class PluginManager extends JDialog
 
 		pack();
 
-		setLocationRelativeTo(view);
+		setLocationRelativeTo(frame);
 
 		show();
 	}
@@ -280,8 +280,7 @@ public class PluginManager extends JDialog
 					== JOptionPane.YES_OPTION)
 				{
 					new PluginManagerProgress(PluginManager.this,
-						jEdit.getProperty("plugin-manager.progress"
-						+ ".removing-task"),roster);
+						"remove",roster);
 					updateTree();
 				}
 			}
@@ -307,9 +306,10 @@ public class PluginManager extends JDialog
 					PluginList.Branch branch = plugin.getCompatibleBranch();
 
 					if(branch != null
+						&& branch.canSatisfyDependencies()
 						&& plugin.installedVersion != null
-						&& MiscUtilities.compareVersions(branch.version,
-						plugin.installedVersion) > 0)
+						&& MiscUtilities.compareStrings(branch.version,
+						plugin.installedVersion,false) > 0)
 						plugins.addElement(plugin);
 				}
 
@@ -321,16 +321,15 @@ public class PluginManager extends JDialog
 				}
 
 				Roster roster = new Roster();
-				new InstallPluginsDialog(PluginManager.this,plugins,
-					InstallPluginsDialog.UPDATE)
+				new InstallPluginsDialog(PluginManager.this,
+					plugins,InstallPluginsDialog.UPDATE)
 					.installPlugins(roster);
 
 				if(roster.isEmpty())
 					return;
 
 				new PluginManagerProgress(PluginManager.this,
-					jEdit.getProperty("plugin-manager.progress"
-					+ ".updating-task"),roster);
+					"update",roster);
 
 				updateTree();
 			}
@@ -359,16 +358,15 @@ public class PluginManager extends JDialog
 				}
 
 				Roster roster = new Roster();
-				new InstallPluginsDialog(PluginManager.this,plugins,
-					InstallPluginsDialog.INSTALL)
+				new InstallPluginsDialog(PluginManager.this,
+					plugins,InstallPluginsDialog.INSTALL)
 					.installPlugins(roster);
 
 				if(roster.isEmpty())
 					return;
 
 				new PluginManagerProgress(PluginManager.this,
-					jEdit.getProperty("plugin-manager.progress"
-					+ ".installing-task"),roster);
+					"install",roster);
 
 				updateTree();
 			}

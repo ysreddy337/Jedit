@@ -7,7 +7,7 @@
 <!-- This file contains the jEdit API Quick Reference            -->
 
 
-<chapter id="api-macro"><title>General jEdit Classes</title>
+<chapter id="api-guide"><title>General jEdit Classes</title>
 
 <sect1 id="class-jedit"><title>Class jEdit</title>
 
@@ -132,29 +132,29 @@
 <listitem>
 <funcsynopsis>
  <funcprototype>
-  <funcdef>public static boolean <function>getBooleanProperty</function></funcdef>
-  <paramdef>String <parameter>name</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns a <type>boolean</type> value of <constant>true</constant> or
-    <constant>false</constant> for the property named by <varname>name</varname> by
-    examining the contents of the property; returns
-    <constant>false</constant> if the property cannot be found.
-</para>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
   <funcdef>public static void <function>setProperty</function></funcdef>
   <paramdef>String <parameter>name</parameter></paramdef>
   <paramdef>String <parameter>property</parameter></paramdef>
  </funcprototype>
 </funcsynopsis>
 <para>
-    This method sets the property named by <varname>name</varname> with the value
+    Sets the property named by <varname>name</varname> with the value
     <varname>property</varname>. An existing property is overwritten.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static boolean <function>getBooleanProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns a <classname>boolean</classname> value of <constant>true</constant> or
+    <constant>false</constant> for the property named by <varname>name</varname> by
+    examining the contents of the property; returns
+    <constant>false</constant> if the property cannot be found.
 </para>
 </listitem>
 
@@ -167,9 +167,96 @@
  </funcprototype>
 </funcsynopsis>
 <para>
-    This method sets the property named by <varname>name</varname> to
+    Sets the property named by <varname>name</varname> to
     <varname>value</varname>. The boolean value is stored internally as the
     string <quote>true</quote> or <quote>false</quote>.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static int <function>getIntegerProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+  <paramdef>int <parameter>defaultValue</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the integer value of the property named by
+    <varname>name</varname>. If the property value is not a valid
+    numeric string, returns <varname>defaultValue</varname> instead.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static void <function>setIntegerProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+  <paramdef>int <parameter>value</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Sets the property named by <varname>name</varname> to
+    <varname>value</varname>.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static Color <function>getColorProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the value of the specified property as a
+    <classname>java.awt.Color</classname> instance, or <constant>null</constant>
+    if the color value cannot be parsed.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static void <function>setColorProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+  <paramdef>Color <parameter>value</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Sets the property named by <varname>name</varname> to
+    the textual representation of the color instance named by
+    <varname>value</varname>.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static Font <function>getFontProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the value of the specified property as a
+    <classname>java.awt.Font</classname> instance, or <constant>null</constant>
+    if the font specification cannot be parsed.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static void <function>setFontProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+  <paramdef>Font <parameter>value</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Sets the property named by <varname>name</varname> to
+    the textual representation of the font instance stored in
+    <varname>value</varname>.
 </para>
 </listitem>
 
@@ -182,9 +269,10 @@
  </funcprototype>
 </funcsynopsis>
 <para>
-    This sets a property that will not be stored during the current
+    This sets a property that will be stored during the current
     jEdit session only. This method is useful for storing a value
-    obtained by one macro for use by another macro.
+    obtained by one macro for use by another macro, because it does not
+    clutter up the user properties file on disk.
 </para>
 </listitem>
 
@@ -209,7 +297,8 @@
 </funcsynopsis>
 <para>
     Returns the path of the directory in which user-specific settings
-    are stored. This will be null if jEdit was started with the
+    are stored. This will be <constant>null</constant> if jEdit was
+    started with the
     <command>-nosettings</command> command-line switch; so do not
     blindly use this method without checking for a null return value
     first.
@@ -253,18 +342,6 @@ are useful in some situations. They include the following:</para>
 <listitem>
 <funcsynopsis>
  <funcprototype>
-  <funcdef>public static Buffer[] <function>getBuffers</function></funcdef>
-  <void/>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns an array of open buffers.
-</para>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
   <funcdef>public static Properties <function>getProperties</function></funcdef>
   <void/>
  </funcprototype>
@@ -280,6 +357,18 @@ are useful in some situations. They include the following:</para>
     written to a file named <filename>properties</filename> in the user settings
     directory upon program exit or whenever <function>jEdit.saveSettings()</function>
     is called.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static Buffer[] <function>getBuffers</function></funcdef>
+  <void/>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns an array of open buffers.
 </para>
 </listitem>
 
@@ -341,7 +430,7 @@ are useful in some situations. They include the following:</para>
  </funcprototype>
 </funcsynopsis>
 <para>
-    Returns an array containing all existing plugins.
+    Returns an array containing all loaded plugins.
 </para>
 </listitem>
 
@@ -366,8 +455,8 @@ are useful in some situations. They include the following:</para>
 <para>
     This class represents the <quote>parent</quote> or top-level frame window
     in which the editing occurs. It contains the various visible
-    components of the program, including the editing pane, menubar,
-    toolbar, and any docking windows containing plugins.
+    components of the program, including the editing pane, menu bar,
+    toolbar, and any docked windows.
 </para>
 
 <para>
@@ -448,7 +537,7 @@ are useful in some situations. They include the following:</para>
  </funcprototype>
 </funcsynopsis>
 <para>
-    Eeach <classname>View</classname> displays a
+    Each <classname>View</classname> displays a
     <classname>StatusBar</classname> at its bottom edge. It shows the
     current cursor position, the editing mode of the current buffer and
     other information. The method <function>setMessage(String
@@ -478,285 +567,12 @@ are useful in some situations. They include the following:</para>
 
 </sect1>
 
-<!-- open sect1 -->
-<sect1 id="class-registers"><title>Class Registers</title>
-<para>
-  A <classname>Register</classname> is string of text indexed by a
-  single character.  Typically the text is taken from selected buffer text
-  and the index character is a keyboard character selected by the user.
-</para>
-
-<para>
-  The application maintains a single <classname>Registers</classname> object
-  consisting of an dynamically sized array of <classname>Register</classname>
-  objects.  The <classname>Registers</classname> class defines a number of methods
-  that give each register the properties of a virtual clipboard.
-</para>
-
-<para>
-  The following methods provide a clipboard operations for register
-  objects:
-</para>
-
-<itemizedlist>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static void <function>copy</function></funcdef>
-        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
-        <paramdef>char <parameter>register</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-    <para>
-      Saves the selected text in the designated <parameter>textArea</parameter>
-      to the register indexed at <parameter>register</parameter>.  This
-      will replace the existing contents of the designated register.
-    </para>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static void <function>cut</function></funcdef>
-        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
-        <paramdef>char <parameter>register</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  <para>
-    Saves the selected text in the designated <parameter>textArea</parameter>
-    to the register indexed at <parameter>register</parameter>, and removes the
-    text from the text area.  This will replace the existing contents of the
-    designated register.
-  </para>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static void <function>append</function></funcdef>
-        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
-        <paramdef>char <parameter>register</parameter></paramdef>
-        <paramdef>String <parameter>separator</parameter></paramdef>
-        <paramdef>boolean <parameter>cut</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static void <function>append</function></funcdef>
-        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
-        <paramdef>char <parameter>register</parameter></paramdef>
-        <paramdef>String <parameter>separator</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static void <function>append</function></funcdef>
-        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
-        <paramdef>char <parameter>register</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  <para>
-    These three methods append the selected text in the
-    <parameter>textArea</parameter> to the designated register. If the
-    <parameter>cut</parameter> parameter is not specified, the selected text
-    remains in the text area. If the <parameter>separator</parameter>
-    parameter is not specified, a newline character is used to separate the
-    appended text from any existng register text.
-  </para>
-  </listitem>
-
-</itemizedlist>
-
-<para>
-  The following methods provide a lower-level interface for working with
-  registers:
-</para>
-
-<itemizedlist>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static void <function>setRegister</function></funcdef>
-        <paramdef>char <parameter>name</parameter></paramdef>
-        <paramdef>Register <parameter>register</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static void <function>setRegister</function></funcdef>
-        <paramdef>char <parameter>name</parameter></paramdef>
-        <paramdef>Register <parameter>newRegister</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static void <function>clearRegister</function></funcdef>
-        <paramdef>char <parameter>name</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-    <para>
-      Sets the text of the designated register to <constant>null</constant>.
-      If the register is one of the two registers reserved by the
-      application (as discussed in the next section), the text value is
-      set to an empty string.
-    </para>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static Register <function>getRegister</function></funcdef>
-        <paramdef>char <parameter>name</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public static Register[] <function>getRegisters</function></funcdef>
-        <void/>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
-
-</itemizedlist>
-
-</sect1>
-
-
-<sect1 id="class-register"><title>Interface Registers.Register</title>
-
-<para>
-  This interface requires implementation of two methods:
-  <function>setValue()</function>, which takes a
-  <classname>String</classname> parameter, and
-  <function>toString()</function>, which return a textual representation
-  of the register's contents. Two classes implement this interface. A
-  <classname>ClipboardRegister</classname> is tied to the contents of the
-  application's clipboard. The application assigns a
-  <classname>ClipboardRegister</classname> to the register indexed under
-  the character <filename>$</filename>. A
-  <classname>StringRegister</classname> is created for registers assigned
-  by the user. In addition, the application assigns to the
-  <classname>StringRegister</classname> indexed under <filename>%</filename>
-  the last text segment selected in the text area.
-</para>
-
-<para>
-  A <classname>Register</classname> object does not maintain a copy of
-  its index key.  Indexing is performed by the <classname>Registers</classname>
-  object.
-</para>
-
-
-</sect1>
-
-
-<!-- LaTeX spews with id's that are too long? -->
-<sect1 id="class-dockablewindowmanager"><title>Class DockableWindowManager</title>
-
-    <para>
-        Windows conforming to jEdit's dockable window API can appear in
-        <quote>panes</quote> located above, below or to the left or right of the
-        main editing pane. They can also be displayed in <quote>floating</quote>
-        frame windows. A <classname>DockableWindowManager</classname> keeps
-        track of the plugins associated with a particular
-        <classname>View</classname>. Each <classname>View</classname> object
-        contains an instance of this class.
-    </para>
-
-    <itemizedlist>
-      <listitem>
-        <funcsynopsis>
-          <funcprototype>
-            <funcdef>public DockableWindow <function>getDockableWindow</function></funcdef>
-            <paramdef>String <parameter>name</parameter></paramdef>
-          </funcprototype>
-        </funcsynopsis>
-        <para>
-          This method returns the <classname>DockableWindow</classname>
-          object named by the <varname>name</varname> parameter.  The name of a
-          <classname>DockableWindow</classname> is a required property of the
-          plugin.  If there is no <classname>DockableWindow</classname> bearing the
-          requested name, the method returns <constant>null</constant>.
-        </para>
-       </listitem>
-
-       <listitem>
-        <funcsynopsis>
-          <funcprototype>
-            <funcdef>public void <function>addDockableWindow</function></funcdef>
-            <paramdef>String <parameter>name</parameter></paramdef>
-          </funcprototype>
-        </funcsynopsis>
-        <para>
-          If the <classname>DockableWindow</classname> named by the
-          <varname>name</varname> parameter does not exist, a message is
-          sent to the associated plugin to create it.  The
-          <classname>DockableWindow</classname> is then made visible.
-        </para>
-       </listitem>
-
-       <listitem>
-        <funcsynopsis>
-          <funcprototype>
-            <funcdef>public void <function>showDockableWindow</function></funcdef>
-            <paramdef>String <parameter>name</parameter></paramdef>
-          </funcprototype>
-        </funcsynopsis>
-       </listitem>
-
-       <listitem>
-        <funcsynopsis>
-          <funcprototype>
-            <funcdef>public void <function>removeDockableWindow</function></funcdef>
-            <paramdef>String <parameter>name</parameter></paramdef>
-          </funcprototype>
-        </funcsynopsis>
-       </listitem>
-
-       <listitem>
-        <funcsynopsis>
-          <funcprototype>
-            <funcdef>public void <function>toggleDockableWindow</function></funcdef>
-            <paramdef>String <parameter>name</parameter></paramdef>
-          </funcprototype>
-        </funcsynopsis>
-       <para>
-         These methods, respectively show, hide and toggle the visibility
-         of the <classname>DockableWindow</classname> object named by
-         the <varname>name</varname> parameter.  If the
-         <classname>DockableWindowManager</classname> does not contain a
-         reference to the window, these methods send an error message to the
-         activity log and have no other effect.  Only
-         <function>addDockableWindow()</function> can cause the creation
-         of a <classname>DockableWindow</classname>.
-         </para>
-       </listitem>
-    </itemizedlist>
-
-</sect1>
-
 <sect1 id="class-jedittextarea"><title>Class JEditTextArea</title>
 
 <para>
     This class is the visible component that displays the file
-    being edited. It is derived from Java's <classname>JComponent</classname> class.
+    being edited. It is derived from Java's
+    <classname>JComponent</classname> class.
 </para>
 
 <para>
@@ -800,9 +616,8 @@ are useful in some situations. They include the following:</para>
     can be created by specifying its starting and ending caret positions:
   </para>
 
-  <informalexample><programlisting>    selRange = new Selection.Range(start, end);
-
-    setRect = new Selection.Rect(start, end);</programlisting></informalexample>
+  <informalexample><programlisting>selRange = new Selection.Range(start, end);
+setRect = new Selection.Rect(start, end);</programlisting></informalexample>
 
   <para>
     Both classes inherit or implement the following methods of the parent
@@ -991,7 +806,7 @@ JEditTextArea</title>
     <para>
       Adds a single <classname>Selection</classname> or an array of
       <classname>Selection</classname> objects to the existing collection
-      maintined by the <classname>JEditTextArea</classname>.  Nested or
+      maintained by the <classname>JEditTextArea</classname>.  Nested or
       overlapping selections will be merged where possible.
     </para>
   </listitem>
@@ -1123,14 +938,14 @@ JEditTextArea</title>
     </funcsynopsis>
     <para>
       Returns a sorted array of line numbers on which a selection or selections
-      are present. The current line is included in the array whether or
-      not it is part of a selection.
+      are present.
     </para>
     <para>
       This method is the most convenient way to iterate through selected lines
       in a buffer. The line numbers in the array returned by this method can
       be passed as a parameter to such methods as
-      <function>getLineText()</function>, as discussed below.
+      <function>Buffer.getLineText()</function> (see
+      <xref linkend="class-buffer-editing"/>).
     </para>
   </listitem>
 
@@ -1247,10 +1062,7 @@ JEditTextArea</title>
 
 </sect2>
 
-<sect2 id="class-jedittextarea-non-selection">
-  <title>Other methods in JEditTextArea</title>
-
-<sect3 id="class-jedittextarea-caret">
+<sect2 id="class-jedittextarea-caret">
 <title>Editing caret methods</title>
 <para>
     These methods are used to get, set and move the position of the
@@ -1468,10 +1280,10 @@ JEditTextArea</title>
 </itemizedlist>
 
 
-</sect3>
+</sect2>
 
 <!-- open sect3 -->
-<sect3 id="class-jedittextarea-scrolling">
+<sect2 id="class-jedittextarea-scrolling">
 <title>Methods for scrolling the text area</title>
 
 <itemizedlist>
@@ -1515,15 +1327,27 @@ JEditTextArea</title>
 <listitem>
 <funcsynopsis>
  <funcprototype>
+  <funcdef>public void <function>scrollTo</function></funcdef>
+  <paramdef>int <parameter>location</parameter></paramdef>
+  <paramdef>boolean <parameter>doElectricScroll</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
   <funcdef>public void <function>scrollToCaret</function></funcdef>
   <paramdef>boolean <parameter>doElectricScroll</parameter></paramdef>
  </funcprototype>
 </funcsynopsis>
 <para>
-    Scrolls the text area to ensure that the caret is visible. The
-    <parameter>doElectricScroll</parameter> parameter detemines whether
+    The first version scrolls the text area to ensure that the caret is
+    visible; the second scrolls to ensure that an arbitrary offset
+    (from the start of the buffer) is visible. The
+    <parameter>doElectricScroll</parameter> parameter determines whether
     <quote>electric scrolling</quote> will occur. This leaves a minimum
-    number of lines between the caret line and the top and bottom of the
+    number of lines between the target line and the top and bottom of the
     editing pane.
 </para>
 </listitem>
@@ -1568,144 +1392,36 @@ JEditTextArea</title>
   </para>
   <para>
     To convert a virtual line count to a physical count or vice versa,
-    see <xref linkend="class-buffer-virtual-lines" />.
+    see <xref linkend="class-jedittextarea-virtual-lines" />.
   </para>
 </listitem>
 
-<listitem>
- <funcsynopsis>
-  <funcprototype>
-    <funcdef>public void <function>setElectricScroll</function></funcdef>
-     <paramdef>int <parameter>electricScroll</parameter></paramdef>
-   </funcprototype>
- </funcsynopsis>
-</listitem>
-
-<listitem>
-  <funcsynopsis>
-    <funcprototype>
-      <funcdef>public int <function>getElectricScroll</function></funcdef>
-      <void/>
-    </funcprototype>
-  </funcsynopsis>
-  <para>
-    The <quote>electric scroll</quote> attribute is the number of lines
-    above and below the editing caret that always remain visible when
-    scrolling.
-  </para>
-</listitem>
 </itemizedlist>
 
-</sect3>
+</sect2>
 
-<sect3 id="class-jedittextarea-position">
-<title>Methods for calculating editing positions</title>
-
-
-<itemizedlist>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public int <function>getLineOfOffset</function></funcdef>
-  <paramdef>int <parameter>offset</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the line on which the given offset is found.
-</para>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public int <function>getLineStartOffset</function></funcdef>
-  <paramdef>int <parameter>line</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public int <function>getLineEndOffset</function></funcdef>
-  <paramdef>int <parameter>line</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the offset of the beginning or end of the given line.
-</para>
-</listitem>
-
-</itemizedlist>
-</sect3>
-
-<sect3 id="class-jedittextarea-gettext">
-<title>Other methods for retrieving text</title>
-
-<para>
-    These methods can retrieve buffer text without regard
-    to a selection or the position of the editing caret.
-</para>
-
-<itemizedlist>
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public String <function>getText</function></funcdef>
-  <paramdef>int <parameter>start</parameter></paramdef>
-  <paramdef>int <parameter>len</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the text located between buffer offset positions.
-</para>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public String <function>getLineText</function></funcdef>
-  <paramdef>int <parameter>lineIndex</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the text on the given line.
-</para>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public String <function>getText</function></funcdef>
-  <void/>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the entire text in the text area.
-</para>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public void <function>setText</function></funcdef>
-  <paramdef>String <parameter>text</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Sets (and replaces) the entire text of the text area.
-</para>
-</listitem>
-
-</itemizedlist>
-</sect3>
-
-
-<sect3 id="class-jedittextarea-delete">
+<sect2 id="class-jedittextarea-delete">
 <title>Methods for deleting text</title>
 
 <itemizedlist>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public void <function>backspace</function></funcdef>
+  <void/>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public void <function>backspaceWord</function></funcdef>
+  <void/>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
 
 <listitem>
 <funcsynopsis>
@@ -1714,9 +1430,6 @@ JEditTextArea</title>
   <void/>
  </funcprototype>
 </funcsynopsis>
-<para>
-    Deletes the character to the left of the editing caret.
-</para>
 </listitem>
 
 <listitem>
@@ -1765,10 +1478,9 @@ JEditTextArea</title>
 </listitem>
 
 </itemizedlist>
-</sect3>
+</sect2>
 
-<!-- open sect3 -->
-<sect3 id="class-jedittextarea-modify">
+<sect2 id="class-jedittextarea-modify">
 <title>Methods for modifying text</title>
 
 <itemizedlist>
@@ -1841,7 +1553,7 @@ JEditTextArea</title>
      Inserts the character at the caret position as if it were typed at
      the keyboard (keyboard input is actually passed to this method).
      Unlike <function>setSelectedText()</function>, or
-     <function>insertString()</function> in the
+     <function>insert()</function> in the
      <classname>Buffer</classname> class, this method triggers
      any active text formatting features such as auto indent,
      abbreviation expansion and word wrap.
@@ -1850,9 +1562,9 @@ JEditTextArea</title>
 
 </itemizedlist>
 
-</sect3>
+</sect2>
 
-<sect3 id="class-jedittextarea-commment">
+<sect2 id="class-jedittextarea-commment">
 <title>Methods for creating comments</title>
 
 <itemizedlist>
@@ -1883,71 +1595,45 @@ JEditTextArea</title>
 </listitem>
 
 </itemizedlist>
-</sect3>
+</sect2>
 
-<sect3 id="class-jedittextarea-statistics">
-<title>Methods for getting buffer statistics</title>
+<sect2 id="class-jedittextarea-virtual-lines">
+<title>Virtual and physical line indices</title>
+
+<para>
+When jEdit's folding or narrowing features are used to hide
+  portions of a buffer, the <quote>virtual</quote> line count visible
+  in the text area is generally not equal to the <quote>physical</quote>
+
+line count of the buffer represented by the gutter's display.  The
+  following pair of methods translate one enumeration to the other.
+</para>
+
 
 <itemizedlist>
 
 <listitem>
 <funcsynopsis>
- <funcprototype>
-  <funcdef>public int <function>getBufferLength</function></funcdef>
-  <void/>
- </funcprototype>
+<funcprototype>
+<funcdef>public int <function>virtualToPhysical</function></funcdef>
+
+<paramdef>int <parameter>lineNo</parameter></paramdef>
+</funcprototype>
 </funcsynopsis>
-<para>
-    Returns the number of characters in the buffer.
-</para>
 </listitem>
 
 <listitem>
 <funcsynopsis>
- <funcprototype>
-  <funcdef>public int <function>getLineCount</function></funcdef>
-  <void/>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the number of lines in the buffer being edited.
-</para>
-</listitem>
+<funcprototype>
 
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public int <function>getVirtualLineCount</function></funcdef>
-  <void/>
- </funcprototype>
+<funcdef>public int <function>physicalToVirtual</function></funcdef>
+<paramdef>int <parameter>lineNo</parameter></paramdef>
+</funcprototype>
 </funcsynopsis>
-<para>
-    Returns the number of <quote>virtual</quote> or visible lines in the
-    buffer being edited, which may be less than the total number of
-    lines because of folding or narrowing.
-</para>
-<para>
-  To convert a virtual line count to a physical count or vice versa,
-  see <xref linkend="class-buffer-virtual-lines" />.
-</para>
-
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public int <function>getLineLength</function></funcdef>
-  <paramdef>int <parameter>line</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the length of the line number <varname>line</varname> (using a
-    zero-based count).
-</para>
 </listitem>
 
 </itemizedlist>
-</sect3>
+
 </sect2>
 
 </sect1>
@@ -1957,11 +1643,10 @@ JEditTextArea</title>
 <para>
     A <classname>Buffer</classname> represents the contents of an open text
     file as it is maintained in the computer's memory (as opposed to
-    how it may be stored on a disk). It is derived from Java's
-    <classname>PlainDocument</classname> class.
+    how it may be stored on a disk).
 </para>
 
-<sect2 id="class-buffer-file"><title>File attribute methods</title>
+<sect2 id="class-buffer-attrs"><title>File attribute methods</title>
 
 <itemizedlist>
 
@@ -1991,10 +1676,12 @@ JEditTextArea</title>
  </funcprototype>
 </funcsynopsis>
 <para>
- This method may return <literal>null</literal> if the file is stored on
+ This method may return <constant>null</constant> if the file is stored on
  a remote file system (for example, if the <application>FTP</application>
  or <application>Archive</application> plugins are in use). This method
- should be avoided if possible.
+ should be avoided unless you really need to use the
+ <classname>java.io.File</classname> APIs and you are sure the buffer in
+ question is a local file.
 </para>
 </listitem>
 
@@ -2044,7 +1731,7 @@ JEditTextArea</title>
 
 </sect2>
 
-<sect2 id="class-buffer-editing-attr"><title>Editing attribute methods</title>
+<sect2 id="class-buffer-attr"><title>Editing attribute methods</title>
 
 <itemizedlist>
 
@@ -2094,49 +1781,89 @@ JEditTextArea</title>
     </para>
   </listitem>
 </itemizedlist>
+
 <para>
-  The following two methods are inherited by the <classname>Buffer</classname>
-  class.
+  The <classname>Buffer</classname> object maintains a table of
+  properties that describe a broad range of attributes. The value of each
+  property is stored using a
+  <classname>String</classname> that names the particular property.
+  Most of these properties are documented in <xref
+  linkend="buffer-local" />.
 </para>
 
 <itemizedlist>
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public void <function>putProperty</function></funcdef>
-        <paramdef>Object <parameter>key</parameter></paramdef>
-        <paramdef>Object <parameter>value</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
 
   <listitem>
     <funcsynopsis>
       <funcprototype>
         <funcdef>public Object <function>getProperty</function></funcdef>
-        <paramdef>Object <parameter>key</parameter></paramdef>
+        <paramdef>String <parameter>name</parameter></paramdef>
       </funcprototype>
     </funcsynopsis>
     <para>
-      The <classname>Buffer</classname> object maintains a table of
-      properties that describe a broad range of attributes. The value of each
-      property is stored using a key for indexing purposes, usually a
-      <classname>String</classname> that names the particular property.
-      Property values can be set and retreived using these two methods.
-      The <classname>Object</classname> returned by
-      <function>getProperty()</function> usually has to be cast to a derived type
-      to be useful. Most of these properties are documented in <xref
-      linkend="buffer-local" />.
+      Using this method is generally discouraged, because it returns an
+      <classname>Object</classname> which must be cast to another type
+      in order to be useful, and this can cause problems if the object
+      is of a different type than what your plugin or macro expects.
+    </para>
+    <para>
+      jEdit 4.0 added a number of <quote>wrapper</quote> methods,
+      documented below; you are strongly encouraged to use them
+      instead.
     </para>
   </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public void <function>setProperty</function></funcdef>
+        <paramdef>String <parameter>name</parameter></paramdef>
+        <paramdef>Object <parameter>value</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+    <para>
+     Sets the value of a property named by <varname>name</varname> to
+     <varname>value</varname>.
+    </para>
+  </listitem>
+
 </itemizedlist>
 
 <para>
-  These two methods provide shortcuts for getting snd setting <type>boolean</type>
+  These methods provide shortcuts for getting and setting
+  string, integer and <classname>boolean</classname>
   properties.
 </para>
 
 <itemizedlist>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>getStringProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the value of the property named by
+    <varname>name</varname> as a string.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static void <function>setStringProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+  <paramdef>String <parameter>value</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Sets the property named by <varname>name</varname> to
+    <varname>value</varname>.
+</para>
+</listitem>
+
 <listitem>
 <funcsynopsis>
  <funcprototype>
@@ -2145,7 +1872,7 @@ JEditTextArea</title>
  </funcprototype>
 </funcsynopsis>
 <para>
-    Returns a <type>boolean</type> value of <constant>true</constant> or
+    Returns a <classname>boolean</classname> value of <constant>true</constant> or
     <constant>false</constant> for the property named by <varname>name</varname> by
     examining the contents of the property; returns
     <constant>false</constant> if the property cannot be found.
@@ -2161,19 +1888,47 @@ JEditTextArea</title>
  </funcprototype>
 </funcsynopsis>
 <para>
-    This method sets the property named by <varname>name</varname> to
+    Sets the property named by <varname>name</varname> to
     <varname>value</varname>. The boolean value is stored internally as the
     string <quote>true</quote> or <quote>false</quote>.
 </para>
 </listitem>
 
-</itemizedlist>
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static int <function>getIntegerProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+  <paramdef>int <parameter>defaultValue</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the integer value of the property named by
+    <varname>name</varname>. If the property value is not a valid
+    numeric string, returns <varname>defaultValue</varname> instead.
+</para>
+</listitem>
 
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static void <function>setIntegerProperty</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+  <paramdef>int <parameter>value</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Sets the property named by <varname>name</varname> to
+    <varname>value</varname>.
+</para>
+</listitem>
+</itemizedlist>
 
 </sect2>
 
-<sect2 id="class-buffer-editing-action"><title>Editing action methods</title>
-<sect3 id="class-buffer-editing-general"><title>General editing methods</title>
+
+
+<sect2 id="class-buffer-io"><title>Input/output methods</title>
 
 <itemizedlist>
 
@@ -2230,49 +1985,13 @@ JEditTextArea</title>
 </para>
 </listitem>
 
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public void <function>beginCompoundEdit</function></funcdef>
-  <void/>
- </funcprototype>
-</funcsynopsis>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public void <function>endCompoundEdit</function></funcdef>
-  <void/>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Marks the beginning and end of a series of editing operations that will
-    be dealt with by a single <guimenuitem>Undo</guimenuitem> command.
-</para>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public void <function>removeTrailingWhiteSpace</function></funcdef>
-  <paramdef>int[] <parameter>lines</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Removes trailing whitespace in the lines referenced by the index numbers
-    in <parameter>lines</parameter> array.
-</para>
-</listitem>
-
 </itemizedlist>
 
-  <para>
-    The following methods are inherited by <classname>Buffer</classname>
-    from its parent class.
-  </para>
+</sect2>
 
-  <itemizedlist>
+<sect2 id="class-buffer-editing"><title>General editing methods</title>
+
+<itemizedlist>
 
     <listitem>
       <funcsynopsis>
@@ -2306,40 +2025,176 @@ JEditTextArea</title>
        <function>toString()</function> on the <classname>Segment</classname>
        will create a new object suitable for manipulation.
      </para>
+     <para>
+       Using a <classname>Segment</classname> is generally more
+       efficient than using a <classname>String</classname> because it
+       results in less memory allocation and array copying. However,
+       <classname>Segments</classname> are slightly harder to set up and
+       use.
+     </para>
     </listitem>
+
+    <listitem>
+    <funcsynopsis>
+    <funcprototype>
+    <funcdef>public String <function>getLineText</function></funcdef>
+    <paramdef>int <parameter>lineIndex</parameter></paramdef>
+    </funcprototype>
+    </funcsynopsis>
+    </listitem>
+
+    <listitem>
+    <funcsynopsis>
+    <funcprototype>
+    <funcdef>public void <function>getLineText</function></funcdef>
+    <paramdef>int <parameter>lineIndex</parameter></paramdef>
+          <paramdef>Segment <parameter>text</parameter></paramdef>
+    </funcprototype>
+    </funcsynopsis>
+    <para>
+      Returns the text of the given line. Just as with
+      <function>getText()</function>, there are two forms of this
+      method; the first returns a <classname>String</classname>, the
+      second copies into a <classname>Segment</classname>.
+    </para>
+    </listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public void <function>beginCompoundEdit</function></funcdef>
+  <void/>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public void <function>endCompoundEdit</function></funcdef>
+  <void/>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Marks the beginning and end of a series of editing operations that will
+    be dealt with by a single <guimenuitem>Undo</guimenuitem> command.
+</para>
+</listitem>
 
     <listitem>
       <funcsynopsis>
         <funcprototype>
-          <funcdef>public void <function>insertString</function></funcdef><!--
+          <funcdef>public void <function>insert</function></funcdef><!--
           --><paramdef>int <parameter>offset</parameter></paramdef>
           <paramdef>String <parameter>text</parameter></paramdef>
-          <paramdef>AttributeSet <parameter>attr</parameter></paramdef>
         </funcprototype>
       </funcsynopsis>
      <para>
        This method inserts the string <varname>text</varname> at offset
-       <varname>offset</varname> in the buffer. The attribute
-       <varname>attr</varname> is not used by jEdit and should be left
-       as <constant>null</constant>.
+       <varname>offset</varname> in the buffer.
      </para>
     </listitem>
 
     <listitem>
       <funcsynopsis>
         <funcprototype>
-          <funcdef>public int <function>getLength</function></funcdef><void/>
+          <funcdef>public void <function>remove</function></funcdef><!--
+          --><paramdef>int <parameter>offset</parameter></paramdef>
+          <paramdef>int <parameter>length</parameter></paramdef>
         </funcprototype>
       </funcsynopsis>
      <para>
-       This method returns the number of characters in the buffer.
+       This method removes <varname>length</varname> characters of
+       text starting from <varname>offset</varname>.
      </para>
     </listitem>
 
-    </itemizedlist>
-</sect3>
+    <listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public void <function>removeTrailingWhiteSpace</function></funcdef>
+  <paramdef>int[] <parameter>lines</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Removes trailing whitespace in the lines referenced by the index numbers
+    in <parameter>lines</parameter> array.
+</para>
+</listitem>
 
-<sect3 id="class-buffer-editing-marker"><title>Marker methods</title>
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public int <function>getLineOfOffset</function></funcdef>
+  <paramdef>int <parameter>offset</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the line on which the given offset is found.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public int <function>getLineStartOffset</function></funcdef>
+  <paramdef>int <parameter>line</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public int <function>getLineEndOffset</function></funcdef>
+  <paramdef>int <parameter>line</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the offset of the beginning or end of the given line.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public int <function>getLineLength</function></funcdef>
+  <paramdef>int <parameter>line</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the length of the line number <varname>line</varname> (using a
+    zero-based count).
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public int <function>getLineCount</function></funcdef>
+  <void/>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the number of lines in the buffer being edited.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+<funcprototype>
+<funcdef>public int <function>getLength</function></funcdef><void/>
+</funcprototype>
+</funcsynopsis>
+<para>
+ Returns the number of characters in the buffer.
+</para>
+</listitem>
+
+</itemizedlist>
+</sect2>
+
+<sect2 id="class-buffer-markers"><title>Marker methods</title>
 <para>
   Buffers may have one or more <glossterm>markers</glossterm> which serve
   as textual bookmarks.  A <classname>Marker</classname> has three key attributes: the
@@ -2441,139 +2296,6 @@ JEditTextArea</title>
   </listitem>
 
 </itemizedlist>
-</sect3>
-
-<sect3 id="class-buffer-editing-folding"><title>Folding methods</title>
-
-<para>
-  The <quote>folding</quote> features of jEdit allow sections of source
-  code with a given indentation level to be hidden, creating
-  <quote>folds</quote> that can be hidden and expanded, as well as a
-  virtual line numbering scheme that skips hidden, folded lines.  The
-  following methods in the <classname>Buffer</classname> class deal with
-  the folding mechanism.
-</para>
-
-<itemizedlist>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public boolean <function>collapseFoldAt</function></funcdef>
-        <paramdef>int <parameter>line</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-    <para>
-      Collapses the fold that contains the specified line number.  The
-      method returns <constant>false</constant> if there are no folds in
-      the buffer for the indicated line.
-    </para>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public boolean <function>expandFoldAt</function></funcdef>
-        <paramdef>int <parameter>line</parameter></paramdef>
-        <paramdef>boolean <parameter>fully</parameter></paramdef>
-        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-    <para>
-      Expands the fold that contains the specified line number.  If
-      <parameter>fully</parameter> is true, all folds at the line will be
-      expanded, otherwise only one level of folding will be expanded. The
-      <parameter>textArea</parameter> parameter is provided to the method
-      to facilitiate scrolling after folds are expanded.
-    </para>
-    <para>
-      The method returns <constant>false</constant> if there are no folds in
-      the buffer for the indicated line.
-    </para>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public void <function>expandFolds</function></funcdef>
-        <paramdef>int <parameter>level</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-    <para>
-      This method expands all folds in the buffer up to
-      <parameter>level</parameter> and collapses all folds with a
-      higher level.  The <parameter>level</parameter> parameter
-      represents the number of indentations, not the actual number
-      of indented spaces.
-    </para>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public void <function>expandAllFolds</function></funcdef>
-        <void/>
-      </funcprototype>
-    </funcsynopsis>
-    <para>
-      Expands all folds in the buffer.
-    </para>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public void <function>narrow</function></funcdef>
-        <paramdef>int <parameter>start</parameter></paramdef>
-        <paramdef>int <parameter>end</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-    <para>
-      Narrows the visible portion of the buffer to the specified
-      line range. To undo the narrowing, call the
-      <function>Buffer.expandAllFolds()</function> method.
-    </para>
-  </listitem>
-
-</itemizedlist>
-
-</sect3>
-
-<sect3 id="class-buffer-virtual-lines">
-<title>Virtual and physical line indices</title>
-
-<para>
-  When jEdit's folding or narrowing features are used to hide
-  portions of a buffer, the <quote>virtual</quote> line count visible
-  in the text area is generally not equal to the <quote>physical</quote>
-  line count of the buffer represented by the gutter's display.  The
-  following pair of methods translate one enumeration to the other.
-</para>
-
-
-<itemizedlist>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public int <function>virtualToPhysical</function></funcdef>
-        <paramdef>int <parameter>lineNo</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
-
-  <listitem>
-    <funcsynopsis>
-      <funcprototype>
-        <funcdef>public int <function>physicalToVirtual</function></funcdef>
-        <paramdef>int <parameter>lineNo</parameter></paramdef>
-      </funcprototype>
-    </funcsynopsis>
-  </listitem>
-
-</itemizedlist>
-
-</sect3>
 
 </sect2>
 
@@ -2582,24 +2304,24 @@ JEditTextArea</title>
 <sect1 id="class-macros"><title>Class Macros</title>
 
 <para>
-    The following shortcut methods are useful in displaying output messages
-    or obtaining input from a macro.
+  This class contains a few methods useful for displaying output messages
+  or obtaining input from a macro. These methods are documented in
+  detail in <xref linkend="helpful-methods" />.
+  Plugins should use the methods in the
+  <classname>GUIUtilities</classname> class instead; see
+  <xref linkend="class-guiutilities" />.
 </para>
 
-  <itemizedlist>
+<itemizedlist>
 
 <listitem>
  <funcsynopsis>
   <funcprototype>
    <funcdef>public static void <function>message</function></funcdef>
-	<paramdef>View <parameter>view</parameter></paramdef>
+    <paramdef>Component <parameter>comp</parameter></paramdef>
     <paramdef>String <parameter>message</parameter></paramdef>
   </funcprototype>
  </funcsynopsis>
-<para>
-    Displays the text of <parameter>message</parameter> (with an information icon)
-    in a modal message box centered on the designated <parameter>view</parameter>.
-</para>
 </listitem>
 
 <listitem>
@@ -2610,9 +2332,6 @@ JEditTextArea</title>
     <paramdef>String <parameter>message</parameter></paramdef>
   </funcprototype>
  </funcsynopsis>
-<para>
-    Similar to <function>message</function> but displays an error icon.
-</para>
 </listitem>
 
 <listitem>
@@ -2634,19 +2353,455 @@ JEditTextArea</title>
    <paramdef>String <parameter>defaultValue</parameter></paramdef>
   </funcprototype>
  </funcsynopsis>
+</listitem>
+
+<listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static int <function>confirm</function></funcdef>
+	<paramdef>View <parameter>view</parameter></paramdef>
+    <paramdef>String <parameter>message</parameter></paramdef>
+    <paramdef>int <parameter>buttons</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+</listitem>
+
+</itemizedlist>
+
+</sect1>
+
+<sect1 id="class-guiutilities"><title>Class GUIUtilities</title>
+
 <para>
-    Displays the text of <parameter>prompt</parameter>, a text input field,
-    and a question icon in the designated <parameter>view</parameter>. In
-    the second version, the text field will initially contain the text of
-    <parameter>defaultValue</parameter>. Returns the contents of the text
-    field if the dialog box is dismissed by pressing the
-    <guilabel>OK</guilabel> button, or <constant>null</constant> if the
-    <guilabel>Cancel</guilabel> button is pressed.
+ The first set of methods in this class, documented below, display
+ various common dialog boxes. The remainder deal with various
+ miscellaneous user interface-related tasks.
+</para>
+
+<itemizedlist>
+
+<listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static void <function>message</function></funcdef>
+   <paramdef>Component <parameter>comp</parameter></paramdef>
+    <paramdef>String <parameter>prefix</parameter></paramdef>
+    <paramdef>Object[] <parameter>args</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+</listitem>
+
+<listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static void <function>error</function></funcdef>
+   <paramdef>Component <parameter>comp</parameter></paramdef>
+    <paramdef>String <parameter>prefix</parameter></paramdef>
+    <paramdef>Object[] <parameter>args</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+ <para>
+  These two methods both show a dialog box; they are identical
+  in every way except for the icon used (either a message icon, or an
+  error icon).
+  The title of the dialog is taken from a property named
+  <literal><replaceable>prefix</replaceable>.title</literal>;
+  the message text is taken from
+  <literal><replaceable>prefix</replaceable>.message</literal>.
+  The message property can consist of multiple lines of text.
+ </para>
+ <para>
+  The elements of the <varname>args</varname> array are substituted
+  into the value of the message property in place of strings of the
+  form <literal>{<replaceable>n</replaceable>}</literal>, where
+  <replaceable>n</replaceable> is an index in the array.
+  You can find out more about this feature by reading the documentation
+  for the <function>format</function> method of the
+  <classname>java.text.MessageFormat</classname> class.
+ </para>
+</listitem>
+
+<listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static String <function>input</function></funcdef>
+   <paramdef>Component <parameter>comp</parameter></paramdef>
+   <paramdef>String <parameter>prefix</parameter></paramdef>
+   <paramdef>Object <parameter>def</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+</listitem>
+
+<listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static String <function>input</function></funcdef>
+   <paramdef>Component <parameter>comp</parameter></paramdef>
+   <paramdef>String <parameter>prefix</parameter></paramdef>
+   <paramdef>Object[] <parameter>args</parameter></paramdef>
+   <paramdef>Object <parameter>def</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+ <para>
+  These two methods prompt for input; both return <literal>null</literal>
+  if the user pressed <guibutton>Cancel</guibutton>, or the entered
+  value if they pressed <guibutton>OK</guibutton>.
+ </para>
+ <para>
+  The dialog box title and message is obtained in the same manner as
+  with the <function>message()</function> and <function>error()</function>
+  methods.
+ </para>
+</listitem>
+
+<listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static String <function>inputProperty</function></funcdef>
+   <paramdef>Component <parameter>comp</parameter></paramdef>
+   <paramdef>String <parameter>prefix</parameter></paramdef>
+   <paramdef>Object <parameter>def</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+</listitem>
+
+<listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static String <function>inputProperty</function></funcdef>
+   <paramdef>Component <parameter>comp</parameter></paramdef>
+   <paramdef>String <parameter>prefix</parameter></paramdef>
+   <paramdef>Object[] <parameter>args</parameter></paramdef>
+   <paramdef>Object <parameter>def</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+</listitem>
+
+<listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static int <function>confirm</function></funcdef>
+    <paramdef>Component <parameter>comp</parameter></paramdef>
+    <paramdef>String <parameter>prefix</parameter></paramdef>
+    <paramdef>Object[] <parameter>args</parameter></paramdef>
+    <paramdef>int <parameter>buttons</parameter></paramdef>
+    <paramdef>int <parameter>type</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String[] <function>showVFSFileDialog</function></funcdef>
+  <paramdef>View <parameter>view</parameter></paramdef>
+  <paramdef>String <parameter>path</parameter></paramdef>
+  <paramdef>int <parameter>type</parameter></paramdef>
+  <paramdef>boolean <parameter>multipleSelection</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    This method displays the <!-- enhanced, more versatile -->
+    <classname>VFSFileChooserDialog</classname> provided by jEdit.  <!-- In this case, -->
+    If <parameter>path</parameter> is set to <constant>null</constant>, the dialog
+    will display the directory of the current buffer. The
+    <parameter>type</parameter> parameter can either be
+    <constant>VFSBrowser.OPEN_DIALOG</constant>
+    or <constant>VFSBrowser.SAVE_DIALOG</constant>. The final parameter
+    determines whether multiple selection of files is permitted.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static void <function>showPopupMenu</function></funcdef>
+  <paramdef>JPopupMenu <parameter>popup</parameter></paramdef>
+  <paramdef>Component <parameter>comp</parameter></paramdef>
+  <paramdef>int <parameter>x</parameter></paramdef>
+  <paramdef>int <parameter>y</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+ Plugins should use this method to display popup menus. Unlike the
+ standard <function>JPopupMenu.show()</function> method, this one
+ ensures that the popup is positioned within the bounds of the screen.
+</para></listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static Icon <function>loadIcon</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+ Loads an icon from the specified URL. Relative URLs are resolved relative
+ to the standard icon directory inside <filename>jedit.jar</filename>.
+</para></listitem>
+
+</itemizedlist>
+
+<para>
+    The following two methods are
+    described in <xref linkend="plugin-implement-menu" />.
+</para>
+
+<itemizedlist>
+
+ <listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static JMenuItem <function>loadMenuItem</function></funcdef>
+   <paramdef>String <parameter>name</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+ </listitem>
+
+ <listitem>
+ <funcsynopsis>
+  <funcprototype>
+   <funcdef>public static JMenu <function>loadMenu</function></funcdef>
+   <paramdef>String <parameter>name</parameter></paramdef>
+  </funcprototype>
+ </funcsynopsis>
+ </listitem>
+
+</itemizedlist>
+
+</sect1>
+
+<sect1 id="class-textutilities"><title>Class TextUtilities</title>
+
+<para>
+    This class contains a number of <classname>static</classname> methods
+    that can be helpful in handling buffer text.
+</para>
+
+<itemizedlist>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static int <function>findMatchingBracket</function></funcdef>
+  <paramdef>Buffer <parameter>buffer</parameter></paramdef>
+  <paramdef>int <parameter>line</parameter></paramdef>
+  <paramdef>int <parameter>offset</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the offset of the bracket matching the one at offset
+    <parameter>offset</parameter> of line <parameter>line</parameter> of the buffer;
+    returns -1 if the bracket is unmatched or if the specified
+    character is not a bracket.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static int <function>findWordStart</function></funcdef>
+  <paramdef>String <parameter>line</parameter></paramdef>
+  <paramdef>int <parameter>pos</parameter></paramdef>
+  <paramdef>String <parameter>noWordSep</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static int <function>findWordEnd</function></funcdef>
+  <paramdef>String <parameter>line</parameter></paramdef>
+  <paramdef>int <parameter>pos</parameter></paramdef>
+  <paramdef>String <parameter>noWordSep</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the position on which the word found on line
+    <parameter>line</parameter>, position <parameter>line</parameter> begins or ends.
+    The parameter <parameter>noWordSep</parameter> contains those non-alphanumeric
+    characters that will be treated as part of a word for purposes of
+    finding the beginning or end of word (such as an underscore
+    character).
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>format</function></funcdef>
+  <paramdef>String <parameter>text</parameter></paramdef>
+  <paramdef>int <parameter>maxLineLength</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Reformats a string and inserts line separators as necessary so
+    that no line exceeds <parameter>maxLineLength</parameter> in length.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>spacesToTabs</function></funcdef>
+  <paramdef>String <parameter>in</parameter></paramdef>
+  <paramdef>int <parameter>tabSize</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>tabsToSpaces</function></funcdef>
+  <paramdef>String <parameter>in</parameter></paramdef>
+  <paramdef>int <parameter>tabSize</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Makes the indicated change based upon a tab size of
+    <parameter>tabSize</parameter>.
 </para>
 </listitem>
 
 </itemizedlist>
 
+</sect1>
+
+<sect1 id="class-miscutilities"><title>Class MiscUtilities</title>
+
+<para>
+This class is another collection of <classname>static</classname> utility methods.
+</para>
+
+<para>
+    These methods extract various elements from a path name:
+</para>
+
+<itemizedlist>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>getFileName</function></funcdef>
+  <paramdef>String <parameter>path</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>getFileNameNoExtension</function></funcdef>
+  <paramdef>String <parameter>path</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>getFileExtension</function></funcdef>
+  <paramdef>String <parameter>name</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>getParentOfPath</function></funcdef>
+  <paramdef>String <parameter>path</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    Returns the directory containing the specified local file.
+</para>
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>constructPath</function></funcdef>
+  <paramdef>String <parameter>parent</parameter></paramdef>
+  <paramdef>String <parameter>path</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    If <varname>path</varname> is absolute, it is returned. Otherwise,
+    an absolute path is constructed from it and the <varname>parent</varname>.
+    If <varname>parent</varname> is <constant>null</constant>, the current
+    working directory is assumed.
+</para>
+</listitem>
+
+</itemizedlist>
+
+<para>
+    These methods are hard to categorize, but are useful nonetheless:
+</para>
+
+<itemizedlist>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static String <function>createWhiteSpace</function></funcdef>
+  <paramdef>int <parameter>len</parameter></paramdef>
+  <paramdef>int <parameter>tabSize</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+    If <parameter>tabSize</parameter> is set to zero, the string will consist entirely
+    of space characters.  To get a whitespace string tuned to the current buffer's
+    settings, call this method as follows:</para>
+<informalexample>
+<programlisting>myWhitespace = MiscUtilities.createWhiteSpace(myLength,
+    buffer.getTabSize());</programlisting></informalexample>
+
+</listitem>
+
+<listitem>
+<funcsynopsis>
+ <funcprototype>
+  <funcdef>public static void <function>compareStrings</function></funcdef>
+  <paramdef>String <parameter>str1</parameter></paramdef>
+  <paramdef>String <parameter>str2</parameter></paramdef>
+ </funcprototype>
+</funcsynopsis>
+<para>
+ Compares two strings. Returns a negative number of <varname>str1</varname>
+ is <quote>before</quote> <varname>str2</varname>, zero if they are
+ equal, and a positive number of <varname>str1</varname> is
+ <quote>after</quote> <varname>str2</varname>.
+ Unlike <function>String.compareTo()</function>,
+ this method correctly recognizes and handles embedded numbers.
+</para>
+</listitem>
+
+</itemizedlist>
+
+<para>
+  The <function>compareStrings()</function> method is very useful for
+  sorting strings. The <classname>MiscUtilities</classname> class
+  defines several <classname>java.util.Comparator</classname>
+  implementations that use this method, useful for using with the
+  sorting features of the Java collections API:
+</para>
+
+<itemizedlist>
+ <listitem><para><classname>StringCompare</classname></para></listitem>
+ <listitem><para><classname>StringICaseCompare</classname></para></listitem>
+ <listitem><para><classname>MenuItemCompare</classname></para></listitem>
+</itemizedlist>
+
+<para>
+  For example, you might call:
+</para>
+
+<informalexample><programlisting>Arrays.sort(myListOfStrings,
+    new MiscUtilities.StringICaseCompare());</programlisting></informalexample>
 
 </sect1>
 
@@ -2738,9 +2893,6 @@ JEditTextArea</title>
   <void/>
  </funcprototype>
 </funcsynopsis>
-<para>
-    Determines whether the search term is interpreted as a regular expression.
-</para>
 </listitem>
 
 <listitem>
@@ -2761,8 +2913,9 @@ JEditTextArea</title>
 </funcsynopsis>
 <para>
     Determines whether a reverse search will conducted from the current
-    position to the beginning of a buffer.  Currently, only literal
-    reverse searches are supported.
+    position to the beginning of a buffer. Note that reverse search and
+    regular expression search is mutually exclusive; enabling one will
+    disable the other.
 </para>
 </listitem>
 
@@ -2824,6 +2977,9 @@ JEditTextArea</title>
     set of files that are the subject of a search. There are four classes derived
     from <classname>SearchFileSet</classname>:
 </para>
+</listitem>
+
+</itemizedlist>
 
 <bridgehead renderas="sect2">DirectoryListSet</bridgehead>
 
@@ -2890,9 +3046,10 @@ JEditTextArea</title>
 </listitem>
 </itemizedlist>
 
-<para>
-<emphasis>class BufferListSet</emphasis>
-</para>
+<!-- In 4.0, BufferListSet is abstract. This might change in the
+future. -->
+
+<!-- <bridgehead renderas="sect2">class BufferListSet</bridgehead>
 
 <para>
     This class represents a buffer set containing an arbitrary set
@@ -2914,7 +3071,7 @@ JEditTextArea</title>
 
 </listitem>
 
-</itemizedlist>
+</itemizedlist> -->
 
 <para>
     The actual tasks of searching and replacing, based on these parameters,
@@ -2985,12 +3142,14 @@ JEditTextArea</title>
  <funcprototype>
   <funcdef>public static boolean <function>hyperSearch</function></funcdef>
   <paramdef>View <parameter>view</parameter></paramdef>
+  <paramdef>boolean <parameter>selection</parameter></paramdef>
  </funcprototype>
 </funcsynopsis>
 <para>
-    This collects all instances of matching text in the members of the
-    <classname>SearchFileSet</classname> and displays them in a dedicated window.
-    Text selection is ignored.
+    Performs a HyperSearch either in the current selection (if
+    <varname>selection</varname> is true) or in the current
+    <classname>SearchFileSet</classname> (if <varname>selection</varname>
+    is false).
 </para>
 </listitem>
 
@@ -3018,14 +3177,15 @@ jEdit.setBooleanProperty(<quote>search.keepDialog.toggle</quote>,true);</program
   To create and display the search and replace
   dialog, first assign desired values to the search settings using the methods
   described above.  Then create a new <classname>SearchDialog</classname> object
-  using the following constructor:
+  using the following static method in the <classname>SearchDialog</classname>
+  class:
 </para>
 
 <itemizedlist>
   <listitem>
     <funcsynopsis>
       <funcprototype>
-        <funcdef>public <function>SearchDialog</function></funcdef>
+        <funcdef>public static void <function>showSearchDialog</function></funcdef>
         <paramdef>View <parameter>view</parameter></paramdef>
         <paramdef>String <parameter>searchString</parameter></paramdef>
         <paramdef>int <parameter>searchIn</parameter></paramdef>
@@ -3045,302 +3205,287 @@ jEdit.setBooleanProperty(<quote>search.keepDialog.toggle</quote>,true);</program
 
 </sect1>
 
-
-<sect1 id="class-guiutilities"><title>Class GUIUtilities</title>
+<!-- open sect1 -->
+<sect1 id="class-registers"><title>Class Registers</title>
+<para>
+  A <classname>Register</classname> is string of text indexed by a
+  single character.  Typically the text is taken from selected buffer text
+  and the index character is a keyboard character selected by the user.
+</para>
 
 <para>
-    The methods dealing with creating menus and menu items are described
-    in <xref linkend="plugin-implement-menu" />.
-    One other <type>static</type> method in this class encapsulates the
-    creation and display of jEdit's custom file chooser dialog box.
+  The application maintains a single <classname>Registers</classname> object
+  consisting of an dynamically sized array of <classname>Register</classname>
+  objects.  The <classname>Registers</classname> class defines a number of methods
+  that give each register the properties of a virtual clipboard.
+</para>
+
+<para>
+  The following methods provide a clipboard operations for register
+  objects:
 </para>
 
 <itemizedlist>
 
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static String[] <function>showVFSFileDialog</function></funcdef>
-  <paramdef>View <parameter>view</parameter></paramdef>
-  <paramdef>String <parameter>path</parameter></paramdef>
-  <paramdef>int <parameter>type</parameter></paramdef>
-  <paramdef>boolean <parameter>multipleSelection</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    This method displays the <!-- enhanced, more versatile -->
-    <classname>VFSFileChooserDialog</classname> provided by jEdit.  <!-- In this case, -->
-    If <parameter>path</parameter> is set to <constant>null</constant>, the dialog
-    will display the directory of the current buffer. The
-    <parameter>type</parameter> parameter can either be
-    <constant>JFileChooser.OPEN_DIALOG</constant>
-    or <constant>JFileChooser.SAVE_DIALOG</constant> (you might need to
-    import the <classname>JFileChooser</classname> class from the
-    <literal>javax.swing</literal> package). The final parameter
-    determines whether multiple selection of files is permitted.
-</para>
-</listitem>
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static void <function>copy</function></funcdef>
+        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
+        <paramdef>char <parameter>register</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+    <para>
+      Saves the selected text in the designated <parameter>textArea</parameter>
+      to the register indexed at <parameter>register</parameter>.  This
+      will replace the existing contents of the designated register.
+    </para>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static void <function>cut</function></funcdef>
+        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
+        <paramdef>char <parameter>register</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  <para>
+    Saves the selected text in the designated <parameter>textArea</parameter>
+    to the register indexed at <parameter>register</parameter>, and removes the
+    text from the text area.  This will replace the existing contents of the
+    designated register.
+  </para>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static void <function>append</function></funcdef>
+        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
+        <paramdef>char <parameter>register</parameter></paramdef>
+        <paramdef>String <parameter>separator</parameter></paramdef>
+        <paramdef>boolean <parameter>cut</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static void <function>append</function></funcdef>
+        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
+        <paramdef>char <parameter>register</parameter></paramdef>
+        <paramdef>String <parameter>separator</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static void <function>append</function></funcdef>
+        <paramdef>JEditTextArea <parameter>textArea</parameter></paramdef>
+        <paramdef>char <parameter>register</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  <para>
+    These three methods append the selected text in the
+    <parameter>textArea</parameter> to the designated register. If the
+    <parameter>cut</parameter> parameter is not specified, the selected text
+    remains in the text area. If the <parameter>separator</parameter>
+    parameter is not specified, a newline character is used to separate the
+    appended text from any existing register text.
+  </para>
+  </listitem>
 
 </itemizedlist>
+
+<para>
+  The following methods provide a lower-level interface for working with
+  registers:
+</para>
+
+<itemizedlist>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static void <function>setRegister</function></funcdef>
+        <paramdef>char <parameter>name</parameter></paramdef>
+        <paramdef>Registers.Register <parameter>register</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static void <function>setRegister</function></funcdef>
+        <paramdef>char <parameter>name</parameter></paramdef>
+        <paramdef>Registers.Register <parameter>newRegister</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static void <function>clearRegister</function></funcdef>
+        <paramdef>char <parameter>name</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+    <para>
+      Sets the text of the designated register to <constant>null</constant>.
+      If the register is one of the two registers reserved by the
+      application (as discussed in the next section), the text value is
+      set to an empty string.
+    </para>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static Registers.Register <function>getRegister</function></funcdef>
+        <paramdef>char <parameter>name</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public static Registers.Register[] <function>getRegisters</function></funcdef>
+        <void/>
+      </funcprototype>
+    </funcsynopsis>
+  </listitem>
+
+</itemizedlist>
+
+<sect2 id="class-register"><title>Interface Registers.Register</title>
+
+<para>
+  This interface requires implementation of two methods:
+  <function>setValue()</function>, which takes a
+  <classname>String</classname> parameter, and
+  <function>toString()</function>, which return a textual representation
+  of the register's contents. Two classes implement this interface. A
+  <classname>ClipboardRegister</classname> is tied to the contents of the
+  application's clipboard. The application assigns a
+  <classname>ClipboardRegister</classname> to the register indexed under
+  the character <filename>$</filename>. A
+  <classname>StringRegister</classname> is created for registers assigned
+  by the user. In addition, the application assigns to the
+  <classname>StringRegister</classname> indexed under <filename>%</filename>
+  the last text segment selected in the text area.
+</para>
+
+<para>
+  A <classname>Register</classname> object does not maintain a copy of
+  its index key.  Indexing is performed by the <classname>Registers</classname>
+  object.
+</para>
+
+
+</sect2>
 
 </sect1>
 
-<sect1 id="class-textutilities"><title>Class TextUtilities</title>
+<!-- LaTeX spews with id's that are too long? -->
+<sect1 id="class-dockablewindowmanager"><title>Class DockableWindowManager</title>
 
-<para>
-    This class contains a number of <type>static</type> methods
-    that can be helpful in handling buffer text.
-</para>
+    <para>
+        Windows conforming to jEdit's dockable window API can appear in
+        <quote>panes</quote> located above, below or to the left or right of the
+        main editing pane. They can also be displayed in <quote>floating</quote>
+        frame windows. A <classname>DockableWindowManager</classname> keeps
+        track of the windows associated with a particular
+        <classname>View</classname>. Each <classname>View</classname> object
+        contains an instance of this class.
+    </para>
 
-<itemizedlist>
+    <itemizedlist>
+      <listitem>
+        <funcsynopsis>
+          <funcprototype>
+            <funcdef>public JComponent <function>getDockable</function></funcdef>
+            <paramdef>String <parameter>name</parameter></paramdef>
+          </funcprototype>
+        </funcsynopsis>
+        <para>
+          Returns the dockable window
+          named by the <varname>name</varname> parameter. If there is no
+          dockable window bearing the
+          requested name, the method returns <constant>null</constant>.
+        </para>
+        <note>
+         <para>
+          You might wonder why this method is not named
+          <function>getDockableWindow()</function>. A method with that
+          name already exists, but it is deprecated since it returns
+          instances of the <classname>DockableWindow</classname>
+          interface, which should no longer be used.
+         </para>
+         <para>
+          Always call <function>getDockable()</function> instead.
+         </para>
+        </note>
+       </listitem>
 
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static int <function>findMatchingBracket</function></funcdef>
-  <paramdef>Buffer <parameter>buffer</parameter></paramdef>
-  <paramdef>int <parameter>line</parameter></paramdef>
-  <paramdef>int <parameter>offset</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the offset of the bracket matching the one at offset
-    <parameter>offset</parameter> of line <parameter>line</parameter> of the buffer;
-    returns -1 if the bracket is unmatched or if the specified
-    character is not a bracket.  The method throws a
-    <classname>BadLocationException</classname> if the <parameter>line</parameter>
-    or <parameter>offset</parameter> parameters are out of range.
-</para>
-</listitem>
+       <listitem>
+        <funcsynopsis>
+          <funcprototype>
+            <funcdef>public void <function>addDockableWindow</function></funcdef>
+            <paramdef>String <parameter>name</parameter></paramdef>
+          </funcprototype>
+        </funcsynopsis>
+        <para>
+          If the dockable window named by the
+          <varname>name</varname> parameter does not exist, it is
+          created. The dockable window is then made visible.
+        </para>
+       </listitem>
 
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static int <function>findWordStart</function></funcdef>
-  <paramdef>String <parameter>line</parameter></paramdef>
-  <paramdef>int <parameter>pos</parameter></paramdef>
-  <paramdef>String <parameter>noWordSep</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-</listitem>
+       <listitem>
+        <funcsynopsis>
+          <funcprototype>
+            <funcdef>public void <function>showDockableWindow</function></funcdef>
+            <paramdef>String <parameter>name</parameter></paramdef>
+          </funcprototype>
+        </funcsynopsis>
+       </listitem>
 
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static int <function>findWordEnd</function></funcdef>
-  <paramdef>String <parameter>line</parameter></paramdef>
-  <paramdef>int <parameter>pos</parameter></paramdef>
-  <paramdef>String <parameter>noWordSep</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the position on which the word found on line
-    <parameter>line</parameter>, position <parameter>line</parameter> begins or ends.
-    The parameter <parameter>noWordSep</parameter> contains those non-alphanumeric
-    characters that will be treated as part of a word for purposes of
-    finding the beginning or end of word (such as an underscore
-    character).
-</para>
-</listitem>
+       <listitem>
+        <funcsynopsis>
+          <funcprototype>
+            <funcdef>public void <function>removeDockableWindow</function></funcdef>
+            <paramdef>String <parameter>name</parameter></paramdef>
+          </funcprototype>
+        </funcsynopsis>
+       </listitem>
 
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static String <function>format</function></funcdef>
-  <paramdef>String <parameter>text</parameter></paramdef>
-  <paramdef>int <parameter>maxLineLength</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Reformats a string and inserts line separators as necessary so
-    that no line exceeds <parameter>maxLineLength</parameter> in length.
-</para>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static String <function>spacesToTabs</function></funcdef>
-  <paramdef>String <parameter>in</parameter></paramdef>
-  <paramdef>int <parameter>tabSize</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static String <function>tabsToSpaces</function></funcdef>
-  <paramdef>String <parameter>in</parameter></paramdef>
-  <paramdef>int <parameter>tabSize</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Makes the indicated change based upon a tab size of
-    <parameter>tabSize</parameter>.
-</para>
-</listitem>
-
-</itemizedlist>
+       <listitem>
+        <funcsynopsis>
+          <funcprototype>
+            <funcdef>public void <function>toggleDockableWindow</function></funcdef>
+            <paramdef>String <parameter>name</parameter></paramdef>
+          </funcprototype>
+        </funcsynopsis>
+       <para>
+         These methods, respectively show, hide and toggle the visibility
+         of the dockable window object named by
+         the <varname>name</varname> parameter.  If the
+         <classname>DockableWindowManager</classname> does not contain a
+         reference to the window, these methods send an error message to the
+         activity log and have no other effect.  Only
+         <function>addDockableWindow()</function> can cause the creation
+         of a dockable window.
+         </para>
+       </listitem>
+    </itemizedlist>
 
 </sect1>
-
-<sect1 id="class-miscutilities"><title>Class MiscUtilities</title>
-
-<para>
-This class is another collection of <type>static</type> utility methods.
-</para>
-
-<para>
-    These methods extract various elements from a path name:
-</para>
-
-<itemizedlist>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static String <function>getFileName</function></funcdef>
-  <paramdef>String <parameter>path</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static String <function>getFileExtension</function></funcdef>
-  <paramdef>String <parameter>name</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static String <function>getParentOfFile</function></funcdef>
-  <paramdef>String <parameter>path</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    Returns the directory containing the specified local file.
-    <!-- XXX: for local files only -->
-</para>
-</listitem>
-
-</itemizedlist>
-
-<para>
-    The following method creates a string of whitespace characters that uses as
-    many tabs as possible:
-</para>
-
-<itemizedlist>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static String <function>createWhiteSpace</function></funcdef>
-  <paramdef>int <parameter>len</parameter></paramdef>
-  <paramdef>int <parameter>tabSize</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-<para>
-    If <parameter>tabSize</parameter> is set to zero, the string will consist entirely
-    of space characters.  To get a whitespace string tuned to the current buffer's
-    settings, call this method as follows:</para>
-<informalexample>
-<programlisting>myWhitespace = MiscUtilities.createWhiteSpace(myLength,
-    buffer.getTabSize());</programlisting></informalexample>
-
-</listitem>
-</itemizedlist>
-
-<para>
-    Here are two sorting methods, one for simple arrays and one for
-    Java <classname>Vector</classname> objects:
-</para>
-
-<itemizedlist>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static void <function>quicksort</function></funcdef>
-  <paramdef>Object[] <parameter>obj</parameter></paramdef>
-  <paramdef>Compare <parameter>compare</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-</listitem>
-
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public static void <function>quicksort</function></funcdef>
-  <paramdef>Vector <parameter>vector</parameter></paramdef>
-  <paramdef>Compare <parameter>compare</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-</listitem>
-
-</itemizedlist>
-
-<para>
-    The type of the second parameter in both methods is a Java
-    <glossterm>interface</glossterm> defined inside the
-    <classname>MiscUtilities</classname> class. Any Java class implementing
-    an interface must implement each of the methods set forth
-    in the interface's abstract specification.  The <classname>Compare</classname>
-    interface consists of a single method:
-</para>
-
-<itemizedlist>
-<listitem>
-<funcsynopsis>
- <funcprototype>
-  <funcdef>public int <function>compare</function></funcdef>
-  <paramdef>Object <parameter>obj1</parameter></paramdef>
-  <paramdef>Object <parameter>obj2</parameter></paramdef>
- </funcprototype>
-</funcsynopsis>
-</listitem>
-</itemizedlist>
-
-<para>
-    To work correctly with the <function>quicksort</function> algorithm, this method
-    should return a negative value if <parameter>obj1</parameter> is ordered prior to
-    <parameter>obj2</parameter>, a positive value if <parameter>obj2</parameter>
-    is prior, and zero if the two objects are equivalent for ordering purposes.
-</para>
-
-<para>
-    When writing macros, keep in mind that
-    under Java versions earlier than 1.3, BeanShell cannot implement
-    arbitrary interfaces
-    such as <classname>Compare</classname> (although, as we have noted
-    in <xref linkend="macro-tips-BeanShell-interface" />,
-    a BeanShell method can
-    implement a number of specific listener interfaces).  Fortunately,
-    jEdit provides a number of classes implementing <classname>Compare</classname>
-    for sorting purposes. Among them are <classname>StringCompare</classname> and
-    <classname>StringICaseCompare</classname>. Both classes compare
-    <classname>String</classname>
-    object; the latter class compares two strings on a case-insentive basis.
-</para>
-
-<para>
-    Calling <function>quicksort</function> on a <classname>Vector</classname> of
-    <classname>String</classname> objects could therefore take the following form:
-</para>
-<informalexample><programlisting>MiscUtilities.quicksort(myVectorOfStrings,
-    new StringICaseCompare());</programlisting></informalexample>
-<para>
-    There is no return value, but the <classname>Vector</classname> provided
-    as the first parameter will be now be sorted on a case-insensitive basis.
-</para>
-
-</sect1>
-
 
 <sect1 id="class-beanshell"><title>Class BeanShell</title>
 
@@ -3356,22 +3501,21 @@ This class is another collection of <type>static</type> utility methods.
 <funcprototype>
   <funcdef>public static void <function>runScript</function></funcdef>
   <paramdef>View <parameter>view</parameter></paramdef>
+  <paramdef>Reader <parameter>in</parameter></paramdef>
   <paramdef>String <parameter>path</parameter></paramdef>
   <paramdef>boolean <parameter>ownNamespace</parameter></paramdef>
-  <paramdef>boolean <parameter>rethrowBshErrors</parameter></paramdef>
  </funcprototype>
 </funcsynopsis>
 </listitem>
 </itemizedlist>
 
 <para>
-    This method runs the script file identified by <parameter>path</parameter>.  Within
+    If the <varname>in</varname> parameter is non-null, the script is
+    read from that stream; otherwise it is read from the file identified
+    by <parameter>path</parameter>.  Within
     that script, references to <parameter>buffer</parameter>, <parameter>textArea</parameter>
     and <parameter>editPane</parameter> are
-    determined with reference to the <parameter>view</parameter> parameter.  If
-    <parameter>rethrowBshErrors</parameter> is set to true, any runtime exception thrown
-    by the child script will be rethrown to the parent script for
-    additional handling.
+    determined with reference to the <parameter>view</parameter> parameter.
 </para>
 
 <para>
@@ -3387,6 +3531,167 @@ This class is another collection of <type>static</type> utility methods.
 
 </sect1>
 
+<sect1 id="class-abstractoptionpane"><title>Class AbstractOptionPane</title>
+
+<para>
+  Most plugin option panes extend this implementation of
+  <classname>OptionPane</classname>, instead of implementing
+  <classname>OptionPane</classname> directly. It provides
+  a convenient default framework for laying out configuration options in
+  a manner similar to the option panes created by jEdit itself.
+  It is derived from Java's <classname>JPanel</classname> class and
+  contains a <classname>GridBagLayout</classname> object for component
+  management. It also contains shortcut methods to simplify layout.
+</para>
+
+<para>
+  The constructor for a class derived from
+  <classname>AbstractOptionPane</classname> should
+  call the parent constructor and pass the option pane's <quote>internal
+  name</quote> as a
+  parameter. The internal name is used to key a property where the
+  option pane's label is stored; see
+  <xref linkend="resources-properties" />.
+  It should also implement two methods:
+</para>
+
+<itemizedlist>
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>protected void <function>_init</function></funcdef>
+        <paramdef></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+    <para>
+      This method should create and arrange the components of the option pane
+      and initialize the option data displayed to the user. This method
+      is called when the option pane is first displayed, and is not
+      called again for the lifetime of the object.
+    </para>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>protected void <function>_save</function></funcdef>
+        <paramdef></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+    <para>
+      This method should save any settings, to the jEdit properties or
+      other data store.
+    </para>
+  </listitem>
+
+</itemizedlist>
+
+<para>
+  <classname>AbstractOptionPane</classname> also contains three shortcut
+  methods, typically called from <function>_init()</function>,
+  for adding components to the option pane:
+</para>
+
+<itemizedlist>
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>protected void <function>addComponent</function></funcdef>
+          <paramdef>String <parameter>label</parameter></paramdef>
+          <paramdef>Component <parameter>comp</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>protected void <function>addComponent</function></funcdef>
+          <paramdef>Component <parameter>comp</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        These shortcut methods add components to the option pane in a
+        single vertical column, running top to bottom.  The first
+        displays the text of the <parameter>label</parameter> parameter
+        to the left of the <classname>Component</classname> represented
+        by <parameter>comp</parameter>.
+      </para>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>protected void <function>addSeparator</function></funcdef>
+          <paramdef>String <parameter>label</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        This is another shortcut method that adds a text label between
+        two horizontal separators to the option pane.
+        The <parameter>label</parameter> parameter represents the name
+        of a property (typically a property defined in the plugin's
+        property file) whose value will be used as the separator text.
+      </para>
+    </listitem>
+
+</itemizedlist>
+
+</sect1>
+
+<sect1 id="class-optiongroup"><title>Class OptionGroup</title>
+
+<para>
+  In those cases where a single option pane is inadequate to present all
+  of a plugin's configuration options, this class can be used to create a
+  group of options panes. The group will appear as a single node in the
+  options dialog tree-based index. The member option panes will appear as
+  leaf nodes under the group's node.  Three simple methods create and
+  populate an option pane:
+</para>
+
+<itemizedlist>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public <function>OptionGroup</function></funcdef>
+        <paramdef>String <parameter>name</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+    <para>
+      The constructor's single parameter represents the internal
+      name of the option group. The internal name is used to key a
+      property where the option group's label is stored; see
+      <xref linkend="resources-properties" />.
+    </para>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public void <function>addOptionPane</function></funcdef>
+        <paramdef>OptionPane <parameter>pane</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </listitem>
+
+  <listitem>
+    <funcsynopsis>
+      <funcprototype>
+        <funcdef>public void <function>addOptionGroup</function></funcdef>
+        <paramdef>OptionGroup <parameter>group</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+    <para>
+      This pair of methods adds members to the option group.  The second
+      method enables option groups to be nested, for plugins with a
+      particularly large set of configurable options.
+    </para>
+  </listitem>
+
+</itemizedlist>
+
+</sect1>
+
 </chapter>
-
-

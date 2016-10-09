@@ -1,5 +1,8 @@
 /*
  * AbbrevEditor.java - Panel for editing abbreviations
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,14 +22,17 @@
 
 package org.gjt.sp.jedit.gui;
 
+//{{{ Imports
 import javax.swing.border.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import org.gjt.sp.jedit.*;
+//}}}
 
 public class AbbrevEditor extends JPanel
 {
+	//{{{ AbbrevEditor constructor
 	public AbbrevEditor()
 	{
 		GridBagLayout layout = new GridBagLayout();
@@ -35,11 +41,27 @@ public class AbbrevEditor extends JPanel
 		GridBagConstraints cons = new GridBagConstraints();
 		cons.anchor = cons.WEST;
 		cons.fill = cons.BOTH;
-		cons.weightx = 1.0f;
+		cons.weightx = 0.0f;
 		cons.gridx = 1;
 		cons.gridy = 1;
 
-		JLabel label = new JLabel(jEdit.getProperty("abbrev-editor.before"));
+		JLabel label = new JLabel(jEdit.getProperty("abbrev-editor.abbrev"),
+			SwingConstants.RIGHT);
+		label.setBorder(new EmptyBorder(0,0,0,12));
+		layout.setConstraints(label,cons);
+		add(label);
+		cons.gridx++;
+		cons.weightx = 1.0f;
+		abbrev = new JTextField();
+		layout.setConstraints(abbrev,cons);
+		add(abbrev);
+
+		cons.gridx = 1;
+		cons.weightx = 0.0f;
+		cons.gridwidth = 2;
+
+		cons.gridy++;
+		label = new JLabel(jEdit.getProperty("abbrev-editor.before"));
 		label.setBorder(new EmptyBorder(6,0,3,0));
 		layout.setConstraints(label,cons);
 		add(label);
@@ -64,8 +86,21 @@ public class AbbrevEditor extends JPanel
 		scroller = new JScrollPane(afterCaret);
 		layout.setConstraints(scroller,cons);
 		add(scroller);
-	}
+	} //}}}
 
+	//{{{ getAbbrev() method
+	public String getAbbrev()
+	{
+		return abbrev.getText();
+	} //}}}
+
+	//{{{ setAbbrev() method
+	public void setAbbrev(String abbrev)
+	{
+		this.abbrev.setText(abbrev);
+	} //}}}
+
+	//{{{ getExpansion() method
 	public String getExpansion()
 	{
 		StringBuffer buf = new StringBuffer();
@@ -119,8 +154,9 @@ public class AbbrevEditor extends JPanel
 		}
 
 		return buf.toString();
-	}
+	} //}}}
 
+	//{{{ setExpansion() method
 	public void setExpansion(String expansion)
 	{
 		if(expansion == null)
@@ -169,18 +205,28 @@ public class AbbrevEditor extends JPanel
 
 		beforeCaret.setText(beforeCaretText);
 		afterCaret.setText(afterCaretText);
-	}
+	} //}}}
 
+	//{{{ getAbbrevField() method
+	public JTextField getAbbrevField()
+	{
+		return abbrev;
+	} //}}}
+
+	//{{{ getBeforeCaretTextArea() method
 	public JTextArea getBeforeCaretTextArea()
 	{
 		return beforeCaret;
-	}
+	} //}}}
 
+	//{{{ getAfterCaretTextArea() method
 	public JTextArea getAfterCaretTextArea()
 	{
 		return afterCaret;
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+	private JTextField abbrev;
 	private JTextArea beforeCaret, afterCaret;
+	//}}}
 }

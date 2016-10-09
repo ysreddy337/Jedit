@@ -1,5 +1,8 @@
 /*
  * FavoritesVFS.java - Stores frequently-visited directory locations
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 2000 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,9 +22,11 @@
 
 package org.gjt.sp.jedit.io;
 
+//{{{ Imports
 import java.awt.Component;
-import java.util.Vector;
+import java.util.ArrayList;
 import org.gjt.sp.jedit.jEdit;
+//}}}
 
 /**
  * A VFS used for remembering frequently-visited directories. Listing it
@@ -30,12 +35,13 @@ import org.gjt.sp.jedit.jEdit;
  * favorite and clicking 'delete' in the browser just deletes the
  * favorite, and not the directory itself.
  * @author Slava Pestov
- * @version $Id: FavoritesVFS.java,v 1.2 2001/09/08 04:50:46 spestov Exp $
+ * @version $Id: FavoritesVFS.java,v 1.5 2002/01/16 09:21:51 spestov Exp $
  */
 public class FavoritesVFS extends VFS
 {
 	public static final String PROTOCOL = "favorites";
 
+	//{{{ FavoritesVFS constructor
 	public FavoritesVFS()
 	{
 		super("favorites");
@@ -45,95 +51,128 @@ public class FavoritesVFS extends VFS
 		 * VFS to pass to VFSManager.sendVFSUpdate(),
 		 * hence this hack. */
 		instance = this;
-	}
+	} //}}}
 
+	//{{{ getCapabilities() method
 	public int getCapabilities()
 	{
 		// BROWSE_CAP not set because we don't want the VFS browser
 		// to create the default 'favorites' button on the tool bar
 		return /* BROWSE_CAP | */ DELETE_CAP;
-	}
+	} //}}}
 
+	//{{{ getParentOfPath() method
 	public String getParentOfPath(String path)
 	{
 		return PROTOCOL + ":";
-	}
+	} //}}}
 
+	//{{{ _listDirectory() method
 	public VFS.DirectoryEntry[] _listDirectory(Object session, String url,
 		Component comp)
 	{
 		synchronized(lock)
 		{
+			if(favorites == null)
+				loadFavorites();
+
 			VFS.DirectoryEntry[] retVal = new VFS.DirectoryEntry[favorites.size()];
 			for(int i = 0; i < retVal.length; i++)
 			{
-				String favorite = (String)favorites.elementAt(i);
+				String favorite = (String)favorites.get(i);
 				retVal[i] = _getDirectoryEntry(session,favorite,comp);
 			}
 			return retVal;
 		}
-	}
+	} //}}}
 
+	//{{{ _getDirectoryEntry() method
 	public DirectoryEntry _getDirectoryEntry(Object session, String path,
 		Component comp)
 	{
 		return new VFS.DirectoryEntry(path,path,"favorites:" + path,
 					VFS.DirectoryEntry.DIRECTORY,
 					0L,false);
-	}
+	} //}}}
 
+	//{{{ _delete() method
 	public boolean _delete(Object session, String path, Component comp)
 	{
 		synchronized(lock)
 		{
 			path = path.substring(PROTOCOL.length() + 1);
-			favorites.removeElement(path);
+			favorites.remove(path);
 
 			VFSManager.sendVFSUpdate(this,PROTOCOL + ":",false);
 		}
 
 		return true;
-	}
+	} //}}}
 
+	//{{{ loadFavorites() method
 	public static void loadFavorites()
 	{
+		favorites = new ArrayList();
+
 		synchronized(lock)
 		{
 			String favorite;
 			int i = 0;
 			while((favorite = jEdit.getProperty("vfs.favorite." + i)) != null)
 			{
-				favorites.addElement(favorite);
+				favorites.add(favorite);
 				i++;
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ addToFavorites() method
 	public static void addToFavorites(String path)
 	{
 		synchronized(lock)
 		{
-			favorites.addElement(path);
+			if(favorites == null)
+				loadFavorites();
+
+			if(!favorites.contains(path))
+				favorites.add(path);
 
 			VFSManager.sendVFSUpdate(instance,PROTOCOL + ":",false);
 		}
-	}
+	} //}}}
 
+	//{{{ saveFavorites() method
 	public static void saveFavorites()
 	{
 		synchronized(lock)
 		{
+			if(favorites == null)
+				return;
+
 			for(int i = 0; i < favorites.size(); i++)
 			{
 				jEdit.setProperty("vfs.favorite." + i,
-					(String)favorites.elementAt(i));
+					(String)favorites.get(i));
 			}
 			jEdit.unsetProperty("vfs.favorite." + favorites.size());
 		}
-	}
+	} //}}}
 
-	// private members
+	//{{{ getFavorites() method
+	public static Object[] getFavorites()
+	{
+		synchronized(lock)
+		{
+			if(favorites == null)
+				loadFavorites();
+
+			return favorites.toArray();
+		}
+	} //}}}
+
+	//{{{ Private members
 	private static FavoritesVFS instance;
 	private static Object lock = new Object();
-	private static Vector favorites = new Vector();
+	private static ArrayList favorites;
+	//}}}
 }

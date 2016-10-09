@@ -18,7 +18,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: QuickNotepadPlugin.java,v 1.1.1.1 2001/09/02 05:39:27 spestov Exp $
+ * $Id: QuickNotepadPlugin.java,v 1.6 2002/04/11 09:42:14 spestov Exp $
  */
 
 import java.util.Vector;
@@ -27,7 +27,6 @@ import java.awt.event.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 import org.gjt.sp.jedit.gui.*;
-import org.gjt.sp.jedit.msg.CreateDockableWindow;
 
 
 /**
@@ -35,52 +34,24 @@ import org.gjt.sp.jedit.msg.CreateDockableWindow;
  *
  * @author John Gellene
  */
-public class QuickNotepadPlugin extends EBPlugin
+public class QuickNotepadPlugin extends EditPlugin
 {
-    public static final String NAME = "quicknotepad";
+	public static final String NAME = "quicknotepad";
 	public static final String MENU = "quicknotepad.menu";
-    public static final String PROPERTY_PREFIX = "plugin.QuickNotepadPlugin.";
-    public static final String OPTION_PREFIX = "options.quicknotepad.";
+	public static final String PROPERTY_PREFIX = "plugin.QuickNotepadPlugin.";
+	public static final String OPTION_PREFIX = "options.quicknotepad.";
 
-    public void start()
+
+	public void createMenuItems(Vector menuItems)
 	{
-        EditBus.addToNamedList(DockableWindow.DOCKABLE_WINDOW_LIST, NAME);
-    }
-
-
-	public void stop()
-	{
+		menuItems.addElement(GUIUtilities.loadMenu(MENU));
 	}
 
 
-    public void createMenuItems(Vector menuItems)
+	public void createOptionPanes(OptionsDialog od)
 	{
-        menuItems.addElement(GUIUtilities.loadMenu(MENU));
-    }
-
-
-    public void createOptionPanes(OptionsDialog od)
-	{
-        od.addOptionPane(new QuickNotepadOptionPane());
-    }
-
-
-    public void handleMessage(EBMessage message)
-	{
-        if(message instanceof CreateDockableWindow)
-		{
-            CreateDockableWindow cmsg = (CreateDockableWindow)message;
-            if (cmsg.getDockableWindowName().equals(NAME))
-			{
-//				try {
-//					Runtime.getRuntime().exec("start cmd /C");
-//				} catch (java.io.IOException e) {}
-				DockableWindow win = new QuickNotepadDockable(
-					cmsg.getView(), cmsg.getPosition());
-				cmsg.setDockableWindow(win);
-            }
-        }
-    }
+		od.addOptionPane(new QuickNotepadOptionPane());
+	}
 
 }
 

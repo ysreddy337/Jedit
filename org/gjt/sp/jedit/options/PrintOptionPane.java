@@ -1,5 +1,8 @@
 /*
  * PrintOptionPane.java - Printing options panel
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 2000 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,42 +22,26 @@
 
 package org.gjt.sp.jedit.options;
 
+//{{{ Imports
 import javax.swing.*;
 import java.awt.*;
 import org.gjt.sp.jedit.gui.FontSelector;
 import org.gjt.sp.jedit.*;
+//}}}
 
 public class PrintOptionPane extends AbstractOptionPane
 {
+	//{{{ PrintOptionPane constructor
 	public PrintOptionPane()
 	{
 		super("print");
-	}
+	} //}}}
 
-	// protected members
+	//{{{ _init() method
 	protected void _init()
 	{
 		/* Font */
-		String _fontFamily = jEdit.getProperty("print.font");
-		int _fontStyle;
-		try
-		{
-			_fontStyle = Integer.parseInt(jEdit.getProperty("print.fontstyle"));
-		}
-		catch(NumberFormatException nf)
-		{
-			_fontStyle = Font.PLAIN;
-		}
-		int _fontSize;
-		try
-		{
-			_fontSize = Integer.parseInt(jEdit.getProperty("print.fontsize"));
-		}
-		catch(NumberFormatException nf)
-		{
-			_fontSize = 14;
-		}
-		font = new FontSelector(new Font(_fontFamily,_fontStyle,_fontSize));
+		font = new FontSelector(jEdit.getFontProperty("print.font"));
 		addComponent(jEdit.getProperty("options.print.font"),font);
 
 		/* Header */
@@ -75,57 +62,37 @@ public class PrintOptionPane extends AbstractOptionPane
 		printLineNumbers.setSelected(jEdit.getBooleanProperty("print.lineNumbers"));
 		addComponent(printLineNumbers);
 
-		/* Syntax highlighting */
-		style = new JCheckBox(jEdit.getProperty("options.print"
-			+ ".style"));
-		style.setSelected(jEdit.getBooleanProperty("print.style"));
-		addComponent(style);
-
+		/* Color */
 		color = new JCheckBox(jEdit.getProperty("options.print"
 			+ ".color"));
 		color.setSelected(jEdit.getBooleanProperty("print.color"));
 		addComponent(color);
 
-		addSeparator("options.print.margins");
+		/* Tab size */
+		String[] tabSizes = { "2", "4", "8" };
+		tabSize = new JComboBox(tabSizes);
+		tabSize.setEditable(true);
+		tabSize.setSelectedItem(jEdit.getProperty("print.tabSize"));
+		addComponent(jEdit.getProperty("options.print.tabSize"),tabSize);
+	} //}}}
 
-		/* Margins */
-		topMargin = new JTextField(jEdit.getProperty("print.margin.top"));
-		addComponent(jEdit.getProperty("options.print.margin.top"),topMargin);
-		leftMargin = new JTextField(jEdit.getProperty("print.margin.left"));
-		addComponent(jEdit.getProperty("options.print.margin.left"),leftMargin);
-		bottomMargin = new JTextField(jEdit.getProperty("print.margin.bottom"));
-		addComponent(jEdit.getProperty("options.print.margin.bottom"),bottomMargin);
-		rightMargin = new JTextField(jEdit.getProperty("print.margin.right"));
-		addComponent(jEdit.getProperty("options.print.margin.right"),rightMargin);
-	}
-
+	//{{{ _save() method
 	protected void _save()
 	{
-		Font _font = font.getFont();
-		jEdit.setProperty("print.font",_font.getFamily());
-		jEdit.setProperty("print.fontsize",String.valueOf(_font.getSize()));
-		jEdit.setProperty("print.fontstyle",String.valueOf(_font.getStyle()));
-
+		jEdit.setFontProperty("print.font",font.getFont());
 		jEdit.setBooleanProperty("print.header",printHeader.isSelected());
 		jEdit.setBooleanProperty("print.footer",printFooter.isSelected());
 		jEdit.setBooleanProperty("print.lineNumbers",printLineNumbers.isSelected());
-		jEdit.setBooleanProperty("print.style",style.isSelected());
 		jEdit.setBooleanProperty("print.color",color.isSelected());
-		jEdit.setProperty("print.margin.top",topMargin.getText());
-		jEdit.setProperty("print.margin.left",leftMargin.getText());
-		jEdit.setProperty("print.margin.bottom",bottomMargin.getText());
-		jEdit.setProperty("print.margin.right",rightMargin.getText());
-	}
+		jEdit.setProperty("print.tabSize",(String)tabSize.getSelectedItem());
+	} //}}}
 
-	// private members
+	//{{{ Private members
 	private FontSelector font;
 	private JCheckBox printHeader;
 	private JCheckBox printFooter;
 	private JCheckBox printLineNumbers;
-	private JCheckBox style;
 	private JCheckBox color;
-	private JTextField topMargin;
-	private JTextField leftMargin;
-	private JTextField bottomMargin;
-	private JTextField rightMargin;
+	private JComboBox tabSize;
+	//}}}
 }

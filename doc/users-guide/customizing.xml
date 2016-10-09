@@ -1,5 +1,5 @@
 <!-- jEdit buffer-local properties: -->
-<!-- :indentSize=1:noTabs=true: -->
+<!-- :tabSize=1:indentSize=1:noTabs=true: -->
 
 <chapter id="customizing"><title>Customizing jEdit</title>
  <sect1 id="buffer-opts"><title>The Buffer Options Dialog Box</title>
@@ -13,25 +13,25 @@
    The following settings may be changed here:
   </para>
   <itemizedlist>
-   <listitem><para>The edit mode (see <xref linkend="modes" />)</para></listitem>
-   <listitem><para>The tab width (see <xref linkend="indent" />)</para></listitem>
-   <listitem><para>The indent width</para></listitem>
-   <listitem><para>The wrap column (see <xref linkend="entering-text" />)
-   </para></listitem>
    <listitem><para>The line separator (see <xref linkend="line-separators" />)
    </para></listitem>
-   <listitem><para>If syntax highlighting should be enabled
-   (see <xref linkend="syntax-hilite" />)
+   <listitem><para>The character encoding (see <xref linkend="encodings" />)
    </para></listitem>
+   <listitem><para>If the file should be GZipped on disk
+   (see <xref linkend="opening" />)
+   </para></listitem>
+   <listitem><para>If the file should be saved with a trailing line break
+   </para></listitem>
+   <listitem><para>The edit mode (see <xref linkend="modes" />)</para></listitem>
+   <listitem><para>The fold mode (see <xref linkend="folding" />)</para></listitem>
+   <listitem><para>The wrap mode and margin (see <xref linkend="word-wrap" />)
+   </para></listitem>
+   <listitem><para>The tab width (see <xref linkend="indent" />)</para></listitem>
+   <listitem><para>The indent width</para></listitem>
    <listitem><para>If auto indent and soft tabs should be enabled
    (see <xref linkend="indent" />)
    </para></listitem>
   </itemizedlist>
-  <para>
-   The <quote>Corresponding buffer-local
-   properties</quote> text field displays buffer-local properties that
-   duplicate the current settings in the dialog box.
-  </para>
  </sect1>
  <sect1 id="buffer-local"><title>Buffer-Local Properties</title>
   <para>
@@ -42,7 +42,7 @@
    itself.
   </para>
   <para>
-   When jEdit loads a file, it checks the first 10 lines for
+   When jEdit loads a file, it checks the first and last 10 lines for
    colon-enclosed name/value pairs. The following example changes
    the indent width to 4 characters, enables soft tabs, and sets
    the buffer's edit mode to Perl:
@@ -72,16 +72,9 @@
       See <xref linkend="folding" />.</entry>
      </row>
      <row>
-      <entry>commentEnd</entry>
-      <entry>The range comment end string. For example, in Java mode
-      the default value is <quote>*/</quote>. See <xref linkend="commenting" />.
-      </entry>
-     </row>
-     <row>
-      <entry>commentStart</entry>
-      <entry>The range comment start string. For example, in Java mode
-      the default value is <quote>/*</quote>. See <xref linkend="commenting" />.
-      </entry>
+      <entry>folding</entry>
+      <entry>The fold mode; one of <quote>none</quote>, <quote>indent</quote>,
+      or <quote>explicit</quote>. See <xref linkend="folding" />.</entry>
      </row>
      <row>
       <entry>indentOnEnter</entry>
@@ -100,12 +93,6 @@
       <entry>The width, in characters, of one indent.
       Must be an integer greater than 0.
       See <xref linkend="indent" />.</entry>
-     </row>
-     <row>
-      <entry>lineComment</entry>
-      <entry>The line comment string. For example, in Java mode the
-      default value is <quote>//</quote>. See <xref linkend="commenting" />.
-      </entry>
      </row>
      <row>
       <entry>maxLineLen</entry>
@@ -129,12 +116,7 @@
       <entry>noWordSep</entry>
       <entry>A list of non-alphanumeric characters that are
       <emphasis>not</emphasis> to
-      be treated as word separators.</entry>
-     </row>
-     <row>
-      <entry>syntax</entry>
-      <entry>If set to <quote>false</quote>, syntax highlighting will be not
-      be performed. See <xref linkend="syntax-hilite" />.</entry>
+      be treated as word separators. Global default is <quote>_</quote>.</entry>
      </row>
      <row>
       <entry>tabSize</entry>
@@ -146,6 +128,11 @@
       <entry>Characters, in addition to spaces and tabs, at which lines may be
       split when word wrapping.
       See <xref linkend="entering-text" />.</entry>
+     </row>
+     <row>
+      <entry>wrap</entry>
+      <entry>The word wrap mode; one of <quote>none</quote>, <quote>soft</quote>,
+      or <quote>hard</quote>. See <xref linkend="word-wrap" />.</entry>
      </row>
     </tbody>
    </tgroup>
@@ -165,7 +152,13 @@
   <para>
    The <guibutton>General</guibutton> option pane lets you change various
    miscellaneous settings, such as the number of recent files to remember,
-   the Swing look &amp; feel, and such.
+   if the buffer list should be sorted, and so on.
+  </para>
+  <bridgehead renderas="sect3">The Appearance Pane</bridgehead>
+  <para>
+   The <guibutton>Appearance</guibutton> option pane lets you change the
+   Swing look and feel, as well as the fonts used to display user interface
+   controls such as buttons, labels and menus.
   </para>
   <bridgehead renderas="sect3">The Loading and Saving Pane</bridgehead>
   <para>
@@ -225,7 +218,7 @@
    The <guibutton>Docking</guibutton> option pane lets you specify which
    dockable windows should be floating, and which should be docked in the view.
   </para>
-   <bridgehead renderas="sect3">The Context Menu Pane</bridgehead>
+  <bridgehead renderas="sect3">The Context Menu Pane</bridgehead>
   <para>
    The <guibutton>Context Menu</guibutton> option pane lets you edit the text
    area's right-click context menu.
@@ -257,19 +250,21 @@
    abbreviations.
   </para>
   <para>
-   The combo box labelled <quote>Abbrev set</quote> selects the
+   The combo box labeled <quote>Abbrev set</quote> selects the
    abbreviation set to edit. The first entry, <quote>global</quote>, contains
    abbreviations available in all edit modes. The subsequent
    entries contain mode-specific abbreviations.
   </para>
   <para>
-   To change an abbreviation expansion, click the appropriate table entry,
-   which will display a dialog box for doing so.
+   To change an abbreviation or its expansion, either double-click the appropriate
+   table entry, or click a table entry and then click the
+   <guibutton>Edit</guibutton> button. This will display a dialog box for
+   modifying the abbreviation.
   </para>
   <para>
-   To add an abbreviation, enter it in the last line of the list, which
-   is always blank. When the last line is changed, a new, blank, line
-   is added.
+   The <guibutton>Add</guibutton> button displays a dialog box where you can
+   define a new abbreviation. The <guibutton>Remove</guibutton> button removes
+   the currently selected abbreviation from the list.
   </para>
   <para>
    See <xref linkend="positional-params" /> for information about positional
@@ -280,10 +275,13 @@
    The <guibutton>Printing</guibutton> option pane lets you customize the
    appearance of printed output.
   </para>
-  <bridgehead renderas="sect3">The File System Browser Pane</bridgehead>
+  <bridgehead renderas="sect3">The File System Browser Panes</bridgehead>
   <para>
-   The <guibutton>File System Browser</guibutton> option pane lets you customize
-   jEdit's file system browser.
+   The <guibutton>File System Browser</guibutton> branch
+   contains two option panes, <guibutton>General</guibutton> and
+   <guibutton>Colors</guibutton>. Both of these option panes should be
+   self-explanatory. See <xref linkend="vfs-browser" />
+   for more information.
   </para>
  </sect1>
  <sect1 id="settings-directory"><title>The jEdit Settings Directory</title>
@@ -318,7 +316,7 @@
   <para>
    If you are using <application>jEditLauncher</application>
    to start jEdit on Windows, these parameters cannot be specified on the
-   MS-DOS prompt command line when starting jedit; they must be set as described
+   MS-DOS prompt command line when starting jEdit; they must be set as described
    in <xref linkend="launcher-starting" />.
   </para>
   <para>
@@ -326,19 +324,6 @@
    inside the settings directory; plugins may add more:
   </para>
   <itemizedlist>
-   <listitem><para><filename>jars</filename> - this directory contains
-   plugins. See <xref linkend="using-plugins" />.</para></listitem>
-   <listitem><para><filename>macros</filename> - this directory contains
-   macros. See <xref linkend="using-macros" />.</para></listitem>
-   <listitem><para><filename>modes</filename> - this directory contains custom
-   edit modes. See <xref linkend="writing-modes-part" />.
-   </para></listitem>
-   <listitem><para><filename>PluginManager.download</filename> - this directory
-   is usually empty. It only contains files while the plugin manager is
-   downloading a plugin. For information about the plugin manager,
-   see <xref linkend="using-plugins" />.</para></listitem>
-   <listitem><para><filename>session</filename> - a list of files, used when
-   restoring previously open files on startup.</para></listitem>
    <listitem><para><filename>abbrevs</filename> - a plain text file which
    stores all defined abbreviations. See <xref linkend="abbrevs" />.
    </para></listitem>
@@ -350,6 +335,17 @@
    <guimenu>Edit</guimenu>&gt;<guimenuitem>Paste Previous</guimenuitem> command.
    See <xref linkend="text-transfer" /> and <xref linkend="history" />.
    </para></listitem>
+   <listitem><para><filename>jars</filename> - this directory contains
+   plugins. See <xref linkend="using-plugins" />.</para></listitem>
+   <listitem><para><filename>macros</filename> - this directory contains
+   macros. See <xref linkend="using-macros" />.</para></listitem>
+   <listitem><para><filename>modes</filename> - this directory contains custom
+   edit modes. See <xref linkend="writing-modes-part" />.
+   </para></listitem>
+   <listitem><para><filename>PluginManager.download</filename> - this directory
+   is usually empty. It only contains files while the plugin manager is
+   downloading a plugin. For information about the plugin manager,
+   see <xref linkend="using-plugins" />.</para></listitem>
    <listitem><para><filename>properties</filename> - a plain text file which
    stores the majority of jEdit's settings.</para></listitem>
    <listitem><para><filename>recent.xml</filename> - an XML file which stores
@@ -360,6 +356,14 @@
    <listitem><para><filename>server</filename> - a plain text file that only
    exists while jEdit is running. The edit server's port number and
    authorization key is stored here. See <xref linkend="starting" />.
+   </para></listitem>
+   <listitem><para><filename>session</filename> - a list of files, used when
+   restoring previously open files on startup.</para></listitem>
+   <listitem><para><filename>settings-backups</filename> - this directory
+   contains numbered backups of all automatically-written settings files
+   (<filename>abbrevs</filename>, <filename>activity.log</filename>,
+   <filename>history</filename>, <filename>properties</filename>,
+   <filename>recent.xml</filename>, and <filename>session</filename>).
    </para></listitem>
   </itemizedlist>
  </sect1>

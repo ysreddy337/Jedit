@@ -1,6 +1,9 @@
 /*
  * BoyerMooreSearchMatcher.java - Literal pattern String matcher utilizing the
  *         Boyer-Moore algorithm
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 1999, 2000 mike dillon
  * Portions copyright (C) 2001 Tom Locke
  * Portions copyright (C) 2001 Slava Pestov
@@ -22,13 +25,17 @@
 
 package org.gjt.sp.jedit.search;
 
+//{{{ Imports
 import bsh.NameSpace;
+import gnu.regexp.CharIndexed;
 import javax.swing.text.Segment;
 import org.gjt.sp.jedit.BeanShell;
 import org.gjt.sp.util.Log;
+//}}}
 
 public class BoyerMooreSearchMatcher implements SearchMatcher
 {
+	//{{{ BoyerMooreSearchMatcher constructor
 	/**
 	 * Creates a new string literal matcher.
 	 */
@@ -58,10 +65,10 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 		this.replace = replace;
 		this.ignoreCase = ignoreCase;
 		this.reverseSearch = reverseSearch;
-		this.beanshell = beanshell;
 
-		if(beanshell)
+		if(beanshell && replace != null && replace.length() != 0)
 		{
+			this.beanshell = true;
 			this.replaceMethod = replaceMethod;
 			replaceNS = new NameSpace(BeanShell.getNameSpace(),
 				"search and replace");
@@ -69,19 +76,27 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 
 		generateSkipArray();
 		generateSuffixArray();
-	}
+	} //}}}
 
+	//{{{ nextMatch() method
 	/**
 	 * Returns the offset of the first match of the specified text
 	 * within this matcher.
 	 * @param text The text to search in
+	 * @param start True if the start of the segment is the beginning of the
+	 * buffer
+	 * @param end True if the end of the segment is the end of the buffer
+	 * @param firstTime If false and the search string matched at the start
+	 * offset with length zero, automatically find next match
 	 * @return an array where the first element is the start offset
 	 * of the match, and the second element is the end offset of
 	 * the match
+	 * @since jEdit 4.0pre3
 	 */
-	public int[] nextMatch(Segment text)
+	public int[] nextMatch(CharIndexed text, boolean start, boolean end,
+		boolean firstTime)
 	{
-		int pos = match(text.array, text.offset, text.offset + text.count);
+		int pos = match(text);
 
 		if (pos == -1)
 		{
@@ -89,11 +104,11 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 		}
 		else
 		{
-			return new int[] { pos - text.offset, pos + pattern.length
-				- text.offset };
+			return new int[] { pos, pos + pattern.length };
 		}
-	}
+	} //}}}
 
+	//{{{ substitute() method
 	/**
 	 * Returns the specified text, with any substitution specified
 	 * within this matcher performed.
@@ -107,14 +122,15 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 			Object obj = BeanShell.runCachedBlock(replaceMethod,
 				null,replaceNS);
 			if(obj == null)
-				return null;
+				return "";
 			else
 				return obj.toString();
 		}
 		else
 			return replace;
-	}
+	} //}}}
 
+	//{{{ match() method
 	/*
 	 *  a good introduction to the Boyer-Moore fast string matching
 	 *  algorithm may be found on Moore's website at:
@@ -122,20 +138,20 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 	 *   http://www.cs.utexas.edu/users/moore/best-ideas/string-searching/
 	 *
 	 */
-	public int match(char[] text, int offset, int length)
+	public int match(CharIndexed text)
 	{
-		// position variable for pattern start
-		int anchor = reverseSearch ? length - 1 : offset;
-
 		// position variable for pattern test position
 		int pos;
+
+		// position variable for pattern start
+		int anchor = 0;
 
 		// last possible start position of a match with this pattern;
 		// this is negative if the pattern is longer than the text
 		// causing the search loop below to immediately fail
-		int last_anchor = reverseSearch
-			? offset + pattern.length - 1
-			: length - pattern.length;
+		//int last_anchor = reverseSearch
+		//	? offset + pattern.length - 1
+		//	: length - pattern.length;
 
 		// each time the pattern is checked, we start this many
 		// characters ahead of 'anchor'
@@ -157,14 +173,13 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 		// pattern to determine the furthest we can move the anchor
 		// without missing any potential pattern matches.
 SEARCH:
-		while (reverseSearch ? anchor >= last_anchor : anchor <= last_anchor)
+		while (text.isValid())
 		{
 			for (pos = pattern_end; pos >= 0; --pos)
 			{
-				int idx = reverseSearch ? anchor - pos : anchor + pos;
-				ch = ignoreCase
-					? Character.toUpperCase(text[idx])
-					: text[idx];
+				ch = text.charAt(pos);
+				if(ignoreCase)
+					ch = Character.toUpperCase(ch);
 
 				// pattern test
 				if (ch != pattern[pos])
@@ -180,7 +195,8 @@ SEARCH:
 					// skip the greater of the two distances provided by the
 					// heuristics
 					int skip = (bad_char > good_suffix) ? bad_char : good_suffix;
-					anchor += reverseSearch ? -skip : skip;
+					anchor += skip;
+					text.move(skip);
 
 					// go back to the while loop
 					continue SEARCH;
@@ -188,14 +204,14 @@ SEARCH:
 			}
 
 			// MATCH: return the position of its first character
-			return (reverseSearch ? anchor - pattern_end : anchor);
+			return anchor;
 		}
 
 		// MISMATCH: return -1 as defined by API
 		return -1;
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
 	private char[] pattern;
 	private String replace;
 	private boolean ignoreCase;
@@ -207,9 +223,11 @@ SEARCH:
 	// Boyer-Moore member fields
 	private int[] skip;
 	private int[] suffix;
+	//}}}
 
 	// Boyer-Moore helper methods
 
+	//{{{ generateSkipArray() method
 	/*
 	 *  the 'skip' array is used to determine for each index in the
 	 *  hashed alphabet how many characters can be skipped if
@@ -230,8 +248,9 @@ SEARCH:
 			skip[getSkipIndex(pattern[pos])] = pos;
 		}
 		while (++pos < pattern.length);
-	}
+	} //}}}
 
+	//{{{ getSkipIndex() method
 	/*
 	 *  to avoid our skip table having a length of 2 ^ 16, we hash each
 	 *  character of the input into a character in the alphabet [\x00-\xFF]
@@ -251,8 +270,9 @@ SEARCH:
 	private static final int getSkipIndex(char ch)
 	{
 		return ((int) ch) & 0x000000FF;
-	}
+	} //}}}
 
+	//{{{ generateSuffixArray() method
 	/*
 	 *  XXX: hairy code that is basically just a functional(?) port of some
 	 *  other code i barely understood
@@ -299,5 +319,7 @@ SEARCH:
 				k = tmp[k];
 			}
 		}
-	}
+	} //}}}
+
+	//}}}
 }

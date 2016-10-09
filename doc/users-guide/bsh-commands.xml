@@ -4,7 +4,7 @@
 <!-- jEdit buffer-local properties:                              -->
 <!-- :indentSize=1:noTabs=yes:maxLineLen=72:tabSize=2:           -->
 
-<chapter id="BeanShell-commands"><title>BeanShell Commands</title>
+<chapter id="beanshell-commands"><title>BeanShell Commands</title>
 
 <para>
   BeanShell includes a set of <firstterm>commands</firstterm>;
@@ -20,25 +20,9 @@
  </para>
 </note>
 
-<sect1 id="BeanShell-commands-output"><title>Output Commands</title>
+<sect1 id="beanshell-commands-output"><title>Output Commands</title>
 
   <itemizedlist>
-
-    <listitem>
-      <funcsynopsis>
-        <funcprototype>
-          <funcdef>void <function>print</function></funcdef>
-          <paramdef><parameter>arg</parameter></paramdef>
-        </funcprototype>
-      </funcsynopsis>
-      <para>
-        Writes the string value of the argument to the activity log,
-        or if run from the <application>Console</application> plugin,
-        to the current output window.  If <parameter>arg</parameter> is
-        an array, <function>print</function> runs itself recursively
-        on the array's elements.
-      </para>
-    </listitem>
 
     <!-- one day jEdit will provide its own error() implementation -->
     <!-- <listitem>
@@ -81,13 +65,42 @@
       </para>
     </listitem>
 
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>print</function></funcdef>
+          <paramdef><parameter>arg</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Writes the string value of the argument to the activity log,
+        or if run from the <application>Console</application> plugin,
+        to the current output window.  If <parameter>arg</parameter> is
+        an array, <function>print</function> runs itself recursively
+        on the array's elements.
+      </para>
+    </listitem>
+
   </itemizedlist>
 
 </sect1>
 
-<sect1 id="BeanShell-commands-file"><title>File Management Commands</title>
+<sect1 id="beanshell-commands-file"><title>File Management Commands</title>
 
   <itemizedlist>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>cd</function></funcdef>
+          <paramdef>String <parameter>dirname</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Changes the working directory of the BeanShell interpreter
+        to <parameter>dirname</parameter>.
+      </para>
+    </listitem>
 
     <listitem>
       <funcsynopsis>
@@ -100,6 +113,20 @@
         Displays the contents of directory <parameter>dirname</parameter>.
         The format of the display is similar to the Unix
         <function>ls -l</function> command.
+      </para>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>mv</function></funcdef>
+          <paramdef>String <parameter>fromFile</parameter></paramdef>
+          <paramdef>String <parameter>toFile</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Moves the file named by <parameter>fromFile</parameter> to
+        <parameter>toFile</parameter>.
       </para>
     </listitem>
 
@@ -121,19 +148,6 @@
     <listitem>
       <funcsynopsis>
         <funcprototype>
-          <funcdef>void <function>cd</function></funcdef>
-          <paramdef>String <parameter>dirname</parameter></paramdef>
-        </funcprototype>
-      </funcsynopsis>
-      <para>
-        Changes the working directory of the BeanShell interpreter
-        to <parameter>dirname</parameter>.
-      </para>
-    </listitem>
-
-    <listitem>
-      <funcsynopsis>
-        <funcprototype>
           <funcdef>void <function>pwd</function></funcdef>
           <void/>
         </funcprototype>
@@ -141,20 +155,6 @@
       <para>
         Writes the current working directory of the BeanShell interpreter
         to the output stream of the current process.
-      </para>
-    </listitem>
-
-    <listitem>
-      <funcsynopsis>
-        <funcprototype>
-          <funcdef><function>mv</function></funcdef>
-          <paramdef>String <parameter>fromFile</parameter></paramdef>
-          <paramdef>String <parameter>toFile</parameter></paramdef>
-        </funcprototype>
-      </funcsynopsis>
-      <para>
-        Moves the file named by <parameter>fromFile</parameter> to
-        <parameter>toFile</parameter>.
       </para>
     </listitem>
 
@@ -173,9 +173,22 @@
   </itemizedlist>
 
 </sect1>
-<sect1 id="BeanShell-commands-serial"><title>Component Commands</title>
+<sect1 id="beanshell-commands-serial"><title>Component Commands</title>
 
   <itemizedlist>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>JFrame <function>frame</function></funcdef>
+          <paramdef>Component <parameter>frame</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Displays the component in a top-level <classname>JFrame</classname>,
+        centered and packed.  Returns the <classname>JFrame</classname> object.
+      </para>
+    </listitem>
 
     <listitem>
       <funcsynopsis>
@@ -207,19 +220,6 @@
     <listitem>
       <funcsynopsis>
         <funcprototype>
-          <funcdef>JFrame <function>frame</function></funcdef>
-          <paramdef>Component <parameter>frame</parameter></paramdef>
-        </funcprototype>
-      </funcsynopsis>
-      <para>
-        Displays the component in a top-level <classname>JFrame</classname>,
-        centered and packed.  Returns the <classname>JFrame</classname> object.
-      </para>
-    </listitem>
-
-    <listitem>
-      <funcsynopsis>
-        <funcprototype>
           <funcdef>Font <function>setFont</function></funcdef>
           <paramdef>Component <parameter>comp</parameter></paramdef>
           <paramdef>int <parameter>ptsize</parameter></paramdef>
@@ -237,7 +237,7 @@
 </sect1>
 
 
-<sect1 id="BeanShell-commands-resource">
+<sect1 id="beanshell-commands-resource">
 <title>Resource Management Commands</title>
 
   <itemizedlist>
@@ -302,7 +302,7 @@
         </funcprototype>
       </funcsynopsis>
       <para>
-        Retruns an array containing the current classpath.
+        Returns an array containing the current classpath.
       </para>
     </listitem>
 
@@ -325,7 +325,7 @@
       <para>
         Reloads the class or package specified by
         <parameter>packagename</parameter> in the BeanShell interpreter.
-        If called without a parameter, releads all classes
+        If called without a parameter, reloads all classes
         in the interpreter's classpath.
       </para>
     </listitem>
@@ -349,14 +349,28 @@
 
 </sect1>
 
-<sect1 id="BeanShell-commands-script"><title>Script Execution Commands</title>
+<sect1 id="beanshell-commands-script"><title>Script Execution Commands</title>
 
   <itemizedlist>
 
     <listitem>
       <funcsynopsis>
         <funcprototype>
-          <funcdef><function>exec</function></funcdef>
+          <funcdef>Thread <function>bg</function></funcdef>
+          <paramdef>String <parameter>filename</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Run the BeanShell script named by <parameter>filename</parameter>
+        in a copy of the existing namespace and in a separate thread.  Returns
+        the <classname>Thread</classname> object so created.
+      </para>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>exec</function></funcdef>
           <paramdef>String <parameter>cmdline</parameter></paramdef>
         </funcprototype>
       </funcsynopsis>
@@ -365,19 +379,6 @@
         <function>Runtime.exec()</function> on
         <parameter>cmdline</parameter>. Any output is directed to the
         output stream of the calling process.
-      </para>
-    </listitem>
-
-    <listitem>
-      <funcsynopsis>
-        <funcprototype>
-          <funcdef>void <function>source</function></funcdef>
-          <paramdef>String <parameter>filename</parameter></paramdef>
-        </funcprototype>
-      </funcsynopsis>
-      <para>
-        Evaluates the contents of <parameter>filename</parameter>
-        as a BeanShell script in the interpreter's current namespace.
       </para>
     </listitem>
 
@@ -410,21 +411,7 @@
       </para>
     </listitem>
 
-    <listitem>
-      <funcsynopsis>
-        <funcprototype>
-          <funcdef>Thread <function>bg</function></funcdef>
-          <paramdef>String <parameter>filename</parameter></paramdef>
-        </funcprototype>
-      </funcsynopsis>
-      <para>
-        Run the BeanShell script named by <parameter>filename</parameter>
-        in a copy of the existing namespace and in a separate thread.  Returns
-        the <classname>Thread</classname> object so created.
-      </para>
-    </listitem>
-
-    <listitem>
+    <!-- <listitem>
       <funcsynopsis>
         <funcprototype>
           <funcdef>void <function>server</function></funcdef>
@@ -432,7 +419,7 @@
         </funcprototype>
       </funcsynopsis>
       <para>
-        Createes a <quote>server</quote> version of the BeanShell
+        Creates a <quote>server</quote> version of the BeanShell
         interpreter that shares the same namespace as the current
         interpreter.  The server interpreter listens on the designated
         port.
@@ -447,16 +434,70 @@
         Security of this port is not guaranteed.  Use this command
         with extreme caution.
       </para></caution>
+    </listitem> -->
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>source</function></funcdef>
+          <paramdef>String <parameter>filename</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Evaluates the contents of <parameter>filename</parameter>
+        as a BeanShell script in the interpreter's current namespace.
+      </para>
     </listitem>
 
   </itemizedlist>
 
 </sect1>
 
-<sect1 id="BeanShell-commands-object">
+<sect1 id="beanshell-commands-object">
 <title>BeanShell Object Management Commands</title>
 
   <itemizedlist>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef><function>bind</function></funcdef>
+          <paramdef>bsh.This <parameter>ths</parameter></paramdef>
+          <paramdef>bsh.Namespace <parameter>namespace</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Binds the scripted object <parameter>ths</parameter> to
+        <parameter>namespace</parameter>.
+      </para>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>clear</function></funcdef>
+          <void/>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Clear all variables, methods, and imports from this namespace.
+        If this namespace is the root, it will be reset to the default
+        imports.
+      </para>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>bsh.This <function>extend</function></funcdef>
+          <paramdef>bsh.This <parameter>object</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Creates a new BeanShell <classname>This</classname> scripted object
+        that is a child of the parameter <parameter>object</parameter>.
+      </para>
+    </listitem>
 
     <listitem>
       <funcsynopsis>
@@ -479,13 +520,13 @@ crufties.counter = 5;
     <listitem>
       <funcsynopsis>
         <funcprototype>
-          <funcdef>bsh.This <function>extend</function></funcdef>
-          <paramdef>bsh.This <parameter>object</parameter></paramdef>
+          <funcdef><function>setNameSpace</function></funcdef>
+          <paramdef>bsh.Namespace <parameter>namespace</parameter></paramdef>
         </funcprototype>
       </funcsynopsis>
       <para>
-        Creates a new BeanShell <classname>This</classname> scripted object
-        that is a child of the parameter <parameter>object</parameter>.
+        Set the namespace of the current scope to
+        <parameter>namespace</parameter>.
       </para>
     </listitem>
 
@@ -497,25 +538,11 @@ crufties.counter = 5;
         </funcprototype>
       </funcsynopsis>
       <para>
-        Returns a refernece to the BeanShell <classname>This</classname>
+        Returns a reference to the BeanShell <classname>This</classname>
         object representing the enclosing method scope specified
         by <parameter>scopename</parameter>.  This method work similar to
         the <function>super</function> keyword but can refer to enclosing
         scope at higher levels in a hierarchy of scopes.
-      </para>
-    </listitem>
-
-    <listitem>
-      <funcsynopsis>
-        <funcprototype>
-          <funcdef><function>bind</function></funcdef>
-          <paramdef>bsh.This <parameter>ths</parameter></paramdef>
-          <paramdef>bsh.Namespace <parameter>namespace</parameter></paramdef>
-        </funcprototype>
-      </funcsynopsis>
-      <para>
-        Binds the scripted object <parameter>ths</parameter> to
-        <parameter>namespace</parameter>.
       </para>
     </listitem>
 
@@ -533,27 +560,14 @@ crufties.counter = 5;
       </para>
     </listitem>
 
-    <listitem>
-      <funcsynopsis>
-        <funcprototype>
-          <funcdef><function>setNameSpace</function></funcdef>
-          <paramdef>bsh.Namespace <parameter>namespace</parameter></paramdef>
-        </funcprototype>
-      </funcsynopsis>
-      <para>
-        Set the namespace of the current scope to
-        <parameter>namespace</parameter>.
-      </para>
-    </listitem>
-
   </itemizedlist>
 
 </sect1>
 
-<sect1 id="BeanShell-commands-other"><title>Other Commands</title>
+<sect1 id="beanshell-commands-other"><title>Other Commands</title>
 
   <itemizedlist>
-    <listitem>
+    <!-- <listitem>
       <funcsynopsis>
         <funcprototype>
           <funcdef>void <function>exit</function></funcdef>
@@ -568,7 +582,7 @@ crufties.counter = 5;
         <function>jEdit.exit()</function> instead so the application will
         shutdown in an orderly fashion.
       </para></caution>
-    </listitem>
+    </listitem> -->
 
     <listitem>
       <funcsynopsis>

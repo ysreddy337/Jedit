@@ -1,6 +1,9 @@
 /*
  * FileRootsVFS.java - Local root filesystems VFS
- * Copyright (C) 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,69 +22,61 @@
 
 package org.gjt.sp.jedit.io;
 
+//{{{ Imports
 import javax.swing.filechooser.FileSystemView;
 import java.awt.Component;
 import java.lang.reflect.*;
 import java.io.File;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * A VFS that lists local root filesystems.
  * @author Slava Pestov
- * @version $Id: FileRootsVFS.java,v 1.1.1.1 2001/09/02 05:38:16 spestov Exp $
+ * @version $Id: FileRootsVFS.java,v 1.4 2002/04/03 02:07:18 spestov Exp $
  */
 public class FileRootsVFS extends VFS
 {
 	public static final String PROTOCOL = "roots";
 
+	//{{{ FileRootsVFS constructor
 	public FileRootsVFS()
 	{
 		super("roots");
 
-		// try using Java 2 method first
+		// JDK 1.4 adds a method to obtain a drive letter label
 		try
 		{
-			method = File.class.getMethod("listRoots",new Class[0]);
-			Log.log(Log.DEBUG,this,"File.listRoots() detected");
+			method = FileSystemView.class.getMethod("getSystemDisplayName",
+				new Class[] { java.io.File.class });
+			fsView = FileSystemView.getFileSystemView();
+			Log.log(Log.DEBUG,this,"FileSystemView.getSystemDisplayName() detected");
 		}
 		catch(Exception e)
 		{
-			fsView = FileSystemView.getFileSystemView();
-			Log.log(Log.DEBUG,this,"File.listRoots() not detected");
+			Log.log(Log.DEBUG,this,"FileSystemView.getSystemDisplayName() not detected");
 		}
-	}
+	} //}}}
 
+	//{{{ getCapabilities() method
 	public int getCapabilities()
 	{
 		// BROWSE_CAP not set because we don't want the VFS browser
 		// to create the default 'favorites' item in the 'More' menu
 		return 0 /* BROWSE_CAP | */;
-	}
+	} //}}}
 
+	//{{{ getParentOfPath() method
 	public String getParentOfPath(String path)
 	{
 		return PROTOCOL + ":";
-	}
+	} //}}}
 
+	//{{{ _listDirectory() method
 	public VFS.DirectoryEntry[] _listDirectory(Object session, String url,
 		Component comp)
 	{
-		File[] roots;
-
-		if(method == null)
-			roots = fsView.getRoots();
-		else
-		{
-			try
-			{
-				roots = (File[])method.invoke(null,new Object[0]);
-			}
-			catch(Exception e)
-			{
-				roots = null;
-				Log.log(Log.ERROR,this,e);
-			}
-		}
+		File[] roots = File.listRoots();
 
 		if(roots == null)
 			return null;
@@ -94,16 +89,30 @@ public class FileRootsVFS extends VFS
 		}
 
 		return rootDE;
-	}
+	} //}}}
 
+	//{{{ _getDirectoryEntry() method
 	public DirectoryEntry _getDirectoryEntry(Object session, String path,
 		Component comp)
 	{
-		return new VFS.DirectoryEntry(path,path,path,VFS.DirectoryEntry
-			.FILESYSTEM,0L,false);
-	}
+		String name = path;
 
-	// private members
+		if(method != null && !name.startsWith("A:") && !name.startsWith("B:"))
+		{
+			try
+			{
+				name = name + " " + (String)method.invoke(fsView,
+					new Object[] { new File(path) });
+			}
+			catch(Exception e) {}
+		}
+
+		return new VFS.DirectoryEntry(name,path,path,VFS.DirectoryEntry
+			.FILESYSTEM,0L,false);
+	} //}}}
+
+	//{{{ Private members
 	private FileSystemView fsView;
 	private Method method;
+	//}}}
 }

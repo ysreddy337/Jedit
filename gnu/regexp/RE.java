@@ -45,23 +45,28 @@ class CharUnit implements Serializable {
  * and an optional syntax specification (see RESyntax; if not specified,
  * <code>RESyntax.RE_SYNTAX_PERL5</code> is used).
  * <P>
+ * Once compiled, a regular expression object is reusable as well as
+ * threadsafe: multiple threads can use the RE instance simultaneously
+ * to match against different input text.
+ * <P>
  * Various methods attempt to match input text against a compiled
  * regular expression.  These methods are:
- * <LI><code>isMatch</code>: returns true if the input text in its entirety
- * matches the regular expression pattern.
- * <LI><code>getMatch</code>: returns the first match found in the input text,
- * or null if no match is found.
- * <LI><code>getAllMatches</code>: returns an array of all non-overlapping 
- * matches found in the input text.  If no matches are found, the array is
- * zero-length.
- * <LI><code>substitute</code>: substitute the first occurence of the pattern
- * in the input text with a replacement string (which may include
- * metacharacters $0-$9, see REMatch.substituteInto).
- * <LI><code>substituteAll</code>: same as above, but repeat for each match
- * before returning.
- * <LI><code>getMatchEnumeration</code>: returns an REMatchEnumeration object
- * that allows iteration over the matches (see REMatchEnumeration for some
- * reasons why you may want to do this instead of using <code>getAllMatches</code>.
+ * <LI><code>isMatch</code>: returns true if the input text in its
+ * entirety matches the regular expression pattern.
+ * <LI><code>getMatch</code>: returns the first match found in the
+ * input text, or null if no match is found.
+ * <LI><code>getAllMatches</code>: returns an array of all
+ * non-overlapping matches found in the input text.  If no matches are
+ * found, the array is zero-length.
+ * <LI><code>substitute</code>: substitute the first occurence of the
+ * pattern in the input text with a replacement string (which may
+ * include metacharacters $0-$9, see REMatch.substituteInto).
+ * <LI><code>substituteAll</code>: same as above, but repeat for each
+ * match before returning.
+ * <LI><code>getMatchEnumeration</code>: returns an REMatchEnumeration
+ * object that allows iteration over the matches (see
+ * REMatchEnumeration for some reasons why you may want to do this
+ * instead of using <code>getAllMatches</code>.
  * <P>
  *
  * These methods all have similar argument lists.  The input can be a
@@ -80,7 +85,7 @@ class CharUnit implements Serializable {
  * pattern operators).  For a Reader or InputStream, this means an
  * offset from the current read position, so subsequent calls with the
  * same index argument on a Reader or an InputStream will not
- * necessarily be accessing the same position on the stream, whereas
+ * necessarily access the same position on the stream, whereas
  * repeated searches at a given index in a fixed string will return
  * consistent results.
  *
@@ -93,12 +98,12 @@ class CharUnit implements Serializable {
  * thread-safe manner.
  *
  * @author <A HREF="mailto:wes@cacas.org">Wes Biggs</A>
- * @version 1.1.3, 18 June 2001 
+ * @version 1.1.5-dev, to be released
  */
 
-public final class RE extends REToken {
+public class RE extends REToken {
   // This String will be returned by getVersion()
-  private static final String s_version = "1.1.3";
+  private static final String VERSION = "1.1.5-dev";
 
   // The localized strings are kept in a separate file
   private static ResourceBundle messages = PropertyResourceBundle.getBundle("gnu/regexp/MessagesBundle", Locale.getDefault());
@@ -155,11 +160,11 @@ public final class RE extends REToken {
    * REMatch m4 = exp.getMatch(s,8,RE.REG_ANCHORINDEX);         <BR>
    * <P>
    * // Results:<BR>
-   * //  m0 = "food"<BR>
-   * //  m1 = "fool"<BR>
-   * //  m2 = null<BR>
-   * //  m3 = null<BR>
-   * //  m4 = "fool"<BR>
+   * //  m0.toString(): "food"<BR>
+   * //  m1.toString(): "fool"<BR>
+   * //  m2.toString(): null<BR>
+   * //  m3.toString(): null<BR>
+   * //  m4.toString(): "fool"<BR>
    * </CODE>
    */
   public static final int REG_NOTBOL = 16;
@@ -196,7 +201,7 @@ public final class RE extends REToken {
 
   /** Returns a string representing the version of the gnu.regexp package. */
   public static final String version() {
-    return s_version;
+    return VERSION;
   }
 
   // Retrieves a message from the ResourceBundle
@@ -259,10 +264,17 @@ public final class RE extends REToken {
     addToken(new RETokenEndSub(subIndex));
   }
 
-  // Actual constructor implementation
   private RE(Object patternObj, int cflags, RESyntax syntax, int myIndex, int nextSub) throws REException {
     super(myIndex); // Subexpression index of this token.
-    char[] pattern;
+    initialize(patternObj, cflags, syntax, myIndex, nextSub);
+  }
+
+    // For use by subclasses
+    protected RE() { super(0); }
+
+    // The meat of construction
+  protected void initialize(Object patternObj, int cflags, RESyntax syntax, int myIndex, int nextSub) throws REException {
+      char[] pattern;
     if (patternObj instanceof String) {
       pattern = ((String) patternObj).toCharArray();
     } else if (patternObj instanceof char[]) {
@@ -318,9 +330,9 @@ public final class RE extends REToken {
 	// make everything up to here be a branch. create vector if nec.
 	addToken(currentToken);
 	RE theBranch = new RE(firstToken, lastToken, numSubs, subIndex, minimumLength);
+	minimumLength = 0;
 	if (branches == null) {
 	    branches = new Vector();
-	    minimumLength = 0;
 	}
 	branches.addElement(theBranch);
 	firstToken = lastToken = currentToken = null;
@@ -527,13 +539,14 @@ public final class RE extends REToken {
 	    numSubs++;
 	  }
 
-          if (lookAhead)
-            currentToken = new RETokenLookAhead(String.valueOf(pattern,index,endIndex-index).toCharArray(),cflags,syntax,negativelh);
-          else {
-            int useIndex = pure ? 0 : nextSub + numSubs;
-            currentToken = new RE(String.valueOf(pattern,index,endIndex-index).toCharArray(),cflags,syntax,useIndex,nextSub + numSubs);
-            numSubs += ((RE) currentToken).getNumSubs();
-          }
+	  int useIndex = (pure || lookAhead) ? 0 : nextSub + numSubs;
+	  currentToken = new RE(String.valueOf(pattern,index,endIndex-index).toCharArray(),cflags,syntax,useIndex,nextSub + numSubs);
+	  numSubs += ((RE) currentToken).getNumSubs();
+
+          if (lookAhead) {
+	      currentToken = new RETokenLookAhead(currentToken,negativelh);
+	  }
+
 	  index = nextIndex;
 	} // not a comment
       } // subexpression
@@ -784,8 +797,7 @@ public final class RE extends REToken {
   }
 
   /**
-   * Checks if the input in its entirety is an exact match of
-   * this regular expression.
+   * Checks if the regular expression matches the input in its entirety.
    *
    * @param input The input text.
    */
@@ -944,6 +956,7 @@ public final class RE extends REToken {
    * null is returned.
    *
    * @param input The input text.
+   * @return An REMatch instance referencing the match, or null if none.
    */
   public REMatch getMatch(Object input) {
     return getMatch(input,0,0);
@@ -956,6 +969,7 @@ public final class RE extends REToken {
    *
    * @param input The input text.
    * @param index The offset within the text to begin looking for a match.
+   * @return An REMatch instance referencing the match, or null if none.
    */
   public REMatch getMatch(Object input, int index) {
     return getMatch(input,index,0);
@@ -969,33 +983,34 @@ public final class RE extends REToken {
    * @param input The input text.
    * @param index The offset index at which the search should be begin.
    * @param eflags The logical OR of any execution flags above.
+   * @return An REMatch instance referencing the match, or null if none.
    */
   public REMatch getMatch(Object input, int index, int eflags) {
     return getMatch(input,index,eflags,null);
   }
 
   /**
-   * Returns the first match found in the input, beginning
-   * the search at the specified index, and using the specified
-   * execution flags.  If no match is found, returns null.  If a StringBuffer
-   * is provided and is non-null, the contents of the input text from the index to the
-   * beginning of the match (or to the end of the input, if there is no match)
-   * are appended to the StringBuffer.
+   * Returns the first match found in the input, beginning the search
+   * at the specified index, and using the specified execution flags.
+   * If no match is found, returns null.  If a StringBuffer is
+   * provided and is non-null, the contents of the input text from the
+   * index to the beginning of the match (or to the end of the input,
+   * if there is no match) are appended to the StringBuffer.
    *
    * @param input The input text.
    * @param index The offset index at which the search should be begin.
    * @param eflags The logical OR of any execution flags above.
    * @param buffer The StringBuffer to save pre-match text in.
-   */
+   * @return An REMatch instance referencing the match, or null if none.  */
   public REMatch getMatch(Object input, int index, int eflags, StringBuffer buffer) {
     return getMatchImpl(makeCharIndexed(input,index),index,eflags,buffer);
   }
 
-  REMatch getMatchImpl(CharIndexed input, int index, int eflags, StringBuffer buffer) {
+  REMatch getMatchImpl(CharIndexed input, int anchor, int eflags, StringBuffer buffer) {
       // Create a new REMatch to hold results
-      REMatch mymatch = new REMatch(numSubs, index, eflags);
+      REMatch mymatch = new REMatch(numSubs, anchor, eflags);
       do {
-	  // Optimization: check if index + minimumLength > length
+	  // Optimization: check if anchor + minimumLength > length
 	  if (minimumLength == 0 || input.charAt(minimumLength-1) != CharIndexed.OUT_OF_BOUNDS) {
 	      if (match(input, mymatch)) {
 		  // Find longest match of them all to observe leftmost longest
@@ -1011,13 +1026,21 @@ public final class RE extends REToken {
 		  return longest;
 	      }
 	  }
-	  mymatch.clear(++index);
+	  mymatch.clear(++anchor);
 	  // Append character to buffer if needed
 	  if (buffer != null && input.charAt(0) != CharIndexed.OUT_OF_BOUNDS) {
 	      buffer.append(input.charAt(0));
 	  }
       } while (input.move(1));
       
+      // Special handling at end of input for e.g. "$"
+      if (minimumLength == 0) {
+	  if (match(input, mymatch)) {
+	      mymatch.finish(input);
+	      return mymatch;
+	  }
+      }
+
       return null;
   }
 
@@ -1026,6 +1049,7 @@ public final class RE extends REToken {
    * matches found in the input text.
    *
    * @param input The input text.
+   * @return A non-null REMatchEnumeration instance.
    */
   public REMatchEnumeration getMatchEnumeration(Object input) {
     return getMatchEnumeration(input,0,0);
@@ -1038,6 +1062,8 @@ public final class RE extends REToken {
    *
    * @param input The input text.
    * @param index The offset index at which the search should be begin.
+   * @return A non-null REMatchEnumeration instance, with its input cursor
+   *  set to the index position specified.
    */
   public REMatchEnumeration getMatchEnumeration(Object input, int index) {
     return getMatchEnumeration(input,index,0);
@@ -1050,6 +1076,8 @@ public final class RE extends REToken {
    * @param input The input text.
    * @param index The offset index at which the search should be begin.
    * @param eflags The logical OR of any execution flags above.
+   * @return A non-null REMatchEnumeration instance, with its input cursor
+   *  set to the index position specified.
    */
   public REMatchEnumeration getMatchEnumeration(Object input, int index, int eflags) {
     return new REMatchEnumeration(this,makeCharIndexed(input,index),index,eflags);
@@ -1061,6 +1089,7 @@ public final class RE extends REToken {
    *
    * @param input The input text.
    * @param replace The replacement text, which may contain $x metacharacters (see REMatch.substituteInto).
+   * @return A String interpolating the substituted text.
    * @see REMatch#substituteInto
    */
   public String substitute(Object input,String replace) {
@@ -1069,11 +1098,15 @@ public final class RE extends REToken {
 
   /**
    * Substitutes the replacement text for the first match found in the input
-   * beginning at the specified index position.
+   * beginning at the specified index position.  Specifying an index
+   * effectively causes the regular expression engine to throw away the
+   * specified number of characters. 
    *
    * @param input The input text.
    * @param replace The replacement text, which may contain $x metacharacters (see REMatch.substituteInto).
    * @param index The offset index at which the search should be begin.
+   * @return A String containing the substring of the input, starting
+   *   at the index position, and interpolating the substituted text.
    * @see REMatch#substituteInto
    */
   public String substitute(Object input,String replace,int index) {
@@ -1089,6 +1122,8 @@ public final class RE extends REToken {
    * @param replace The replacement text, which may contain $x metacharacters (see REMatch.substituteInto).
    * @param index The offset index at which the search should be begin.
    * @param eflags The logical OR of any execution flags above.
+   * @return A String containing the substring of the input, starting
+   *   at the index position, and interpolating the substituted text.
    * @see REMatch#substituteInto
    */
   public String substitute(Object input,String replace,int index,int eflags) {
@@ -1115,6 +1150,7 @@ public final class RE extends REToken {
    *
    * @param input The input text.
    * @param replace The replacement text, which may contain $x metacharacters (see REMatch.substituteInto).
+   * @return A String interpolating the substituted text.
    * @see REMatch#substituteInto
    */
   public String substituteAll(Object input,String replace) {
@@ -1131,6 +1167,8 @@ public final class RE extends REToken {
    * @param input The input text.
    * @param replace The replacement text, which may contain $x metacharacters (see REMatch.substituteInto).
    * @param index The offset index at which the search should be begin.
+   * @return A String containing the substring of the input, starting
+   *   at the index position, and interpolating the substituted text.
    * @see REMatch#substituteInto
    */
   public String substituteAll(Object input,String replace,int index) {
@@ -1146,6 +1184,8 @@ public final class RE extends REToken {
    * @param replace The replacement text, which may contain $x metacharacters (see REMatch.substituteInto).
    * @param index The offset index at which the search should be begin.
    * @param eflags The logical OR of any execution flags above.
+   * @return A String containing the substring of the input, starting
+   *   at the index position, and interpolating the substituted text.
    * @see REMatch#substituteInto
    */
   public String substituteAll(Object input,String replace,int index,int eflags) {
@@ -1309,7 +1349,7 @@ public final class RE extends REToken {
     else if (input instanceof Reader)
 	return new CharIndexedReader((Reader) input, index);
     else if (input instanceof CharIndexed)
-	return (CharIndexed) input;
+	return (CharIndexed) input; // do we lose index info?
     else 
 	return new CharIndexedString(input.toString(), index);
   }

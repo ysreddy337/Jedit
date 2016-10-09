@@ -1,6 +1,9 @@
 /*
  * BufferIORequest.java - I/O request
- * Copyright (C) 2000 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,22 +22,23 @@
 
 package org.gjt.sp.jedit.io;
 
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Element;
+//{{{ Imports
 import javax.swing.text.Segment;
 import java.io.*;
 import java.util.zip.*;
 import java.util.Vector;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.*;
+//}}}
 
 /**
  * A buffer I/O request.
  * @author Slava Pestov
- * @version $Id: BufferIORequest.java,v 1.1.1.1 2001/09/02 05:38:15 spestov Exp $
+ * @version $Id: BufferIORequest.java,v 1.23 2002/04/08 13:13:56 spestov Exp $
  */
 public class BufferIORequest extends WorkRequest
 {
+	//{{{ Constants
 	/**
 	 * Size of I/O buffers.
 	 */
@@ -45,10 +49,14 @@ public class BufferIORequest extends WorkRequest
 	 */
 	public static final int PROGRESS_INTERVAL = 300;
 
+	public static final String LOAD_DATA = "BufferIORequest__loadData";
+	public static final String END_OFFSETS = "BufferIORequest__endOffsets";
+	public static final String NEW_PATH = "BufferIORequest__newPath";
+
 	/**
-	 * Property loaded data is stored in.
+	 * Buffer boolean property set when an error occurs.
 	 */
-	public static final String LOAD_DATA = "IORequest__loadData";
+	public static final String ERROR_OCCURRED = "BufferIORequest__error";
 
 	/**
 	 * A file load request.
@@ -71,6 +79,16 @@ public class BufferIORequest extends WorkRequest
 	public static final int INSERT = 3;
 
 	/**
+	 * Magic number used for auto-detecting Unicode and GZIP files.
+	 */
+	public static final int GZIP_MAGIC_1 = 0x1f;
+	public static final int GZIP_MAGIC_2 = 0x8b;
+	public static final int UNICODE_MAGIC_1 = 0xfe;
+	public static final int UNICODE_MAGIC_2 = 0xff;
+	//}}}
+
+	//{{{ BufferIORequest constructor
+	/**
 	 * Creates a new buffer I/O request.
 	 * @param type The request type
 	 * @param view The view
@@ -92,8 +110,9 @@ public class BufferIORequest extends WorkRequest
 		markersPath = vfs.getParentOfPath(path)
 			+ '.' + vfs.getFileName(path)
 			+ ".marks";
-	}
+	} //}}}
 
+	//{{{ run() method
 	public void run()
 	{
 		switch(type)
@@ -111,8 +130,9 @@ public class BufferIORequest extends WorkRequest
 			insert();
 			break;
 		}
-	}
+	} //}}}
 
+	//{{{ toString() method
 	public String toString()
 	{
 		String typeString;
@@ -133,9 +153,11 @@ public class BufferIORequest extends WorkRequest
 
 		return getClass().getName() + "[type=" + typeString
 			+ ",buffer=" + buffer + "]";
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+
+	//{{{ Instance variables
 	private int type;
 	private View view;
 	private Buffer buffer;
@@ -143,7 +165,9 @@ public class BufferIORequest extends WorkRequest
 	private VFS vfs;
 	private String path;
 	private String markersPath;
+	//}}}
 
+	//{{{ load() method
 	private void load()
 	{
 		InputStream in = null;
@@ -157,6 +181,8 @@ public class BufferIORequest extends WorkRequest
 				setAbortable(true);
 				setProgressValue(0);
 
+				path = vfs._canonPath(session,path,view);
+
 				VFS.DirectoryEntry entry = vfs._getDirectoryEntry(
 					session,path,view);
 				long length;
@@ -167,28 +193,60 @@ public class BufferIORequest extends WorkRequest
 
 				in = vfs._createInputStream(session,path,false,view);
 				if(in == null)
+				{
+					System.err.println("in = null");
 					return;
+				}
 
-				if(path.endsWith(".gz"))
+				in = new BufferedInputStream(in);
+
+				if(in.markSupported())
+				{
+					in.mark(2);
+					int b1 = in.read();
+					int b2 = in.read();
+					in.reset();
+
+					if(b1 == GZIP_MAGIC_1 && b2 == GZIP_MAGIC_2)
+					{
+						in = new GZIPInputStream(in);
+						buffer.setBooleanProperty(Buffer.GZIPPED,true);
+					}
+					else if((b1 == UNICODE_MAGIC_1 && b2 == UNICODE_MAGIC_2)
+						|| (b1 == UNICODE_MAGIC_2 && b2 == UNICODE_MAGIC_1))
+					{
+						buffer.setProperty(Buffer.ENCODING,"Unicode");
+					}
+				}
+				else if(path.toLowerCase().endsWith(".gz"))
 					in = new GZIPInputStream(in);
 
-				String lineSeparator = read(buffer,in,length);
-				buffer.putProperty(Buffer.LINESEP,lineSeparator);
+				read(buffer,in,length);
 				buffer.setNewFile(false);
 			}
 			catch(CharConversionException ch)
 			{
 				Log.log(Log.ERROR,this,ch);
-				Object[] pp = { path,
-					buffer.getProperty(Buffer.ENCODING),
+				Object[] pp = { buffer.getProperty(Buffer.ENCODING),
 					ch.toString() };
-				VFSManager.error(view,"encoding-error",pp);
+				VFSManager.error(view,path,"ioerror.encoding-error",pp);
+
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				Object[] pp = { path, io.toString() };
-				VFSManager.error(view,"read-error",pp);
+				Object[] pp = { io.toString() };
+				VFSManager.error(view,path,"ioerror.read-error",pp);
+
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
+			}
+			catch(OutOfMemoryError oom)
+			{
+				Log.log(Log.ERROR,this,oom);
+				VFSManager.error(view,path,"out-of-memory-error",null);
+
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 
 			if(jEdit.getBooleanProperty("persistentMarkers"))
@@ -221,6 +279,8 @@ public class BufferIORequest extends WorkRequest
 				{
 				}
 			}
+
+			buffer.setBooleanProperty(ERROR_OCCURRED,true);
 		}
 		finally
 		{
@@ -231,67 +291,24 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				String[] pp = { path, io.toString() };
-				VFSManager.error(view,"read-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(view,path,"ioerror.read-error",pp);
+
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 			catch(WorkThread.Abort a)
 			{
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 		}
-	}
+	} //}}}
 
-	/**
-	 * Reads the buffer from the specified input stream. Read and
-	 * understand all these notes if you want to snarf this code for
-	 * your own app; it has a number of subtle behaviours which are
-	 * not entirely obvious.<p>
-	 *
-	 * Some notes that will help future hackers:
-	 * <ul>
-	 * <li>
-	 * We use a StringBuffer because there is no way to pre-allocate
-	 * in the GapContent - and adding text each time to the GapContent
-	 * would be slow because it would require array enlarging, etc.
-	 * Better to do as few gap inserts as possible.
-	 *
-	 * <li>The StringBuffer is pre-allocated to the file's size (obtained
-	 * from the VFS). If the file size is not known, we default to
-	 * IOBUFSIZE.
-	 *
-	 * <li>We read the stream in IOBUFSIZE (= 32k) blocks, and loop over
-	 * the read characters looking for line breaks.
-	 * <ul>
-	 * <li>a \r or \n causes a line to be added to the model, and appended
-	 * to the string buffer
-	 * <li>a \n immediately following an \r is ignored; so that Windows
-	 * line endings are handled
-	 * </ul>
-	 *
-	 * <li>This method remembers the line separator used in the file, and
-	 * stores it in the lineSeparator buffer-local property. However,
-	 * if the file contains, say, hello\rworld\n, lineSeparator will
-	 * be set to \n, and the file will be saved as hello\nworld\n.
-	 * Hence jEdit is not really appropriate for editing binary files.
-	 *
-	 * <li>To make reloading a bit easier, this method automatically
-	 * removes all data from the model before inserting it. This
-	 * shouldn't cause any problems, as most documents will be
-	 * empty before being loaded into anyway.
-	 *
-	 * <li>If the last character read from the file is a line separator,
-	 * it is not added to the model! There are two reasons:
-	 * <ul>
-	 * <li>On Unix, all text files have a line separator at the end,
-	 * there is no point wasting an empty screen line on that
-	 * <li>Because save() appends a line separator after *every* line,
-	 * it prevents the blank line count at the end from growing
-	 * </ul>
-	 * 
-	 * </ul>
-	 */
-	private String read(Buffer buffer, InputStream _in, long length)
+	//{{{ read() method
+	private void read(Buffer buffer, InputStream _in, long length)
 		throws IOException
 	{
+		IntegerArray endOffsets = new IntegerArray();
+
 		// only true if the file size is known
 		boolean trackProgress = (length != 0);
 		File file = buffer.getFile();
@@ -304,11 +321,12 @@ public class BufferIORequest extends WorkRequest
 		if(length == 0)
 			length = IOBUFSIZE;
 
-		StringBuffer sbuf = new StringBuffer((int)length);
+		SegmentBuffer seg = new SegmentBuffer((int)length + 1);
 
 		InputStreamReader in = new InputStreamReader(_in,
-			(String)buffer.getProperty(Buffer.ENCODING));
+			buffer.getStringProperty(Buffer.ENCODING));
 		char[] buf = new char[IOBUFSIZE];
+
 		// Number of characters in 'buf' array.
 		// InputStream.read() doesn't always fill the
 		// array (eg, the file size is not a multiple of
@@ -362,11 +380,12 @@ public class BufferIORequest extends WorkRequest
 					}
 
 					// Insert a line
-					sbuf.append(buf,lastLine,i -
+					seg.append(buf,lastLine,i -
 						lastLine);
-					sbuf.append('\n');
+					endOffsets.add(seg.count);
+					seg.append('\n');
 					if(trackProgress && lineCount++ % PROGRESS_INTERVAL == 0)
-						setProgressValue(sbuf.length());
+						setProgressValue(seg.count);
 
 					// This is i+1 to take the
 					// trailing \n into account
@@ -399,11 +418,12 @@ public class BufferIORequest extends WorkRequest
 					{
 						CROnly = false;
 						CRLF = false;
-						sbuf.append(buf,lastLine,
+						seg.append(buf,lastLine,
 							i - lastLine);
-						sbuf.append('\n');
+						endOffsets.add(seg.count);
+						seg.append('\n');
 						if(trackProgress && lineCount++ % PROGRESS_INTERVAL == 0)
-							setProgressValue(sbuf.length());
+							setProgressValue(seg.count);
 						lastLine = i + 1;
 					}
 					break;
@@ -424,44 +444,55 @@ public class BufferIORequest extends WorkRequest
 			}
 
 			if(trackProgress)
-				setProgressValue(sbuf.length());
+				setProgressValue(seg.count);
 
 			// Add remaining stuff from buffer
-			sbuf.append(buf,lastLine,len - lastLine);
+			seg.append(buf,lastLine,len - lastLine);
 		}
 
 		setAbortable(false);
 
-		String returnValue;
+		String lineSeparator;
 		if(CRLF)
-			returnValue = "\r\n";
+			lineSeparator = "\r\n";
 		else if(CROnly)
-			returnValue = "\r";
+			lineSeparator = "\r";
 		else
-			returnValue = "\n";
+			lineSeparator = "\n";
 
 		in.close();
 
 		// Chop trailing newline and/or ^Z (if any)
-		int bufferLength = sbuf.length();
+		int bufferLength = seg.count;
 		if(bufferLength != 0)
 		{
-			char ch = sbuf.charAt(bufferLength - 1);
-			if(length >= 2 && ch == 0x1a /* DOS ^Z */
-				&& sbuf.charAt(bufferLength - 2) == '\n')
-				sbuf.setLength(bufferLength - 2);
-			else if(ch == '\n')
-				sbuf.setLength(bufferLength - 1);
+			char ch = seg.array[bufferLength - 1];
+			if(ch == 0x1a /* DOS ^Z */)
+				seg.count--;
+		}
+
+		buffer.setBooleanProperty(Buffer.TRAILING_EOL,false);
+		if(bufferLength != 0)
+		{
+			char ch = seg.array[bufferLength - 1];
+			if(ch == '\n')
+			{
+				buffer.setBooleanProperty(Buffer.TRAILING_EOL,true);
+				seg.count--;
+				endOffsets.setSize(endOffsets.getSize() - 1);
+			}
 		}
 
 		// to avoid having to deal with read/write locks and such,
 		// we insert the loaded data into the buffer in the
 		// post-load cleanup runnable, which runs in the AWT thread.
-		buffer.putProperty(LOAD_DATA,sbuf);
+		buffer.setProperty(LOAD_DATA,seg);
+		buffer.setProperty(END_OFFSETS,endOffsets);
+		buffer.setProperty(NEW_PATH,path);
+		buffer.setProperty(Buffer.LINESEP,lineSeparator);
+	} //}}}
 
-		return returnValue;
-	}
-
+	//{{{ readMarkers() method
 	private void readMarkers(Buffer buffer, InputStream _in)
 		throws IOException
 	{
@@ -485,8 +516,9 @@ public class BufferIORequest extends WorkRequest
 		}
 
 		in.close();
-	}
+	} //}}}
 
+	//{{{ save() method
 	private void save()
 	{
 		OutputStream out = null;
@@ -501,7 +533,17 @@ public class BufferIORequest extends WorkRequest
 
 			try
 			{
+				path = vfs._canonPath(session,path,view);
+
 				buffer.readLock();
+
+				// Only backup once per session
+				if(buffer.getProperty(Buffer.BACKED_UP) == null 
+					|| jEdit.getBooleanProperty("backupEverySave"))
+				{
+					vfs._backup(session,path,view);
+					buffer.setBooleanProperty(Buffer.BACKED_UP,true);
+				}
 
 				/* if the VFS supports renaming files, we first
 				 * save to #<filename>#save#, then rename that
@@ -509,11 +551,14 @@ public class BufferIORequest extends WorkRequest
 				 * data will not be lost */
 				String savePath;
 
-				if((vfs.getCapabilities() & VFS.RENAME_CAP) != 0)
+				boolean twoStageSave = (vfs.getCapabilities() & VFS.RENAME_CAP) != 0
+					&& jEdit.getBooleanProperty("twoStageSave");
+				if(twoStageSave)
 				{
-					savePath = vfs.getParentOfPath(path)
-						+ '#' + vfs.getFileName(path)
-						+ "#save#";
+					savePath = MiscUtilities.constructPath(
+						vfs.getParentOfPath(path),
+						'#' + vfs.getFileName(path)
+						+ "#save#");
 				}
 				else
 					savePath = path;
@@ -521,21 +566,25 @@ public class BufferIORequest extends WorkRequest
 				out = vfs._createOutputStream(session,savePath,view);
 				if(out != null)
 				{
-					if(path.endsWith(".gz"))
+					// Can't use buffer.getName() here because
+					// it is not changed until the save is
+					// complete
+					if(savePath.endsWith(".gz"))
+						buffer.setBooleanProperty(Buffer.GZIPPED,true);
+
+					if(buffer.getBooleanProperty(Buffer.GZIPPED))
 						out = new GZIPOutputStream(out);
 
 					write(buffer,out);
-				}
 
-				// Only backup once per session
-				if(buffer.getProperty(Buffer.BACKED_UP) == null)
-				{
-					vfs._backup(session,path,view);
-					buffer.putProperty(Buffer.BACKED_UP,Boolean.TRUE);
+					if(twoStageSave)
+					{
+						if(!vfs._rename(session,savePath,path,view))
+							throw new IOException(path);
+					}
 				}
-
-				if((vfs.getCapabilities() & VFS.RENAME_CAP) != 0)
-					vfs._rename(session,savePath,path,view);
+				else
+					buffer.setBooleanProperty(ERROR_OCCURRED,true);
 
 				// We only save markers to VFS's that support deletion.
 				// Otherwise, we will accumilate stale marks files.
@@ -554,15 +603,13 @@ public class BufferIORequest extends WorkRequest
 						vfs._delete(session,markersPath,view);
 				}
 			}
-			catch(BadLocationException bl)
-			{
-				Log.log(Log.ERROR,this,bl);
-			}
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				String[] pp = { path, io.toString() };
-				VFSManager.error(view,"write-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(view,path,"ioerror.write-error",pp);
+
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 			finally
 			{
@@ -581,6 +628,8 @@ public class BufferIORequest extends WorkRequest
 				{
 				}
 			}
+
+			buffer.setBooleanProperty(ERROR_OCCURRED,true);
 		}
 		finally
 		{
@@ -592,15 +641,19 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				String[] pp = { path, io.toString() };
-				VFSManager.error(view,"write-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(view,path,"ioerror.write-error",pp);
+
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 			catch(WorkThread.Abort a)
 			{
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ autosave() method
 	private void autosave()
 	{
 		OutputStream out = null;
@@ -615,7 +668,7 @@ public class BufferIORequest extends WorkRequest
 
 			try
 			{
-				buffer.readLock();
+				//buffer.readLock();
 
 				if(!buffer.isDirty())
 				{
@@ -630,19 +683,12 @@ public class BufferIORequest extends WorkRequest
 
 				write(buffer,out);
 			}
-			catch(BadLocationException bl)
+			catch(Exception e)
 			{
-				Log.log(Log.ERROR,this,bl);
-			}
-			catch(IOException io)
-			{
-				/* Log.log(Log.ERROR,this,io);
-				args[0] = io.toString();
-				VFSManager.error(view,"ioerror",args); */
 			}
 			finally
 			{
-				buffer.readUnlock();
+				//buffer.readUnlock();
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -658,41 +704,44 @@ public class BufferIORequest extends WorkRequest
 				}
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ write() method
 	private void write(Buffer buffer, OutputStream _out)
-		throws IOException, BadLocationException
+		throws IOException
 	{
 		BufferedWriter out = new BufferedWriter(
 			new OutputStreamWriter(_out,
-				(String)buffer.getProperty(Buffer.ENCODING)),
+				buffer.getStringProperty(Buffer.ENCODING)),
 				IOBUFSIZE);
 		Segment lineSegment = new Segment();
-		String newline = (String)buffer.getProperty(Buffer.LINESEP);
+		String newline = buffer.getStringProperty(Buffer.LINESEP);
 		if(newline == null)
 			newline = System.getProperty("line.separator");
-		Element map = buffer.getDefaultRootElement();
 
-		setProgressMaximum(map.getElementCount() / PROGRESS_INTERVAL);
+		setProgressMaximum(buffer.getLineCount() / PROGRESS_INTERVAL);
 		setProgressValue(0);
 
 		int i = 0;
-		while(i < map.getElementCount())
+		while(i < buffer.getLineCount())
 		{
-			Element line = map.getElement(i);
-			int start = line.getStartOffset();
-			buffer.getText(start,line.getEndOffset() - start - 1,
-				lineSegment);
+			buffer.getLineText(i,lineSegment);
 			out.write(lineSegment.array,lineSegment.offset,
 				lineSegment.count);
-			out.write(newline);
+
+			if(i != buffer.getLineCount() - 1
+				|| buffer.getBooleanProperty(Buffer.TRAILING_EOL))
+			{
+				out.write(newline);
+			}
 
 			if(++i % PROGRESS_INTERVAL == 0)
 				setProgressValue(i / PROGRESS_INTERVAL);
 		}
 		out.close();
-	}
+	} //}}}
 
+	//{{{ writeMarkers() method
 	private void writeMarkers(Buffer buffer, OutputStream out)
 		throws IOException
 	{
@@ -712,8 +761,9 @@ public class BufferIORequest extends WorkRequest
 			o.write('\n');
 		}
 		o.close();
-	}
+	} //}}}
 
+	//{{{ insert() method
 	private void insert()
 	{
 		InputStream in = null;
@@ -725,6 +775,8 @@ public class BufferIORequest extends WorkRequest
 				String[] args = { vfs.getFileName(path) };
 				setStatus(jEdit.getProperty("vfs.status.load",args));
 				setAbortable(true);
+
+				path = vfs._canonPath(session,path,view);
 
 				VFS.DirectoryEntry entry = vfs._getDirectoryEntry(
 					session,path,view);
@@ -746,8 +798,10 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				String[] pp = { path, io.toString() };
-				VFSManager.error(view,"read-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(view,path,"ioerror.read-error",pp);
+
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -762,6 +816,8 @@ public class BufferIORequest extends WorkRequest
 				{
 				}
 			}
+
+			buffer.setBooleanProperty(ERROR_OCCURRED,true);
 		}
 		finally
 		{
@@ -772,12 +828,17 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				String[] pp = { path, io.toString() };
-				VFSManager.error(view,"read-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(view,path,"ioerror.read-error",pp);
+
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 			catch(WorkThread.Abort a)
 			{
+				buffer.setBooleanProperty(ERROR_OCCURRED,true);
 			}
 		}
-	}
+	} //}}}
+
+	//}}}
 }

@@ -37,6 +37,7 @@ package bsh;
 import java.lang.reflect.*;
 import java.lang.reflect.InvocationHandler;
 import java.io.*;
+import java.util.Hashtable;
 
 /**
 	XThis is a dynamically loaded extension which extends This.java and adds 
@@ -56,7 +57,13 @@ import java.io.*;
 	@see JThis	 See also JThis with explicit JFC support for compatability.
 	@see This	
 */
-class XThis extends This {
+class XThis extends This 
+	{
+	/**
+		A cache of proxy interface handlers.
+		Currently just one per interface.
+	*/
+	Hashtable interfaces;
 
 	InvocationHandler invocationHandler = new Handler();
 
@@ -76,11 +83,19 @@ class XThis extends This {
 	}
 
 	/**
-		Get dynamic proxy for interface.
+		Get dynamic proxy for interface, caching those it creates.
 	*/
 	public Object getInterface( Class clas ) {
-		return Proxy.newProxyInstance(
-			clas.getClassLoader(), new Class[] { clas }, invocationHandler );
+		if ( interfaces == null )
+			interfaces = new Hashtable();
+
+		Object interf = interfaces.get( clas );
+		if ( interf == null ) {
+			interf = Proxy.newProxyInstance( clas.getClassLoader(), 
+				new Class[] { clas }, invocationHandler );
+			interfaces.put( clas, interf );
+		}
+		return interf;
 	}
 
 	/**
@@ -94,6 +109,10 @@ class XThis extends This {
 	*/
 
 	/**
+		This is the invocation handler for the dynamic proxy.
+		<p>
+
+		Notes:
 		Inner class for the invocation handler seems to shield this unavailable
 		interface from JDK1.2 VM...  
 		
@@ -101,9 +120,22 @@ class XThis extends This {
 		classes aren't there (doesn't it?)  This class shouldn't be loaded
 		if an XThis isn't instantiated in NameSpace.java, should it?
 	*/
-	class Handler implements InvocationHandler, java.io.Serializable {
-
+	class Handler implements InvocationHandler, java.io.Serializable 
+	{
 		public Object invoke( Object proxy, Method method, Object[] args ) 
+			throws EvalError 
+		{
+			try { 
+				return invokeImpl( proxy, method, args );
+			} catch ( EvalError ee ) {
+				// Ease debugging...
+				Interpreter.debug( "EvalError in scripted interface: "
+					+ XThis.this.toString() + ": "+ ee );
+				throw ee;
+			}
+		}
+
+		public Object invokeImpl( Object proxy, Method method, Object[] args ) 
 			throws EvalError 
 		{
 			Class [] sig = Reflect.getTypes( args );
@@ -153,28 +185,6 @@ class XThis extends This {
 		}
 	};
 
-	/**
-		For serialization.
-		Note: this is copied from superclass... 
-		It must be private, but we can probably add an accessor to allow
-		us to call the super method explicitly.
-		Just testing to see if this is causing a problem.
-	*/
-    private synchronized void writeObject(ObjectOutputStream s)
-        throws IOException {
-
-		// Temporarily prune the namespace.
-
-		NameSpace parent = namespace.getParent();
-		// Bind would set the interpreter, but it's possible that the parent
-		// is null (it's the root).  So save it...
-		Interpreter interpreter = declaringInterpreter;
-		namespace.prune();
-		s.defaultWriteObject();
-		// put it back
-		namespace.setParent( parent );
-		declaringInterpreter = interpreter;
-	}
 }
 
 

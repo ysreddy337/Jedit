@@ -1,5 +1,8 @@
 /*
  * View.java - jEdit view
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,6 +22,7 @@
 
 package org.gjt.sp.jedit;
 
+//{{{ Imports
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.*;
 import javax.swing.text.*;
@@ -28,9 +32,10 @@ import java.awt.event.*;
 import java.util.*;
 import org.gjt.sp.jedit.msg.*;
 import org.gjt.sp.jedit.gui.*;
-import org.gjt.sp.jedit.search.SearchBar;
+import org.gjt.sp.jedit.search.*;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * A window that edits buffers. There is no public constructor in the
@@ -38,10 +43,112 @@ import org.gjt.sp.util.Log;
  * class.
  *
  * @author Slava Pestov
- * @version $Id: View.java,v 1.1.1.1 2001/09/02 05:37:27 spestov Exp $
+ * @version $Id: View.java,v 1.17 2002/03/20 06:02:24 spestov Exp $
  */
 public class View extends JFrame implements EBComponent
 {
+	//{{{ User interface
+
+	//{{{ ToolBar-related constants
+
+	//{{{ Groups
+	/**
+	 * The group of tool bars above the DockableWindowManager
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int TOP_GROUP = 0;
+
+	/**
+	 * The group of tool bars below the DockableWindowManager
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int BOTTOM_GROUP = 1;
+	public static final int DEFAULT_GROUP = TOP_GROUP;
+	//}}}
+
+	//{{{ Layers
+
+	// Common layers
+	/**
+	 * The highest possible layer.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int TOP_LAYER = Integer.MAX_VALUE;
+
+	/**
+	 * The default layer for tool bars with no preference.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int DEFAULT_LAYER = 0;
+
+	/**
+	 * The lowest possible layer.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int BOTTOM_LAYER = Integer.MIN_VALUE;
+
+	// Layers for top group
+	/**
+	 * Above system tool bar layer.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int ABOVE_SYSTEM_BAR_LAYER = 150;
+
+	/**
+	 * System tool bar layer. jEdit uses this for the main tool bar.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int SYSTEM_BAR_LAYER = 100;
+
+	/**
+	 * Search bar layer. jEdit uses this for the search bar.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int SEARCH_BAR_LAYER = 75;
+
+	/**
+	 * Below search bar layer. This is above the default layer for the
+	 * top group.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int BELOW_SEARCH_BAR_LAYER = 50;
+
+	// Layers for bottom group
+	/**
+	 * Above status bar layer. This is above the status bar and below the
+	 * default layer for the bottom group. Vimulator will use this.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int ABOVE_STATUS_BAR_LAYER = -50;
+
+	/**
+	 * Status bar layer. jEdit uses this for the status bar.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int STATUS_BAR_LAYER = -100;
+
+	/**
+	 * Below status bar layer. BufferSelector will use this.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int BELOW_STATUS_BAR_LAYER = -150;
+	//}}}
+
+	//}}}
+
+	//{{{ getDockableWindowManager() method
 	/**
 	 * Returns the dockable window manager associated with this view.
 	 * @since jEdit 2.6pre3
@@ -49,8 +156,9 @@ public class View extends JFrame implements EBComponent
 	public DockableWindowManager getDockableWindowManager()
 	{
 		return dockableWindowManager;
-	}
+	} //}}}
 
+	//{{{ getToolBar() method
 	/**
 	 * Returns the view's tool bar.
 	 * @since jEdit 3.2.1
@@ -58,52 +166,104 @@ public class View extends JFrame implements EBComponent
 	public JToolBar getToolBar()
 	{
 		return toolBar;
-	}
+	} //}}}
 
+	//{{{ addToolBar() method
 	/**
-	 * Quick search.
-	 * @since jEdit 2.7pre2
+	 * Adds a tool bar to this view.
+	 * @param toolBar The tool bar
 	 */
-	public void quickIncrementalSearch()
+	public void addToolBar(Component toolBar)
 	{
-		if(searchBar == null)
-		{
-			getToolkit().beep();
-			return;
-		}
+		addToolBar(DEFAULT_GROUP, DEFAULT_LAYER, toolBar);
+	} //}}}
 
-		String text = getTextArea().getSelectedText();
-		if(text != null && text.indexOf('\n') != -1)
-			text = null;
-
-		searchBar.setHyperSearch(false);
-		searchBar.getField().setText(text);
-		searchBar.getField().selectAll();
-		searchBar.getField().requestFocus();
-	}
-
+	//{{{ addToolBar() method
 	/**
-	 * Quick HyperSearch.
-	 * @since jEdit 2.7pre2
+	 * Adds a tool bar to this view.
+	 * @param group The tool bar group to add to
+	 * @param toolBar The tool bar
+	 * @see org.gjt.sp.jedit.gui.ToolBarManager
+	 * @since jEdit 4.0pre7
 	 */
-	public void quickHyperSearch()
+	public void addToolBar(int group, Component toolBar)
 	{
-		if(searchBar == null)
+		addToolBar(group, DEFAULT_LAYER, toolBar);
+	} //}}}
+
+	//{{{ addToolBar() method
+	/**
+	 * Adds a tool bar to this view.
+	 * @param group The tool bar group to add to
+	 * @param layer The layer of the group to add to
+	 * @param toolBar The tool bar
+	 * @see org.gjt.sp.jedit.gui.ToolBarManager
+	 * @since jEdit 4.0pre7
+	 */
+	public void addToolBar(int group, int layer, Component toolBar)
+	{
+		toolBarManager.addToolBar(group, layer, toolBar);
+		getRootPane().revalidate();
+	} //}}}
+
+	//{{{ removeToolBar() method
+	/**
+	 * Removes a tool bar from this view.
+	 * @param toolBar The tool bar
+	 */
+	public void removeToolBar(Component toolBar)
+	{
+		toolBarManager.removeToolBar(toolBar);
+		getRootPane().revalidate();
+	} //}}}
+
+	//{{{ showWaitCursor() method
+	/**
+	 * Shows the wait cursor and glass pane.
+	 */
+	public synchronized void showWaitCursor()
+	{
+		if(waitCount++ == 0)
 		{
-			getToolkit().beep();
-			return;
+			Cursor cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR);
+			setCursor(cursor);
+			EditPane[] editPanes = getEditPanes();
+			for(int i = 0; i < editPanes.length; i++)
+			{
+				EditPane editPane = editPanes[i];
+				editPane.getTextArea().getPainter()
+					.setCursor(cursor);
+			}
 		}
+	} //}}}
 
-		String text = getTextArea().getSelectedText();
-		if(text != null && text.indexOf('\n') != -1)
-			text = null;
+	//{{{ hideWaitCursor() method
+	/**
+	 * Hides the wait cursor and glass pane.
+	 */
+	public synchronized void hideWaitCursor()
+	{
+		if(waitCount > 0)
+			waitCount--;
 
-		searchBar.setHyperSearch(true);
-		searchBar.getField().setText(text);
-		searchBar.getField().selectAll();
-		searchBar.getField().requestFocus();
-	}
+		if(waitCount == 0)
+		{
+			// still needed even though glass pane
+			// has a wait cursor
+			Cursor cursor = Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR);
+			setCursor(cursor);
+			cursor = Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR);
+			EditPane[] editPanes = getEditPanes();
+			for(int i = 0; i < editPanes.length; i++)
+			{
+				EditPane editPane = editPanes[i];
+				editPane.getTextArea().getPainter()
+					.setCursor(cursor);
+			}
+		}
+	} //}}}
 
+	//{{{ getSearchBar() method
 	/**
 	 * Returns the search bar.
 	 * @since jEdit 2.4pre4
@@ -111,8 +271,23 @@ public class View extends JFrame implements EBComponent
 	public final SearchBar getSearchBar()
 	{
 		return searchBar;
-	}
+	} //}}}
 
+	//{{{ getStatus() method
+	/**
+	 * Returns the status bar.
+	 * @since jEdit 3.2pre2
+	 */
+	public StatusBar getStatus()
+	{
+		return status;
+	} //}}}
+
+	//}}}
+
+	//{{{ Input handling
+
+	//{{{ getKeyEventInterceptor() method
 	/**
 	 * Returns the listener that will handle all key events in this
 	 * view, if any.
@@ -120,8 +295,9 @@ public class View extends JFrame implements EBComponent
 	public KeyListener getKeyEventInterceptor()
 	{
 		return keyEventInterceptor;
-	}
+	} //}}}
 
+	//{{{ setKeyEventInterceptor() method
 	/**
 	 * Sets the listener that will handle all key events in this
 	 * view. For example, the complete word command uses this so
@@ -132,16 +308,18 @@ public class View extends JFrame implements EBComponent
 	public void setKeyEventInterceptor(KeyListener listener)
 	{
 		this.keyEventInterceptor = listener;
-	}
+	} //}}}
 
+	//{{{ getInputHandler() method
 	/**
 	 * Returns the input handler.
 	 */
 	public InputHandler getInputHandler()
 	{
 		return inputHandler;
-	}
+	} //}}}
 
+	//{{{ setInputHandler() method
 	/**
 	 * Sets the input handler.
 	 * @param inputHandler The new input handler
@@ -149,16 +327,18 @@ public class View extends JFrame implements EBComponent
 	public void setInputHandler(InputHandler inputHandler)
 	{
 		this.inputHandler = inputHandler;
-	}
+	} //}}}
 
+	//{{{ getMacroRecorder() method
 	/**
 	 * Returns the macro recorder.
 	 */
 	public Macros.Recorder getMacroRecorder()
 	{
 		return recorder;
-	}
+	} //}}}
 
+	//{{{ setMacroRecorder() method
 	/**
 	 * Sets the macro recorder.
 	 * @param recorder The macro recorder
@@ -166,17 +346,96 @@ public class View extends JFrame implements EBComponent
 	public void setMacroRecorder(Macros.Recorder recorder)
 	{
 		this.recorder = recorder;
-	}
+	} //}}}
 
+	//{{{ processKeyEvent() method
 	/**
-	 * Returns the status bar.
-	 * @since jEdit 3.2pre2
+	 * Forwards key events directly to the input handler.
+	 * This is slightly faster than using a KeyListener
+	 * because some Swing overhead is avoided.
 	 */
-	public StatusBar getStatus()
+	public void processKeyEvent(KeyEvent evt)
 	{
-		return status;
-	}
+		if(isClosed())
+			return;
 
+		if(getFocusOwner() instanceof JComponent)
+		{
+			JComponent comp = (JComponent)getFocusOwner();
+			InputMap map = comp.getInputMap();
+			ActionMap am = comp.getActionMap();
+
+			if(map != null && am != null && comp.isEnabled())
+			{
+				Object binding = map.get(KeyStroke.getKeyStrokeForEvent(evt));
+				if(binding != null && am.get(binding) != null)
+				{
+					return;
+				}
+			}
+		}
+
+		if(getFocusOwner() instanceof JTextComponent)
+		{
+			// fix for the bug where key events in JTextComponents
+			// inside views are also handled by the input handler
+			if(evt.getID() == KeyEvent.KEY_PRESSED)
+			{
+				switch(evt.getKeyCode())
+				{
+				case KeyEvent.VK_BACK_SPACE:
+				case KeyEvent.VK_TAB:
+				case KeyEvent.VK_ENTER:
+					return;
+				}
+			}
+
+			Keymap keymap = ((JTextComponent)getFocusOwner())
+				.getKeymap();
+			if(keymap.getAction(KeyStroke.getKeyStrokeForEvent(evt)) != null)
+				return;
+		}
+
+		if(evt.isConsumed())
+			return;
+
+		evt = KeyEventWorkaround.processKeyEvent(evt);
+		if(evt == null)
+			return;
+
+		switch(evt.getID())
+		{
+		case KeyEvent.KEY_TYPED:
+			// Handled in text area
+			if(keyEventInterceptor != null)
+				/* keyEventInterceptor.keyTyped(evt) */;
+			else if(inputHandler.isPrefixActive()
+				&& !getTextArea().hasFocus())
+				inputHandler.keyTyped(evt);
+			break;
+		case KeyEvent.KEY_PRESSED:
+			if(keyEventInterceptor != null)
+				keyEventInterceptor.keyPressed(evt);
+			else
+				inputHandler.keyPressed(evt);
+			break;
+		case KeyEvent.KEY_RELEASED:
+			if(keyEventInterceptor != null)
+				keyEventInterceptor.keyReleased(evt);
+			else
+				inputHandler.keyReleased(evt);
+			break;
+		}
+
+		if(!evt.isConsumed())
+			super.processKeyEvent(evt);
+	} //}}}
+
+	//}}}
+
+	//{{{ Buffers, edit panes, split panes
+
+	//{{{ splitHorizontally() method
 	/**
 	 * Splits the view horizontally.
 	 * @since jEdit 2.7pre2
@@ -184,8 +443,9 @@ public class View extends JFrame implements EBComponent
 	public void splitHorizontally()
 	{
 		split(JSplitPane.VERTICAL_SPLIT);
-	}
+	} //}}}
 
+	//{{{ splitVertically() method
 	/**
 	 * Splits the view vertically.
 	 * @since jEdit 2.7pre2
@@ -193,8 +453,9 @@ public class View extends JFrame implements EBComponent
 	public void splitVertically()
 	{
 		split(JSplitPane.HORIZONTAL_SPLIT);
-	}
+	} //}}}
 
+	//{{{ split() method
 	/**
 	 * Splits the view.
 	 * @since jEdit 2.3pre2
@@ -216,7 +477,6 @@ public class View extends JFrame implements EBComponent
 			Component left = oldSplitPane.getLeftComponent();
 			final JSplitPane newSplitPane = new JSplitPane(orientation,
 				oldEditPane,editPane);
-			newSplitPane.setBorder(null);
 
 			if(left == oldEditPane)
 				oldSplitPane.setLeftComponent(newSplitPane);
@@ -258,8 +518,9 @@ public class View extends JFrame implements EBComponent
 				}
 			});
 		}
-	}
+	} //}}}
 
+	//{{{ unsplit() method
 	/**
 	 * Unsplits the view.
 	 * @since jEdit 2.3pre2
@@ -293,8 +554,9 @@ public class View extends JFrame implements EBComponent
 				editPane.focusOnTextArea();
 			}
 		});
-	}
+	} //}}}
 
+	//{{{ nextTextArea() method
 	/**
 	 * Moves keyboard focus to the next text area.
 	 * @since jEdit 2.7pre4
@@ -313,8 +575,9 @@ public class View extends JFrame implements EBComponent
 				break;
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ prevTextArea() method
 	/**
 	 * Moves keyboard focus to the previous text area.
 	 * @since jEdit 2.7pre4
@@ -333,8 +596,9 @@ public class View extends JFrame implements EBComponent
 				break;
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ getSplitPane() method
 	/**
 	 * Returns the top-level split pane, if any.
 	 * @since jEdit 2.3pre2
@@ -342,32 +606,36 @@ public class View extends JFrame implements EBComponent
 	public JSplitPane getSplitPane()
 	{
 		return splitPane;
-	}
+	} //}}}
 
+	//{{{ getBuffer() method
 	/**
 	 * Returns the current edit pane's buffer.
 	 */
 	public Buffer getBuffer()
 	{
 		return editPane.getBuffer();
-	}
+	} //}}}
 
+	//{{{ setBuffer() method
 	/**
 	 * Sets the current edit pane's buffer.
 	 */
 	public void setBuffer(Buffer buffer)
 	{
 		editPane.setBuffer(buffer);
-	}
+	} //}}}
 
+	//{{{ getTextArea() method
 	/**
 	 * Returns the current edit pane's text area.
 	 */
 	public JEditTextArea getTextArea()
 	{
 		return editPane.getTextArea();
-	}
+	} //}}}
 
+	//{{{ getEditPane() method
 	/**
 	 * Returns the current edit pane.
 	 * @since jEdit 2.5pre2
@@ -375,8 +643,9 @@ public class View extends JFrame implements EBComponent
 	public EditPane getEditPane()
 	{
 		return editPane;
-	}
+	} //}}}
 
+	//{{{ getEditPanes() method
 	/**
 	 * Returns all edit panes.
 	 * @since jEdit 2.5pre2
@@ -396,8 +665,9 @@ public class View extends JFrame implements EBComponent
 			vec.copyInto(ep);
 			return ep;
 		}
-	}
+	} //}}}
 
+	//{{{ getSplitConfig() method
 	/**
 	 * Returns a string that can be passed to the view constructor to
 	 * recreate the current split configuration in a new view.
@@ -413,8 +683,9 @@ public class View extends JFrame implements EBComponent
 		//else
 			splitConfig.append(getBuffer().getPath());
 		return splitConfig.toString();
-	}
+	} //}}}
 
+	//{{{ updateGutterBorders() method
 	/**
 	 * Updates the borders of all gutters in this view to reflect the
 	 * currently focused text area.
@@ -425,83 +696,13 @@ public class View extends JFrame implements EBComponent
 		EditPane[] editPanes = getEditPanes();
 		for(int i = 0; i < editPanes.length; i++)
 			editPanes[i].getTextArea().getGutter().updateBorder();
-	}
+	} //}}}
 
-	/**
-	 * Adds a tool bar to this view.
-	 * @param toolBar The tool bar
-	 */
-	public void addToolBar(Component toolBar)
-	{
-		toolBars.add(toolBar);
-		getRootPane().revalidate();
-	}
+	//}}}
 
-	/**
-	 * Removes a tool bar from this view.
-	 * @param toolBar The tool bar
-	 */
-	public void removeToolBar(Component toolBar)
-	{
-		toolBars.remove(toolBar);
-		getRootPane().revalidate();
-	}
+	//{{{ Synchronized scrolling
 
-	/**
-	 * Returns true if this view has been closed with
-	 * <code>jEdit.closeView()</code>.
-	 */
-	public boolean isClosed()
-	{
-		return closed;
-	}
-
-	/**
-	 * Shows the wait cursor and glass pane.
-	 */
-	public synchronized void showWaitCursor()
-	{
-		if(waitCount++ == 0)
-		{
-			// still needed even though glass pane
-			// has a wait cursor
-			Cursor cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR);
-			setCursor(cursor);
-			EditPane[] editPanes = getEditPanes();
-			for(int i = 0; i < editPanes.length; i++)
-			{
-				EditPane editPane = editPanes[i];
-				editPane.getTextArea().getPainter()
-					.setCursor(cursor);
-			}
-		}
-	}
-
-	/**
-	 * Hides the wait cursor and glass pane.
-	 */
-	public synchronized void hideWaitCursor()
-	{
-		if(waitCount > 0)
-			waitCount--;
-
-		if(waitCount == 0)
-		{
-			// still needed even though glass pane
-			// has a wait cursor
-			Cursor cursor = Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR);
-			setCursor(cursor);
-			cursor = Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR);
-			EditPane[] editPanes = getEditPanes();
-			for(int i = 0; i < editPanes.length; i++)
-			{
-				EditPane editPane = editPanes[i];
-				editPane.getTextArea().getPainter()
-					.setCursor(cursor);
-			}
-		}
-	}
-
+	//{{{ isSynchroScrollEnabled() method
 	/**
 	 * Returns if synchronized scrolling is enabled.
 	 * @since jEdit 2.7pre1
@@ -509,8 +710,9 @@ public class View extends JFrame implements EBComponent
 	public boolean isSynchroScrollEnabled()
 	{
 		return synchroScroll;
-	}
+	} //}}}
 
+	//{{{ toggleSynchroScrollEnabled() method
 	/**
 	 * Toggles synchronized scrolling.
 	 * @since jEdit 2.7pre2
@@ -518,8 +720,9 @@ public class View extends JFrame implements EBComponent
 	public void toggleSynchroScrollEnabled()
 	{
 		setSynchroScrollEnabled(!synchroScroll);
-	}
+	} //}}}
 
+	//{{{ setSynchroScrollEnabled() method
 	/**
 	 * Sets synchronized scrolling.
 	 * @since jEdit 2.7pre1
@@ -532,8 +735,9 @@ public class View extends JFrame implements EBComponent
 		int horizontalOffset = textArea.getHorizontalOffset();
 		synchroScrollVertical(textArea,firstLine);
 		synchroScrollHorizontal(textArea,horizontalOffset);
-	}
+	} //}}}
 
+	//{{{ synchroScrollVertical() method
 	/**
 	 * Sets the first line of all text areas.
 	 * @param textArea The text area that is propagating this change
@@ -551,8 +755,9 @@ public class View extends JFrame implements EBComponent
 			if(editPanes[i].getTextArea() != textArea)
 				editPanes[i].getTextArea()._setFirstLine(firstLine);
 		}
-	}
+	} //}}}
 
+	//{{{ synchroScrollHorizontal() method
 	/**
 	 * Sets the horizontal offset of all text areas.
 	 * @param textArea The text area that is propagating this change
@@ -570,24 +775,107 @@ public class View extends JFrame implements EBComponent
 			if(editPanes[i].getTextArea() != textArea)
 				editPanes[i].getTextArea()._setHorizontalOffset(horizontalOffset);
 		}
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ quickIncrementalSearch() method
+	/**
+	 * Quick search.
+	 * @since jEdit 4.0pre3
+	 */
+	public void quickIncrementalSearch(boolean word)
+	{
+		if(searchBar == null)
+		{
+			getToolkit().beep();
+			return;
+		}
+
+		JEditTextArea textArea = getTextArea();
+
+		String text = textArea.getSelectedText();
+		if(text == null && word)
+		{
+			textArea.selectWord();
+			text = textArea.getSelectedText();
+		}
+		else if(text != null && text.indexOf('\n') != -1)
+			text = null;
+
+		searchBar.setHyperSearch(false);
+		searchBar.getField().setText(text);
+		searchBar.getField().requestFocus();
+		searchBar.getField().selectAll();
+	} //}}}
+
+	//{{{ quickHyperSearch() method
+	/**
+	 * Quick HyperSearch.
+	 * @since jEdit 4.0pre3
+	 */
+	public void quickHyperSearch(boolean word)
+	{
+		JEditTextArea textArea = getTextArea();
+
+		String text = textArea.getSelectedText();
+		if(text == null && word)
+		{
+			textArea.selectWord();
+			text = textArea.getSelectedText();
+		}
+
+		if(text != null && text.indexOf('\n') == -1)
+		{
+			HistoryModel.getModel("find").addItem(text);
+			SearchAndReplace.setSearchString(text);
+			SearchAndReplace.setSearchFileSet(new CurrentBufferSet());
+			SearchAndReplace.hyperSearch(this);
+		}
+		else
+		{
+			if(searchBar == null)
+			{
+				getToolkit().beep();
+				return;
+			}
+
+			searchBar.setHyperSearch(true);
+			searchBar.getField().setText(null);
+			searchBar.getField().requestFocus();
+			searchBar.getField().selectAll();
+		}
+	} //}}}
+
+	//{{{ isClosed() method
+	/**
+	 * Returns true if this view has been closed with
+	 * <code>jEdit.closeView()</code>.
+	 */
+	public boolean isClosed()
+	{
+		return closed;
+	} //}}}
+
+	//{{{ getNext() method
 	/**
 	 * Returns the next view in the list.
 	 */
 	public View getNext()
 	{
 		return next;
-	}
+	} //}}}
 
+	//{{{ getPrev() method
 	/**
 	 * Returns the previous view in the list.
 	 */
 	public View getPrev()
 	{
 		return prev;
-	}
+	} //}}}
 
+	//{{{ handleMessage() method
 	public void handleMessage(EBMessage msg)
 	{
 		if(msg instanceof PropertiesChanged)
@@ -601,107 +889,61 @@ public class View extends JFrame implements EBComponent
 			handleBufferUpdate((BufferUpdate)msg);
 		else if(msg instanceof EditPaneUpdate)
 			handleEditPaneUpdate((EditPaneUpdate)msg);
-	}
+		else if(msg instanceof MultiSelectStatusChanged)
+			status.updateMiscStatus();
+	} //}}}
 
-	/**
-	 * Forwards key events directly to the input handler.
-	 * This is slightly faster than using a KeyListener
-	 * because some Swing overhead is avoided.
-	 */
-	public void processKeyEvent(KeyEvent evt)
-	{
-		if(isClosed())
-			return;
-
-		// JTextComponents don't consume events...
-		if(getFocusOwner() instanceof JTextComponent)
-		{
-			// fix for the bug where key events in JTextComponents
-			// inside views are also handled by the input handler
-			if(evt.getID() == KeyEvent.KEY_PRESSED)
-			{
-				switch(evt.getKeyCode())
-				{
-				case KeyEvent.VK_BACK_SPACE:
-				case KeyEvent.VK_TAB:
-				case KeyEvent.VK_ENTER:
-					return;
-				}
-			}
-
-			Keymap keymap = ((JTextComponent)getFocusOwner())
-				.getKeymap();
-			if(keymap.getAction(KeyStroke.getKeyStrokeForEvent(evt)) != null)
-				return;
-		}
-
-		if(evt.isConsumed())
-			return;
-
-		evt = KeyEventWorkaround.processKeyEvent(evt);
-		if(evt == null)
-			return;
-
-		switch(evt.getID())
-		{
-		case KeyEvent.KEY_TYPED:
-			if(keyEventInterceptor != null)
-				keyEventInterceptor.keyTyped(evt);
-			else if(inputHandler.isPrefixActive())
-				inputHandler.keyTyped(evt);
-			break;
-		case KeyEvent.KEY_PRESSED:
-			if(keyEventInterceptor != null)
-				keyEventInterceptor.keyPressed(evt);
-			else
-				inputHandler.keyPressed(evt);
-			break;
-		case KeyEvent.KEY_RELEASED:
-			if(keyEventInterceptor != null)
-				keyEventInterceptor.keyReleased(evt);
-			else
-				inputHandler.keyReleased(evt);
-			break;
-		}
-
-		if(!evt.isConsumed())
-			super.processKeyEvent(evt);
-	}
-
-	// package-private members
+	//{{{ Package-private members
 	View prev;
 	View next;
 
+	//{{{ View constructor
 	View(Buffer buffer, String splitConfig)
 	{
+		enableEvents(AWTEvent.KEY_EVENT_MASK);
+
 		setIconImage(GUIUtilities.getEditorIcon());
 
 		dockableWindowManager = new DockableWindowManager(this);
 
-		Component comp = restoreSplitConfig(buffer,splitConfig);
-		dockableWindowManager.add(comp);
+		JPanel topToolBars = new JPanel(new VariableGridLayout(
+			VariableGridLayout.FIXED_NUM_COLUMNS,
+			1));
+		JPanel bottomToolBars = new JPanel(new VariableGridLayout(
+			VariableGridLayout.FIXED_NUM_COLUMNS,
+			1));
 
-		EditBus.addToBus(this);
+		toolBarManager = new ToolBarManager(topToolBars, bottomToolBars);
+
+		getContentPane().add(BorderLayout.NORTH,topToolBars);
+		getContentPane().add(BorderLayout.CENTER,dockableWindowManager);
+		getContentPane().add(BorderLayout.SOUTH,bottomToolBars);
+
+		status = new StatusBar(this);
+		addToolBar(BOTTOM_GROUP, STATUS_BAR_LAYER, status);
 
 		setJMenuBar(GUIUtilities.loadMenuBar("view.mbar"));
-
-		toolBars = new Box(BoxLayout.Y_AXIS);
 
 		inputHandler = new DefaultInputHandler(this,(DefaultInputHandler)
 			jEdit.getInputHandler());
 
-		propertiesChanged();
+		Component comp = restoreSplitConfig(buffer,splitConfig);
+		dockableWindowManager.add(comp);
 
-		getContentPane().add(BorderLayout.NORTH,toolBars);
-		getContentPane().add(BorderLayout.CENTER,dockableWindowManager);
-		getContentPane().add(BorderLayout.SOUTH,status = new StatusBar(this));
+		status.updateBufferStatus();
+		status.updateMiscStatus();
+
+		EditBus.addToBus(this);
+
+		propertiesChanged();
 
 		setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 		addWindowListener(new WindowHandler());
 
 		dockableWindowManager.init();
-	}
+	} //}}}
 
+	//{{{ close() method
 	void close()
 	{
 		closed = true;
@@ -719,7 +961,7 @@ public class View extends JFrame implements EBComponent
 
 		// null some variables so that retaining references
 		// to closed views won't hurt as much.
-		toolBars = null;
+		toolBarManager = null;
 		toolBar = null;
 		searchBar = null;
 		splitPane = null;
@@ -727,8 +969,9 @@ public class View extends JFrame implements EBComponent
 		recorder = null;
 
 		setContentPane(new JPanel());
-	}
+	} //}}}
 
+	//{{{ updateTitle() method
 	/**
 	 * Updates the title bar.
 	 */
@@ -754,14 +997,19 @@ public class View extends JFrame implements EBComponent
 				? buffer.getPath() : buffer.getName());
 		}
 		setTitle(title.toString());
-	}
+	} //}}}
 
-	// private members
+	//}}}
+
+	//{{{ Private members
+
+	//{{{ Instance variables
 	private boolean closed;
 
 	private DockableWindowManager dockableWindowManager;
 
-	private Box toolBars;
+	private ToolBarManager toolBarManager;
+
 	private JToolBar toolBar;
 	private SearchBar searchBar;
 
@@ -779,7 +1027,9 @@ public class View extends JFrame implements EBComponent
 	private int waitCount;
 
 	private boolean showFullPath;
+	//}}}
 
+	//{{{ getEditPanes() method
 	private void getEditPanes(Vector vec, Component comp)
 	{
 		if(comp instanceof EditPane)
@@ -790,8 +1040,9 @@ public class View extends JFrame implements EBComponent
 			getEditPanes(vec,split.getLeftComponent());
 			getEditPanes(vec,split.getRightComponent());
 		}
-	}
+	} //}}}
 
+	//{{{ getSplitConfig() method
 	/*
 	 * The split config is recorded in a simple RPN "language":
 	 * "vertical" pops the two topmost elements off the stack, creates a
@@ -823,8 +1074,9 @@ public class View extends JFrame implements EBComponent
 
 		splitConfig.append(splitPane.getOrientation()
 			== JSplitPane.VERTICAL_SPLIT ? "\tvertical" : "\thorizontal");
-	}
+	} //}}}
 
+	//{{{ restoreSplitConfig() method
 	private Component restoreSplitConfig(Buffer buffer, String splitConfig)
 	{
 		if(buffer != null)
@@ -868,8 +1120,9 @@ public class View extends JFrame implements EBComponent
 		}
 
 		return (Component)stack.peek();
-	}
+	} //}}}
 
+	//{{{ propertiesChanged() method
 	/**
 	 * Reloads various settings from the properties.
 	 */
@@ -883,20 +1136,19 @@ public class View extends JFrame implements EBComponent
 		dockableWindowManager.propertiesChanged();
 
 		SwingUtilities.updateComponentTreeUI(getRootPane());
-	}
+	} //}}}
 
+	//{{{ loadToolBars() method
 	private void loadToolBars()
 	{
 		if(jEdit.getBooleanProperty("view.showToolbar"))
 		{
 			if(toolBar != null)
-				toolBars.remove(toolBar);
+				toolBarManager.removeToolBar(toolBar);
 
 			toolBar = GUIUtilities.loadToolBar("view.toolbar");
-			toolBar.add(Box.createGlue());
 
-			toolBars.add(toolBar,0);
-			getRootPane().revalidate();
+			addToolBar(TOP_GROUP, SYSTEM_BAR_LAYER, toolBar);
 		}
 		else if(toolBar != null)
 		{
@@ -909,7 +1161,7 @@ public class View extends JFrame implements EBComponent
 			if(searchBar == null)
 			{
 				searchBar = new SearchBar(this);
-				addToolBar(searchBar);
+				addToolBar(TOP_GROUP, SEARCH_BAR_LAYER, searchBar);
 			}
 		}
 		else if(searchBar != null)
@@ -917,8 +1169,9 @@ public class View extends JFrame implements EBComponent
 			removeToolBar(searchBar);
 			searchBar = null;
 		}
-	}
+	} //}}}
 
+	//{{{ createEditPane() method
 	private EditPane createEditPane(Buffer buffer)
 	{
 		EditPane editPane = new EditPane(this,buffer);
@@ -928,16 +1181,18 @@ public class View extends JFrame implements EBComponent
 		textArea.addScrollListener(new ScrollHandler());
 		EditBus.send(new EditPaneUpdate(editPane,EditPaneUpdate.CREATED));
 		return editPane;
-	}
+	} //}}}
 
+	//{{{ setEditPane() method
 	private void setEditPane(EditPane editPane)
 	{
 		this.editPane = editPane;
 		status.repaintCaretStatus();
 		status.updateBufferStatus();
 		status.updateMiscStatus();
-	}
+	} //}}}
 
+	//{{{ handleBufferUpdate() method
 	private void handleBufferUpdate(BufferUpdate msg)
 	{
 		Buffer buffer = msg.getBuffer();
@@ -958,8 +1213,9 @@ public class View extends JFrame implements EBComponent
 				}
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ handleEditPaneUpdate() method
 	private void handleEditPaneUpdate(EditPaneUpdate msg)
 	{
 		if(msg.getEditPane().getView() == this
@@ -968,10 +1224,14 @@ public class View extends JFrame implements EBComponent
 			status.repaintCaretStatus();
 			status.updateBufferStatus();
 			status.updateMiscStatus();
-			status.updateFoldStatus();
 		}
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ Inner classes
+
+	//{{{ CaretHandler class
 	class CaretHandler implements CaretListener
 	{
 		public void caretUpdate(CaretEvent evt)
@@ -979,8 +1239,9 @@ public class View extends JFrame implements EBComponent
 			status.repaintCaretStatus();
 			status.updateMiscStatus();
 		}
-	}
+	} //}}}
 
+	//{{{ FocusHandler class
 	class FocusHandler extends FocusAdapter
 	{
 		public void focusGained(FocusEvent evt)
@@ -997,8 +1258,9 @@ public class View extends JFrame implements EBComponent
 
 			setEditPane((EditPane)comp);
 		}
-	}
+	} //}}}
 
+	//{{{ ScrollHandler class
 	class ScrollHandler implements ScrollListener
 	{
 		public void scrolledVertically(JEditTextArea textArea)
@@ -1008,20 +1270,13 @@ public class View extends JFrame implements EBComponent
 		}
 
 		public void scrolledHorizontally(JEditTextArea textArea) {}
-	}
+	} //}}}
 
+	//{{{ WindowHandler class
 	class WindowHandler extends WindowAdapter
 	{
-		boolean gotFocus;
-
 		public void windowActivated(WindowEvent evt)
 		{
-			if(!gotFocus)
-			{
-				editPane.focusOnTextArea();
-				gotFocus = true;
-			}
-
 			final Vector buffers = new Vector();
 			EditPane[] editPanes = getEditPanes();
 			for(int i = 0; i < editPanes.length; i++)
@@ -1054,5 +1309,7 @@ public class View extends JFrame implements EBComponent
 		{
 			jEdit.closeView(View.this);
 		}
-	}
+	} //}}}
+
+	//}}}
 }

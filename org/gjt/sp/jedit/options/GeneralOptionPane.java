@@ -20,6 +20,7 @@
 package org.gjt.sp.jedit.options;
 
 import javax.swing.*;
+import java.awt.event.*;
 import java.awt.*;
 import java.io.*;
 import org.gjt.sp.jedit.*;
@@ -35,26 +36,6 @@ public class GeneralOptionPane extends AbstractOptionPane
 	// protected members
 	protected void _init()
 	{
-		/* Look and feel */
-		addComponent(new JLabel(jEdit.getProperty("options.general.lf.note")));
-
-		lfs = UIManager.getInstalledLookAndFeels();
-		String[] names = new String[lfs.length];
-		String lf = UIManager.getLookAndFeel().getClass().getName();
-		int index = 0;
-		for(int i = 0; i < names.length; i++)
-		{
-			names[i] = lfs[i].getName();
-			if(lf.equals(lfs[i].getClassName()))
-				index = i;
-		}
-
-		lookAndFeel = new JComboBox(names);
-		lookAndFeel.setSelectedIndex(index);
-
-		addComponent(jEdit.getProperty("options.general.lf"),
-			lookAndFeel);
-
 		/* History count */
 		history = new JTextField(jEdit.getProperty("history"));
 		addComponent(jEdit.getProperty("options.general.history"),history);
@@ -69,13 +50,28 @@ public class GeneralOptionPane extends AbstractOptionPane
 		sortBuffers = new JCheckBox(jEdit.getProperty(
 			"options.general.sortBuffers"));
 		sortBuffers.setSelected(jEdit.getBooleanProperty("sortBuffers"));
+		sortBuffers.addActionListener(new ActionListener()
+		{
+			public void actionPerformed(ActionEvent evt)
+			{
+				sortByName.setEnabled(sortBuffers.isSelected());
+			}
+		});
+
 		addComponent(sortBuffers);
 
 		/* Sort buffers by names */
 		sortByName = new JCheckBox(jEdit.getProperty(
 			"options.general.sortByName"));
 		sortByName.setSelected(jEdit.getBooleanProperty("sortByName"));
+		sortByName.setEnabled(sortBuffers.isSelected());
 		addComponent(sortByName);
+
+		/* Sort recent file list */
+		sortRecent = new JCheckBox(jEdit.getProperty(
+			"options.general.sortRecent"));
+		sortRecent.setSelected(jEdit.getBooleanProperty("sortRecent"));
+		addComponent(sortRecent);
 
 		/* Check mod status on focus */
 		checkModStatus = new JCheckBox(jEdit.getProperty(
@@ -97,6 +93,13 @@ public class GeneralOptionPane extends AbstractOptionPane
 		showSearchbar.setSelected(jEdit.getBooleanProperty(
 			"view.showSearchbar"));
 		addComponent(showSearchbar);
+
+		/* Beep on search auto wrap */
+		beepOnSearchAutoWrap = new JCheckBox(jEdit.getProperty(
+			"options.general.beepOnSearchAutoWrap"));
+		beepOnSearchAutoWrap.setSelected(jEdit.getBooleanProperty(
+			"search.beepOnSearchAutoWrap"));
+		addComponent(beepOnSearchAutoWrap);
 
 		/* Show buffer switcher */
 		showBufferSwitcher = new JCheckBox(jEdit.getProperty(
@@ -120,27 +123,22 @@ public class GeneralOptionPane extends AbstractOptionPane
 		else
 			showSplash.setSelected(!new File(settingsDirectory,"nosplash").exists());
 		addComponent(showSplash);
-
-		/* Global colors */
-		globalColors = new JCheckBox(jEdit.getProperty(
-			"options.general.globalColors"));
-		globalColors.setSelected(jEdit.getBooleanProperty("globalColors"));
-		addComponent(globalColors);
 	}
 
 	protected void _save()
 	{
-		String lf = lfs[lookAndFeel.getSelectedIndex()].getClassName();
-		jEdit.setProperty("lookAndFeel",lf);
 		jEdit.setProperty("history",history.getText());
 		jEdit.setBooleanProperty("saveCaret",saveCaret.isSelected());
 		jEdit.setBooleanProperty("sortBuffers",sortBuffers.isSelected());
 		jEdit.setBooleanProperty("sortByName",sortByName.isSelected());
+		jEdit.setBooleanProperty("sortRecent",sortRecent.isSelected());
 		jEdit.setBooleanProperty("view.checkModStatus",checkModStatus
 			.isSelected());
 		jEdit.setBooleanProperty("view.showFullPath",showFullPath
 			.isSelected());
 		jEdit.setBooleanProperty("view.showSearchbar",showSearchbar
+			.isSelected());
+		jEdit.setBooleanProperty("search.beepOnSearchAutoWrap",beepOnSearchAutoWrap
 			.isSelected());
 		jEdit.setBooleanProperty("view.showBufferSwitcher",
 			showBufferSwitcher.isSelected());
@@ -169,22 +167,19 @@ public class GeneralOptionPane extends AbstractOptionPane
 				}
 			}
 		}
-
-		jEdit.setBooleanProperty("globalColors",globalColors.isSelected());
 	}
 
 	// private members
-	private UIManager.LookAndFeelInfo[] lfs;
-	private JComboBox lookAndFeel;
 	private JTextField history;
 	private JCheckBox saveCaret;
 	private JCheckBox sortBuffers;
 	private JCheckBox sortByName;
+	private JCheckBox sortRecent;
 	private JCheckBox checkModStatus;
 	private JCheckBox showFullPath;
 	private JCheckBox showSearchbar;
+  private JCheckBox beepOnSearchAutoWrap;
 	private JCheckBox showBufferSwitcher;
 	private JCheckBox showTips;
 	private JCheckBox showSplash;
-	private JCheckBox globalColors;
 }

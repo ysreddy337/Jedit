@@ -22,7 +22,7 @@ package org.gjt.sp.util;
 /**
  * Services work requests in the background.
  * @author Slava Pestov
- * @version $Id: WorkThread.java,v 1.1.1.1 2001/09/02 05:38:26 spestov Exp $
+ * @version $Id: WorkThread.java,v 1.4 2001/11/23 09:08:49 spestov Exp $
  */
 public class WorkThread extends Thread
 {
@@ -156,13 +156,13 @@ public class WorkThread extends Thread
 			else
 			{
 				requestRunning = true;
-				pool.fireProgressChanged(this);
+				pool.fireStatusChanged(this);
 				doRequest(request);
 				requestRunning = false;
-				pool.fireProgressChanged(this);
 			}
 		}
 
+		pool.fireStatusChanged(this);
 
 		synchronized(pool.waitForAllLock)
 		{
@@ -186,7 +186,7 @@ public class WorkThread extends Thread
 
 	private void doRequest(WorkThreadPool.Request request)
 	{
-// 		Log.log(Log.DEBUG,WorkThread.class,"Running in work thread: " + request);
+//		Log.log(Log.DEBUG,WorkThread.class,"Running in work thread: " + request);
 
 		try
 		{
@@ -211,7 +211,7 @@ public class WorkThread extends Thread
 			status = null;
 			progressValue = progressMaximum = 0;
 			pool.requestDone();
-			pool.fireProgressChanged(this);
+			pool.fireStatusChanged(this);
 		}
 	}
 

@@ -21,13 +21,15 @@ package org.gjt.sp.jedit;
 
 import java.awt.event.ActionEvent;
 import java.awt.*;
+import org.gjt.sp.jedit.gui.BeanShellErrorDialog;
+import org.gjt.sp.util.Log;
 
 public class BeanShellAction extends EditAction
 {
-	public BeanShellAction(String name, boolean plugin, String code,
-		String isSelected, boolean noRepeat, boolean noRecord)
+	public BeanShellAction(String name, String code, String isSelected,
+		boolean noRepeat, boolean noRecord)
 	{
-		super(name,plugin);
+		super(name);
 
 		this.code = code;
 		this.isSelected = isSelected;
@@ -43,19 +45,38 @@ public class BeanShellAction extends EditAction
 		if(isSelected != null)
 		{
 			String cachedIsSelectedName = "selected_" + sanitizedName;
-			cachedIsSelected = BeanShell.cacheBlock(cachedIsSelectedName,
-				isSelected,true);
+			try
+			{
+				cachedIsSelected = BeanShell.cacheBlock(cachedIsSelectedName,
+					isSelected,true);
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,this,e);
+
+				new BeanShellErrorDialog(null,e.toString());
+			}
 		}
 	}
 
 	public void invoke(View view)
 	{
-		if(cachedCode == null)
+		try
 		{
-			String cachedCodeName = "action_" + sanitizedName;
-			cachedCode = BeanShell.cacheBlock(cachedCodeName,code,true);
+			if(cachedCode == null)
+			{
+				String cachedCodeName = "action_" + sanitizedName;
+				cachedCode = BeanShell.cacheBlock(cachedCodeName,code,true);
+			}
+
+			BeanShell.runCachedBlock(cachedCode,view,null);
 		}
-		BeanShell.runCachedBlock(cachedCode,view,null);
+		catch(Throwable e)
+		{
+			Log.log(Log.ERROR,this,e);
+
+			new BeanShellErrorDialog(view,e.toString());
+		}
 	}
 
 	public boolean isToggle()
@@ -68,8 +89,19 @@ public class BeanShellAction extends EditAction
 		if(isSelected == null)
 			return false;
 
-		return Boolean.TRUE.equals(BeanShell.runCachedBlock(cachedIsSelected,
-			view,null));
+		try
+		{
+			return Boolean.TRUE.equals(BeanShell.runCachedBlock(
+				cachedIsSelected,view,null));
+		}
+		catch(Throwable e)
+		{
+			Log.log(Log.ERROR,this,e);
+
+			new BeanShellErrorDialog(view,e.toString());
+
+			return false;
+		}
 	}
 
 	public boolean noRepeat()

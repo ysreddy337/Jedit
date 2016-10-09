@@ -1,6 +1,10 @@
 /*
  * Macros.java - Macro manager
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * Portions copyright (C) 2002 mike dillon
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,80 +23,134 @@
 
 package org.gjt.sp.jedit;
 
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Element;
-import javax.swing.JOptionPane;
+//{{{ Imports
+import gnu.regexp.RE;
+import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.File;
-import java.io.IOException;
+import java.awt.*;
+import java.io.*;
 import java.util.*;
 import org.gjt.sp.jedit.browser.*;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.msg.*;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * This class records and runs macros.
  *
  * @author Slava Pestov
- * @version $Id: Macros.java,v 1.1.1.1 2001/09/02 05:37:19 spestov Exp $
+ * @version $Id: Macros.java,v 1.18 2002/04/08 05:33:31 spestov Exp $
  */
 public class Macros
 {
+	//{{{ message() method
 	/**
 	 * Utility method that can be used to display a message dialog in a macro.
-	 * @param view The view
+	 * @param comp The component to show the dialog on behalf of, this
+	 * will usually be a view instance
 	 * @param message The message
 	 * @since jEdit 2.7pre2
 	 */
-	public static void message(View view, String message)
+	public static void message(Component comp, String message)
 	{
-		JOptionPane.showMessageDialog(view,message,
+		GUIUtilities.hideSplashScreen();
+
+		JOptionPane.showMessageDialog(comp,message,
 			jEdit.getProperty("macro-message.title"),
 			JOptionPane.INFORMATION_MESSAGE);
-	}
+	} //}}}
 
+	//{{{ error() method
 	/**
 	 * Utility method that can be used to display an error dialog in a macro.
-	 * @param view The view
+	 * @param comp The component to show the dialog on behalf of, this
+	 * will usually be a view instance
 	 * @param message The message
 	 * @since jEdit 2.7pre2
 	 */
-	public static void error(View view, String message)
+	public static void error(Component comp, String message)
 	{
-		JOptionPane.showMessageDialog(view,message,
+		GUIUtilities.hideSplashScreen();
+
+		JOptionPane.showMessageDialog(comp,message,
 			jEdit.getProperty("macro-message.title"),
 			JOptionPane.ERROR_MESSAGE);
-	}
+	} //}}}
 
+	//{{{ input() method
 	/**
 	 * Utility method that can be used to prompt for input in a macro.
-	 * @param view The view
+	 * @param comp The component to show the dialog on behalf of, this
+	 * will usually be a view instance
 	 * @param prompt The prompt string
 	 * @since jEdit 2.7pre2
 	 */
-	public static String input(View view, String prompt)
+	public static String input(Component comp, String prompt)
 	{
-		return input(view,prompt,null);
-	}
+		GUIUtilities.hideSplashScreen();
 
+		return input(comp,prompt,null);
+	} //}}}
+
+	//{{{ input() method
 	/**
 	 * Utility method that can be used to prompt for input in a macro.
-	 * @param view The view
+	 * @param comp The component to show the dialog on behalf of, this
+	 * will usually be a view instance
 	 * @param prompt The prompt string
 	 * @since jEdit 3.1final
 	 */
-	public static String input(View view, String prompt, String defaultValue)
+	public static String input(Component comp, String prompt, String defaultValue)
 	{
-		return (String)JOptionPane.showInputDialog(view,prompt,
+		GUIUtilities.hideSplashScreen();
+
+		return (String)JOptionPane.showInputDialog(comp,prompt,
 			jEdit.getProperty("macro-input.title"),
 			JOptionPane.QUESTION_MESSAGE,null,null,defaultValue);
-	}
+	} //}}}
 
+	//{{{ confirm() method
+	/**
+	 * Utility method that can be used to ask for confirmation in a macro.
+	 * @param comp The component to show the dialog on behalf of, this
+	 * will usually be a view instance
+	 * @param prompt The prompt string
+	 * @param buttons The buttons to display - for example,
+	 * JOptionPane.YES_NO_CANCEL_OPTION
+	 * @since jEdit 4.0pre2
+	 */
+	public static int confirm(Component comp, String prompt, int buttons)
+	{
+		GUIUtilities.hideSplashScreen();
+
+		return JOptionPane.showConfirmDialog(comp,prompt,
+			jEdit.getProperty("macro-confirm.title"),buttons,
+			JOptionPane.QUESTION_MESSAGE);
+	} //}}}
+
+	//{{{ confirm() method
+	/**
+	 * Utility method that can be used to ask for confirmation in a macro.
+	 * @param comp The component to show the dialog on behalf of, this
+	 * will usually be a view instance
+	 * @param prompt The prompt string
+	 * @param buttons The buttons to display - for example,
+	 * JOptionPane.YES_NO_CANCEL_OPTION
+	 * @param type The dialog type - for example,
+	 * JOptionPane.WARNING_MESSAGE
+	 */
+	public static int confirm(Component comp, String prompt, int buttons, int type)
+	{
+		GUIUtilities.hideSplashScreen();
+
+		return JOptionPane.showConfirmDialog(comp,prompt,
+			jEdit.getProperty("macro-confirm.title"),buttons,type);
+	} //}}}
+
+	//{{{ browseSystemMacros() method
 	/**
 	 * Opens the system macro directory in a VFS browser.
 	 * @param view The view
@@ -100,28 +158,16 @@ public class Macros
 	 */
 	public static void browseSystemMacros(View view)
 	{
-		if(userMacroPath == null)
+		if(systemMacroPath == null)
 		{
 			GUIUtilities.error(view,"no-webstart",null);
 			return;
 		}
 
-		DockableWindowManager dockableWindowManager
-			= view.getDockableWindowManager();
+		VFSBrowser.browseDirectory(view,systemMacroPath);
+	} //}}}
 
-		dockableWindowManager.addDockableWindow(VFSBrowser.NAME);
-		final VFSBrowser browser = (VFSBrowser)dockableWindowManager
-			.getDockableWindow(VFSBrowser.NAME);
-
-		VFSManager.runInAWTThread(new Runnable()
-		{
-			public void run()
-			{
-				browser.setDirectory(systemMacroPath);
-			}
-		});
-	}
-
+	//{{{ browseUserMacros() method
 	/**
 	 * Opens the user macro directory in a VFS browser.
 	 * @param view The view
@@ -135,22 +181,10 @@ public class Macros
 			return;
 		}
 
-		DockableWindowManager dockableWindowManager
-			= view.getDockableWindowManager();
+		VFSBrowser.browseDirectory(view,userMacroPath);
+	} //}}}
 
-		dockableWindowManager.addDockableWindow(VFSBrowser.NAME);
-		final VFSBrowser browser = (VFSBrowser)dockableWindowManager
-			.getDockableWindow(VFSBrowser.NAME);
-
-		VFSManager.runInAWTThread(new Runnable()
-		{
-			public void run()
-			{
-				browser.setDirectory(userMacroPath);
-			}
-		});
-	}
-
+	//{{{ loadMacros() method
 	/**
 	 * Rebuilds the macros list, and sends a MacrosChanged message
 	 * (views update their Macros menu upon receiving it)
@@ -158,9 +192,9 @@ public class Macros
 	 */
 	public static void loadMacros()
 	{
-		macroList = new Vector();
-		macroHierarchy = new Vector();
-		macroHash = new Hashtable();
+		macroActionSet.removeAllActions();
+		macroHierarchy.removeAllElements();
+		macroHash.clear();
 
 		if(jEdit.getJEditHome() != null)
 		{
@@ -178,12 +212,58 @@ public class Macros
 			loadMacros(macroHierarchy,"",new File(userMacroPath));
 		}
 
-		// sort macro list
-		MiscUtilities.quicksort(macroList,new MiscUtilities.StringICaseCompare());
-
 		EditBus.send(new MacrosChanged(null));
-	}
+	} //}}}
 
+	//{{{ registerHandler() method
+	/**
+	 * Adds a macro handler to the handlers list
+	 * @since jEdit 4.0pre6
+	 */
+	public static void registerHandler(Handler handler)
+	{
+		if (getHandler(handler.getName()) != null)
+		{
+			Log.log(Log.ERROR, Macros.class, "Cannot register more than one macro handler with the same name");
+			return;
+		}
+
+		Log.log(Log.DEBUG,Macros.class,"Registered " + handler.getName()
+			+ " macro handler");
+		macroHandlers.add(handler);
+	} //}}}
+
+	//{{{ getHandlers() method
+	/**
+	 * Returns an array containing the list of registered macro handlers
+	 * @since jEdit 4.0pre6
+	 */
+	public static Handler[] getHandlers()
+	{
+		Handler[] handlers = new Handler[macroHandlers.size()];
+		return (Handler[])macroHandlers.toArray(handlers);
+	} //}}}
+
+	//{{{ getHandler() method
+	/**
+	 * Returns the macro handler with the specified name, or null if
+	 * there is no registered handler with that name.
+	 * @since jEdit 4.0pre6
+	 */
+	public static Handler getHandler(String name)
+	{
+		Handler handler = null;
+		for (int i = 0; i < macroHandlers.size(); i++)
+		{
+			handler = (Handler)macroHandlers.get(i);
+			if (handler.getName().equals(name)) return handler;
+		}
+
+		return null;
+	}
+	//}}}
+
+	//{{{ getMacroHierarchy() method
 	/**
 	 * Returns a vector hierarchy with all known macros in it.
 	 * Each element of this vector is either a macro name string,
@@ -195,17 +275,19 @@ public class Macros
 	public static Vector getMacroHierarchy()
 	{
 		return macroHierarchy;
-	}
+	} //}}}
 
+	//{{{ getMacroActionSet() method
 	/**
-	 * Returns a single vector with all known macros in it.
-	 * @since jEdit 3.1pre3
+	 * Returns an action set with all known macros in it.
+	 * @since jEdit 4.0pre1
 	 */
-	public static Vector getMacroList()
+	public static ActionSet getMacroActionSet()
 	{
-		return macroList;
-	}
+		return macroActionSet;
+	} //}}}
 
+	//{{{ getMacro() method
 	/**
 	 * Returns the macro with the specified name.
 	 * @param macro The macro's name
@@ -214,51 +296,99 @@ public class Macros
 	public static Macro getMacro(String macro)
 	{
 		return (Macro)macroHash.get(macro);
-	}
+	} //}}}
 
+	//{{{ Macro class
 	/**
 	 * Encapsulates the macro's label, name and path.
 	 * @since jEdit 2.2pre4
 	 */
-	public static class Macro
+	public static class Macro extends EditAction
 	{
-		public String name;
-		public String path;
-		public EditAction action;
-
-		public Macro(String name, final String path)
+		//{{{ Macro constructor
+		public Macro(Handler handler, String name, String label, String path)
 		{
-			this.name = name;
+			super(name);
+			this.handler = handler;
+			this.label = label;
 			this.path = path;
+		} //}}}
 
-			action = new EditAction(name,false)
-			{
-				public void invoke(View view)
-				{
-					lastMacro = path;
-					Buffer buffer = view.getBuffer();
-
-					try
-					{
-						buffer.beginCompoundEdit();
-
-						BeanShell.runScript(view,path,
-							true,false);
-					}
-					finally
-					{
-						buffer.endCompoundEdit();
-					}
-				}
-			};
-		}
-
-		public String toString()
+		//{{{ getHandler() method
+		public Handler getHandler()
 		{
-			return name;
+			return handler;
 		}
-	}
+		//}}}
 
+		//{{{ getLabel() method
+		public String getLabel()
+		{
+			return label;
+		} //}}}
+
+		//{{{ getMouseOverText() method
+		public String getMouseOverText()
+		{
+			return handler.getLabel() + " - " + path;
+		} //}}}
+
+		//{{{ getPath() method
+		public String getPath()
+		{
+			return path;
+		} //}}}
+
+		//{{{ invoke() method
+		public void invoke(View view)
+		{
+			lastMacro = this;
+			Buffer buffer = view.getBuffer();
+
+			try
+			{
+				buffer.beginCompoundEdit();
+
+				handler.runMacro(view, this);
+			}
+			finally
+			{
+				/* this is probably a bad way to fix this,
+				 * ...DAMN jEdit's source code is getting full
+				 * of stuff like 'this is a hack', 'this sucks',
+				 * etc... ok, back on track,
+				 * EditPane.setBuffer() calls endCompoundEdit()
+				 * if the buffer has a * compound edit pending;
+				 * but if a macro switches buffers, the below
+				 * call will print a warning to the activity
+				 * log. so we check for a pending edit first. */
+				if(buffer.insideCompoundEdit())
+					buffer.endCompoundEdit();
+			}
+		} //}}}
+
+		//{{{ getCode() method
+		public String getCode()
+		{
+			return "Macros.getMacro(\"" + getName() + "\").invoke(view);";
+		} //}}}
+
+		//{{{ macroNameToLabel() method
+		public static String macroNameToLabel(String macroName)
+		{
+			int index = macroName.lastIndexOf('/');
+			return macroName.substring(index + 1).replace('_', ' ');
+		}
+		//}}}
+
+		//{{{ Private members
+		private Handler handler;
+		private String path;
+		private String label;
+		//}}}
+	} //}}}
+
+	//{{{ recordTemporaryMacro() method
 	/**
 	 * Starts recording a temporary macro.
 	 * @param view The view
@@ -285,19 +415,13 @@ public class Macros
 		if(buffer == null)
 			return;
 
-		try
-		{
-			buffer.remove(0,buffer.getLength());
-			buffer.insertString(0,jEdit.getProperty("macro.temp.header"),null);
-		}
-		catch(BadLocationException bl)
-		{
-			Log.log(Log.ERROR,Macros.class,bl);
-		}
+		buffer.remove(0,buffer.getLength());
+		buffer.insert(0,jEdit.getProperty("macro.temp.header"));
 
 		recordMacro(view,buffer,true);
-	}
+	} //}}}
 
+	//{{{ recordMacro() method
 	/**
 	 * Starts recording a macro.
 	 * @param view The view
@@ -332,19 +456,13 @@ public class Macros
 		if(buffer == null)
 			return;
 
-		try
-		{
-			buffer.remove(0,buffer.getLength());
-			buffer.insertString(0,jEdit.getProperty("macro.header"),null);
-		}
-		catch(BadLocationException bl)
-		{
-			Log.log(Log.ERROR,Macros.class,bl);
-		}
+		buffer.remove(0,buffer.getLength());
+		buffer.insert(0,jEdit.getProperty("macro.header"));
 
 		recordMacro(view,buffer,false);
-	}
+	} //}}}
 
+	//{{{ stopRecording() method
 	/**
 	 * Stops a recording currently in progress.
 	 * @param view The view
@@ -364,8 +482,9 @@ public class Macros
 				view.setBuffer(recorder.buffer);
 			recorder.dispose();
 		}
-	}
+	} //}}}
 
+	//{{{ runTemporaryMacro() method
 	/**
 	 * Runs the temporary macro.
 	 * @param view The view
@@ -381,23 +500,30 @@ public class Macros
 			return;
 		}
 
-		lastMacro = MiscUtilities.constructPath(
+		String path = MiscUtilities.constructPath(
 			jEdit.getSettingsDirectory(),"macros",
 			"Temporary_Macro.bsh");
+
+		Handler handler = getHandler("beanshell");
+		Macro temp = handler.createMacro(path,path);
 
 		Buffer buffer = view.getBuffer();
 
 		try
 		{
 			buffer.beginCompoundEdit();
-			BeanShell.runScript(view,lastMacro,true,false);
+			temp.invoke(view);
 		}
 		finally
 		{
-			buffer.endCompoundEdit();
+			/* I already wrote a comment expaining this in
+			 * Macro.invoke(). */
+			if(buffer.insideCompoundEdit())
+				buffer.endCompoundEdit();
 		}
-	}
+	} //}}}
 
+	//{{{ runLastMacro() method
 	/**
 	 * Runs the most recently run or recorded macro.
 	 * @param view The view
@@ -408,54 +534,143 @@ public class Macros
 		if(lastMacro == null)
 			view.getToolkit().beep();
 		else
-			BeanShell.runScript(view,lastMacro,true,false);
-	}
+			lastMacro.invoke(view);
+	} //}}}
 
-	// private members
+	//{{{ showRunScriptDialog() method
+	/**
+	 * Prompts for one or more files to run as macros
+	 * @param view The view
+	 * @since jEdit 4.0pre7
+	 */
+	public static void showRunScriptDialog(View view)
+	{
+		String[] paths = GUIUtilities.showVFSFileDialog(view,
+			null,JFileChooser.OPEN_DIALOG,true);
+		if(paths != null)
+		{
+			Buffer buffer = view.getBuffer();
+			try
+			{
+				buffer.beginCompoundEdit();
+
+file_loop:			for(int i = 0; i < paths.length; i++)
+				{
+					String path = paths[i];
+
+					Handler handler;
+
+					for (int j = 0; j < macroHandlers.size(); j++)
+					{
+						handler = (Handler)macroHandlers.get(j);
+
+						if (handler.accept(path))
+						{
+							Macro macro = handler.createMacro(path,path);
+							macro.invoke(view);
+							continue file_loop;
+						}
+					}
+
+					// only executed if above loop falls
+					// through, ie there is no handler for
+					// this file
+					Log.log(Log.WARNING,Macros.class,path +
+						": Cannot find a suitable macro handler"
+						+ ", assuming BeanShell");
+					getHandler("beanshell").createMacro(
+						path,path).invoke(view);
+				}
+			}
+			finally
+			{
+				buffer.endCompoundEdit();
+			}
+		}
+	} //}}}
+
+	//{{{ Private members
+
+	//{{{ Static variables
 	private static String systemMacroPath;
 	private static String userMacroPath;
 
-	private static Vector macroList;
+	private static ArrayList macroHandlers;
+
+	private static ActionSet macroActionSet;
 	private static Vector macroHierarchy;
 	private static Hashtable macroHash;
-	private static String lastMacro;
+	private static Macro lastMacro;
+	//}}}
 
+	//{{{ Class initializer
 	static
 	{
-		EditBus.addToBus(new MacrosEBComponent());
-	}
+		macroHandlers = new ArrayList();
+		registerHandler(new BeanShellHandler());
+		macroActionSet = new ActionSet(jEdit.getProperty("action-set.macros"));
+		jEdit.addActionSet(macroActionSet);
+		macroHierarchy = new Vector();
+		macroHash = new Hashtable();
+	} //}}}
 
+	//{{{ loadMacros() method
 	private static void loadMacros(Vector vector, String path, File directory)
 	{
-		String[] macroFiles = directory.list();
-		if(macroFiles == null)
+		File[] macroFiles = directory.listFiles();
+		if(macroFiles == null || macroFiles.length == 0)
 			return;
 
 		MiscUtilities.quicksort(macroFiles,new MiscUtilities.StringICaseCompare());
 
 		for(int i = 0; i < macroFiles.length; i++)
 		{
-			String fileName = macroFiles[i];
-			File file = new File(directory,fileName);
-			if(fileName.toLowerCase().endsWith(".bsh"))
+			File file = macroFiles[i];
+			String fileName = file.getName();
+			if(file.isHidden())
 			{
-				String label = fileName.substring(0,fileName.length() - 4);
-				String name = path + label;
-				Macro newMacro = new Macro(name,file.getPath());
-				vector.addElement(newMacro);
-				macroList.addElement(newMacro);
-				macroHash.put(name,newMacro);
+				/* do nothing! */
+				continue;
 			}
 			else if(file.isDirectory())
 			{
 				Vector submenu = new Vector();
 				submenu.addElement(fileName.replace('_',' '));
 				loadMacros(submenu,path + fileName + '/',file);
-				vector.addElement(submenu);
+				if(submenu.size() != 1)
+					vector.addElement(submenu);
+			}
+			else
+			{
+				Handler handler;
+				for (int j = 0; j < macroHandlers.size(); j++)
+				{
+					handler = (Handler)macroHandlers.get(j);
+					try
+					{
+						if (handler.accept(fileName))
+						{
+							Macro newMacro = handler.createMacro(
+								path + fileName, file.getPath());
+							vector.addElement(newMacro);
+							macroActionSet.addAction(newMacro);
+							macroHash.put(newMacro.getName(),newMacro);
+							break;
+						}
+					}
+					catch (Exception e)
+					{
+						Log.log(Log.ERROR, Macros.class, e);
+						macroHandlers.remove(handler);
+						j--;
+						continue;
+					}
+				}
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ recordMacro() method
 	/**
 	 * Starts recording a macro.
 	 * @param view The view
@@ -465,57 +680,20 @@ public class Macros
 	 */
 	private static void recordMacro(View view, Buffer buffer, boolean temporary)
 	{
-		lastMacro = buffer.getPath();
+		Handler handler = getHandler("beanshell");
+		String path = buffer.getPath();
+		lastMacro = handler.createMacro(path,path);
 
 		view.setMacroRecorder(new Recorder(view,buffer,temporary));
 
 		// setting the message to 'null' causes the status bar to check
 		// if a recording is in progress
 		view.getStatus().setMessage(null);
-	}
+	} //}}}
 
-	static class MacrosEBComponent implements EBComponent
-	{
-		public void handleMessage(EBMessage msg)
-		{
-			if(msg instanceof BufferUpdate)
-			{
-				BufferUpdate bmsg = (BufferUpdate)msg;
-				if(bmsg.getWhat() == BufferUpdate.DIRTY_CHANGED
-					&& !bmsg.getBuffer().isDirty())
-					maybeReloadMacros(bmsg.getBuffer().getPath());
-			}
-			else if(msg instanceof VFSUpdate)
-			{
-				maybeReloadMacros(((VFSUpdate)msg).getPath());
-			}
-		}
+	//}}}
 
-		private void maybeReloadMacros(String path)
-		{
-			// On Windows and MacOS, path names are case insensitive
-			if(File.separatorChar == '\\' || File.separatorChar == ':')
-			{
-				path = path.toLowerCase();
-				if(systemMacroPath != null && path.startsWith(
-					systemMacroPath.toLowerCase()))
-					loadMacros();
-
-				if(userMacroPath != null && path.startsWith(
-					userMacroPath.toLowerCase()))
-					loadMacros();
-			}
-			else
-			{
-				if(systemMacroPath != null && path.startsWith(systemMacroPath))
-					loadMacros();
-
-				if(userMacroPath != null && path.startsWith(userMacroPath))
-					loadMacros();
-			}
-		}
-	}
-
+	//{{{ Recorder class
 	public static class Recorder implements EBComponent
 	{
 		View view;
@@ -524,14 +702,16 @@ public class Macros
 
 		boolean lastWasInput;
 
+		//{{{ Recorder constructor
 		public Recorder(View view, Buffer buffer, boolean temporary)
 		{
 			this.view = view;
 			this.buffer = buffer;
 			this.temporary = temporary;
 			EditBus.addToBus(this);
-		}
+		} //}}}
 
+		//{{{ record() method
 		public void record(String code)
 		{
 			if(lastWasInput)
@@ -542,8 +722,9 @@ public class Macros
 
 			append("\n");
 			append(code);
-		}
+		} //}}}
 
+		//{{{ record() method
 		public void record(int repeat, String code)
 		{
 			if(repeat == 1)
@@ -555,8 +736,9 @@ public class Macros
 					+ code + "\n"
 					+ "}");
 			}
-		}
+		} //}}}
 
+		//{{{ record() method
 		public void record(int repeat, char ch)
 		{
 			// record \n and \t on lines specially so that auto indent
@@ -580,8 +762,9 @@ public class Macros
 					lastWasInput = true;
 				}
 			}
-		}
+		} //}}}
 
+		//{{{ handleMessage() method
 		public void handleMessage(EBMessage msg)
 		{
 			if(msg instanceof BufferUpdate)
@@ -593,20 +776,15 @@ public class Macros
 						stopRecording(view);
 				}
 			}
-		}
+		} //}}}
 
+		//{{{ append() method
 		private void append(String str)
 		{
-			try
-			{
-				buffer.insertString(buffer.getLength(),str,null);
-			}
-			catch(BadLocationException bl)
-			{
-				Log.log(Log.ERROR,this,bl);
-			}
-		}
+			buffer.insert(buffer.getLength(),str);
+		} //}}}
 
+		//{{{ dispose() method
 		private void dispose()
 		{
 			if(lastWasInput)
@@ -615,9 +793,7 @@ public class Macros
 				append("\");");
 			}
 
-			int lineCount = buffer.getDefaultRootElement()
-				.getElementCount();
-			for(int i = 0; i < lineCount; i++)
+			for(int i = 0; i < buffer.getLineCount(); i++)
 			{
 				buffer.indentLine(i,true,true);
 			}
@@ -627,6 +803,95 @@ public class Macros
 			// setting the message to 'null' causes the status bar to
 			// check if a recording is in progress
 			view.getStatus().setMessage(null);
-		}
+		} //}}}
+	} //}}}
+
+	//{{{ Handler class
+	/**
+	 * Encapsulates creating and invoking macros in arbitrary scripting languages
+	 * @since jEdit 4.0pre6
+	 */
+	public static abstract class Handler
+	{
+		//{{{ getName() method
+		public String getName()
+		{
+			return name;
+		} //}}}
+
+		//{{{ getLabel() method
+		public String getLabel()
+		{
+			return label;
+		} //}}}
+
+		//{{{ accept() method
+		public boolean accept(String name)
+		{
+			return filter.isMatch(name);
+		} //}}}
+
+		//{{{ createMacro() method
+		public abstract Macro createMacro(String macroName, String path);
+		//}}}
+
+		//{{{ runMacro() method
+		public abstract void runMacro(View view, Macro macro);
+		//}}}
+
+		//{{{ Handler constructor
+		protected Handler(String name)
+		{
+			this.name = name;
+			label = jEdit.getProperty("macro-handler."
+				+ name + ".label", name);
+			try
+			{
+				filter = new RE(MiscUtilities.globToRE(
+					jEdit.getProperty(
+					"macro-handler." + name + ".glob")));
+			}
+			catch (Exception e)
+			{
+				throw new InternalError("Missing or invalid glob for handler " + name);
+			}
+		} //}}}
+
+		//{{{ Private members
+		private String name;
+		private String label;
+		private RE filter;
+		//}}}
 	}
+	//}}}
+
+	//{{{ BeanShellHandler class
+	static class BeanShellHandler extends Handler
+	{
+		//{{{ BeanShellHandler constructor
+		BeanShellHandler()
+		{
+			super("beanshell");
+		}
+		//}}}
+
+		//{{{ createMacro() method
+		public Macro createMacro(String macroName, String path)
+		{
+			// Remove '.bsh'
+			macroName = macroName.substring(0, macroName.length() - 4);
+
+			return new Macro(this, macroName,
+				Macro.macroNameToLabel(macroName), path);
+		}
+		//}}}
+
+		//{{{ runMacro() method
+		public void runMacro(View view, Macro macro)
+		{
+			BeanShell.runScript(view,macro.getPath(),null,true);
+		}
+		//}}}
+	}
+	//}}}
 }

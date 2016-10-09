@@ -1,5 +1,8 @@
 /*
  * BrowserIORequest.java - VFS browser I/O request
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 2000 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,20 +22,24 @@
 
 package org.gjt.sp.jedit.browser;
 
+//{{{ Imports
+import javax.swing.tree.DefaultMutableTreeNode;
 import java.io.*;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.jEdit;
 import org.gjt.sp.jedit.MiscUtilities;
 import org.gjt.sp.util.WorkRequest;
 import org.gjt.sp.util.WorkThread;
+//}}}
 
 /**
  * A browser I/O request.
  * @author Slava Pestov
- * @version $Id: BrowserIORequest.java,v 1.1.1.1 2001/09/02 05:38:17 spestov Exp $
+ * @version $Id: BrowserIORequest.java,v 1.8 2002/01/28 04:20:54 spestov Exp $
  */
 public class BrowserIORequest extends WorkRequest
 {
+	//{{{ Request types
 	/**
 	 * Directory listing I/O request.
 	 */
@@ -52,16 +59,20 @@ public class BrowserIORequest extends WorkRequest
 	 * Make directory I/O request.
 	 */
 	public static final int MKDIR = 3;
+	//}}}
 
+	//{{{ BrowserIORequest constructor
 	/**
 	 * Creates a new browser I/O request.
 	 * @param type The request type
 	 * @param browser The VFS browser instance
 	 * @param path1 The first path name to operate on
 	 * @param path2 The second path name to operate on
+	 * @param node Only used for type == LIST_DIRECTORY
 	 */
 	public BrowserIORequest(int type, VFSBrowser browser,
-		Object session, VFS vfs, String path1, String path2)
+		Object session, VFS vfs, String path1, String path2,
+		DefaultMutableTreeNode node)
 	{
 		this.type = type;
 		this.browser = browser;
@@ -69,8 +80,10 @@ public class BrowserIORequest extends WorkRequest
 		this.vfs = vfs;
 		this.path1 = path1;
 		this.path2 = path2;
-	}
+		this.node = node;
+	} //}}}
 
+	//{{{ run() method
 	public void run()
 	{
 		switch(type)
@@ -89,9 +102,11 @@ public class BrowserIORequest extends WorkRequest
 			break;
 		}
 
-		browser.endRequest();
-	}
+		if(type != LIST_DIRECTORY)
+			browser.endRequest();
+	} //}}}
 
+	//{{{ toString() method
 	public String toString()
 	{
 		String typeString;
@@ -117,32 +132,42 @@ public class BrowserIORequest extends WorkRequest
 		return getClass().getName() + "[type=" + typeString
 			+ ",vfs=" + vfs + ",path1=" + path1
 			+ ",path2=" + path2 + "]";
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+
+	//{{{ Instance variables
 	private int type;
 	private VFSBrowser browser;
 	private Object session;
 	private VFS vfs;
 	private String path1;
 	private String path2;
+	private DefaultMutableTreeNode node;
+	//}}}
 
+	//{{{ listDirectory() method
 	private void listDirectory()
 	{
 		VFS.DirectoryEntry[] directory = null;
 		String[] args = { path1 };
 		setStatus(jEdit.getProperty("vfs.status.listing-directory",args));
 
+		String canonPath = null;
+
 		try
 		{
 			setAbortable(true);
-			directory = vfs._listDirectory(session,path1,browser);
+
+			canonPath = vfs._canonPath(session,path1,browser);
+
+			directory = vfs._listDirectory(session,canonPath,browser);
 		}
 		catch(IOException io)
 		{
 			setAbortable(false);
-			String[] pp = { path1, io.toString() };
-			VFSManager.error(browser,"directory-error",pp);
+			String[] pp = { io.toString() };
+			VFSManager.error(browser,path1,"ioerror.directory-error",pp);
 		}
 		catch(WorkThread.Abort a)
 		{
@@ -156,15 +181,16 @@ public class BrowserIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				setAbortable(false);
-				String[] pp = { path1, io.toString() };
-				VFSManager.error(browser,"directory-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(browser,path1,"ioerror.directory-error",pp);
 			}
 		}
 
 		setAbortable(false);
-		browser.directoryLoaded(directory);
-	}
+		browser.directoryLoaded(node,canonPath,directory);
+	} //}}}
 
+	//{{{ delete() method
 	private void delete()
 	{
 		try
@@ -175,13 +201,16 @@ public class BrowserIORequest extends WorkRequest
 
 			try
 			{
+				path1 = vfs._canonPath(session,path1,browser);
+
+
 				if(!vfs._delete(session,path1,browser))
-					VFSManager.error(browser,"vfs.browser.delete-error",args);
+					VFSManager.error(browser,path1,"ioerror.delete-error",null);
 			}
 			catch(IOException io)
 			{
-				String[] pp = { path1, io.toString() };
-				VFSManager.error(browser,"directory-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(browser,path1,"ioerror.directory-error",pp);
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -195,12 +224,13 @@ public class BrowserIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				String[] pp = { path1, io.toString() };
-				VFSManager.error(browser,"directory-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(browser,path1,"ioerror.directory-error",pp);
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ rename() method
 	private void rename()
 	{
 		try
@@ -211,22 +241,25 @@ public class BrowserIORequest extends WorkRequest
 
 			try
 			{
+				path1 = vfs._canonPath(session,path1,browser);
+				path2 = vfs._canonPath(session,path2,browser);
+
 				VFS.DirectoryEntry file = vfs._getDirectoryEntry(
 					session,path2,browser);
 				if(file != null)
-					VFSManager.error(browser,"vfs.browser.rename-exists",
+					VFSManager.error(browser,path1,"ioerror.rename-exists",
 						new String[] { path2 });
 				else
 				{
 					if(!vfs._rename(session,path1,path2,browser))
-						VFSManager.error(browser,"vfs.browser.rename-error",
-							new String[] { path1 });
+						VFSManager.error(browser,path1,"ioerror.rename-error",
+							new String[] { path2 });
 				}
 			}
 			catch(IOException io)
 			{
-				String[] pp = { path1, io.toString() };
-				VFSManager.error(browser,"directory-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(browser,path1,"ioerror.directory-error",pp);
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -240,12 +273,13 @@ public class BrowserIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				String[] pp = { path1, io.toString() };
-				VFSManager.error(browser,"directory-error",pp);
+				String[] pp = { io.toString() };
+				VFSManager.error(browser,path1,"ioerror.directory-error",pp);
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ mkdir() method
 	private void mkdir()
 	{
 		try
@@ -256,13 +290,15 @@ public class BrowserIORequest extends WorkRequest
 
 			try
 			{
+				path1 = vfs._canonPath(session,path1,browser);
+
 				if(!vfs._mkdir(session,path1,browser))
-					VFSManager.error(browser,"vfs.browser.mkdir-error",args);
+					VFSManager.error(browser,path1,"ioerror.mkdir-error",null);
 			}
 			catch(IOException io)
 			{
 				args[0] = io.toString();
-				VFSManager.error(browser,"ioerror",args);
+				VFSManager.error(browser,path1,"ioerror",args);
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -277,8 +313,10 @@ public class BrowserIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				String[] args = { io.toString() };
-				VFSManager.error(browser,"ioerror",args);
+				VFSManager.error(browser,path1,"ioerror",args);
 			}
 		}
-	}
+	} //}}}
+
+	//}}}
 }

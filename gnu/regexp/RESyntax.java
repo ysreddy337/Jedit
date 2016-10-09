@@ -1,6 +1,6 @@
 /*
  *  gnu/regexp/RESyntax.java
- *  Copyright (C) 1998-2001 Wes Biggs
+ *  Copyright (C) 1998-2002 Wes Biggs
  *
  *  This library is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU Lesser General Public License as published
@@ -159,7 +159,7 @@ public final class RESyntax implements Serializable {
 
   /**
    * Syntax bit. Allow use of (?=xxx) and (?!xxx) apply the subexpression
-   * to the text following the current position without cousuming that text.
+   * to the text following the current position without consuming that text.
    */
   public static final int RE_LOOKAHEAD                 = 21;
 
@@ -169,7 +169,7 @@ public final class RESyntax implements Serializable {
   public static final int RE_STRING_ANCHORS            = 22;
 
   /**
-   * Syntax bit. Allow embedded comments, (#comment), as in Perl5.
+   * Syntax bit. Allow embedded comments, (?#comment), as in Perl5.
    */
   public static final int RE_COMMENTS                  = 23;
 
@@ -277,7 +277,14 @@ public final class RESyntax implements Serializable {
    * using single line mode (/s modifier).
    */
   public static final RESyntax RE_SYNTAX_PERL5_S;
-  
+
+    /**
+     * Predefined syntax.
+     * Emulates regular expression support in Java 1.4's java.util.regex
+     * package.
+     */
+    public static final RESyntax RE_SYNTAX_JAVA_1_4;
+
   static {
       // Define syntaxes
       
@@ -387,7 +394,7 @@ public final class RESyntax implements Serializable {
       RE_SYNTAX_PERL5 = new RESyntax(RE_SYNTAX_PERL4)
 	  .set(RE_PURE_GROUPING)          // (?:)
 	  .set(RE_STINGY_OPS)             // *?,??,+?,{}?
-	  .set(RE_LOOKAHEAD)              // (?=)(?!) not implemented
+	  .set(RE_LOOKAHEAD)              // (?=)(?!)
 	  .set(RE_STRING_ANCHORS)         // \A,\Z
 	  .set(RE_CHAR_CLASS_ESC_IN_LISTS)// \d,\D,\w,\W,\s,\S within []
 	  .set(RE_COMMENTS)              // (?#)
@@ -395,6 +402,10 @@ public final class RESyntax implements Serializable {
       
       RE_SYNTAX_PERL5_S = new RESyntax(RE_SYNTAX_PERL5)
 	  .set(RE_DOT_NEWLINE)
+	  .makeFinal();
+
+      RE_SYNTAX_JAVA_1_4 = new RESyntax(RE_SYNTAX_PERL5)
+	  // XXX
 	  .makeFinal();
   }
 

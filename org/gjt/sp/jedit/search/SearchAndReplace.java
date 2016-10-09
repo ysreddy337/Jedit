@@ -1,6 +1,9 @@
 /*
  * SearchAndReplace.java - Search and replace
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
  * Portions copyright (C) 2001 Tom Locke
  *
  * This program is free software; you can redistribute it and/or
@@ -20,7 +23,7 @@
 
 package org.gjt.sp.jedit.search;
 
-import javax.swing.text.BadLocationException;
+//{{{ Imports
 import javax.swing.text.Segment;
 import javax.swing.JOptionPane;
 import java.awt.Component;
@@ -29,15 +32,19 @@ import org.gjt.sp.jedit.msg.SearchSettingsChanged;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * Class that implements regular expression and literal search within
  * jEdit buffers.
  * @author Slava Pestov
- * @version $Id: SearchAndReplace.java,v 1.1.1.1 2001/09/02 05:37:58 spestov Exp $
+ * @version $Id: SearchAndReplace.java,v 1.27 2002/04/12 03:49:45 spestov Exp $
  */
 public class SearchAndReplace
 {
+	//{{{ Getters and setters
+
+	//{{{ setSearchString() method
 	/**
 	 * Sets the current search string.
 	 * @param search The new search string
@@ -51,16 +58,18 @@ public class SearchAndReplace
 		matcher = null;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getSearchString() method
 	/**
 	 * Returns the current search string.
 	 */
 	public static String getSearchString()
 	{
 		return search;
-	}
+	} //}}}
 
+	//{{{ setReplaceString() method
 	/**
 	 * Sets the current replacement string.
 	 * @param search The new replacement string
@@ -74,16 +83,18 @@ public class SearchAndReplace
 		matcher = null;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getRepalceString() method
 	/**
 	 * Returns the current replacement string.
 	 */
 	public static String getReplaceString()
 	{
 		return replace;
-	}
+	} //}}}
 
+	//{{{ setIgnoreCase() method
 	/**
 	 * Sets the ignore case flag.
 	 * @param ignoreCase True if searches should be case insensitive,
@@ -98,8 +109,9 @@ public class SearchAndReplace
 		matcher = null;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getIgnoreCase() method
 	/**
 	 * Returns the state of the ignore case flag.
 	 * @return True if searches should be case insensitive,
@@ -108,8 +120,9 @@ public class SearchAndReplace
 	public static boolean getIgnoreCase()
 	{
 		return ignoreCase;
-	}
+	} //}}}
 
+	//{{{ setRegexp() method
 	/**
 	 * Sets the state of the regular expression flag.
 	 * @param regexp True if regular expression searches should be
@@ -121,11 +134,15 @@ public class SearchAndReplace
 			return;
 
 		SearchAndReplace.regexp = regexp;
+		if(regexp && reverse)
+			reverse = false;
+
 		matcher = null;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getRegexp() method
 	/**
 	 * Returns the state of the regular expression flag.
 	 * @return True if regular expression searches should be performed
@@ -133,8 +150,9 @@ public class SearchAndReplace
 	public static boolean getRegexp()
 	{
 		return regexp;
-	}
+	} //}}}
 
+	//{{{ setReverseSearch() method
 	/**
 	 * Sets the reverse search flag. Note that currently, only literal
 	 * reverse searches are supported.
@@ -146,13 +164,14 @@ public class SearchAndReplace
 		if(reverse == SearchAndReplace.reverse)
 			return;
 
-		SearchAndReplace.reverse = reverse;
+		SearchAndReplace.reverse = (regexp ? false : reverse);
 
 		matcher = null;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getReverseSearch() method
 	/**
 	 * Returns the state of the reverse search flag.
 	 * @return True if searches should go backwards,
@@ -161,8 +180,9 @@ public class SearchAndReplace
 	public static boolean getReverseSearch()
 	{
 		return reverse;
-	}
+	} //}}}
 
+	//{{{ setBeanShellReplace() method
 	/**
 	 * Sets the state of the BeanShell replace flag.
 	 * @param regexp True if the replace string is a BeanShell expression
@@ -177,8 +197,9 @@ public class SearchAndReplace
 		matcher = null;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getBeanShellReplace() method
 	/**
 	 * Returns the state of the BeanShell replace flag.
 	 * @return True if the replace string is a BeanShell expression
@@ -187,8 +208,9 @@ public class SearchAndReplace
 	public static boolean getBeanShellReplace()
 	{
 		return beanshell;
-	}
+	} //}}}
 
+	//{{{ setAutoWrap() method
 	/**
 	 * Sets the state of the auto wrap around flag.
 	 * @param wrap If true, the 'continue search from start' dialog
@@ -203,8 +225,9 @@ public class SearchAndReplace
 		SearchAndReplace.wrap = wrap;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getAutoWrap() method
 	/**
 	 * Returns the state of the auto wrap around flag.
 	 * @param wrap If true, the 'continue search from start' dialog
@@ -214,8 +237,9 @@ public class SearchAndReplace
 	public static boolean getAutoWrapAround()
 	{
 		return wrap;
-	}
+	} //}}}
 
+	//{{{ setSearchMatcher() method
 	/**
 	 * Sets the current search string matcher. Note that calling
 	 * <code>setSearchString</code>, <code>setReplaceString</code>,
@@ -227,8 +251,9 @@ public class SearchAndReplace
 		SearchAndReplace.matcher = matcher;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getSearchMatcher() method
 	/**
 	 * Returns the current search string matcher.
 	 * @exception IllegalArgumentException if regular expression search
@@ -238,8 +263,9 @@ public class SearchAndReplace
 		throws Exception
 	{
 		return getSearchMatcher(true);
-	}
+	} //}}}
 
+	//{{{ getSearchMatcher() method
 	/**
 	 * Returns the current search string matcher.
 	 * @param reverseOK Replacement commands need a non-reversed matcher,
@@ -281,8 +307,9 @@ public class SearchAndReplace
 		}
 
 		return matcher;
-	}
+	} //}}}
 
+	//{{{ setSearchFileSet() method
 	/**
 	 * Sets the current search file set.
 	 * @param fileset The file set to perform searches in
@@ -292,16 +319,22 @@ public class SearchAndReplace
 		SearchAndReplace.fileset = fileset;
 
 		EditBus.send(new SearchSettingsChanged(null));
-	}
+	} //}}}
 
+	//{{{ getSearchFileSet() method
 	/**
 	 * Returns the current search file set.
 	 */
 	public static SearchFileSet getSearchFileSet()
 	{
 		return fileset;
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ Actions
+
+	//{{{ hyperSearch() method
 	/**
 	 * Performs a HyperSearch.
 	 * @param view The view
@@ -309,19 +342,54 @@ public class SearchAndReplace
 	 */
 	public static boolean hyperSearch(View view)
 	{
-		record(view,"hyperSearch(view)",false,true);
+		return hyperSearch(view,false);
+	} //}}}
+
+	//{{{ hyperSearch() method
+	/**
+	 * Performs a HyperSearch.
+	 * @param view The view
+	 * @param selection If true, will only search in the current selection.
+	 * Note that the file set must be the current buffer file set for this
+	 * to work.
+	 * @since jEdit 4.0pre1
+	 */
+	public static boolean hyperSearch(View view, boolean selection)
+	{
+		record(view,"hyperSearch(view," + selection + ")",false,
+			!selection);
 
 		view.getDockableWindowManager().addDockableWindow(
 			HyperSearchResults.NAME);
 		final HyperSearchResults results = (HyperSearchResults)
 			view.getDockableWindowManager()
-			.getDockableWindow(HyperSearchResults.NAME);
+			.getDockable(HyperSearchResults.NAME);
 		results.searchStarted();
 
 		try
 		{
+			SearchMatcher matcher = getSearchMatcher(false);
+			if(matcher == null)
+			{
+				view.getToolkit().beep();
+				results.searchDone(0,0);
+				return false;
+			}
+
+			Selection[] s;
+			if(selection)
+			{
+				s = view.getTextArea().getSelection();
+				if(s == null)
+				{
+					results.searchDone(0,0);
+					return false;
+				}
+			}
+			else
+				s = null;
 			VFSManager.runInWorkThread(new HyperSearchRequest(view,
-				getSearchMatcher(false),results));
+				matcher,results,s));
 			return true;
 		}
 		catch(Exception e)
@@ -333,8 +401,9 @@ public class SearchAndReplace
 			GUIUtilities.error(view,"searcherror",args);
 			return false;
 		}
-	}
+	} //}}}
 
+	//{{{ find() method
 	/**
 	 * Finds the next occurance of the search string.
 	 * @param view The view
@@ -343,7 +412,9 @@ public class SearchAndReplace
 	public static boolean find(View view)
 	{
 		boolean repeat = false;
-		Buffer buffer = fileset.getNextBuffer(view,null);
+		String path = fileset.getNextFile(view,null);
+		if(path == null)
+			return false;
 
 		try
 		{
@@ -360,8 +431,24 @@ public class SearchAndReplace
 
 loop:			for(;;)
 			{
-				while(buffer != null)
+				while(path != null)
 				{
+					Buffer buffer = jEdit.openTemporary(
+						view,null,path,false);
+
+					/* this is stupid and misleading.
+					 * but 'path' is not used anywhere except
+					 * the above line, and if this is done
+					 * after the 'continue', then we will
+					 * either hang, or be forced to duplicate
+					 * it inside the buffer == null, or add
+					 * a 'finally' clause. you decide which one's
+					 * worse. */
+					path = fileset.getNextFile(view,path);
+
+					if(buffer == null)
+						continue loop;
+
 					// Wait for the buffer to load
 					if(!buffer.isLoaded())
 						VFSManager.waitForRequests();
@@ -377,7 +464,7 @@ loop:			for(;;)
 							start = textArea.getCaretPosition();
 						else if(reverse)
 							start = s.getStart();
-						else 
+						else
 							start = s.getEnd();
 					}
 					else if(reverse)
@@ -385,28 +472,37 @@ loop:			for(;;)
 					else
 						start = 0;
 
-					if(find(view,buffer,start))
+					if(find(view,buffer,start,repeat))
 						return true;
-
-					buffer = fileset.getNextBuffer(view,buffer);
 				}
 
 				if(repeat)
 				{
-					// no point showing this dialog box twice
-					view.getToolkit().beep();
+					if(!BeanShell.isScriptRunning())
+					{
+						view.getStatus().setMessageAndClear(
+							jEdit.getProperty("view.status.search-not-found"));
+
+						view.getToolkit().beep();
+					}
 					return false;
 				}
 
-				/* Don't do this when playing a macro */
-				if(BeanShell.isScriptRunning())
-					break loop;
-
 				boolean restart;
-				if(wrap)
+
+				if(BeanShell.isScriptRunning())
+				{
+					restart = true;
+				}
+				else if(wrap)
 				{
 					view.getStatus().setMessageAndClear(
 						jEdit.getProperty("view.status.auto-wrap"));
+					// beep if beep property set
+					if(jEdit.getBooleanProperty("search.beepOnSearchAutoWrap"))
+					{
+						view.getToolkit().beep();
+					}
 					restart = true;
 				}
 				else
@@ -422,7 +518,7 @@ loop:			for(;;)
 				if(restart)
 				{
 					// start search from beginning
-					buffer = fileset.getFirstBuffer(view);
+					path = fileset.getFirstFile(view);
 					repeat = true;
 				}
 				else
@@ -443,8 +539,9 @@ loop:			for(;;)
 		}
 
 		return false;
-	}
+	} //}}}
 
+	//{{{ find() method
 	/**
 	 * Finds the next instance of the search string in the specified
 	 * buffer.
@@ -452,10 +549,31 @@ loop:			for(;;)
 	 * @param buffer The buffer
 	 * @param start Location where to start the search
 	 */
-	public static boolean find(final View view, final Buffer buffer, final int start)
+	public static boolean find(View view, Buffer buffer, int start)
 		throws Exception
 	{
+		return find(view,buffer,start,false);
+	} //}}}
+
+	//{{{ find() method
+	/**
+	 * Finds the next instance of the search string in the specified
+	 * buffer.
+	 * @param view The view
+	 * @param buffer The buffer
+	 * @param start Location where to start the search
+	 * @param firstTime See <code>SearchMatcher.nextMatch()</code>
+	 * @since jEdit 4.0pre7
+	 */
+	public static boolean find(View view, Buffer buffer, int start,
+		boolean firstTime) throws Exception
+	{
 		SearchMatcher matcher = getSearchMatcher(true);
+		if(matcher == null)
+		{
+			view.getToolkit().beep();
+			return false;
+		}
 
 		Segment text = new Segment();
 		if(reverse)
@@ -463,23 +581,42 @@ loop:			for(;;)
 		else
 			buffer.getText(start,buffer.getLength() - start,text);
 
-		int[] match = matcher.nextMatch(text);
+		// the start and end flags will be wrong with reverse search enabled,
+		// but they are only used by the regexp matcher, which doesn't
+		// support reverse search yet.
+		//
+		// REMIND: fix flags when adding reverse regexp search.
+		int[] match = matcher.nextMatch(new CharIndexedSegment(text,reverse),
+			start == 0,true,firstTime);
+
 		if(match != null)
 		{
-			fileset.matchFound(buffer);
+			jEdit.commitTemporary(buffer);
 			view.setBuffer(buffer);
 			JEditTextArea textArea = view.getTextArea();
-			int matchStart = (reverse ? 0 : start);
-			textArea.setSelection(new Selection.Range(
-				matchStart + match[0],
-				matchStart + match[1]));
-			textArea.moveCaretPosition(matchStart + match[1]);
+
+			if(reverse)
+			{
+				textArea.setSelection(new Selection.Range(
+					start - match[1],
+					start - match[0]));
+				textArea.moveCaretPosition(start - match[1]);
+			}
+			else
+			{
+				textArea.setSelection(new Selection.Range(
+					start + match[0],
+					start + match[1]));
+				textArea.moveCaretPosition(start + match[1]);
+			}
+
 			return true;
 		}
 		else
 			return false;
-	}
+	} //}}}
 
+	//{{{ replace() method
 	/**
 	 * Replaces the current selection with the replacement string.
 	 * @param view The view
@@ -488,6 +625,14 @@ loop:			for(;;)
 	public static boolean replace(View view)
 	{
 		JEditTextArea textArea = view.getTextArea();
+
+		Buffer buffer = view.getBuffer();
+		if(!buffer.isEditable())
+			return false;
+
+		boolean smartCaseReplace = (replace != null
+			&& TextUtilities.getStringCase(replace)
+			== TextUtilities.LOWER_CASE);
 
 		Selection[] selection = textArea.getSelection();
 		if(selection.length == 0)
@@ -498,11 +643,13 @@ loop:			for(;;)
 
 		record(view,"replace(view)",true,false);
 
-		Buffer buffer = view.getBuffer();
-
 		try
 		{
 			buffer.beginCompoundEdit();
+
+			SearchMatcher matcher = getSearchMatcher(false);
+			if(matcher == null)
+				return false;
 
 			int retVal = 0;
 
@@ -516,23 +663,33 @@ loop:			for(;;)
 				this sucks, so we hack to avoid it. */
 				int start = s.getStart();
 
-				retVal += _replace(view,buffer,
-					s.getStart(),s.getEnd());
-
-				// this has no effect if the selection
-				// no longer exists
-				textArea.removeFromSelection(s);
 				if(s instanceof Selection.Range)
 				{
+					retVal += _replace(view,buffer,matcher,
+						s.getStart(),s.getEnd(),
+						smartCaseReplace);
+
+					textArea.removeFromSelection(s);
 					textArea.addToSelection(new Selection.Range(
 						start,s.getEnd()));
 				}
 				else if(s instanceof Selection.Rect)
 				{
+					for(int j = s.getStartLine(); j <= s.getEndLine(); j++)
+					{
+						retVal += _replace(view,buffer,matcher,
+							s.getStart(buffer,j),s.getEnd(buffer,j),
+							smartCaseReplace);
+					}
 					textArea.addToSelection(new Selection.Rect(
 						start,s.getEnd()));
 				}
 			}
+
+			Selection s = textArea.getSelectionAtOffset(
+				textArea.getCaretPosition());
+			if(s != null)
+				textArea.moveCaretPosition(s.getEnd());
 
 			if(retVal == 0)
 			{
@@ -556,8 +713,9 @@ loop:			for(;;)
 		}
 
 		return false;
-	}
+	} //}}}
 
+	//{{{ replace() method
 	/**
 	 * Replaces text in the specified range with the replacement string.
 	 * @param view The view
@@ -568,15 +726,27 @@ loop:			for(;;)
 	 */
 	public static boolean replace(View view, Buffer buffer, int start, int end)
 	{
+		if(!buffer.isEditable())
+			return false;
+
+		boolean smartCaseReplace = (replace != null
+			&& TextUtilities.getStringCase(replace)
+			== TextUtilities.LOWER_CASE);
+
 		JEditTextArea textArea = view.getTextArea();
 
 		try
 		{
-			int retVal = 0;
-
 			buffer.beginCompoundEdit();
 
-			retVal += _replace(view,buffer,start,end);
+			SearchMatcher matcher = getSearchMatcher(false);
+			if(matcher == null)
+				return false;
+
+			int retVal = 0;
+
+			retVal += _replace(view,buffer,matcher,start,end,
+				smartCaseReplace);
 
 			if(retVal != 0)
 				return true;
@@ -595,8 +765,9 @@ loop:			for(;;)
 		}
 
 		return false;
-	}
+	} //}}}
 
+	//{{{ replaceAll() method
 	/**
 	 * Replaces all occurances of the search string with the replacement
 	 * string.
@@ -611,35 +782,65 @@ loop:			for(;;)
 
 		view.showWaitCursor();
 
+		boolean smartCaseReplace = (replace != null
+			&& TextUtilities.getStringCase(replace)
+			== TextUtilities.LOWER_CASE);
+
 		try
 		{
-			Buffer buffer = fileset.getFirstBuffer(view);
-			do
+			SearchMatcher matcher = getSearchMatcher(false);
+			if(matcher == null)
+				return false;
+
+			String path = fileset.getFirstFile(view);
+loop:			while(path != null)
 			{
+				Buffer buffer = jEdit.openTemporary(
+					view,null,path,false);
+
+				/* this is stupid and misleading.
+				 * but 'path' is not used anywhere except
+				 * the above line, and if this is done
+				 * after the 'continue', then we will
+				 * either hang, or be forced to duplicate
+				 * it inside the buffer == null, or add
+				 * a 'finally' clause. you decide which one's
+				 * worse. */
+				path = fileset.getNextFile(view,path);
+
+				if(buffer == null)
+					continue loop;
+
 				// Wait for buffer to finish loading
 				if(buffer.isPerformingIO())
 					VFSManager.waitForRequests();
 
+				if(!buffer.isEditable())
+					continue loop;
+
 				// Leave buffer in a consistent state if
 				// an error occurs
+				int retVal = 0;
+
 				try
 				{
 					buffer.beginCompoundEdit();
-					int retVal = _replace(view,buffer,
-						0,buffer.getLength());
-					if(retVal != 0)
-					{
-						fileCount++;
-						occurCount += retVal;
-						fileset.matchFound(buffer);
-					}
+					retVal = _replace(view,buffer,matcher,
+						0,buffer.getLength(),
+						smartCaseReplace);
 				}
 				finally
 				{
 					buffer.endCompoundEdit();
 				}
+
+				if(retVal != 0)
+				{
+					fileCount++;
+					occurCount += retVal;
+					jEdit.commitTemporary(buffer);
+				}
 			}
-			while((buffer = fileset.getNextBuffer(view,buffer)) != null);
 		}
 		catch(Exception e)
 		{
@@ -661,11 +862,16 @@ loop:			for(;;)
 				new Integer(fileCount) };
 			view.getStatus().setMessageAndClear(jEdit.getProperty(
 				"view.status.replace-all",args));
+			if(occurCount == 0)
+				view.getToolkit().beep();
 		}
 
 		return (fileCount != 0);
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ load() method
 	/**
 	 * Loads search and replace state from the properties.
 	 */
@@ -675,20 +881,19 @@ loop:			for(;;)
 		replace = jEdit.getProperty("search.replace.value");
 		ignoreCase = jEdit.getBooleanProperty("search.ignoreCase.toggle");
 		regexp = jEdit.getBooleanProperty("search.regexp.toggle");
-		reverse = jEdit.getBooleanProperty("search.reverse.toggle");
 		beanshell = jEdit.getBooleanProperty("search.beanshell.toggle");
 		wrap = jEdit.getBooleanProperty("search.wrap.toggle");
 
-		String filesetCode = jEdit.getProperty("search.fileset.value");
-		if(filesetCode != null)
-		{
-			fileset = (SearchFileSet)BeanShell.eval(null,filesetCode,true);
-		}
+		fileset = new CurrentBufferSet();
 
-		if(fileset == null)
-			fileset = new CurrentBufferSet();
-	}
+		// Tags plugin likes to call this method at times other than
+		// startup; so we need to fire a SearchSettingsChanged to
+		// notify the search bar and so on.
+		matcher = null;
+		EditBus.send(new SearchSettingsChanged(null));
+	} //}}}
 
+	//{{{ save() method
 	/**
 	 * Saves search and replace state to the properties.
 	 */
@@ -698,18 +903,13 @@ loop:			for(;;)
 		jEdit.setProperty("search.replace.value",replace);
 		jEdit.setBooleanProperty("search.ignoreCase.toggle",ignoreCase);
 		jEdit.setBooleanProperty("search.regexp.toggle",regexp);
-		jEdit.setBooleanProperty("search.reverse.toggle",reverse);
 		jEdit.setBooleanProperty("search.beanshell.toggle",beanshell);
 		jEdit.setBooleanProperty("search.wrap.toggle",wrap);
+	} //}}}
 
-		String code = fileset.getCode();
-		if(code != null)
-			jEdit.setProperty("search.fileset.value",code);
-		else
-			jEdit.unsetProperty("search.fileset.value");
-	}
+	//{{{ Private members
 
-	// private members
+	//{{{ Instance variables
 	private static String search;
 	private static String replace;
 	private static boolean regexp;
@@ -719,7 +919,9 @@ loop:			for(;;)
 	private static boolean wrap;
 	private static SearchMatcher matcher;
 	private static SearchFileSet fileset;
+	//}}}
 
+	//{{{ record() method
 	private static void record(View view, String action,
 		boolean replaceAction, boolean recordFileSet)
 	{
@@ -759,8 +961,9 @@ loop:			for(;;)
 
 			recorder.record("SearchAndReplace." + action + ";");
 		}
-	}
+	} //}}}
 
+	//{{{ _replace() method
 	/**
 	 * Replaces all occurances of the search string with the replacement
 	 * string.
@@ -768,27 +971,32 @@ loop:			for(;;)
 	 * @param buffer The buffer
 	 * @param start The start offset
 	 * @param end The end offset
-	 * @return True if the replace operation was successful, false
-	 * if no matches were found
+	 * @param matcher The search matcher to use
+	 * @param smartCaseReplace See user's guide
+	 * @return The number of occurrences replaced
 	 */
 	private static int _replace(View view, Buffer buffer,
-		int start, int end) throws Exception
+		SearchMatcher matcher, int start, int end,
+		boolean smartCaseReplace)
+		throws Exception
 	{
-		if(!buffer.isEditable())
-			return 0;
-
-		SearchMatcher matcher = getSearchMatcher(false);
-		if(matcher == null)
-			return 0;
-
 		int occurCount = 0;
+
+		boolean endOfLine = (buffer.getLineEndOffset(
+			buffer.getLineOfOffset(end)) - 1 == end);
 
 		Segment text = new Segment();
 		int offset = start;
-loop:		for(;;)
+loop:		for(int counter = 0; ; counter++)
 		{
 			buffer.getText(offset,end - offset,text);
-			int[] occur = matcher.nextMatch(text);
+
+			boolean startOfLine = (buffer.getLineStartOffset(
+				buffer.getLineOfOffset(offset)) == offset);
+
+			int[] occur = matcher.nextMatch(
+				new CharIndexedSegment(text,false),
+				startOfLine,endOfLine,counter == 0);
 			if(occur == null)
 				break loop;
 			int _start = occur[0];
@@ -796,13 +1004,24 @@ loop:		for(;;)
 
 			String found = new String(text.array,text.offset + _start,_length);
 			String subst = matcher.substitute(found);
+			if(smartCaseReplace && ignoreCase)
+			{
+				int strCase = TextUtilities.getStringCase(found);
+				if(strCase == TextUtilities.LOWER_CASE)
+					subst = subst.toLowerCase();
+				else if(strCase == TextUtilities.UPPER_CASE)
+					subst = subst.toUpperCase();
+				else if(strCase == TextUtilities.TITLE_CASE)
+					subst = TextUtilities.toTitleCase(subst);
+			}
 
 			if(subst != null)
 			{
 				buffer.remove(offset + _start,_length);
-				buffer.insertString(offset + _start,subst,null);
+				buffer.insert(offset + _start,subst);
 				occurCount++;
 				offset += _start + subst.length();
+
 				end += (subst.length() - found.length());
 			}
 			else
@@ -810,5 +1029,7 @@ loop:		for(;;)
 		}
 
 		return occurCount;
-	}
+	} //}}}
+
+	//}}}
 }

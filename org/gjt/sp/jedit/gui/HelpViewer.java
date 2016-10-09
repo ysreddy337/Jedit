@@ -1,5 +1,8 @@
 /*
  * HelpViewer.java - HTML Help viewer
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,6 +22,7 @@
 
 package org.gjt.sp.jedit.gui;
 
+//{{{ Imports
 import com.microstar.xml.*;
 import javax.swing.*;
 import javax.swing.border.*;
@@ -31,35 +35,41 @@ import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import org.gjt.sp.jedit.browser.FileCellRenderer; // for icons
 import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * jEdit's HTML viewer. It uses a Swing JEditorPane to display the HTML,
  * and implements a URL history.
  * @author Slava Pestov
- * @version $Id: HelpViewer.java,v 1.2 2001/09/03 05:58:06 spestov Exp $
+ * @version $Id: HelpViewer.java,v 1.16 2002/02/06 09:54:01 spestov Exp $
  */
 public class HelpViewer extends JFrame implements EBComponent
 {
+	//{{{ HelpViewer constructor
 	/**
-	 * @deprecated Create a new HelpViewer instance instead
+	 * Creates a new help viewer with the default help page.
+	 * @since jEdit 4.0pre4
 	 */
-	public static void gotoURL(URL url)
+	public HelpViewer()
 	{
-		new HelpViewer(url.toString());
-	}
+		this("welcome.html");
+	} //}}}
 
+	//{{{ HelpViewer constructor
 	/**
-	 * @deprecated Pass a String instead of a URL
+	 * Creates a new help viewer for the specified URL.
+	 * @param url The URL
 	 */
 	public HelpViewer(URL url)
 	{
-		// XXX
 		this(url.toString());
-	}
+	} //}}}
 
+	//{{{ HelpViewer constructor
 	/**
 	 * Creates a new help viewer for the specified URL.
 	 * @param url The URL
@@ -69,6 +79,17 @@ public class HelpViewer extends JFrame implements EBComponent
 		super(jEdit.getProperty("helpviewer.title"));
 
 		setIconImage(GUIUtilities.getEditorIcon());
+
+		try
+		{
+			baseURL = new File(MiscUtilities.constructPath(
+				jEdit.getJEditHome(),"doc")).toURL().toString();
+		}
+		catch(MalformedURLException mu)
+		{
+			Log.log(Log.ERROR,this,mu);
+			// what to do?
+		}
 
 		history = new String[25];
 		nodes = new Hashtable();
@@ -121,15 +142,19 @@ public class HelpViewer extends JFrame implements EBComponent
 		toc.setRootVisible(false);
 		toc.setShowsRootHandles(true);
 
+		DefaultMutableTreeNode node = (DefaultMutableTreeNode)
+			nodes.get("users-guide/using-jedit-part.html");
+		if(node != null)
+			toc.expandPath(new TreePath(node.getPath()));
+
 		viewer = new JEditorPane();
 		viewer.setEditable(false);
 		viewer.addHyperlinkListener(new LinkHandler());
 		viewer.setFont(new Font("Monospaced",Font.PLAIN,12));
 
-		JSplitPane splitter = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+		final JSplitPane splitter = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
 			new JScrollPane(toc),new JScrollPane(viewer));
 		splitter.setBorder(null);
-
 
 		getContentPane().add(BorderLayout.CENTER,splitter);
 
@@ -137,14 +162,25 @@ public class HelpViewer extends JFrame implements EBComponent
 
 		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
-		setSize(800,400);
+		getRootPane().setPreferredSize(new Dimension(800,500));
+
+		pack();
 		GUIUtilities.loadGeometry(this,"helpviewer");
 
 		EditBus.addToBus(this);
 
 		show();
-	}
 
+		SwingUtilities.invokeLater(new Runnable()
+		{
+			public void run()
+			{
+				splitter.setDividerLocation(250);
+			}
+		});
+	} //}}}
+
+	//{{{ gotoURL() method
 	/**
 	 * Displays the specified URL in the HTML component.
 	 * @param url The URL
@@ -153,6 +189,29 @@ public class HelpViewer extends JFrame implements EBComponent
 	 */
 	public void gotoURL(String url, boolean addToHistory)
 	{
+		String shortURL;
+		if(MiscUtilities.isURL(url))
+		{
+			if(url.startsWith(baseURL))
+			{
+				shortURL = url.substring(baseURL.length());
+				if(shortURL.startsWith("/"))
+					shortURL = shortURL.substring(1);
+			}
+			else
+			{
+				shortURL = null;
+			}
+		}
+		else
+		{
+			shortURL = url;
+			if(baseURL.endsWith("/"))
+				url = baseURL + url;
+			else
+				url = baseURL + '/' + url;
+		}
+
 		// reset default cursor so that the hand cursor doesn't
 		// stick around
 		viewer.setCursor(Cursor.getDefaultCursor());
@@ -195,35 +254,39 @@ public class HelpViewer extends JFrame implements EBComponent
 		}
 
 		// select the appropriate tree node.
-		index = url.lastIndexOf("/doc/");
-		if(index != -1)
-			url = url.substring(index + 5);
+		if(shortURL != null)
+		{
+			DefaultMutableTreeNode node = (DefaultMutableTreeNode)nodes.get(shortURL);
 
-		DefaultMutableTreeNode node = (DefaultMutableTreeNode)nodes.get(url);
+			if(node == null)
+				return;
 
-		if(node == null)
-			return;
+			TreePath path = new TreePath(tocModel.getPathToRoot(node));
+			toc.expandPath(path);
+			toc.setSelectionPath(path);
+			toc.scrollPathToVisible(path);
+		}
+	} //}}}
 
-		TreePath path = new TreePath(tocModel.getPathToRoot(node));
-		toc.expandPath(path);
-		toc.setSelectionPath(path);
-		toc.scrollPathToVisible(path);
-	}
-
+	//{{{ dispose() method
 	public void dispose()
 	{
 		EditBus.removeFromBus(this);
 		GUIUtilities.saveGeometry(this,"helpviewer");
 		super.dispose();
-	}
+	} //}}}
 
+	//{{{ handleMessage() method
 	public void handleMessage(EBMessage msg)
 	{
 		if(msg instanceof PropertiesChanged)
 			SwingUtilities.updateComponentTreeUI(getRootPane());
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+
+	//{{{ Instance variables
+	private String baseURL;
 	private JButton back;
 	private JButton forward;
 	private DefaultTreeModel tocModel;
@@ -234,28 +297,31 @@ public class HelpViewer extends JFrame implements EBComponent
 	private JTextField urlField;
 	private String[] history;
 	private int historyPos;
+	//}}}
 
+	//{{{ createTOC() method
 	private void createTOC()
 	{
 		DefaultMutableTreeNode root = new DefaultMutableTreeNode();
 
-		root.add(createNode("jeditresource:/doc/welcome.html",
+		root.add(createNode("welcome.html",
 			jEdit.getProperty("helpviewer.toc.welcome")));
 
-		root.add(createNode("jeditresource:/doc/README.txt",
+		root.add(createNode("README.txt",
 			jEdit.getProperty("helpviewer.toc.readme")));
-		root.add(createNode("jeditresource:/doc/NEWS.txt",
+		root.add(createNode("NEWS.txt",
 			jEdit.getProperty("helpviewer.toc.news")));
-		root.add(createNode("jeditresource:/doc/TODO.txt",
+		root.add(createNode("TODO.txt",
 			jEdit.getProperty("helpviewer.toc.todo")));
-		root.add(createNode("jeditresource:/doc/CHANGES.txt",
+		root.add(createNode("CHANGES.txt",
 			jEdit.getProperty("helpviewer.toc.changes")));
-		root.add(createNode("jeditresource:/doc/COPYING.txt",
+		root.add(createNode("COPYING.txt",
 			jEdit.getProperty("helpviewer.toc.copying")));
-		root.add(createNode("jeditresource:/doc/COPYING.DOC.txt",
+		root.add(createNode("COPYING.DOC.txt",
 			jEdit.getProperty("helpviewer.toc.copying-doc")));
 
-		loadUserGuideTOC(root);
+		loadTOC(root,"users-guide/toc.xml");
+		loadTOC(root,"FAQ/toc.xml");
 
 		DefaultMutableTreeNode pluginDocs = new DefaultMutableTreeNode(
 			jEdit.getProperty("helpviewer.toc.plugins"),true);
@@ -287,90 +353,112 @@ public class HelpViewer extends JFrame implements EBComponent
 			}
 		}
 
-		root.add(pluginDocs);
+		if(pluginDocs.getChildCount() != 0)
+			root.add(pluginDocs);
 
 		tocModel = new DefaultTreeModel(root);
-	}
+	} //}}}
 
-	private void loadUserGuideTOC(DefaultMutableTreeNode root)
+	//{{{ loadTOC() method
+	private void loadTOC(DefaultMutableTreeNode root, String path)
 	{
-		URL resource = getClass().getResource("/doc/users-guide/toc.xml");
-		if(resource == null)
-			return;
-
-		TOCHandler h = new TOCHandler(root);
+		TOCHandler h = new TOCHandler(root,MiscUtilities.getParentOfPath(path));
 		XmlParser parser = new XmlParser();
 		parser.setHandler(h);
 
 		try
 		{
-			// use a URL here because with Web Start version,
-			// toc.xml is not a local file
 			parser.parse(null, null, new InputStreamReader(
-				resource.openStream()));
+				new URL(baseURL + '/' + path).openStream()));
 		}
 		catch(XmlException xe)
 		{
 			int line = xe.getLine();
 			String message = xe.getMessage();
-			Log.log(Log.ERROR,this,"toc.xml:" + line
+			Log.log(Log.ERROR,this,path + ':' + line
 				+ ": " + message);
 		}
 		catch(Exception e)
 		{
-			Log.log(Log.ERROR,this,e);
+			Log.log(Log.NOTICE,this,e);
 		}
-	}
+	} //}}}
 
+	//{{{ createNode() method
 	private DefaultMutableTreeNode createNode(String href, String title)
 	{
 		DefaultMutableTreeNode node = new DefaultMutableTreeNode(
 			new HelpNode(href,title),true);
 		nodes.put(href,node);
 		return node;
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ Inner classes
+
+	//{{{ HelpNode class
 	static class HelpNode
 	{
 		String href, title;
 
+		//{{{ HelpNode constructor
 		HelpNode(String href, String title)
 		{
 			this.href = href;
 			this.title = title;
-		}
+		} //}}}
 
+		//{{{ toString() method
 		public String toString()
 		{
 			return title;
-		}
-	}
+		} //}}}
+	} //}}}
 
+	//{{{ TOCHandler class
 	class TOCHandler extends HandlerBase
 	{
-		TOCHandler(DefaultMutableTreeNode root)
+		String dir;
+
+		//{{{ TOCHandler constructor
+		TOCHandler(DefaultMutableTreeNode root, String dir)
 		{
 			nodes = new Stack();
 			node = root;
-		}
+			this.dir = dir;
+		} //}}}
 
+		//{{{ attribute() method
 		public void attribute(String aname, String value, boolean isSpecified)
 		{
 			if(aname.equals("HREF"))
 				href = value;
-		}
+		} //}}}
 
+		//{{{ charData() method
 		public void charData(char[] c, int off, int len)
 		{
 			if(tag.equals("TITLE"))
-				title = new String(c, off, len);
-		}
+			{
+				StringBuffer buf = new StringBuffer();
+				for(int i = 0; i < len; i++)
+				{
+					char ch = c[off + i];
+					if(ch == ' ' || !Character.isWhitespace(ch))
+						buf.append(ch);
+				}
+				title = buf.toString();
+			}
+		} //}}}
 
+		//{{{ startElement() method
 		public void startElement(String name)
 		{
 			tag = name;
-		}
+		} //}}}
 
+		//{{{ endElement() method
 		public void endElement(String name)
 		{
 			if(name == null)
@@ -379,33 +467,35 @@ public class HelpViewer extends JFrame implements EBComponent
 			if(name.equals("TITLE"))
 			{
 				DefaultMutableTreeNode newNode = createNode(
-					"jeditresource:/doc/users-guide/"
-					+ href,title);
+					dir + href,title);
 				node.add(newNode);
 				nodes.push(node);
 				node = newNode;
 			}
 			else if(name.equals("ENTRY"))
 				node = (DefaultMutableTreeNode)nodes.pop();
-		}
-		// end HandlerBase implementation
+		} //}}}
 
-		// private members
+		//{{{ Private members
 		private String tag;
 		private String title;
 		private String href;
 		private DefaultMutableTreeNode node;
 		private Stack nodes;
-	}
+		//}}}
+	} //}}}
 
+	//{{{ TOCTree class
 	class TOCTree extends JTree
 	{
+		//{{{ TOCTree constructor
 		TOCTree(TreeModel model)
 		{
 			super(model);
 			ToolTipManager.sharedInstance().registerComponent(this);
-		}
+		} //}}}
 
+		//{{{ getToolTipText() method
 		public final String getToolTipText(MouseEvent evt)
 		{
 			TreePath path = getPathForLocation(evt.getX(), evt.getY());
@@ -416,8 +506,9 @@ public class HelpViewer extends JFrame implements EBComponent
 					return path.getLastPathComponent().toString();
 			}
 			return null;
-		}
+		} //}}}
 
+		//{{{ getToolTipLocation() method
 		public final Point getToolTipLocation(MouseEvent evt)
 		{
 			TreePath path = getPathForLocation(evt.getX(), evt.getY());
@@ -426,12 +517,13 @@ public class HelpViewer extends JFrame implements EBComponent
 				Rectangle cellRect = getPathBounds(path);
 				if(cellRect != null && !cellRectIsVisible(cellRect))
 				{
-					return new Point(cellRect.x, cellRect.y - 1);
+					return new Point(cellRect.x + 14, cellRect.y);
 				}
 			}
 			return null;
-		}
+		} //}}}
 
+		//{{{ processMouseEvent() method
 		protected void processMouseEvent(MouseEvent evt)
 		{
 			ToolTipManager ttm = ToolTipManager.sharedInstance();
@@ -477,21 +569,25 @@ public class HelpViewer extends JFrame implements EBComponent
 				super.processMouseEvent(evt);
 				break;
 			}
-		}
+		} //}}}
 
-		// private members
+		//{{{ Private members
 		private int toolTipInitialDelay = -1;
 		private int toolTipReshowDelay = -1;
 
+		//{{{ cellRectIsVisible() method
 		private boolean cellRectIsVisible(Rectangle cellRect)
 		{
 			Rectangle vr = TOCTree.this.getVisibleRect();
 			return vr.contains(cellRect.x,cellRect.y) &&
 				vr.contains(cellRect.x + cellRect.width,
 				cellRect.y + cellRect.height);
-		}
-	}
+		} //}}}
 
+		//}}}
+	} //}}}
+
+	//{{{ TOCCellRenderer class
 	class TOCCellRenderer extends DefaultTreeCellRenderer
 	{
 		EmptyBorder border = new EmptyBorder(1,0,1,1);
@@ -502,15 +598,19 @@ public class HelpViewer extends JFrame implements EBComponent
 		{
 			super.getTreeCellRendererComponent(tree,value,sel,
 				expanded,leaf,row,focus);
-			setIcon(null);
+			setIcon(leaf ? FileCellRenderer.fileIcon
+				: (expanded ? FileCellRenderer.openDirIcon
+				: FileCellRenderer.dirIcon));
 			setBorder(border);
 
 			return this;
 		}
-	}
+	} //}}}
 
+	//{{{ ActionHandler class
 	class ActionHandler implements ActionListener
 	{
+		//{{{ actionPerformed() class
 		public void actionPerformed(ActionEvent evt)
 		{
 			Object source = evt.getSource();
@@ -540,11 +640,13 @@ public class HelpViewer extends JFrame implements EBComponent
 					}
 				}
 			}
-		}
-	}
+		} //}}}
+	} //}}}
 
+	//{{{ LinkHandler class
 	class LinkHandler implements HyperlinkListener
 	{
+		//{{{ hyperlinkUpdate() method
 		public void hyperlinkUpdate(HyperlinkEvent evt)
 		{
 			if(evt.getEventType() == HyperlinkEvent.EventType.ACTIVATED)
@@ -568,17 +670,21 @@ public class HelpViewer extends JFrame implements EBComponent
 			else if (evt.getEventType() == HyperlinkEvent.EventType.EXITED) {
 				viewer.setCursor(Cursor.getDefaultCursor());
 			}
-		}
-	}
+		} //}}}
+	} //}}}
 
+	//{{{ KeyHandler class
 	class KeyHandler extends KeyAdapter
 	{
+		//{{{ keyPressed() method
 		public void keyPressed(KeyEvent evt)
 		{
 			if(evt.getKeyCode() == KeyEvent.VK_ENTER)
 			{
 				gotoURL(urlField.getText(),true);
 			}
-		}
-	}
+		} //}}}
+	} //}}}
+
+	//}}}
 }

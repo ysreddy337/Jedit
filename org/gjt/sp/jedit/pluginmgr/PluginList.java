@@ -24,6 +24,7 @@ import java.io.*;
 import java.net.URL;
 import java.util.Hashtable;
 import java.util.Vector;
+import java.util.zip.GZIPInputStream;
 import org.gjt.sp.util.Log;
 import org.gjt.sp.jedit.*;
 
@@ -49,7 +50,7 @@ class PluginList
 		parser.setHandler(handler);
 
 		parser.parse(null,null,new BufferedReader(new InputStreamReader(
-			new URL(path).openStream(),"UTF8")));
+			new GZIPInputStream(new URL(path).openStream()),"UTF8")));
 	}
 
 	void addPlugin(Plugin plugin)
@@ -186,7 +187,8 @@ class PluginList
 		boolean canBeInstalled()
 		{
 			Branch branch = getCompatibleBranch();
-			return branch != null && !branch.obsolete;
+			return branch != null && !branch.obsolete
+				&& branch.canSatisfyDependencies();
 		}
 
 		void install(Roster roster, String installDirectory, boolean downloadSource)
@@ -223,7 +225,9 @@ class PluginList
 	{
 		String version;
 		String date;
+		int downloadSize;
 		String download;
+		int downloadSourceSize;
 		String downloadSource;
 		boolean obsolete;
 		Vector deps = new Vector();
@@ -284,11 +288,11 @@ class PluginList
 						.elementAt(i);
 					if(plugin.installedVersion != null
 						&&
-					(from == null || MiscUtilities.compareVersions(
-						plugin.installedVersion,from) >= 0)
+					(from == null || MiscUtilities.compareStrings(
+						plugin.installedVersion,from,false) >= 0)
 						&&
-					   (to == null || MiscUtilities.compareVersions(
-					   	plugin.installedVersion,to) <= 0))
+					   (to == null || MiscUtilities.compareStrings(
+					   	plugin.installedVersion,to,false) <= 0))
 					{
 						return true;
 					}
@@ -300,11 +304,11 @@ class PluginList
 			{
 				String javaVersion = System.getProperty("java.version").substring(0,3);
 
-				if((from == null || MiscUtilities.compareVersions(
-					javaVersion,from) >= 0)
+				if((from == null || MiscUtilities.compareStrings(
+					javaVersion,from,false) >= 0)
 					&&
-				   (to == null || MiscUtilities.compareVersions(
-				   	javaVersion,to) <= 0))
+				   (to == null || MiscUtilities.compareStrings(
+				   	javaVersion,to,false) <= 0))
 					return true;
 				else
 					return false;
@@ -313,11 +317,11 @@ class PluginList
 			{
 				String build = jEdit.getBuild();
 
-				if((from == null || MiscUtilities.compareVersions(
-					build,from) >= 0)
+				if((from == null || MiscUtilities.compareStrings(
+					build,from,false) >= 0)
 					&&
-				   (to == null || MiscUtilities.compareVersions(
-				   	build,to) <= 0))
+				   (to == null || MiscUtilities.compareStrings(
+				   	build,to,false) <= 0))
 					return true;
 				else
 					return false;
@@ -331,9 +335,14 @@ class PluginList
 
 		boolean canSatisfy()
 		{
-			// new plugins can always be downloaded (assuming Mike
-			// maintains plugin central properly)
-			return (what.equals("plugin") || isSatisfied());
+			if(isSatisfied())
+				return true;
+			else if(what.equals("plugin"))
+			{
+				return plugin.canBeInstalled();
+			}
+			else
+				return false;
 		}
 
 		void satisfy(Roster roster, String installDirectory,
@@ -347,14 +356,14 @@ class PluginList
 						.elementAt(i);
 					if((plugin.installedVersion == null
 						||
-					MiscUtilities.compareVersions(
-						plugin.installedVersion,branch.version) < 0)
+					MiscUtilities.compareStrings(
+						plugin.installedVersion,branch.version,false) < 0)
 						&&
-					(from == null || MiscUtilities.compareVersions(
-						branch.version,from) >= 0)
+					(from == null || MiscUtilities.compareStrings(
+						branch.version,from,false) >= 0)
 						&&
-					   (to == null || MiscUtilities.compareVersions(
-					   	branch.version,to) <= 0))
+					   (to == null || MiscUtilities.compareStrings(
+					   	branch.version,to,false) <= 0))
 					{
 						plugin.install(roster,installDirectory,
 							downloadSource);

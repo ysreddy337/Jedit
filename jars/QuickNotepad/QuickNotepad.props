@@ -1,26 +1,29 @@
+# Properties file for QuickNotepad plugin
+# $Id: QuickNotepad.props,v 1.8 2001/12/23 05:37:00 spestov Exp $
+
 # general plugin information
 plugin.QuickNotepadPlugin.name=QuickNotepad
 plugin.QuickNotepadPlugin.author=John Gellene
-plugin.QuickNotepadPlugin.version=1.0
+plugin.QuickNotepadPlugin.version=2.0
 plugin.QuickNotepadPlugin.docs=QuickNotepad.html
-plugin.QuickNotepadPlugin.depend.0=jdk 1.1
-plugin.QuickNotepadPlugin.depend.1=jedit 03.01.99.00
-plugin.QuickNotepadPlugin.depend.2=plugin EditBusPlugin 1.0
+plugin.QuickNotepadPlugin.depend.0=jedit 04.00.01.00
 
-# dockable window name
-quicknotepad.title=QuickNotepad
+# action labels for actions supplied by dockables.xml
+quicknotepad.label=QuickNotepad
+quicknotepad-toggle.label=QuickNotepad
 
-# action labels
-quicknotepad.toggle.label=QuickNotepad
-quicknotepad-to-front.label=Bring QuickNotepad to front
+# action labels for actions supplied by actions.xml
 quicknotepad.choose-file.label=Choose notepad file
 quicknotepad.save-file.label=Save notepad file
 quicknotepad.copy-to-buffer.label=Copy notepad to buffer
 
 # application menu items
 quicknotepad.menu.label=QuickNotepad
-quicknotepad.menu=quicknotepad.toggle - quicknotepad.choose-file \
+quicknotepad.menu=quicknotepad - quicknotepad.choose-file \
 	quicknotepad.save-file quicknotepad.copy-to-buffer
+
+# window title
+quicknotepad.title=QuickNotepad
 
 # plugin toolbar buttons
 quicknotepad.choose-file.icon=Open.gif
@@ -43,5 +46,3 @@ options.quicknotepad.fontsize=14
 
 # Setting not defined but supplied for completeness
 options.quicknotepad.filepath=
-
-

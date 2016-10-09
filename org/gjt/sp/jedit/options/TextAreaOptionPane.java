@@ -1,5 +1,8 @@
 /*
  * TextAreaOptionPane.java - Text area options panel
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 1998, 1999, 2000 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,41 +22,26 @@
 
 package org.gjt.sp.jedit.options;
 
+//{{{ Imports
 import javax.swing.*;
 import java.awt.*;
 import org.gjt.sp.jedit.gui.FontSelector;
 import org.gjt.sp.jedit.*;
+//}}}
 
 public class TextAreaOptionPane extends AbstractOptionPane
 {
+	//{{{ TextAreaOptionPane constructor
 	public TextAreaOptionPane()
 	{
 		super("textarea");
-	}
+	} //}}}
 
+	//{{{ _init() method
 	public void _init()
 	{
 		/* Font */
-		String _fontFamily = jEdit.getProperty("view.font");
-		int _fontStyle;
-		try
-		{
-			_fontStyle = Integer.parseInt(jEdit.getProperty("view.fontstyle"));
-		}
-		catch(NumberFormatException nf)
-		{
-			_fontStyle = Font.PLAIN;
-		}
-		int _fontSize;
-		try
-		{
-			_fontSize = Integer.parseInt(jEdit.getProperty("view.fontsize"));
-		}
-		catch(NumberFormatException nf)
-		{
-			_fontSize = 14;
-		}
-		font = new FontSelector(new Font(_fontFamily,_fontStyle,_fontSize));
+		font = new FontSelector(jEdit.getFontProperty("view.font"));
 
 		addComponent(jEdit.getProperty("options.textarea.font"),font);
 
@@ -118,26 +106,26 @@ public class TextAreaOptionPane extends AbstractOptionPane
 		antiAlias = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".antiAlias"));
 		antiAlias.setSelected(jEdit.getBooleanProperty("view.antiAlias"));
+		addComponent(antiAlias);
 
 		/* Fractional font metrics */
 		fracFontMetrics = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".fracFontMetrics"));
 		fracFontMetrics.setSelected(jEdit.getBooleanProperty(
 			"view.fracFontMetrics"));
+		addComponent(fracFontMetrics);
 
-		if(System.getProperty("java.version").compareTo("1.2") >= 0)
-		{
-			addComponent(antiAlias);
-			addComponent(fracFontMetrics);
-		}
-	}
+		/* Parse fully */
+		parseFully = new JCheckBox(jEdit.getProperty(
+			"options.textarea.parseFully"));
+		parseFully.setSelected(jEdit.getBooleanProperty("parseFully"));
+		addComponent(parseFully);
+	} //}}}
 
+	//{{{ _save() method
 	public void _save()
 	{
-		Font _font = font.getFont();
-		jEdit.setProperty("view.font",_font.getFamily());
-		jEdit.setProperty("view.fontsize",String.valueOf(_font.getSize()));
-		jEdit.setProperty("view.fontstyle",String.valueOf(_font.getStyle()));
+		jEdit.setFontProperty("view.font",font.getFont());
 
 		jEdit.setBooleanProperty("view.lineHighlight",lineHighlight
 			.isSelected());
@@ -149,16 +137,17 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			.isSelected());
 		jEdit.setBooleanProperty("view.caretBlink",blinkCaret.isSelected());
 		jEdit.setBooleanProperty("view.blockCaret",blockCaret.isSelected());
-		jEdit.setProperty("view.electricBorders",electricBorders
-			.isSelected() ? "3" : "0");
+		jEdit.setIntegerProperty("view.electricBorders",electricBorders
+			.isSelected() ? 3 : 0);
 		jEdit.setBooleanProperty("view.homeEnd",homeEnd.isSelected());
 		jEdit.setBooleanProperty("view.middleMousePaste",
 			middleMousePaste.isSelected());
 		jEdit.setBooleanProperty("view.antiAlias",antiAlias.isSelected());
 		jEdit.setBooleanProperty("view.fracFontMetrics",fracFontMetrics.isSelected());
-	}
+		jEdit.setBooleanProperty("parseFully",parseFully.isSelected());
+	} //}}}
 
-	// private members
+	//{{{ Private members
 	private FontSelector font;
 	private JCheckBox lineHighlight;
 	private JCheckBox bracketHighlight;
@@ -171,4 +160,6 @@ public class TextAreaOptionPane extends AbstractOptionPane
 	private JCheckBox middleMousePaste;
 	private JCheckBox antiAlias;
 	private JCheckBox fracFontMetrics;
+	private JCheckBox parseFully;
+	//}}}
 }

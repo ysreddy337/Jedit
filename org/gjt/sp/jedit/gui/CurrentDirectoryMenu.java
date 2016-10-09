@@ -1,5 +1,8 @@
 /*
  * CurrentDirectoryMenu.java - File list menu
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -22,28 +25,48 @@ package org.gjt.sp.jedit.gui;
 import javax.swing.*;
 import java.awt.event.*;
 import java.io.File;
+import org.gjt.sp.jedit.browser.*;
+import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.*;
 
 public class CurrentDirectoryMenu extends EnhancedMenu
 {
+	//{{{ CurrentDirectoryMenu constructor
 	public CurrentDirectoryMenu()
 	{
 		super("current-directory");
-	}
+	} //}}}
 
+	//{{{ setPopupMenuVisible() method
 	public void setPopupMenuVisible(boolean b)
 	{
 		if(b)
 		{
-			final View view = EditAction.getView(this);
+			final View view = GUIUtilities.getView(this);
 
 			if(getMenuComponentCount() != 0)
 				removeAll();
 
-			File file = view.getBuffer().getFile();
-			if(file == null)
+			final String path = MiscUtilities.getParentOfPath(
+				view.getBuffer().getPath());
+			JMenuItem mi = new JMenuItem(path);
+			mi.setIcon(FileCellRenderer.openDirIcon);
+
+			//{{{ Directory action listener...
+			mi.addActionListener(new ActionListener()
 			{
-				JMenuItem mi = new JMenuItem(jEdit.getProperty(
+				public void actionPerformed(ActionEvent evt)
+				{
+					VFSBrowser.browseDirectory(view,path);
+				}
+			}); //}}}
+
+			add(mi);
+			addSeparator();
+
+			if(view.getBuffer().getFile() == null)
+			{
+				mi = new JMenuItem(jEdit.getProperty(
 					"current-directory.not-local"));
 				mi.setEnabled(false);
 				add(mi);
@@ -51,28 +74,32 @@ public class CurrentDirectoryMenu extends EnhancedMenu
 				return;
 			}
 
-			File dir = new File(file.getParent());
-
-			JMenuItem mi = new JMenuItem(dir.getPath());
-			mi.setEnabled(false);
-			add(mi);
-			addSeparator();
+			File dir = new File(path);
 
 			JMenu current = this;
+
+			//{{{ ActionListener class
 			ActionListener listener = new ActionListener()
 			{
 				public void actionPerformed(ActionEvent evt)
 				{
 					jEdit.openFile(view,evt.getActionCommand());
 				}
-			};
+			}; //}}}
 
 			// for filtering out backups
 			String backupPrefix = jEdit.getProperty("backup.prefix");
 			String backupSuffix = jEdit.getProperty("backup.suffix");
 
 			String[] list = dir.list();
-			if(list != null)
+			if(list == null || list.length == 0)
+			{
+				mi = new JMenuItem(jEdit.getProperty(
+					"current-directory.no-files"));
+				mi.setEnabled(false);
+				add(mi);
+			}
+			else
 			{
 				MiscUtilities.quicksort(list,
 					new MiscUtilities.StringICaseCompare());
@@ -96,15 +123,16 @@ public class CurrentDirectoryMenu extends EnhancedMenu
 						continue;
 
 					// skip directories
-					file = new File(dir,name);
+					File file = new File(path,name);
 					if(file.isDirectory())
 						continue;
 
 					mi = new JMenuItem(name);
 					mi.setActionCommand(file.getPath());
 					mi.addActionListener(listener);
+					mi.setIcon(FileCellRenderer.fileIcon);
 
-					if(current.getItemCount() >= 20)
+					if(current.getItemCount() >= 20 && i != list.length - 1)
 					{
 						//current.addSeparator();
 						JMenu newCurrent = new JMenu(
@@ -120,5 +148,5 @@ public class CurrentDirectoryMenu extends EnhancedMenu
 		}
 
 		super.setPopupMenuVisible(b);
-	}
+	} //}}}
 }

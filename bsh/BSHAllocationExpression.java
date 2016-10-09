@@ -37,6 +37,9 @@ package bsh;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 
+/**
+	New object, new array, or inner class style allocation with body.
+*/
 class BSHAllocationExpression extends SimpleNode
 {
     BSHAllocationExpression(int id) { super(id); }
@@ -106,7 +109,8 @@ class BSHAllocationExpression extends SimpleNode
         } catch(InvocationTargetException e) {
             Interpreter.debug("The constructor threw an exception:\n\t" +
                 e.getTargetException());
-            throw new TargetError(e.getTargetException(), this);
+            throw new TargetError(
+				"Object constructor", e.getTargetException(), this, true);
         }
 	}
 

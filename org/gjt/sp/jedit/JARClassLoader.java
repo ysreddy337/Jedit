@@ -1,6 +1,9 @@
 /*
  * JARClassLoader.java - Loads classes from JAR files
- * Copyright (C) 1999, 2000 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
  * Portions copyright (C) 1999 mike dillon
  *
  * This program is free software; you can redistribute it and/or
@@ -20,31 +23,39 @@
 
 package org.gjt.sp.jedit;
 
+//{{{ Imports
 import java.io.*;
 import java.lang.reflect.Modifier;
 import java.net.*;
 import java.util.*;
 import java.util.zip.*;
+import org.gjt.sp.jedit.gui.DockableWindowManager;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * A class loader implementation that loads classes from JAR files.
  * @author Slava Pestov
- * @version $Id: JARClassLoader.java,v 1.2 2001/09/08 04:50:46 spestov Exp $
+ * @version $Id: JARClassLoader.java,v 1.14 2002/03/17 04:26:27 spestov Exp $
  */
 public class JARClassLoader extends ClassLoader
 {
-	// no-args constructor is for loading classes from all plugins
-	// eg BeanShell uses one of these so that scripts can use
-	// plugin classes
+	//{{{ JARClassLoader constructor
+	/**
+	 * This constructor creates a class loader for loading classes from all
+	 * plugins. For example BeanShell uses one of these so that scripts can
+	 * use plugin classes.
+	 */
 	public JARClassLoader()
 	{
-	}
+	} //}}}
 
+	//{{{ JARClassLoader constructor
 	public JARClassLoader(String path)
 		throws IOException
 	{
 		zipFile = new ZipFile(path);
+		jar = new EditPlugin.JAR(path,this);
 
 		Enumeration entires = zipFile.entries();
 		while(entires.hasMoreElements())
@@ -54,9 +65,19 @@ public class JARClassLoader extends ClassLoader
 			String lname = name.toLowerCase();
 			if(lname.equals("actions.xml"))
 			{
-				jEdit.loadActions(path + "!actions.xml",
+				jEdit.loadActions(
+					path + "!actions.xml",
 					new BufferedReader(new InputStreamReader(
-					zipFile.getInputStream(entry))),true);
+					zipFile.getInputStream(entry))),
+					jar.getActions());
+			}
+			if(lname.equals("dockables.xml"))
+			{
+				DockableWindowManager.loadDockableWindows(
+					path + "!dockables.xml",
+					new BufferedReader(new InputStreamReader(
+					zipFile.getInputStream(entry))),
+					jar.getActions());
 			}
 			else if(lname.endsWith(".props"))
 				jEdit.loadProps(zipFile.getInputStream(entry),true);
@@ -69,10 +90,10 @@ public class JARClassLoader extends ClassLoader
 			}
 		}
 
-		jar = new EditPlugin.JAR(path,this);
 		jEdit.addPluginJAR(jar);
-	}
+	} //}}}
 
+	//{{{ loadClass() method
 	/**
 	 * @exception ClassNotFoundException if the class could not be found
 	 */
@@ -118,8 +139,9 @@ public class JARClassLoader extends ClassLoader
 
 			throw cnf;
 		}
-	}
+	} //}}}
 
+	//{{{ getResourceAsStream() method
 	public InputStream getResourceAsStream(String name)
 	{
 		if(zipFile == null)
@@ -139,8 +161,9 @@ public class JARClassLoader extends ClassLoader
 
 			return null;
 		}
-	}
+	} //}}}
 
+	//{{{ getResource() method
 	public URL getResource(String name)
 	{
 		if(zipFile == null)
@@ -159,8 +182,9 @@ public class JARClassLoader extends ClassLoader
 			Log.log(Log.ERROR,this,mu);
 			return null;
 		}
-	}
+	} //}}}
 
+	//{{{ getResourceAsPath() method
 	public String getResourceAsPath(String name)
 	{
 		if(zipFile == null)
@@ -171,8 +195,9 @@ public class JARClassLoader extends ClassLoader
 
 		return "jeditresource:/" + MiscUtilities.getFileName(
 			jar.getPath()) + "!" + name;
-	}
+	} //}}}
 
+	//{{{ closeZipFile() method
 	/**
 	 * Closes the ZIP file. This plugin will no longer be usable
 	 * after this.
@@ -193,8 +218,9 @@ public class JARClassLoader extends ClassLoader
 		}
 
 		zipFile = null;
-	}
+	} //}}}
 
+	//{{{ getZipFile() method
 	/**
 	 * Returns the ZIP file associated with this class loader.
 	 * @since jEdit 3.0final
@@ -202,9 +228,9 @@ public class JARClassLoader extends ClassLoader
 	public ZipFile getZipFile()
 	{
 		return zipFile;
-	}
+	} //}}}
 
-	// package-private members
+	//{{{ startAllPlugins() method
 	void startAllPlugins()
 	{
 		for(int i = 0; i < pluginClasses.size(); i++)
@@ -222,13 +248,14 @@ public class JARClassLoader extends ClassLoader
 				Log.log(Log.ERROR,this,t);
 
 				jar.addPlugin(new EditPlugin.Broken(name));
-				String[] args = { name, t.toString() };
-				GUIUtilities.error(null,"plugin.start-error",args);
+				String[] args = { t.toString() };
+				jEdit.pluginError(jar.getPath(),
+					"plugin-error.start-error",args);
 			}
 		}
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
 
 	// used to mark non-existent classes in class hash
 	private static final Object NO_CLASS = new Object();
@@ -239,6 +266,7 @@ public class JARClassLoader extends ClassLoader
 	private Vector pluginClasses = new Vector();
 	private ZipFile zipFile;
 
+	//{{{ loadPluginClass() method
 	private void loadPluginClass(String name)
 		throws Exception
 	{
@@ -249,10 +277,22 @@ public class JARClassLoader extends ClassLoader
 		{
 			if(plugins[i].getClass().getName().equals(name))
 			{
-				String[] args = { name };
-				GUIUtilities.error(null,"plugin.already-loaded",args);
+				jEdit.pluginError(jar.getPath(),
+					"plugin-error.already-loaded",null);
 				return;
 			}
+		}
+
+		/* This is a bit silly... but WheelMouse 0.5 seems to be
+		 * unmaintained so the best solution is to add a hack here.
+		 */
+		if(name.equals("WheelMousePlugin")
+			&& jEdit.getProperty("plugin.WheelMousePlugin.version").equals("0.5")
+			&& OperatingSystem.hasJava14())
+		{
+			jar.addPlugin(new EditPlugin.Broken(name));
+			jEdit.pluginError(jar.getPath(),"plugin-error.update",null);
+			return;
 		}
 
 		// Check dependencies
@@ -270,26 +310,32 @@ public class JARClassLoader extends ClassLoader
 			&& !Modifier.isAbstract(modifiers)
 			&& EditPlugin.class.isAssignableFrom(clazz))
 		{
+			String label = jEdit.getProperty("plugin."
+				+ name + ".name");
 			String version = jEdit.getProperty("plugin."
 				+ name + ".version");
 
 			if(version == null)
 			{
-				Log.log(Log.WARNING,this,"Plugin " +
-					name + " doesn't"
-					+ " have a 'version' property.");
-				version = "";
+				Log.log(Log.ERROR,this,"Plugin " +
+					name + " needs"
+					+ " 'name' and 'version' properties.");
+				jar.addPlugin(new EditPlugin.Broken(name));
+				return;
 			}
-			else
-				version = " (version " + version + ")";
 
-			Log.log(Log.NOTICE,this,"Starting plugin " + name
-					+ version);
+			jar.getActions().setLabel(jEdit.getProperty(
+				"action-set.plugin",
+				new String[] { label }));
+
+			Log.log(Log.NOTICE,this,"Starting plugin " + label
+					+ " (version " + version + ")");
 
 			jar.addPlugin((EditPlugin)clazz.newInstance());
 		}
-	}
+	} //}}}
 
+	//{{{ checkDependencies() method
 	private boolean checkDependencies(String name)
 	{
 		int i = 0;
@@ -310,22 +356,33 @@ public class JARClassLoader extends ClassLoader
 
 			if(what.equals("jdk"))
 			{
-				if(System.getProperty("java.version").compareTo(arg) < 0)
+				if(MiscUtilities.compareStrings(
+					System.getProperty("java.version"),
+					arg,false) < 0)
 				{
-					String[] args = { name, arg,
+					String[] args = { arg,
 						System.getProperty("java.version") };
-					GUIUtilities.error(null,"plugin.dep-jdk",args);
+					jEdit.pluginError(jar.getPath(),"plugin-error.dep-jdk",args);
 					return false;
 				}
 			}
 			else if(what.equals("jedit"))
 			{
-				if(jEdit.getBuild().compareTo(arg) < 0)
+				if(arg.length() != 11)
+				{
+					Log.log(Log.ERROR,this,"Invalid jEdit version"
+						+ " number: " + arg);
+					return false;
+				}
+
+				if(MiscUtilities.compareStrings(
+					jEdit.getBuild(),arg,false) < 0)
 				{
 					String needs = MiscUtilities.buildToVersion(arg);
-					String[] args = { name, needs,
+					String[] args = { needs,
 						jEdit.getVersion() };
-					GUIUtilities.error(null,"plugin.dep-jedit",args);
+					jEdit.pluginError(jar.getPath(),
+						"plugin-error.dep-jedit",args);
 					return false;
 				}
 			}
@@ -347,23 +404,27 @@ public class JARClassLoader extends ClassLoader
 
 				if(currVersion == null)
 				{
-					String[] args = { name, needVersion, plugin };
-					GUIUtilities.error(null,"plugin.dep-plugin.no-version",args);
+					String[] args = { needVersion, plugin };
+					jEdit.pluginError(jar.getPath(),
+						"plugin-error.dep-plugin.no-version",
+						args);
 					return false;
 				}
 
-				if(MiscUtilities.compareVersions(currVersion,
-					needVersion) < 0)
+				if(MiscUtilities.compareStrings(currVersion,
+					needVersion,false) < 0)
 				{
-					String[] args = { name, needVersion, plugin, currVersion };
-					GUIUtilities.error(null,"plugin.dep-plugin",args);
+					String[] args = { needVersion, plugin, currVersion };
+					jEdit.pluginError(jar.getPath(),
+						"plugin-error.dep-plugin",args);
 					return false;
 				}
 
 				if(jEdit.getPlugin(plugin) instanceof EditPlugin.Broken)
 				{
-					String[] args = { name, plugin };
-					GUIUtilities.error(null,"plugin.dep-plugin.broken",args);
+					String[] args = { plugin };
+					jEdit.pluginError(jar.getPath(),
+						"plugin-error.dep-plugin.broken",args);
 					return false;
 				}
 			}
@@ -375,8 +436,9 @@ public class JARClassLoader extends ClassLoader
 				}
 				catch(Exception e)
 				{
-					String[] args = { name, arg };
-					GUIUtilities.error(null,"plugin.dep-class",args);
+					String[] args = { arg };
+					jEdit.pluginError(jar.getPath(),
+						"plugin-error.dep-class",args);
 					return false;
 				}
 			}
@@ -389,9 +451,12 @@ public class JARClassLoader extends ClassLoader
 		}
 
 		return true;
-	}
+	} //}}}
 
-	// Load class from this JAR only.
+	//{{{ _loadClass() method
+	/**
+	 * Load class from this JAR only.
+	 */
 	private Class _loadClass(String clazz, boolean resolveIt)
 		throws ClassNotFoundException
 	{
@@ -444,5 +509,7 @@ public class JARClassLoader extends ClassLoader
 
 			throw new ClassNotFoundException(clazz);
 		}
-	}
+	} //}}}
+
+	//}}}
 }

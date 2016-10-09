@@ -216,8 +216,7 @@ class CheckBoxListModel extends AbstractTableModel
 
 	public boolean isCellEditable(int row, int col)
 	{
-		return (col == 0 && !(((JCheckBoxList.Entry)items.elementAt(row)).value
-			instanceof String));
+		return col == 0;
 	}
 
 	public void setValueAt(Object value, int row, int col)
@@ -226,6 +225,7 @@ class CheckBoxListModel extends AbstractTableModel
 		{
 			((JCheckBoxList.Entry)items.elementAt(row)).checked =
 				(value.equals(Boolean.TRUE));
+			fireTableRowsUpdated(row,row);
 		}
 	}
 }

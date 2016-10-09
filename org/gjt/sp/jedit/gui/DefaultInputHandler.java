@@ -1,5 +1,8 @@
 /*
  * DefaultInputHandler.java - Default implementation of an input handler
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,6 +22,7 @@
 
 package org.gjt.sp.jedit.gui;
 
+//{{{ Imports
 import javax.swing.KeyStroke;
 import java.awt.event.*;
 import java.awt.Toolkit;
@@ -26,15 +30,17 @@ import java.util.Hashtable;
 import java.util.StringTokenizer;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * The default input handler. It maps sequences of keystrokes into actions
  * and inserts key typed events into the text area.
  * @author Slava Pestov
- * @version $Id: DefaultInputHandler.java,v 1.1.1.1 2001/09/02 05:37:37 spestov Exp $
+ * @version $Id: DefaultInputHandler.java,v 1.13 2002/03/17 01:28:43 spestov Exp $
  */
 public class DefaultInputHandler extends InputHandler
 {
+	//{{{ DefaultInputHandler constructor
 	/**
 	 * Creates a new input handler with no key bindings defined.
 	 * @param view The view
@@ -44,8 +50,9 @@ public class DefaultInputHandler extends InputHandler
 		super(view);
 
 		bindings = currentBindings = new Hashtable();
-	}
+	} //}}}
 
+	//{{{ DefaultInputHandler constructor
 	/**
 	 * Creates a new input handler with the same set of key bindings
 	 * as the one specified. Note that both input handlers share
@@ -59,8 +66,9 @@ public class DefaultInputHandler extends InputHandler
 		super(view);
 
 		bindings = currentBindings = copy.bindings;
-	}
+	} //}}}
 
+	//{{{ addKeyBinding() method
 	/**
 	 * Adds a key binding to this input handler. The key binding is
 	 * a list of white space separated key strokes of the form
@@ -96,8 +104,9 @@ public class DefaultInputHandler extends InputHandler
 			else
 				current.put(keyStroke,action);
 		}
-	}
+	} //}}}
 
+	//{{{ removeKeyBinding() method
 	/**
 	 * Removes a key binding from this input handler. This is not yet
 	 * implemented.
@@ -106,16 +115,18 @@ public class DefaultInputHandler extends InputHandler
 	public void removeKeyBinding(String keyBinding)
 	{
 		throw new InternalError("Not yet implemented");
-	}
+	} //}}}
 
+	//{{{ removeAllKeyBindings() method
 	/**
 	 * Removes all key bindings from this input handler.
 	 */
 	public void removeAllKeyBindings()
 	{
 		bindings.clear();
-	}
+	} //}}}
 
+	//{{{ getKeyBinding() method
 	/**
 	 * Returns either an edit action, or a hashtable if the specified key
 	 * is a prefix.
@@ -148,16 +159,18 @@ public class DefaultInputHandler extends InputHandler
 		}
 
 		return null;
-	}
+	} //}}}
 
+	//{{{ isPrefixActive() method
 	/**
 	 * Returns if a prefix key has been pressed.
 	 */
 	public boolean isPrefixActive()
 	{
 		return bindings != currentBindings;
-	}
+	} //}}}
 
+	//{{{ keyPressed() method
 	/**
 	 * Handle a key pressed event. This will look up the binding for
 	 * the key stroke and execute it.
@@ -167,44 +180,42 @@ public class DefaultInputHandler extends InputHandler
 		int keyCode = evt.getKeyCode();
 		int modifiers = evt.getModifiers();
 
-		if(modifiers == 0
-			&& bindings == currentBindings
-			&& (keyCode == KeyEvent.VK_ENTER
-			|| keyCode == KeyEvent.VK_TAB))
-		{
-			userInput((char)keyCode);
-			evt.consume();
-			return;
-		}
-
-		if((modifiers & ~KeyEvent.SHIFT_MASK) == 0)
+		if(!(evt.isControlDown() || evt.isAltDown() || evt.isMetaDown()))
 		{
 			// if modifier active, handle all keys, otherwise
 			// only some
-			switch(keyCode)
+			if((keyCode >= KeyEvent.VK_A && keyCode <= KeyEvent.VK_Z)
+				|| (keyCode >= KeyEvent.VK_0 && keyCode <= KeyEvent.VK_9))
 			{
-			case KeyEvent.VK_BACK_SPACE:
-			case KeyEvent.VK_DELETE:
-			case KeyEvent.VK_ESCAPE:
-			case KeyEvent.VK_ENTER:
-			case KeyEvent.VK_TAB:
-				break;
-			default:
-				if(!evt.isActionKey())
-					return;
-				else
-					break;
+				return;
 			}
-		}
-
-		if(readNextChar != null)
-		{
-			readNextChar = null;
-			view.getStatus().setMessage(null);
+			else if(keyCode == KeyEvent.VK_SPACE)
+			{
+				return;
+			}
+			else if(readNextChar != null)
+			{
+				if(keyCode == KeyEvent.VK_ESCAPE)
+				{
+					readNextChar = null;
+					view.getStatus().setMessage(null);
+				}
+				else if(!evt.isActionKey()
+					&& keyCode != KeyEvent.VK_TAB
+					&& keyCode != KeyEvent.VK_ENTER)
+				{
+					return;
+				}
+			}
+			else
+			{
+				// ok even with no modifiers
+			}
 		}
 
 		KeyStroke keyStroke = KeyStroke.getKeyStroke(keyCode,
 			modifiers);
+
 		Object o = currentBindings.get(keyStroke);
 		if(o == null)
 		{
@@ -220,27 +231,53 @@ public class DefaultInputHandler extends InputHandler
 				repeatCount = 0;
 				repeat = false;
 				evt.consume();
+				currentBindings = bindings;
 			}
-			currentBindings = bindings;
-			return;
+			else if(modifiers == 0 && (keyCode == KeyEvent.VK_ENTER
+				|| keyCode == KeyEvent.VK_TAB))
+			{
+				userInput((char)keyCode);
+				evt.consume();
+			}
 		}
-		else if(o instanceof EditAction)
+
+		if(readNextChar != null)
+		{
+			readNextChar = null;
+			view.getStatus().setMessage(null);
+		}
+
+		if(o instanceof EditAction)
 		{
 			currentBindings = bindings;
-
 			invokeAction((EditAction)o);
-
 			evt.consume();
-			return;
 		}
 		else if(o instanceof Hashtable)
 		{
 			currentBindings = (Hashtable)o;
 			evt.consume();
-			return;
 		}
-	}
 
+		if(o == null)
+		{
+			switch(evt.getKeyCode())
+			{
+				case KeyEvent.VK_NUMPAD0:   case KeyEvent.VK_NUMPAD1:
+				case KeyEvent.VK_NUMPAD2:   case KeyEvent.VK_NUMPAD3:
+				case KeyEvent.VK_NUMPAD4:   case KeyEvent.VK_NUMPAD5:
+				case KeyEvent.VK_NUMPAD6:   case KeyEvent.VK_NUMPAD7:
+				case KeyEvent.VK_NUMPAD8:   case KeyEvent.VK_NUMPAD9:
+				case KeyEvent.VK_MULTIPLY:  case KeyEvent.VK_ADD:
+				/* case KeyEvent.VK_SEPARATOR: */ case KeyEvent.VK_SUBTRACT:
+				case KeyEvent.VK_DECIMAL:   case KeyEvent.VK_DIVIDE:
+					KeyEventWorkaround.numericKeypadKey();
+					break;
+			}
+		}
+	} //}}}
+
+	//{{{ keyTyped() method
 	/**
 	 * Handle a key typed event. This inserts the key into the text area.
 	 */
@@ -257,38 +294,53 @@ public class DefaultInputHandler extends InputHandler
 		// this is a hack. a literal space is impossible to
 		// insert in a key binding string, but you can write
 		// SPACE.
-		if(c == ' ')
-			keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_SPACE,0);
-		else
+		switch(c)
+		{
+		case ' ':
+			keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_SPACE,
+				evt.getModifiers());
+			break;
+		case '\t':
+			keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_TAB,
+				evt.getModifiers());
+			break;
+		case '\n':
+			keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER,
+				evt.getModifiers());
+			break;
+		default:
 			keyStroke = KeyStroke.getKeyStroke(c);
+			break;
+		}
 
 		Object o = currentBindings.get(keyStroke);
 
 		if(o instanceof Hashtable)
 		{
 			currentBindings = (Hashtable)o;
-			return;
 		}
 		else if(o instanceof EditAction)
 		{
 			currentBindings = bindings;
 			invokeAction((EditAction)o);
-			return;
-		}
-
-		// otherwise, reset to default map and do user input
-		currentBindings = bindings;
-
-		if(repeat && Character.isDigit(c))
-		{
-			repeatCount *= 10;
-			repeatCount += (c - '0');
-			view.getStatus().setMessage(null);
 		}
 		else
-			userInput(c);
-	}
+		{
+			// otherwise, reset to default map and do user input
+			currentBindings = bindings;
 
+			if(repeat && Character.isDigit(c))
+			{
+				repeatCount *= 10;
+				repeatCount += (c - '0');
+				view.getStatus().setMessage(null);
+			}
+			else
+				userInput(c);
+		}
+	} //}}}
+
+	//{{{ parseKeyStroke() method
 	/**
 	 * Converts a string to a keystroke. The string should be of the
 	 * form <i>modifiers</i>+<i>shortcut</i> where <i>modifiers</i>
@@ -315,13 +367,13 @@ public class DefaultInputHandler extends InputHandler
 					modifiers |= InputEvent.ALT_MASK;
 					break;
 				case 'C':
-					if(macOS)
+					if(OperatingSystem.isMacOS())
 						modifiers |= InputEvent.META_MASK;
 					else
 						modifiers |= InputEvent.CTRL_MASK;
 					break;
 				case 'M':
-					if(macOS)
+					if(OperatingSystem.isMacOS())
 						modifiers |= InputEvent.CTRL_MASK;
 					else
 						modifiers |= InputEvent.META_MASK;
@@ -369,16 +421,10 @@ public class DefaultInputHandler extends InputHandler
 
 			return KeyStroke.getKeyStroke(ch,modifiers);
 		}
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
 	private Hashtable bindings;
 	private Hashtable currentBindings;
-
-	private static boolean macOS;
-
-	static
-	{
-		macOS = (System.getProperty("os.name").indexOf("Mac") != -1);
-	}
+	//}}}
 }

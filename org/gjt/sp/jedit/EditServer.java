@@ -1,6 +1,9 @@
 /*
  * EditServer.java - jEdit server
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,11 +22,14 @@
 
 package org.gjt.sp.jedit;
 
+//{{{ Imports
 import javax.swing.SwingUtilities;
 import java.io.*;
 import java.net.*;
 import java.util.Random;
+import org.gjt.sp.jedit.io.FileVFS;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * The edit server protocol is very simple. <code>$HOME/.jedit/server</code>
@@ -31,9 +37,10 @@ import org.gjt.sp.util.Log;
  * the second being the authorization key.<p>
  *
  * You connect to that port on the local machine, sending the authorization
- * key as ASCII, followed by a newline, followed by a BeanShell script.
- * Then close the socket and the BeanShell script will be executed by the
- * server instance of jEdit.<p>
+ * key as four bytes in network byte order, followed by the length of the
+ * BeanShell script as two bytes in network byte order, followed by the
+ * script in UTF8 encoding. After the socked is closed, the BeanShell script
+ * will be executed by jEdit.<p>
  *
  * The snippet is executed in the AWT thread. None of the usual BeanShell
  * variables (view, buffer, textArea, editPane) are set so the script has to
@@ -44,10 +51,11 @@ import org.gjt.sp.util.Log;
  * complicated stuff can be done too.
  *
  * @author Slava Pestov
- * @version $Id: EditServer.java,v 1.1.1.1 2001/09/02 05:37:20 spestov Exp $
+ * @version $Id: EditServer.java,v 1.7 2002/03/14 10:20:19 spestov Exp $
  */
 public class EditServer extends Thread
 {
+	//{{{ EditServer constructor
 	EditServer(String portFile)
 	{
 		super("jEdit server daemon [" + portFile + "]");
@@ -56,6 +64,17 @@ public class EditServer extends Thread
 
 		try
 		{
+			// On Unix, set permissions of port file to rw-------,
+			// so that on broken Unices which give everyone read
+			// access to user home dirs, people can't see your
+			// port file (and hence send arbitriary BeanShell code
+			// your way. Nasty.)
+			if(OperatingSystem.isUnix())
+			{
+				new File(portFile).createNewFile();
+				FileVFS.setPermissions(portFile,0600);
+			}
+
 			// Bind to any port on localhost; accept 2 simultaneous
 			// connection attempts before rejecting connections
 			socket = new ServerSocket(0, 2,
@@ -64,6 +83,7 @@ public class EditServer extends Thread
 			int port = socket.getLocalPort();
 
 			FileWriter out = new FileWriter(portFile);
+			out.write("b\n");
 			out.write(String.valueOf(port));
 			out.write("\n");
 			out.write(String.valueOf(authKey));
@@ -86,63 +106,67 @@ public class EditServer extends Thread
 			 * as NOTICE, not ERROR */
 			Log.log(Log.NOTICE,this,io);
 		}
-	}
+	} //}}}
 
+	//{{{ isOK() method
 	public boolean isOK()
 	{
 		return ok;
-	}
+	} //}}}
 
+	//{{{ run() method
 	public void run()
 	{
-		try
+		boolean abort = false;
+
+		for(;;)
 		{
-			for(;;)
+			if(abort)
+				return;
+
+			Socket client = null;
+			try
 			{
-				Socket client = socket.accept();
+				client = socket.accept();
+
+				// Stop script kiddies from opening the edit
+				// server port and just leaving it open, as a
+				// DoS
+				client.setSoTimeout(1000);
+
 				Log.log(Log.MESSAGE,this,client + ": connected");
 
-				BufferedReader in = new BufferedReader(
-					new InputStreamReader(
-					client.getInputStream(),
-					"UTF8"));
+				DataInputStream in = new DataInputStream(
+					client.getInputStream());
 
-				try
+				if(!handleClient(client,in))
+					abort = true;
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,this,e);
+				abort = true;
+			}
+			finally
+			{
+				if(client != null)
 				{
-					int key = Integer.parseInt(in.readLine());
-					if(key != authKey)
+					try
 					{
-						Log.log(Log.ERROR,this,
-							client + ": wrong"
-							+ " authorization key");
-						in.close();
 						client.close();
-						return;
 					}
-				}
-				catch(Exception e)
-				{
-					Log.log(Log.ERROR,this,
-							client + ": invalid"
-							+ " authorization key");
-					in.close();
-					client.close();
-					return;
-				}
+					catch(Exception e)
+					{
+						Log.log(Log.ERROR,this,e);
+					}
 
-				Log.log(Log.DEBUG,this,client + ": authenticated"
-					+ " successfully");
-				handleClient(client,in);
-
-				client.close();
+					client = null;
+				}
 			}
 		}
-		catch(IOException io)
-		{
-			Log.log(Log.ERROR,this,io);
-		}
-	}
+	} //}}}
 
+	//{{{ handleClient() method
 	/**
 	 * @param restore Ignored unless no views are open
 	 * @param parent The client's parent directory
@@ -167,7 +191,9 @@ public class EditServer extends Thread
 
 			if(restore)
 			{
-				if(jEdit.getFirstBuffer() == null)
+				if(jEdit.getFirstBuffer() == null
+					|| (jEdit.getFirstBuffer().isUntitled()
+					&& jEdit.getBufferCount() == 1))
 					splitConfig = jEdit.restoreOpenFiles();
 				else if(jEdit.getBooleanProperty("restore.cli"))
 				{
@@ -178,7 +204,9 @@ public class EditServer extends Thread
 
 			// if session file is empty or -norestore specified,
 			// we need an initial buffer
-			if(jEdit.getFirstBuffer() == null)
+			if(jEdit.getFirstBuffer() == null
+					|| (jEdit.getFirstBuffer().isUntitled()
+                                        && jEdit.getBufferCount() == 1))
 				buffer = jEdit.newFile(null);
 
 			if(splitConfig != null)
@@ -193,47 +221,70 @@ public class EditServer extends Thread
 
 			jEdit.openFiles(view,parent,args);
 
+			// un-iconify using JDK 1.3 API
+			view.setState(java.awt.Frame.NORMAL);
 			view.requestFocus();
 			view.toFront();
 
 			// do not create a new view
 			return;
 		}
-	}
+	} //}}}
 
-	// package-private members
+	// stopServer() method
 	void stopServer()
 	{
 		stop();
 		new File(portFile).delete();
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+
+	//{{{ Instance variables
 	private String portFile;
 	private ServerSocket socket;
 	private int authKey;
 	private boolean ok;
+	//}}}
 
-	private void handleClient(Socket client, Reader in)
-		throws IOException
+	//{{{ handleClient() method
+	private boolean handleClient(Socket client, DataInputStream in)
+		throws Exception
 	{
-		final StringBuffer script = new StringBuffer();
-		char[] buf = new char[1024];
-		int count;
-
-		while((count = in.read(buf,0,buf.length)) != -1)
+		int key = in.readInt();
+		if(key != authKey)
 		{
-			script.append(buf,0,count);
+			Log.log(Log.ERROR,this,client + ": wrong"
+				+ " authorization key (got " + key
+				+ ", expected " + authKey + ")");
+			in.close();
+			client.close();
+
+			return false;
 		}
-
-		SwingUtilities.invokeLater(new Runnable()
+		else
 		{
-			public void run()
+			// Reset the timeout
+			client.setSoTimeout(0);
+
+			Log.log(Log.DEBUG,this,client + ": authenticated"
+				+ " successfully");
+
+			final String script = in.readUTF();
+			Log.log(Log.DEBUG,this,script);
+
+			SwingUtilities.invokeLater(new Runnable()
 			{
-				String scriptString = script.toString();
-				Log.log(Log.DEBUG,this,scriptString);
-				BeanShell.eval(null,scriptString,false);
-			}
-		});
-	}
+				public void run()
+				{
+					BeanShell.eval(null,BeanShell.getNameSpace(),
+						script);
+				}
+			});
+
+			return true;
+		}
+	} //}}}
+
+	//}}}
 }

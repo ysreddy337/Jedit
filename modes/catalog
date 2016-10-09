@@ -7,6 +7,12 @@
 
 <MODES>
 
+<MODE NAME="4gl"		FILE="4gl.xml"
+				FILE_NAME_GLOB="*.4gl" />
+
+<MODE NAME="actionscript"	FILE="actionscript.xml"
+				FILE_NAME_GLOB="*.as" />
+
 <MODE NAME="ada95"		FILE="ada95.xml"
 				FILE_NAME_GLOB="*.{ada,adb,ads}" />
 
@@ -28,12 +34,18 @@
 <MODE NAME="batch"		FILE="batch.xml"
 				FILE_NAME_GLOB="*.bat" />
 
-<MODE NAME="beanshell"		FILE="beanshell.xml"
-				FILE_NAME_GLOB="*.bsh" />
+<MODE NAME="bbj"		FILE="bbj.xml"
+				FILE_NAME_GLOB="*.bbj" />
 
 <!-- if anyone knows a file name glob that can be used with this mode,
      please let me know -->
 <MODE NAME="bcel"		FILE="bcel.xml" />
+
+<MODE NAME="beanshell"		FILE="beanshell.xml"
+				FILE_NAME_GLOB="*.bsh" />
+
+<MODE NAME="bibtex"		FILE="bibtex.xml"
+				FILE_NAME_GLOB="*.bib" />
 
 <!--  We let Objective C mode highlight .h files -->
 <MODE NAME="c"			FILE="c.xml"
@@ -66,6 +78,9 @@
 <MODE NAME="haskell"		FILE="haskell.xml"
 				FILE_NAME_GLOB="*.hs" />
 
+<!-- Used by Andre Kaplan's Hex plugin -->
+<MODE NAME="hex"		FILE="hex.xml" />
+
 <MODE NAME="html"		FILE="html.xml"
 				FILE_NAME_GLOB="*.{html,htm}" />
 
@@ -97,13 +112,19 @@
 				FILE_NAME_GLOB="*{makefile,.mak}" />
 
 <MODE NAME="ml"			FILE="ml.xml"
-				FILE_NAME_GLOB="*.ml" />
+				FILE_NAME_GLOB="*.{sml,ml}" />
+
+<MODE NAME="modula3"		FILE="modula3.xml"
+				FILE_NAME_GLOB="*.[im]3" />
 
 <MODE NAME="netrexx"		FILE="netrexx.xml"
 				FILE_NAME_GLOB="*.nrx" />
 
 <MODE NAME="objective-c"	FILE="objective-c.xml"
 				FILE_NAME_GLOB="*.[mh]" />
+
+<MODE NAME="objectrexx"		FILE="objectrexx.xml"
+				FILE_NAME_GLOB="*.{rex,orx}" />
 
 <MODE NAME="occam"		FILE="occam.xml"
 				FILE_NAME_GLOB="*.icc" />
@@ -112,7 +133,7 @@
 				FILE_NAME_GLOB="*.x{om,in}" />
 
 <MODE NAME="pascal"		FILE="pascal.xml"
-				FILE_NAME_GLOB="*.pas" />
+				FILE_NAME_GLOB="*.{pas,inc,dpr,dpk}" />
 
 <MODE NAME="patch"		FILE="patch.xml"
 				FILE_NAME_GLOB="*.{diff,patch}" />
@@ -122,7 +143,7 @@
 				FIRST_LINE_GLOB="#!/*perl*" />
 
 <MODE NAME="php"		FILE="php.xml"
-				FILE_NAME_GLOB="*.{php3,php,phtml}"
+				FILE_NAME_GLOB="*.{php3,php4,php,phtml}"
 				FIRST_LINE_GLOB="&lt;?php" />
 
 <MODE NAME="pl-sql"		FILE="pl-sql.xml"
@@ -134,23 +155,29 @@
 <MODE NAME="povray"		FILE="povray.xml"
 				FILE_NAME_GLOB="*.{pov,povray}" />
 
+<MODE NAME="prolog"             FILE="prolog.xml"
+                                FILE_NAME_GLOB="*.pro" />
+
 <MODE NAME="progress"           FILE="progress.xml"
-                                FILE_NAME_GLOB="*.{p,i,w,f}" />
+                                FILE_NAME_GLOB="*.[piwf]" />
 
 <MODE NAME="properties"		FILE="props.xml"
 				FILE_NAME_GLOB="*{properties,props}" />
 
 <MODE NAME="pvwave"		FILE="pvwave.xml"
-				FILE_NAME_GLOB="*.{pro,jou}" />
+				FILE_NAME_GLOB="*.jou" />
 
 <MODE NAME="python"		FILE="python.xml"
-				FILE_NAME_GLOB="*.py" />
+				FILE_NAME_GLOB="*.{py,pyw}" />
+
+<MODE NAME="rebol"		FILE="rebol.xml"
+				FILE_NAME_GLOB="*.r" />
 
 <MODE NAME="rpm-spec"		FILE="rpmspec.xml"
 				FILE_NAME_GLOB="*.spec" />
 
 <MODE NAME="ruby"		FILE="ruby.xml"
-				FILE_NAME_GLOB="*.rb" />
+				FILE_NAME_GLOB="*.{rb,rbw}" />
 
 <MODE NAME="rview"		FILE="rview.xml"
 				FILE_NAME_GLOB="*.rvw" />
@@ -168,6 +195,9 @@
 
 <MODE NAME="shtml"		FILE="shtml.xml"
 				FILE_NAME_GLOB="*.{shtml,shtm}" />
+
+<MODE NAME="smalltalk"		FILE="smalltalk.xml"
+				FILE_NAME_GLOB="*.{st,sources,changes}" />
 
 <MODE NAME="sqr"                FILE="sqr.xml"
                                 FILE_NAME_GLOB="*.{sqr,sqc}" />
@@ -191,7 +221,7 @@
 				FILE_NAME_GLOB="*.{vbs,bas,cls}" />
 
 <MODE NAME="velocity"		FILE="velocity.xml"
-				FILE_NAME_GLOB="*.vw" />
+				FILE_NAME_GLOB="*.vm" />
 
 <MODE NAME="verilog"		FILE="verilog.xml"
 				FILE_NAME_GLOB="*.{ver,v}" />
@@ -207,7 +237,7 @@
 <!-- Great. AElfred doesn't support entities in attribute values,
      but all other XML parsers complain if < appears. -->
 <MODE NAME="xml"		FILE="xml.xml"
-				FILE_NAME_GLOB="*.xml"
+				FILE_NAME_GLOB="*.{xml,xhtml}"
 				FIRST_LINE_GLOB="<\?xml*" />
 
 </MODES>

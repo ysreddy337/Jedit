@@ -62,14 +62,7 @@ public class BufferHistory
 
 	public static void load(File file)
 	{
-		try
-		{
-			max = Integer.parseInt(jEdit.getProperty("recentFiles"));
-		}
-		catch(NumberFormatException e)
-		{
-			max = 50;
-		}
+		max = jEdit.getIntegerProperty("recentFiles",50);
 
 		Log.log(Log.MESSAGE,jEdit.class,"Loading recent file list " + file);
 
@@ -235,6 +228,14 @@ public class BufferHistory
 			String type = st.nextToken();
 			int start = Integer.parseInt(st.nextToken());
 			int end = Integer.parseInt(st.nextToken());
+			if(end < start)
+			{
+				// I'm not sure when this can happen,
+				// but it does sometimes, witness the
+				// jEdit bug tracker.
+				continue;
+			}
+
 			Selection sel;
 			if(type.equals("range"))
 				sel = new Selection.Range(start,end);
@@ -276,7 +277,12 @@ public class BufferHistory
 		{
 			if("recent.dtd".equals(systemId))
 			{
-				try
+				// this will result in a slight speed up, since we
+				// don't need to read the DTD anyway, as AElfred is
+				// non-validating
+				return new StringReader("<!-- -->");
+
+				/* try
 				{
 					return new BufferedReader(new InputStreamReader(
 						getClass().getResourceAsStream("recent.dtd")));
@@ -286,7 +292,7 @@ public class BufferHistory
 					Log.log(Log.ERROR,this,"Error while opening"
 						+ " recent.dtd:");
 					Log.log(Log.ERROR,this,e);
-				}
+				} */
 			}
 
 			return null;

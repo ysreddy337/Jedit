@@ -37,7 +37,12 @@ class PluginListHandler extends HandlerBase
 	{
 		if("plugins.dtd".equals(systemId))
 		{
-			try
+			// this will result in a slight speed up, since we
+			// don't need to read the DTD anyway, as AElfred is
+			// non-validating
+			return new StringReader("<!-- -->");
+
+			/* try
 			{
 				return new BufferedReader(new InputStreamReader(
 					getClass().getResourceAsStream(
@@ -48,7 +53,7 @@ class PluginListHandler extends HandlerBase
 				Log.log(Log.ERROR,this,"Error while opening"
 					+ " plugins.dtd:");
 				Log.log(Log.ERROR,this,e);
-			}
+			} */
 		}
 
 		return null;
@@ -77,6 +82,8 @@ class PluginListHandler extends HandlerBase
 			depTo = value;
 		else if(aname == "PLUGIN")
 			depPlugin = value;
+		else if(aname == "SIZE")
+			size = Integer.parseInt(value);
 	}
 
 	public void doctypeDecl(String name, String publicId,
@@ -133,6 +140,10 @@ class PluginListHandler extends HandlerBase
 			download = null;
 			branch = new PluginList.Branch();
 		}
+		else if(tag == "DOWNLOAD")
+			downloadSize = size;
+		else if(tag == "DOWNLOAD_SOURCE")
+			downloadSourceSize = size;
 	}
 
 	public void endElement(String tag)
@@ -171,7 +182,9 @@ class PluginListHandler extends HandlerBase
 			branch.version = version;
 			branch.date = date;
 			branch.download = download;
+			branch.downloadSize = downloadSize;
 			branch.downloadSource = downloadSource;
+			branch.downloadSourceSize = downloadSourceSize;
 			branch.obsolete = obsolete;
 			plugin.branches.addElement(branch);
 			version = null;
@@ -225,7 +238,10 @@ class PluginListHandler extends HandlerBase
 	private String version;
 	private String date;
 	private String download;
+	private int downloadSize;
 	private String downloadSource;
+	private int downloadSourceSize;
+	private int size;
 	private String depWhat;
 	private String depFrom;
 	private String depTo;

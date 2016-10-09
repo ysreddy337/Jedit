@@ -31,7 +31,7 @@ import java.util.StringTokenizer;
  * to the standard error stream. This class can also optionally redirect
  * standard output and error to the log.
  * @author Slava Pestov
- * @version $Id: Log.java,v 1.2 2001/09/03 05:58:06 spestov Exp $
+ * @version $Id: Log.java,v 1.5 2001/12/25 03:06:50 spestov Exp $
  */
 public class Log
 {
@@ -97,14 +97,13 @@ public class Log
 		}
 
 		Log.level = level;
-		Log.stream = stream;
 
 		// Log some stuff
 		log(MESSAGE,Log.class,"When reporting bugs, please"
 			+ " include the following information:");
 		String[] props = {
-			"java.version", "java.vendor",
-			"java.compiler", "os.name", "os.version",
+			"java.version", "java.vm.version", "java.runtime.version",
+			"java.vendor", "java.compiler", "os.name", "os.version",
 			"os.arch", "user.home", "java.home",
 			"java.class.path",
 			};
@@ -244,7 +243,7 @@ public class Log
 	// private members
 	private static Object LOCK = new Object();
 	private static Document logDocument;
-	private static int level;
+	private static int level = WARNING;
 	private static Writer stream;
 	private static String lineSep;
 	private static PrintStream realOut;

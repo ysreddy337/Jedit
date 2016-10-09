@@ -1,5 +1,8 @@
 /*
  * StatusBar.java - The status bar displayed at the bottom of views
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 2001 Slava Pestov
  * Portions copyright (C) 2001 mike dillon
  *
@@ -20,33 +23,39 @@
 
 package org.gjt.sp.jedit.gui;
 
+//{{{ Imports
 import javax.swing.border.*;
 import javax.swing.text.Segment;
 import javax.swing.*;
 import java.awt.event.*;
+import java.awt.font.*;
+import java.awt.geom.*;
 import java.awt.*;
+import org.gjt.sp.jedit.buffer.FoldHandler;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.*;
+//}}}
 
 /**
  * The status bar, used for the following:
  * <ul>
  * <li>Displaying caret position information
  * <li>Displaying readNextChar() prompts
- * <li>Displaying the 'macro recording' message
  * <li>Displaying the status of the overwrite, multi select flags
  * <li>I/O progress
+ * <li>Memory status
  * <li>And so on
  * </ul>
  *
- * @version $Id: StatusBar.java,v 1.1.1.1 2001/09/02 05:37:42 spestov Exp $
+ * @version $Id: StatusBar.java,v 1.23 2002/03/17 03:05:24 spestov Exp $
  * @author Slava Pestov
  * @since jEdit 3.2pre2
  */
-public class StatusBar extends JPanel
+public class StatusBar extends JPanel implements WorkThreadProgressListener
 {
+	//{{{ StatusBar constructor
 	public StatusBar(View view)
 	{
 		super(new BorderLayout(3,3));
@@ -56,8 +65,12 @@ public class StatusBar extends JPanel
 
 		Border border = BorderFactory.createLoweredBevelBorder();
 
+		MouseHandler mouseHandler = new MouseHandler();
+
 		caretStatus = new VICaretStatus();
 		caretStatus.setBorder(border);
+		caretStatus.setToolTipText(jEdit.getProperty("view.status.caret-tooltip"));
+		caretStatus.addMouseListener(mouseHandler);
 		add(BorderLayout.WEST,caretStatus);
 
 		messagePanel = new JPanel();
@@ -67,15 +80,11 @@ public class StatusBar extends JPanel
 		add(BorderLayout.CENTER,messagePanel);
 
 		message = new JLabel();
-		message.setForeground(Color.black);
 		message.setBorder(BorderFactory.createEmptyBorder(0,0,0,0));
 		setMessageComponent(message);
 
-		MouseHandler mouseHandler = new MouseHandler();
-
 		Box box = new Box(BoxLayout.X_AXIS);
 		mode = new JLabel();
-		mode.setForeground(Color.black);
 		mode.setBorder(border);
 		mode.setToolTipText(jEdit.getProperty("view.status.mode-tooltip"));
 		mode.addMouseListener(mouseHandler);
@@ -83,50 +92,129 @@ public class StatusBar extends JPanel
 		box.add(Box.createHorizontalStrut(3));
 
 		encoding = new JLabel();
-		encoding.setForeground(Color.black);
 		encoding.setBorder(border);
 		encoding.setToolTipText(jEdit.getProperty("view.status.encoding-tooltip"));
 		encoding.addMouseListener(mouseHandler);
 		box.add(encoding);
 		box.add(Box.createHorizontalStrut(3));
 
-		multiSelect = new JLabel("multi");
+		FontMetrics fm = getFontMetrics(UIManager.getFont("Label.font"));
+
+		foldMode = new JLabel();
+		foldMode.setHorizontalAlignment(SwingConstants.CENTER);
+		foldMode.setBorder(border);
+		foldMode.setToolTipText(jEdit.getProperty("view.status.fold-tooltip"));
+		foldMode.addMouseListener(mouseHandler);
+
+		int inc = 0;
+		String[] foldModes = FoldHandler.getFoldModes();
+		for (int i = 0; i < foldModes.length; i++)
+		{
+			inc = Math.max(inc, fm.stringWidth(foldModes[i]));
+		}
+
+		Dimension dim = foldMode.getPreferredSize();
+		dim.width += inc;
+		foldMode.setPreferredSize(dim);
+
+		box.add(foldMode);
+		box.add(Box.createHorizontalStrut(3));
+
+		multiSelect = new JLabel();
+		multiSelect.setHorizontalAlignment(SwingConstants.CENTER);
 		multiSelect.setBorder(border);
+		multiSelect.setToolTipText(jEdit.getProperty("view.status.multi-tooltip"));
 		multiSelect.addMouseListener(mouseHandler);
+
+		dim = multiSelect.getPreferredSize();
+		dim.width += Math.max(fm.stringWidth("single"),
+			fm.stringWidth("multi"));
+		multiSelect.setPreferredSize(dim);
+
 		box.add(multiSelect);
 		box.add(Box.createHorizontalStrut(3));
 
-		overwrite = new JLabel("over");
+		overwrite = new JLabel();
+		overwrite.setHorizontalAlignment(SwingConstants.CENTER);
 		overwrite.setBorder(border);
+		overwrite.setToolTipText(jEdit.getProperty("view.status.overwrite-tooltip"));
 		overwrite.addMouseListener(mouseHandler);
+
+		dim = overwrite.getPreferredSize();
+		dim.width += Math.max(fm.stringWidth("ovr"),
+			fm.stringWidth("ins"));
+		overwrite.setPreferredSize(dim);
+
 		box.add(overwrite);
-		box.add(Box.createHorizontalStrut(3));
-
-		fold = new JLabel("fold");
-		fold.setBorder(border);
-		box.add(fold);
-
-		updateBufferStatus();
-		updateMiscStatus();
-		updateFoldStatus();
 
 		box.add(Box.createHorizontalStrut(3));
-		ioProgress = new MiniIOProgress();
-		ioProgress.setBorder(border);
-		ioProgress.addMouseListener(mouseHandler);
-		box.add(ioProgress);
-
+		memory = new MemoryStatus();
+		memory.setBorder(border);
+		memory.addMouseListener(mouseHandler);
+		box.add(memory);
 
 		// UI hack because BoxLayout does not give all components the
 		// same height
-		Dimension dim = multiSelect.getPreferredSize();
-		dim.width = 40;
-		// dim.height = <same as all other components>
-		ioProgress.setPreferredSize(dim);
+		dim = memory.getPreferredSize();
+		dim.width += fm.stringWidth("999Mb/999Mb");
+		dim.height = multiSelect.getPreferredSize().height;
+		memory.setPreferredSize(dim);
 
 		add(BorderLayout.EAST,box);
-	}
+	} //}}}
 
+	//{{{ addNotify() method
+	public void addNotify()
+	{
+		super.addNotify();
+		VFSManager.getIOThreadPool().addProgressListener(this);
+	} //}}}
+
+	//{{{ removeNotify() method
+	public void removeNotify()
+	{
+		super.removeNotify();
+		VFSManager.getIOThreadPool().removeProgressListener(this);
+	} //}}}
+
+	//{{{ WorkThreadListener implementation
+
+	//{{{ statusUpdate() method
+	public void statusUpdate(final WorkThreadPool threadPool, int threadIndex)
+	{
+		SwingUtilities.invokeLater(new Runnable()
+		{
+			public void run()
+			{
+				int requestCount = threadPool.getRequestCount();
+				if(requestCount == 0)
+				{
+					setMessageAndClear(jEdit.getProperty(
+						"view.status.io.done"));
+				}
+				else if(requestCount == 1)
+				{
+					setMessage(jEdit.getProperty(
+						"view.status.io-1"));
+				}
+				else
+				{
+					Object[] args = { new Integer(requestCount) };
+					setMessage(jEdit.getProperty(
+						"view.status.io",args));
+				}
+			}
+		});
+	} //}}}
+
+	//{{{ progressUpdate() method
+	public void progressUpdate(WorkThreadPool threadPool, int threadIndex)
+	{
+	} //}}}
+
+	//}}}
+
+	//{{{ setMessageAndClear() method
 	/**
 	 * Show a message for a short period of time.
 	 * @param message The message
@@ -140,15 +228,18 @@ public class StatusBar extends JPanel
 		{
 			public void actionPerformed(ActionEvent evt)
 			{
-				setMessage(null);
+				// so if view is closed in the meantime...
+				if(isShowing())
+					setMessage(null);
 			}
 		});
 
 		tempTimer.setInitialDelay(10000);
 		tempTimer.setRepeats(false);
 		tempTimer.start();
-	}
+	} //}}}
 
+	//{{{ setMessage() method
 	public void setMessage(String message)
 	{
 		if(tempTimer != null)
@@ -176,8 +267,9 @@ public class StatusBar extends JPanel
 		}
 		else
 			this.message.setText(message);
-	}
+	} //}}}
 
+	//{{{ setMessageComponent() method
 	public void setMessageComponent(Component comp)
 	{
 		if (comp == null || messageComp == comp)
@@ -187,53 +279,35 @@ public class StatusBar extends JPanel
 
 		messageComp = comp;
 		messagePanel.add(BorderLayout.CENTER, messageComp);
-	}
+	} //}}}
 
+	//{{{ repaintCaretStatus() method
 	public void repaintCaretStatus()
 	{
 		caretStatus.repaint();
-	}
+	} //}}}
 
+	//{{{ updateBufferStatus() method
 	public void updateBufferStatus()
 	{
 		Buffer buffer = view.getBuffer();
 		mode.setText(buffer.getMode().getName());
-		encoding.setText(buffer.getProperty("encoding").toString());
-	}
+		encoding.setText(buffer.getStringProperty("encoding"));
+	} //}}}
 
+	//{{{ updateMiscStatus() method
 	public void updateMiscStatus()
 	{
 		JEditTextArea textArea = view.getTextArea();
 
-		if(textArea.isMultipleSelectionEnabled())
-			multiSelect.setForeground(Color.black);
-		else
-		{
-			if(textArea.getSelectionCount() > 1)
-			{
-				multiSelect.setForeground(UIManager.getColor(
-					"Label.foreground"));
-			}
-			else
-				multiSelect.setForeground(gray);
-		}
+		multiSelect.setText(textArea.isMultipleSelectionEnabled()
+			? "multi" : "single");
+		overwrite.setText(textArea.isOverwriteEnabled()
+			? "ovr" : "ins");
+		foldMode.setText((String)textArea.getBuffer().getProperty("folding"));
+	} //}}}
 
-		if(textArea.isOverwriteEnabled())
-			overwrite.setForeground(Color.black);
-		else
-			overwrite.setForeground(gray);
-	}
-
-	public void updateFoldStatus()
-	{
-		Buffer buffer = view.getBuffer();
-		if(buffer.getLineCount() != buffer.getVirtualLineCount())
-			fold.setForeground(Color.black);
-		else
-			fold.setForeground(gray);
-	}
-
-	// private members
+	//{{{ Private members
 	private View view;
 	private VICaretStatus caretStatus;
 	private JPanel messagePanel;
@@ -241,53 +315,95 @@ public class StatusBar extends JPanel
 	private JLabel message;
 	private JLabel mode;
 	private JLabel encoding;
+	private JLabel foldMode;
 	private JLabel multiSelect;
 	private JLabel overwrite;
-	private JLabel fold;
-	private MiniIOProgress ioProgress;
-	private Color gray = new Color(142,142,142);
+	private MemoryStatus memory;
 	/* package-private for speed */ StringBuffer buf = new StringBuffer();
 	private Timer tempTimer;
+	//}}}
 
+	static final String testStr = "9999,999-999 99%";
+
+	//{{{ MouseHandler class
 	class MouseHandler extends MouseAdapter
 	{
 		public void mouseClicked(MouseEvent evt)
 		{
 			Object source = evt.getSource();
-			if(source == mode || source == encoding)
-				new BufferOptions(view,view.getBuffer());
+			if(source == caretStatus)
+			{
+				if(evt.getClickCount() == 2)
+					view.getTextArea().showGoToLineDialog();
+			}
+			else if(source == mode || source == encoding)
+			{
+				if(evt.getClickCount() == 2)
+					new BufferOptions(view,view.getBuffer());
+			}
+			else if(source == foldMode)
+			{
+				String text = foldMode.getText();
+				String[] foldModes = FoldHandler.getFoldModes();
+
+				for (int i = 0; i < foldModes.length; i++)
+				{
+					if (text.equals(foldModes[i]))
+					{
+						i = (i + 1) % foldModes.length;
+						text = foldModes[i];
+						break;
+					}
+				}
+
+				JEditTextArea textArea = view.getTextArea();
+				Buffer buffer = view.getBuffer();
+				buffer.setStringProperty("folding",text);
+				buffer.propertiesChanged();
+			}
 			else if(source == multiSelect)
 				view.getTextArea().toggleMultipleSelectionEnabled();
 			else if(source == overwrite)
 				view.getTextArea().toggleOverwriteEnabled();
-			else if(source == ioProgress)
-				new IOProgressMonitor(view);
+			else if(source == memory)
+			{
+				if(evt.getClickCount() == 2)
+				{
+					jEdit.showMemoryDialog(view);
+					memory.repaint();
+				}
+			}
 		}
-	}
+	} //}}}
 
+	//{{{ VICaretStatus class
 	class VICaretStatus extends JComponent
 	{
+		//{{{ VICaretStatus constructor
 		public VICaretStatus()
 		{
-			VICaretStatus.this.setForeground(UIManager.getColor("Button.foreground"));
+			VICaretStatus.this.setForeground(UIManager.getColor("Label.foreground"));
 			VICaretStatus.this.setBackground(UIManager.getColor("Label.background"));
 			VICaretStatus.this.setFont(UIManager.getFont("Label.font"));
 
-			Dimension size = new Dimension(
-				VICaretStatus.this.getFontMetrics(
-				VICaretStatus.this.getFont())
-				.stringWidth(testStr),0);
-			VICaretStatus.this.setPreferredSize(size);
-		}
+			Font font = VICaretStatus.this.getFont();
+			FontRenderContext frc = new FontRenderContext(null,false,false);
 
+			Rectangle2D bounds = font.getStringBounds(testStr,frc);
+			lm = font.getLineMetrics(testStr,frc);
+
+			Dimension size = new Dimension((int)bounds.getWidth(),
+				(int)bounds.getHeight());
+			VICaretStatus.this.setPreferredSize(size);
+		} //}}}
+
+		//{{{ paintComponent() method
 		public void paintComponent(Graphics g)
 		{
 			Buffer buffer = view.getBuffer();
 
 			if(!buffer.isLoaded())
 				return;
-
-			FontMetrics fm = g.getFontMetrics();
 
 			JEditTextArea textArea = view.getTextArea();
 
@@ -335,14 +451,15 @@ public class StatusBar extends JPanel
 
 			g.drawString(buf.toString(),
 				VICaretStatus.this.getBorder().getBorderInsets(this).left + 1,
-				(VICaretStatus.this.getHeight() + fm.getAscent()) / 2 - 1);
-		}
+				(int)((VICaretStatus.this.getHeight() - lm.getHeight()) / 2
+				+ lm.getAscent()));
+		} //}}}
 
-		// private members
-		private static final String testStr = "9999,999-999 99%";
-
+		//{{{ Private members
 		private Segment seg = new Segment();
+		private LineMetrics lm;
 
+		//{{{ getVirtualPosition() method
 		private int getVirtualPosition(int dot, Buffer buffer, JEditTextArea textArea)
 		{
 			int line = textArea.getCaretLine();
@@ -368,89 +485,114 @@ public class StatusBar extends JPanel
 			}
 
 			return virtualPosition;
-		}
-	}
+		} //}}}
 
-	class MiniIOProgress extends JComponent
-		implements WorkThreadProgressListener
+		//}}}
+	} //}}}
+
+	//{{{ MemoryStatus class
+	class MemoryStatus extends JComponent implements ActionListener
 	{
-		public MiniIOProgress()
+		//{{{ MemoryStatus constructor
+		public MemoryStatus()
 		{
-			MiniIOProgress.this.setDoubleBuffered(true);
-			MiniIOProgress.this.setForeground(UIManager.getColor("Button.foreground"));
-			MiniIOProgress.this.setBackground(UIManager.getColor("Button.background"));
+			MemoryStatus.this.setDoubleBuffered(true);
+			MemoryStatus.this.setForeground(UIManager.getColor("Label.foreground"));
+			MemoryStatus.this.setBackground(UIManager.getColor("Label.background"));
+			MemoryStatus.this.setFont(UIManager.getFont("Label.font"));
+		} //}}}
 
-			icon = GUIUtilities.loadIcon("io.gif");
-		}
-
+		//{{{ addNotify() method
 		public void addNotify()
 		{
 			super.addNotify();
-			VFSManager.getIOThreadPool().addProgressListener(this);
-		}
+			timer = new Timer(2000,this);
+			timer.start();
+			ToolTipManager.sharedInstance().registerComponent(this);
+		} //}}}
 
+		//{{{ removeNotify() method
 		public void removeNotify()
 		{
-			super.removeNotify();
-			VFSManager.getIOThreadPool().removeProgressListener(this);
-		}
+			timer.stop();
+			ToolTipManager.sharedInstance().unregisterComponent(this);
+		} //}}}
 
-		public void progressUpdate(WorkThreadPool threadPool, int threadIndex)
+		//{{{ getToolTipText() method
+		public String getToolTipText()
 		{
-			MiniIOProgress.this.repaint();
-		}
+			Runtime runtime = Runtime.getRuntime();
+			int freeMemory = (int)(runtime.freeMemory() / 1024);
+			int totalMemory = (int)(runtime.totalMemory() / 1024);
+			int usedMemory = (totalMemory - freeMemory);
+			Integer[] args = { new Integer(usedMemory),
+				new Integer(totalMemory) };
+			return jEdit.getProperty("view.status.memory-tooltip",args);
+		} //}}}
 
+		//{{{ actionPerformed() method
+		public void actionPerformed(ActionEvent evt)
+		{
+			MemoryStatus.this.repaint();
+		} //}}}
+
+		//{{{ paintComponent() method
 		public void paintComponent(Graphics g)
 		{
-			WorkThreadPool ioThreadPool = VFSManager.getIOThreadPool();
-			if(ioThreadPool.getThreadCount() == 0)
-				return;
+			Insets insets = MemoryStatus.this.getBorder().getBorderInsets(this);
 
+			Runtime runtime = Runtime.getRuntime();
+			int freeMemory = (int)(runtime.freeMemory() / 1024);
+			int totalMemory = (int)(runtime.totalMemory() / 1024);
+			int usedMemory = (totalMemory - freeMemory);
+
+			int width = MemoryStatus.this.getWidth()
+				- insets.left - insets.right;
+
+			float fraction = ((float)usedMemory) / totalMemory;
+
+			g.setColor(UIManager.getColor("ProgressBar.selectionBackground"));
+
+			g.fillRect(insets.left,insets.top,
+				(int)(width * fraction),
+				MemoryStatus.this.getHeight()
+				- insets.top - insets.bottom);
+
+			String str = (usedMemory / 1024) + "Mb/"
+				+ (totalMemory / 1024) + "Mb";
 			FontMetrics fm = g.getFontMetrics();
 
-			if(ioThreadPool.getRequestCount() == 0)
-				return;
-			else
-			{
-				icon.paintIcon(this,g,MiniIOProgress.this.getWidth()
-					- icon.getIconWidth() - 3,
-					(MiniIOProgress.this.getHeight()
-					- icon.getIconHeight()) / 2);
-			}
+			Graphics g2 = g.create();
+			g2.setClip(insets.left,insets.top,
+				(int)(width * fraction),
+				MemoryStatus.this.getHeight()
+				- insets.top - insets.bottom);
 
-			Insets insets = MiniIOProgress.this.getBorder().getBorderInsets(this);
+			g2.setColor(UIManager.getColor("ProgressBar.selectionForeground"));
 
-			int progressHeight = (MiniIOProgress.this.getHeight() - insets.top - insets.bottom)
-				/ ioThreadPool.getThreadCount();
-			int progressWidth = MiniIOProgress.this.getWidth()
-				- icon.getIconWidth() - insets.left - insets.right - 2;
+			g2.drawString(str,
+				insets.left + (width - fm.stringWidth(str)) / 2,
+				insets.top + fm.getAscent());
 
-			for(int i = 0; i < ioThreadPool.getThreadCount(); i++)
-			{
-				WorkThread thread = ioThreadPool.getThread(i);
-				int max = thread.getProgressMaximum();
-				if(!thread.isRequestRunning() || max == 0)
-					continue;
+			g2.dispose();
 
-				int value = thread.getProgressValue();
-				double progressRatio = ((double)value / max);
+			g2 = g.create();
 
-				// when loading gzip files, for example,
-				// progressValue (data read) can be larger
-				// than progressMaximum (file size)
-				progressRatio = Math.min(progressRatio,1.0);
+			g2.setClip(insets.left + (int)(width * fraction),
+				insets.top,MemoryStatus.this.getWidth()
+				- insets.left - (int)(width * fraction),
+				MemoryStatus.this.getHeight()
+				- insets.top - insets.bottom);
 
-				g.fillRect(insets.left,insets.top + i * progressHeight,
-					(int)(progressRatio * progressWidth),progressHeight);
-			}
-		}
+			g2.setColor(MemoryStatus.this.getForeground());
 
-		public Dimension getPreferredSize()
-		{
-			return new Dimension(40,icon.getIconHeight());
-		}
+			g2.drawString(str,
+				insets.left + (width - fm.stringWidth(str)) / 2,
+				insets.top + fm.getAscent());
 
-		// private members
-		private Icon icon;
-	}
+			g2.dispose();
+		} //}}}
+
+		private Timer timer;
+	} //}}}
 }

@@ -1,6 +1,6 @@
 /*
  * OptionsDialog.java - Global options dialog
- * Copyright (C) 1998, 1999, 2000 Slava Pestov
+ * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
  * Portions copyright (C) 1999 mike dillon
  *
  * This program is free software; you can redistribute it and/or
@@ -34,7 +34,7 @@ import org.gjt.sp.util.Log;
 /**
  * An abstract tabbed options dialog box.
  * @author Slava Pestov
- * @version $Id: OptionsDialog.java,v 1.1.1.1 2001/09/02 05:37:44 spestov Exp $
+ * @version $Id: OptionsDialog.java,v 1.7 2002/01/17 10:37:54 spestov Exp $
  */
 public class OptionsDialog extends EnhancedDialog
 	implements ActionListener, TreeSelectionListener
@@ -100,18 +100,14 @@ public class OptionsDialog extends EnhancedDialog
 
 		content.add(buttons, BorderLayout.SOUTH);
 
-		// compute the jEdit branch
-		TreePath jEditPath = new TreePath(new Object[]{ paneTree
-			.getModel().getRoot(), jEditGroup });
-
 		// register the Options dialog as a TreeSelectionListener.
 		// this is done before the initial selection to ensure that the
 		// first selected OptionPane is displayed on startup.
 		paneTree.getSelectionModel().addTreeSelectionListener(this);
 
-		// select the first member of the jEdit group
-		paneTree.setSelectionPath(jEditPath.pathByAddingChild(
-			jEditGroup.getMember(0)));
+		paneTree.expandPath(new TreePath(
+			new Object[] { paneTree.getModel().getRoot(), jEditGroup }));
+		paneTree.setSelectionRow(0);
 
 		view.hideWaitCursor();
 
@@ -252,24 +248,32 @@ public class OptionsDialog extends EnhancedDialog
 		OptionTreeModel paneTreeModel = new OptionTreeModel();
 		OptionGroup rootGroup = (OptionGroup) paneTreeModel.getRoot();
 
+		addOptionPane(new OverviewOptionPane(), rootGroup);
+
 		// initialize the jEdit branch of the options tree
 		jEditGroup = new OptionGroup("jedit");
 
 		addOptionPane(new GeneralOptionPane(), jEditGroup);
-		addOptionPane(new LoadSaveOptionPane(), jEditGroup);
-		addOptionPane(new EditingOptionPane(), jEditGroup);
-		addOptionPane(new ModeOptionPane(), jEditGroup);
+		addOptionPane(new AppearanceOptionPane(), jEditGroup);
 		addOptionPane(new TextAreaOptionPane(), jEditGroup);
 		addOptionPane(new GutterOptionPane(), jEditGroup);
 		addOptionPane(new ColorOptionPane(), jEditGroup);
 		addOptionPane(new StyleOptionPane(), jEditGroup);
+		addOptionPane(new LoadSaveOptionPane(), jEditGroup);
+		addOptionPane(new EditingOptionPane(), jEditGroup);
+		addOptionPane(new ModeOptionPane(), jEditGroup);
 		addOptionPane(new ShortcutsOptionPane(), jEditGroup);
 		addOptionPane(new DockingOptionPane(), jEditGroup);
 		addOptionPane(new ContextOptionPane(), jEditGroup);
 		addOptionPane(new ToolBarOptionPane(), jEditGroup);
 		addOptionPane(new AbbrevsOptionPane(), jEditGroup);
 		addOptionPane(new PrintOptionPane(), jEditGroup);
-		addOptionPane(new BrowserOptionPane(), jEditGroup);
+		addOptionPane(new FirewallOptionPane(), jEditGroup);
+
+		OptionGroup browserGroup = new OptionGroup("browser");
+		addOptionPane(new BrowserOptionPane(), browserGroup);
+		addOptionPane(new BrowserColorsOptionPane(), browserGroup);
+		addOptionGroup(browserGroup, jEditGroup);
 
 		addOptionGroup(jEditGroup, rootGroup);
 
@@ -332,36 +336,20 @@ public class OptionsDialog extends EnhancedDialog
 		parent.addOptionPane(pane);
 	}
 
-	class PaneNameRenderer extends JLabel implements TreeCellRenderer
+	class PaneNameRenderer extends DefaultTreeCellRenderer
 	{
 		public PaneNameRenderer()
 		{
-			setOpaque(true);
-
 			paneFont = UIManager.getFont("Tree.font");
-			groupFont = new Font(paneFont.getName(),
-				paneFont.getStyle() | Font.BOLD,
-				paneFont.getSize());
+			groupFont = paneFont.deriveFont(Font.BOLD);
 		}
 
 		public Component getTreeCellRendererComponent(JTree tree,
 			Object value, boolean selected, boolean expanded,
 			boolean leaf, int row, boolean hasFocus)
 		{
-			if (selected)
-			{
-				this.setBackground(UIManager.getColor(
-					"Tree.selectionBackground"));
-				this.setForeground(UIManager.getColor(
-					"Tree.selectionForeground"));
-			}
-			else
-			{
-				this.setBackground(UIManager.getColor(
-					"Tree.background"));
-				this.setForeground(UIManager.getColor(
-					"Tree.foreground"));
-			}
+			super.getTreeCellRendererComponent(tree,value,
+				selected,expanded,leaf,row,hasFocus);
 
 			String name = null;
 
@@ -387,6 +375,10 @@ public class OptionsDialog extends EnhancedDialog
 
 				if (label == null)
 				{
+					// hahaha, suckers!!!
+					Log.log(Log.WARNING,this,
+						"options." + name + ".label"
+						+ " property not defined");
 					setText(name);
 				}
 				else
@@ -399,11 +391,6 @@ public class OptionsDialog extends EnhancedDialog
 
 			return this;
 		}
-
-		private Border noFocusBorder = BorderFactory.createEmptyBorder(
-			1, 1, 1, 1);
-		private Border focusBorder = BorderFactory.createLineBorder(
-			UIManager.getColor("Tree.selectionBorderColor"));
 
 		private Font paneFont;
 		private Font groupFont;
@@ -561,7 +548,7 @@ public class OptionsDialog extends EnhancedDialog
 			}
 		}
 
-		private OptionGroup root = new OptionGroup("root");
+		private OptionGroup root = new OptionGroup(null);
 		private EventListenerList listenerList = new EventListenerList();
 	}
 }

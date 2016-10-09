@@ -1,6 +1,9 @@
 /*
  * EnhancedMenuItem.java - Menu item with user-specified accelerator string
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,17 +22,20 @@
 
 package org.gjt.sp.jedit.gui;
 
+//{{{ Imports
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import org.gjt.sp.jedit.textarea.JEditTextArea;
 import org.gjt.sp.jedit.*;
+//}}}
 
 /**
  * jEdit's custom menu item. It adds support for multi-key shortcuts.
  */
 public class EnhancedMenuItem extends JMenuItem
 {
+	//{{{ EnhancedMenuItem constructor
 	/**
 	 * Creates a new menu item. Most plugins should call
 	 * GUIUtilities.loadMenuItem() instead.
@@ -49,11 +55,14 @@ public class EnhancedMenuItem extends JMenuItem
 			addActionListener(new EditAction.Wrapper(action));
 			shortcutProp1 = action.getName() + ".shortcut";
 			shortcutProp2 = action.getName() + ".shortcut2";
+
+			addMouseListener(new MouseHandler());
 		}
 		else
 			setEnabled(false);
-	}
+	} //}}}
 
+	//{{{ getPreferredSize() method
 	public Dimension getPreferredSize()
 	{
 		Dimension d = super.getPreferredSize();
@@ -63,11 +72,12 @@ public class EnhancedMenuItem extends JMenuItem
 		if(shortcut != null)
 		{
 			d.width += (getFontMetrics(acceleratorFont)
-				.stringWidth(shortcut) + 10);
+				.stringWidth(shortcut) + 15);
 		}
 		return d;
-	}
+	} //}}}
 
+	//{{{ paint() method
 	public void paint(Graphics g)
 	{
 		super.paint(g);
@@ -83,20 +93,24 @@ public class EnhancedMenuItem extends JMenuItem
 			FontMetrics fm = g.getFontMetrics();
 			Insets insets = getInsets();
 			g.drawString(shortcut,getWidth() - (fm.stringWidth(
-				shortcut) + insets.right + insets.left),
+				shortcut) + insets.right + insets.left + 5),
 				getFont().getSize() + (insets.top - 1)
 				/* XXX magic number */);
 		}
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+
+	//{{{ Instance variables
 	private String shortcutProp1;
 	private String shortcutProp2;
 	private EditAction action;
 	private static Font acceleratorFont;
 	private static Color acceleratorForeground;
 	private static Color acceleratorSelectionForeground;
+	//}}}
 
+	//{{{ getShortcut() method
 	private String getShortcut()
 	{
 		if(action == null)
@@ -121,8 +135,9 @@ public class EnhancedMenuItem extends JMenuItem
 					return shortcut1 + " or " + shortcut2;
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ Class initializer
 	static
 	{
 		acceleratorFont = UIManager.getFont("MenuItem.acceleratorFont");
@@ -133,5 +148,33 @@ public class EnhancedMenuItem extends JMenuItem
 			.getColor("MenuItem.acceleratorForeground");
 		acceleratorSelectionForeground = UIManager
 			.getColor("MenuItem.acceleratorSelectionForeground");
-	}
+	} //}}}
+
+	//}}}
+
+	//{{{ MouseHandler class
+	class MouseHandler extends MouseAdapter
+	{
+		public void mouseReleased(MouseEvent evt)
+		{
+			GUIUtilities.getView((Component)evt.getSource())
+				.getStatus().setMessage(null);
+		}
+
+		public void mouseEntered(MouseEvent evt)
+		{
+			String msg = action.getMouseOverText();
+			if(msg != null)
+			{
+				GUIUtilities.getView((Component)evt.getSource())
+					.getStatus().setMessage(msg);
+			}
+		}
+
+		public void mouseExited(MouseEvent evt)
+		{
+			GUIUtilities.getView((Component)evt.getSource())
+				.getStatus().setMessage(null);
+		}
+	} //}}}
 }

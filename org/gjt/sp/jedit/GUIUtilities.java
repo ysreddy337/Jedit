@@ -1,6 +1,9 @@
 /*
  * GUIUtilities.java - Various GUI utility functions
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,14 +22,14 @@
 
 package org.gjt.sp.jedit;
 
+//{{{ Imports
 import gnu.regexp.REException;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.net.*;
-import java.util.Hashtable;
-import java.util.StringTokenizer;
+import java.util.*;
 import org.gjt.sp.jedit.browser.*;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.io.VFS;
@@ -34,6 +37,7 @@ import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.jedit.syntax.SyntaxStyle;
 import org.gjt.sp.jedit.syntax.Token;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * Class with several useful GUI functions.<p>
@@ -51,19 +55,82 @@ import org.gjt.sp.util.Log;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: GUIUtilities.java,v 1.1.1.1 2001/09/02 05:37:21 spestov Exp $
+ * @version $Id: GUIUtilities.java,v 1.28 2002/04/06 06:00:48 spestov Exp $
  */
 public class GUIUtilities
 {
-	// some icons
+	//{{{ Some predefined icons
+	public static final Icon NEW_BUFFER_ICON = loadIcon("new.gif");
+	public static final Icon DIRTY_BUFFER_ICON = loadIcon("dirty.gif");
+	public static final Icon READ_ONLY_BUFFER_ICON = loadIcon("readonly.gif");
+	public static final Icon NORMAL_BUFFER_ICON = loadIcon("normal.gif");
+	public static final Icon WINDOW_ICON = loadIcon("jedit-icon.gif");
+	//}}}
 
-	public static final Icon NEW_BUFFER_ICON;
-	public static final Icon DIRTY_BUFFER_ICON;
-	public static final Icon READ_ONLY_BUFFER_ICON;
-	public static final Icon NORMAL_BUFFER_ICON;
-	public static final Icon EDITOR_WINDOW_ICON;
-	public static final Icon PLUGIN_WINDOW_ICON;
+	//{{{ Icon methods
 
+	//{{{ loadIcon() method
+	/**
+	 * Loads an icon.
+	 * @param iconName The icon name
+	 * @since jEdit 2.6pre7
+	 */
+	public static Icon loadIcon(String iconName)
+	{
+		if(icons == null)
+			icons = new Hashtable();
+
+		// check if there is a cached version first
+		Icon icon = (Icon)icons.get(iconName);
+		if(icon != null)
+			return icon;
+
+		// get the icon
+		if(iconName.startsWith("file:"))
+		{
+			icon = new ImageIcon(iconName.substring(5));
+		}
+		else
+		{
+			URL url = GUIUtilities.class.getResource(
+				"/org/gjt/sp/jedit/icons/" + iconName);
+			if(url == null)
+			{
+				Log.log(Log.ERROR,GUIUtilities.class,
+					"Icon not found: " + iconName);
+				return null;
+			}
+
+			icon = new ImageIcon(url);
+		}
+
+		icons.put(iconName,icon);
+		return icon;
+	} //}}}
+
+	//{{{ getEditorIcon() method
+	/**
+	 * Returns the default editor window image.
+	 */
+	public static Image getEditorIcon()
+	{
+		return ((ImageIcon)WINDOW_ICON).getImage();
+	} //}}}
+
+	//{{{ getPluginIcon() method
+	/**
+	 * Returns the default plugin window image.
+	 */
+	public static Image getPluginIcon()
+	{
+		return ((ImageIcon)WINDOW_ICON).getImage();
+	} //}}}
+
+	//}}}
+
+	//{{{ Menus, tool bars
+
+	//{{{ loadMenuBar() method
 	/**
 	 * Creates a menubar. Plugins should not need to call this method.
 	 * @param name The menu bar name
@@ -77,11 +144,27 @@ public class GUIUtilities
 		JMenuBar mbar = new JMenuBar();
 
 		while(st.hasMoreTokens())
-			mbar.add(GUIUtilities.loadMenu(st.nextToken()));
+		{
+			String menu = st.nextToken();
+			if(menu.equals("plugins"))
+				loadPluginsMenu(mbar);
+			else
+				mbar.add(loadMenu(menu));
+		}
 
 		return mbar;
-	}
+	} //}}}
 
+	//{{{ loadMenu() method
+	/**
+	 * @deprecated Use loadMenu(name) instead
+	 */
+	public static JMenu loadMenu(View view, String name)
+	{
+		return loadMenu(name);
+	} //}}}
+
+	//{{{ loadMenu() method
 	/**
 	 * Creates a menu. This form of loadMenu() does not need to be used
 	 * by plugins; use the other form instead.
@@ -95,18 +178,19 @@ public class GUIUtilities
 			return new OpenWithEncodingMenu();
 		else if(name.equals("recent-files"))
 			return new RecentFilesMenu();
+		else if(name.equals("recent-directories"))
+			return new RecentDirectoriesMenu();
 		else if(name.equals("current-directory"))
 			return new CurrentDirectoryMenu();
 		else if(name.equals("markers"))
 			return new MarkersMenu();
 		else if(name.equals("macros"))
 			return new MacrosMenu();
-		else if(name.equals("plugins"))
-			return new PluginsMenu();
 		else
 			return new EnhancedMenu(name);
-	}
+	} //}}}
 
+	//{{{ loadPopupMenu() method
 	/**
 	 * Creates a popup menu.
 	 * @param name The menu name
@@ -136,8 +220,9 @@ public class GUIUtilities
 		}
 
 		return menu;
-	}
+	} //}}}
 
+	//{{{ loadMenuItem() method
 	/**
 	 * Creates a menu item.
 	 * @param name The menu item name
@@ -146,8 +231,9 @@ public class GUIUtilities
 	public static JMenuItem loadMenuItem(String name)
 	{
 		return loadMenuItem(name,true);
-	}
+	} //}}}
 
+	//{{{ loadMenuItem() method
 	/**
 	 * Creates a menu item.
 	 * @param name The menu item name
@@ -156,35 +242,12 @@ public class GUIUtilities
 	 */
 	public static JMenuItem loadMenuItem(String name, boolean setMnemonic)
 	{
-		String label;
-		EditAction action;
-
-		// HACK
-		if(name.startsWith("play-macro@"))
-		{
-			Macros.Macro macro = Macros.getMacro(name.substring(11));
-			if(macro != null)
-			{
-				label = macro.name;
-				int index = label.lastIndexOf('/');
-				label = label.substring(index + 1)
-					.replace('_',' ');
-				action = macro.action;
-			}
-			else
-			{
-				label = name.substring(11);
-				action = null;
-			}
-		}
-		else
-		{
-			action = jEdit.getAction(name);
-
-			label = jEdit.getProperty(name.concat(".label"));
-			if(label == null)
-				label = name;
-		}
+		EditAction action = jEdit.getAction(name);
+		String label = (action == null ?
+			jEdit.getProperty(name + ".label")
+			: action.getLabel());
+		if(label == null)
+			label = name;
 
 		char mnemonic;
 		int index = label.indexOf('$');
@@ -202,12 +265,13 @@ public class GUIUtilities
 		else
 			mi = new EnhancedMenuItem(label,action);
 
-		if(setMnemonic && mnemonic != '\0')
+		if(!OperatingSystem.isMacOS() && setMnemonic && mnemonic != '\0')
 			mi.setMnemonic(mnemonic);
 
 		return mi;
-	}
+	} //}}}
 
+	//{{{ loadToolBar() method
 	/**
 	 * Creates a toolbar.
 	 * @param name The toolbar name
@@ -237,8 +301,9 @@ public class GUIUtilities
 		}
 
 		return toolBar;
-	}
+	} //}}}
 
+	//{{{ loadToolButton() method
 	/**
 	 * Loads a tool bar button. The tooltip is constructed from
 	 * the <code><i>name</i>.label</code> and
@@ -249,93 +314,44 @@ public class GUIUtilities
 	 */
 	public static EnhancedButton loadToolButton(String name)
 	{
-		String label;
-		EditAction action;
+		EditAction action = jEdit.getAction(name);
+		String label = (action == null
+			? jEdit.getProperty(name + ".label")
+			: action.getLabel());
 
-		// HACK
-		if(name.startsWith("play-macro@"))
-		{
-			Macros.Macro macro = Macros.getMacro(name.substring(11));
-
-			if(macro != null)
-			{
-				label = macro.name;
-				int index = label.lastIndexOf('/');
-				label = label.substring(index + 1)
-					.replace('_',' ');
-				action = macro.action;
-			}
-			else
-			{
-				label = name.substring(11);
-				action = null;
-			}
-		}
-		else
-		{
-			action = jEdit.getAction(name);
-
-			label = jEdit.getProperty(name.concat(".label"));
-			if(label == null)
-				label = name;
-			else
-				label = prettifyMenuLabel(label);
-		}
+		if(label == null)
+			label = name;
 
 		Icon icon;
 		String iconName = jEdit.getProperty(name + ".icon");
-		if(iconName != null)
+		if(iconName == null)
+			return null;
+		else
 		{
 			icon = loadIcon(iconName);
 			if(icon == null)
 				return null;
 		}
-		else
-			return null;
 
-		String toolTip = label;
-		String shortcut = jEdit.getProperty(name + ".shortcut");
-		if(shortcut != null)
-			toolTip = toolTip + " (" + shortcut + ")";
+		String toolTip = prettifyMenuLabel(label);
+		String shortcut1 = jEdit.getProperty(name + ".shortcut");
+		String shortcut2 = jEdit.getProperty(name + ".shortcut2");
+		if(shortcut1 != null || shortcut2 != null)
+		{
+			toolTip = toolTip + " ("
+				+ (shortcut1 != null
+				? shortcut1 : "")
+				+ ((shortcut1 != null && shortcut2 != null)
+				? " or " : "")
+				+ (shortcut2 != null
+				? shortcut2
+				: "") + ")";
+		}
 
 		return new EnhancedButton(icon,toolTip,action);
-	}
+	} //}}}
 
-	/**
-	 * Loads a tool bar icon.
-	 * @param iconName The icon name
-	 * @since jEdit 2.6pre7
-	 */
-	public static Icon loadIcon(String iconName)
-	{
-		// check if there is a cached version first
-		Icon icon = (Icon)icons.get(iconName);
-		if(icon != null)
-			return icon;
-
-		// get the icon
-		if(iconName.startsWith("file:"))
-		{
-			icon = new ImageIcon(iconName.substring(5));
-		}
-		else
-		{
-			URL url = GUIUtilities.class.getResource(
-				"/org/gjt/sp/jedit/icons/" + iconName);
-			if(url == null)
-			{
-				Log.log(Log.ERROR,GUIUtilities.class,
-					"Icon not found: " + iconName);
-				return null;
-			}
-
-			icon = new ImageIcon(url);
-		}
-
-		icons.put(iconName,icon);
-		return icon;
-	}
-
+	//{{{ prettifyMenuLabel() method
 	/**
 	 * `Prettifies' a menu item label by removing the `$' sign. This
 	 * can be used to process the contents of an <i>action</i>.label
@@ -350,8 +366,13 @@ public class GUIUtilities
 				.concat(label.substring(index + 1));
 		}
 		return label;
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ Canned dialog boxes
+
+	//{{{ message() method
 	/**
 	 * Displays a dialog box.
 	 * The title of the dialog is fetched from
@@ -372,8 +393,9 @@ public class GUIUtilities
 			jEdit.getProperty(name.concat(".message"),args),
 			jEdit.getProperty(name.concat(".title"),args),
 			JOptionPane.INFORMATION_MESSAGE);
-	}
+	} //}}}
 
+	//{{{ error() method
 	/**
 	 * Displays an error dialog box.
 	 * The title of the dialog is fetched from
@@ -394,8 +416,9 @@ public class GUIUtilities
 			jEdit.getProperty(name.concat(".message"),args),
 			jEdit.getProperty(name.concat(".title"),args),
 			JOptionPane.ERROR_MESSAGE);
-	}
+	} //}}}
 
+	//{{{ input() method
 	/**
 	 * Displays an input dialog box and returns any text the user entered.
 	 * The title of the dialog is fetched from
@@ -408,8 +431,9 @@ public class GUIUtilities
 	public static String input(Component comp, String name, Object def)
 	{
 		return input(comp,name,null,def);
-	}
+	} //}}}
 
+	//{{{ inputProperty() method
 	/**
 	 * Displays an input dialog box and returns any text the user entered.
 	 * The title of the dialog is fetched from
@@ -423,8 +447,9 @@ public class GUIUtilities
 		String def)
 	{
 		return inputProperty(comp,name,null,def);
-	}
+	} //}}}
 
+	//{{{ input() method
 	/**
 	 * Displays an input dialog box and returns any text the user entered.
 	 * The title of the dialog is fetched from
@@ -447,8 +472,9 @@ public class GUIUtilities
 			jEdit.getProperty(name.concat(".title")),
 			JOptionPane.QUESTION_MESSAGE,null,null,def);
 		return retVal;
-	}
+	} //}}}
 
+	//{{{ inputProperty() method
 	/**
 	 * Displays an input dialog box and returns any text the user entered.
 	 * The title of the dialog is fetched from
@@ -474,8 +500,9 @@ public class GUIUtilities
 		if(retVal != null)
 			jEdit.setProperty(def,retVal);
 		return retVal;
-	}
+	} //}}}
 
+	//{{{ confirm() method
 	/**
 	 * Displays a confirm dialog box and returns the button pushed by the
 	 * user. The title of the dialog is fetched from the
@@ -499,8 +526,9 @@ public class GUIUtilities
 		return JOptionPane.showConfirmDialog(comp,
 			jEdit.getProperty(name + ".message",args),
 			jEdit.getProperty(name + ".title"),buttons,type);
-	}
+	} //}}}
 
+	//{{{ showVFSFileDialog() method
 	/**
 	 * Displays a VFS file selection dialog box.
 	 * @param view The view
@@ -513,6 +541,8 @@ public class GUIUtilities
 	public static String[] showVFSFileDialog(View view, String path,
 		int type, boolean multipleSelection)
 	{
+		hideSplashScreen();
+
 		VFSFileChooserDialog fileChooser = new VFSFileChooserDialog(
 			view,path,type,multipleSelection);
 		String[] selectedFiles = fileChooser.getSelectedFiles();
@@ -520,8 +550,13 @@ public class GUIUtilities
 			return null;
 
 		return selectedFiles;
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ Colors and styles
+
+	//{{{ parseColor() method
 	/**
 	 * Converts a color name to a color object. The name must either be
 	 * a known string, such as `red', `green', etc (complete list is in
@@ -532,8 +567,9 @@ public class GUIUtilities
 	public static Color parseColor(String name)
 	{
 		return parseColor(name, Color.black);
-	}
+	} //}}}
 
+	//{{{ parseColor() method
 	public static Color parseColor(String name, Color defaultColor)
 	{
 		if(name == null)
@@ -577,8 +613,9 @@ public class GUIUtilities
 			return Color.pink;
 		else
 			return defaultColor;
-	}
+	} //}}}
 
+	//{{{ getColorHexString() method
 	/**
 	 * Converts a color object to its hex value. The hex value
 	 * prefixed is with `#', for example `#ff0088'.
@@ -588,8 +625,9 @@ public class GUIUtilities
 	{
 		String colString = Integer.toHexString(c.getRGB() & 0xffffff);
 		return "#000000".substring(0,7 - colString.length()).concat(colString);
-	}
+	} //}}}
 
+	//{{{ parseStyle() method
 	/**
 	 * Converts a style string to a style object.
 	 * @param str The style string
@@ -599,6 +637,23 @@ public class GUIUtilities
 	 * @since jEdit 3.2pre6
 	 */
 	public static SyntaxStyle parseStyle(String str, String family, int size)
+		throws IllegalArgumentException
+	{
+		return parseStyle(str,family,size,true);
+	} //}}}
+
+	//{{{ parseStyle() method
+	/**
+	 * Converts a style string to a style object.
+	 * @param str The style string
+	 * @param family Style strings only specify font style, not font family
+	 * @param size Style strings only specify font style, not font family
+	 * @param color If false, the styles will be monochrome
+	 * @exception IllegalArgumentException if the style is invalid
+	 * @since jEdit 4.0pre4
+	 */
+	public static SyntaxStyle parseStyle(String str, String family, int size,
+		boolean color)
 		throws IllegalArgumentException
 	{
 		Color fgColor = Color.black;
@@ -611,11 +666,13 @@ public class GUIUtilities
 			String s = st.nextToken();
 			if(s.startsWith("color:"))
 			{
-				fgColor = GUIUtilities.parseColor(s.substring(6), Color.black);
+				if(color)
+					fgColor = GUIUtilities.parseColor(s.substring(6), Color.black);
 			}
 			else if(s.startsWith("bgColor:"))
 			{
-				bgColor = GUIUtilities.parseColor(s.substring(8), null);
+				if(color)
+					bgColor = GUIUtilities.parseColor(s.substring(8), null);
 			}
 			else if(s.startsWith("style:"))
 			{
@@ -638,8 +695,9 @@ public class GUIUtilities
 			new Font(family,
 			(italic ? Font.ITALIC : 0) | (bold ? Font.BOLD : 0),
 			size));
-	}
+	} //}}}
 
+	//{{{ getStyleString() method
 	/**
 	 * Converts a style into it's string representation.
 	 * @param style The style
@@ -648,7 +706,11 @@ public class GUIUtilities
 	{
 		StringBuffer buf = new StringBuffer();
 
-		buf.append("color:" + getColorHexString(style.getForegroundColor()));
+		if(style.getForegroundColor() != null)
+		{
+			buf.append("color:" + getColorHexString(style.getForegroundColor()));
+		}
+
 		if(style.getBackgroundColor() != null) 
 		{
 			buf.append(" bgColor:" + getColorHexString(style.getBackgroundColor()));
@@ -660,8 +722,9 @@ public class GUIUtilities
 		}
 
 		return buf.toString();
-	}
+	} //}}}
 
+	//{{{ loadStyles() method
 	/**
 	 * Loads the syntax styles from the properties, giving them the specified
 	 * base font family and size.
@@ -671,49 +734,63 @@ public class GUIUtilities
 	 */
 	public static SyntaxStyle[] loadStyles(String family, int size)
 	{
+		return loadStyles(family,size,true);
+	} //}}}
+
+	//{{{ loadStyles() method
+	/**
+	 * Loads the syntax styles from the properties, giving them the specified
+	 * base font family and size.
+	 * @param family The font family
+	 * @param size The font size
+	 * @param color If false, the styles will be monochrome
+	 * @since jEdit 4.0pre4
+	 */
+	public static SyntaxStyle[] loadStyles(String family, int size, boolean color)
+	{
 		SyntaxStyle[] styles = new SyntaxStyle[Token.ID_COUNT];
 
 		try
 		{
 			styles[Token.COMMENT1] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.comment1"),
-				family,size);
+				family,size,color);
 			styles[Token.COMMENT2] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.comment2"),
-				family, size);
+				family, size,color);
 			styles[Token.LITERAL1] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.literal1"),
-				family,size);
+				family,size,color);
 			styles[Token.LITERAL2] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.literal2"),
-				family,size);
+				family,size,color);
 			styles[Token.LABEL] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.label"),
-				family,size);
+				family,size,color);
 			styles[Token.KEYWORD1] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.keyword1"),
-				family,size);
+				family,size,color);
 			styles[Token.KEYWORD2] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.keyword2"),
-				family,size);
+				family,size,color);
 			styles[Token.KEYWORD3] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.keyword3"),
-				family,size);
+				family,size,color);
 			styles[Token.FUNCTION] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.function"),
-				family,size);
+				family,size,color);
 			styles[Token.MARKUP] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.markup"),
-				family,size);
+				family,size,color);
 			styles[Token.OPERATOR] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.operator"),
-				family,size);
+				family,size,color);
 			styles[Token.DIGIT] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.digit"),
-				family,size);
+				family,size,color);
 			styles[Token.INVALID] = GUIUtilities.parseStyle(
 				jEdit.getProperty("view.style.invalid"),
-				family,size);
+				family,size,color);
 		}
 		catch(Exception e)
 		{
@@ -721,8 +798,13 @@ public class GUIUtilities
 		}
 
 		return styles;
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ Loading, saving window geometry
+
+	//{{{ loadGeometry() method
 	/**
 	 * Loads a windows's geometry from the properties.
 	 * The geometry is loaded from the <code><i>name</i>.x</code>,
@@ -740,52 +822,32 @@ public class GUIUtilities
 		int x, y, width, height, adjust_x, adjust_y, adjust_width,
 			adjust_height;
 
-		try
+		Dimension size = win.getSize();
+
+		width = jEdit.getIntegerProperty(name + ".width",size.width);
+		height = jEdit.getIntegerProperty(name + ".height",size.height);
+
+		Component parent = win.getParent();
+		if(parent == null)
 		{
-			width = Integer.parseInt(jEdit.getProperty(name + ".width"));
-			height = Integer.parseInt(jEdit.getProperty(name + ".height"));
+			Dimension screen = win.getToolkit().getScreenSize();
+			x = (screen.width - width) / 2;
+			y = (screen.height - height) / 2;
 		}
-		catch(NumberFormatException nf)
+		else
 		{
-			Dimension size = win.getSize();
-			width = size.width;
-			height = size.height;
+			Rectangle bounds = parent.getBounds();
+			x = bounds.x + (bounds.width - width) / 2;
+			y = bounds.y + (bounds.height - height) / 2;
 		}
 
-		try
-		{
-			x = Integer.parseInt(jEdit.getProperty(name + ".x"));
-			y = Integer.parseInt(jEdit.getProperty(name + ".y"));
-		}
-		catch(NumberFormatException nf)
-		{
-			Component parent = win.getParent();
-			if(parent == null)
-			{
-				Dimension screen = win.getToolkit().getScreenSize();
-				x = (screen.width - width) / 2;
-				y = (screen.height - height) / 2;
-			}
-			else
-			{
-				Rectangle bounds = parent.getBounds();
-				x = bounds.x + (bounds.width - width) / 2;
-				y = bounds.y + (bounds.height - height) / 2;
-			}
-		}
+		x = jEdit.getIntegerProperty(name + ".x",x);
+		y = jEdit.getIntegerProperty(name + ".y",y);
 
-		try
-		{
-			adjust_x = Integer.parseInt(jEdit.getProperty(name + ".dx"));
-			adjust_y = Integer.parseInt(jEdit.getProperty(name + ".dy"));
-			adjust_width = Integer.parseInt(jEdit.getProperty(name + ".d-width"));
-			adjust_height = Integer.parseInt(jEdit.getProperty(name + ".d-height"));
-		}
-		catch(NumberFormatException nf)
-		{
-			adjust_x = adjust_y = 0;
-			adjust_width = adjust_height = 0;
-		}
+		adjust_x = jEdit.getIntegerProperty(name + ".dx",0);
+		adjust_y = jEdit.getIntegerProperty(name + ".dy",0);
+		adjust_width = jEdit.getIntegerProperty(name + ".d-width",0);
+		adjust_height = jEdit.getIntegerProperty(name + ".d-height",0);
 
 		Rectangle desired = new Rectangle(x,y,width,height);
 		Rectangle required = new Rectangle(x - adjust_x,
@@ -797,17 +859,20 @@ public class GUIUtilities
 // 			+ ": setting geometry to " + required);
 		win.setBounds(required);
 
-		if(File.separatorChar == '/'
-			&& System.getProperty("java.version").compareTo("1.2") < 0)
-		{
-			win.setBounds(required);
-			new UnixWorkaround(win,name,desired,required);
-		}
-		else
+		// if(File.separatorChar == '/'
+			// && MiscUtilities.compareStrings(
+			// System.getProperty("java.version"),
+			// "1.2",false) < 0)
+		// {
+			// win.setBounds(required);
+			// new UnixWorkaround(win,name,desired,required);
+		// }
+		// else
 			win.setBounds(desired);
-	}
+	} //}}}
 
-	static class UnixWorkaround
+	//{{{ UnixWorkaround class
+	/* static class UnixWorkaround
 	{
 		Window win;
 		String name;
@@ -816,6 +881,7 @@ public class GUIUtilities
 		long start;
 		boolean windowOpened;
 
+		//{{{ UnixWorkaround constructor
 		UnixWorkaround(Window win, String name, Rectangle desired,
 			Rectangle required)
 		{
@@ -828,10 +894,12 @@ public class GUIUtilities
 
 			win.addComponentListener(new ComponentHandler());
 			win.addWindowListener(new WindowHandler());
-		}
+		} //}}}
 
+		//{{{ ComponentHandler class
 		class ComponentHandler extends ComponentAdapter
 		{
+			//{{{ componentMoved() method
 			public void componentMoved(ComponentEvent evt)
 			{
 				if(System.currentTimeMillis() - start < 1000)
@@ -849,8 +917,9 @@ public class GUIUtilities
 				}
 				else
 					win.removeComponentListener(this);
-			}
+			} //}}}
 
+			//{{{ componentResized() method
 			public void componentResized(ComponentEvent evt)
 			{
 				if(System.currentTimeMillis() - start < 1000)
@@ -868,16 +937,17 @@ public class GUIUtilities
 				}
 				else
 					win.removeComponentListener(this);
-			}
-		}
+			} //}}}
+		} //}}}
 
+		//{{{ WindowHandler class
 		class WindowHandler extends WindowAdapter
 		{
+			//{{{ windowOpened() method
 			public void windowOpened(WindowEvent evt)
 			{
 				windowOpened = true;
 
-				
 				Rectangle r = win.getBounds();
 // 				Log.log(Log.DEBUG,GUIUtilities.class,"Window "
 // 					+ name + ": bounds after opening: " + r);
@@ -886,21 +956,22 @@ public class GUIUtilities
 					|| r.width != desired.width
 					|| r.height != desired.height)
 				{
-					jEdit.setProperty(name + ".dx",String.valueOf(
-						r.x - required.x));
-					jEdit.setProperty(name + ".dy",String.valueOf(
-						r.y - required.y));
-					jEdit.setProperty(name + ".d-width",String.valueOf(
-						r.width - required.width));
-					jEdit.setProperty(name + ".d-height",String.valueOf(
-						r.height - required.height));
+					jEdit.setIntegerProperty(name + ".dx",
+						r.x - required.x);
+					jEdit.setIntegerProperty(name + ".dy",
+						r.y - required.y);
+					jEdit.setIntegerProperty(name + ".d-width",
+						r.width - required.width);
+					jEdit.setIntegerProperty(name + ".d-height",
+						r.height - required.height);
 				}
 
 				win.removeWindowListener(this);
-			}
-		}
-	}
+			} //}}}
+		} //}}}
+	} */ //}}}
 
+	//{{{ saveGeometry() method
 	/**
 	 * Saves a window's geometry to the properties.
 	 * The geometry is saved to the <code><i>name</i>.x</code>,
@@ -912,12 +983,15 @@ public class GUIUtilities
 	public static void saveGeometry(Window win, String name)
 	{
 		Rectangle bounds = win.getBounds();
-		jEdit.setProperty(name + ".x",String.valueOf(bounds.x));
-		jEdit.setProperty(name + ".y",String.valueOf(bounds.y));
-		jEdit.setProperty(name + ".width",String.valueOf(bounds.width));
-		jEdit.setProperty(name + ".height",String.valueOf(bounds.height));
-	}
+		jEdit.setIntegerProperty(name + ".x",bounds.x);
+		jEdit.setIntegerProperty(name + ".y",bounds.y);
+		jEdit.setIntegerProperty(name + ".width",bounds.width);
+		jEdit.setIntegerProperty(name + ".height",bounds.height);
+	} //}}}
 
+	//}}}
+
+	//{{{ hideSplashScreen() method
 	/**
 	 * Ensures that the splash screen is not visible. This should be
 	 * called before displaying any dialog boxes or windows at
@@ -930,24 +1004,9 @@ public class GUIUtilities
 			splash.dispose();
 			splash = null;
 		}
-	}
+	} //}}}
 
-	/**
-	 * Returns the default editor window image.
-	 */
-	public static Image getEditorIcon()
-	{
-		return ((ImageIcon)EDITOR_WINDOW_ICON).getImage();
-	}
-
-	/**
-	 * Returns the default plugin window image.
-	 */
-	public static Image getPluginIcon()
-	{
-		return ((ImageIcon)PLUGIN_WINDOW_ICON).getImage();
-	}
-
+	//{{{ requestFocus() method
 	/**
 	 * Focuses on the specified component as soon as the window becomes
 	 * active.
@@ -964,8 +1023,9 @@ public class GUIUtilities
 				win.removeWindowListener(this);
 			}
 		});
-	}
+	} //}}}
 
+	//{{{ isPopupTrigger() method
 	/**
 	 * Returns if the specified event is the popup trigger event.
 	 * This implements precisely defined behavior, as opposed to
@@ -975,100 +1035,182 @@ public class GUIUtilities
 	 */
 	public static boolean isPopupTrigger(MouseEvent evt)
 	{
-		if(macOS)
+		if(OperatingSystem.isMacOS())
 			return evt.isControlDown();
 		else
 			return ((evt.getModifiers() & InputEvent.BUTTON3_MASK) != 0);
-	}
+	} //}}}
 
-	// deprecated APIs
-
+	//{{{ showPopupMenu() method
 	/**
-	 * @deprecated Use loadMenu(name) instead
+	 * Shows the specified popup menu, ensuring it is displayed within
+	 * the bounds of the screen.
+	 * @param popup The popup menu
+	 * @param comp The component to show it for
+	 * @param x The x co-ordinate
+	 * @param y The y co-ordinate
+	 * @since jEdit 4.0pre1
 	 */
-	public static JMenu loadMenu(View view, String name)
+	public static void showPopupMenu(JPopupMenu popup, Component comp,
+		int x, int y)
 	{
-		return loadMenu(name);
-	}
+		Point p = new Point(x,y);
+		SwingUtilities.convertPointToScreen(p,comp);
 
-	/**
-	 * @deprecated Use loadMenuItem(name) instead
-	 * @param view Unused
-	 * @param name The menu item name
-	 */
-	public static JMenuItem loadMenuItem(View view, String name)
-	{
-		return loadMenuItem(name,true);
-	}
+		Dimension size = popup.getPreferredSize();
 
-	/**
-	 * @deprecated Use loadToolBarIcon() instead
-	 */
-	public static Icon loadToolBarIcon(String iconName)
-	{
-		return loadIcon(iconName);
-	}
+		Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
 
-	/**
-	 * @deprecated Use showVFSFileDialog()
-	 */
-	public static String showFileDialog(View view, String file, int type)
-	{
-		if(file == null)
-			file = System.getProperty("user.dir");
-		File _file = new File(file);
+		boolean horiz = false;
+		boolean vert = false;
 
-		JFileChooser chooser = new JFileChooser();
+		// might need later
+		int origX = x;
 
-		chooser.setCurrentDirectory(_file);
-		if(_file.isDirectory())
-			chooser.setSelectedFile(null);
-		else
-			chooser.setSelectedFile(_file);
-
-		chooser.setDialogType(type);
-		chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-
-		int retVal = chooser.showDialog(view,null);
-		if(retVal == JFileChooser.APPROVE_OPTION)
+		if(p.x + size.width > screen.width
+			&& size.width < screen.width)
 		{
-			File selectedFile = chooser.getSelectedFile();
-			if(selectedFile != null)
-				return selectedFile.getAbsolutePath();
+			x += (screen.width - p.x - size.width);
+			horiz = true;
 		}
 
-		return null;
-	}
+		if(p.y + size.height > screen.height
+			&& size.height < screen.height)
+		{
+			y += (screen.height - p.y - size.height);
+			vert = true;
+		}
 
-	// package-private members
+		// If popup needed to be moved both horizontally and
+		// vertically, the mouse pointer might end up over a
+		// menu item, which will be invoked when the mouse is
+		// released. This is bad, so move popup to a different
+		// location.
+		if(horiz && vert)
+		{
+			x = origX - size.width - 2;
+		}
+
+		popup.show(comp,x,y);
+	} //}}}
+
+	//{{{ getView() method
+	/**
+	 * Finds the view parent of the specified component.
+	 * @since jEdit 4.0pre2
+	 */
+	public static View getView(Component comp)
+	{
+		for(;;)
+		{
+			if(comp instanceof JComponent)
+			{
+				Component real = (Component)((JComponent)comp)
+					.getClientProperty("KORTE_REAL_FRAME");
+				if(real != null)
+					comp = real;
+			}
+
+			if(comp instanceof View)
+				return (View)comp;
+			else if(comp instanceof JPopupMenu)
+				comp = ((JPopupMenu)comp).getInvoker();
+			else if(comp != null)
+				comp = comp.getParent();
+			else
+				break;
+		}
+		return null;
+	} //}}}
+
+	//{{{ Package-private members
+
+	//{{{ showSplashScreen() method
 	static void showSplashScreen()
 	{
 		splash = new SplashScreen();
-	}
+	} //}}}
 
+	//{{{ advanceSplashProgress() method
 	static void advanceSplashProgress()
 	{
 		if(splash != null)
 			splash.advance();
-	}
+	} //}}}
 
-	// private members
+	//}}}
+
+	//{{{ Private members
 	private static SplashScreen splash;
-	private static boolean macOS;
 	private static Hashtable icons;
 
 	private GUIUtilities() {}
 
-	static
+	//{{{ loadPluginsMenu() method
+	private static void loadPluginsMenu(JMenuBar mbar)
 	{
-		macOS = (System.getProperty("os.name").indexOf("Mac") != -1);
+		// Query plugins for menu items
+		Vector pluginMenuItems = new Vector();
 
-		icons = new Hashtable();
-		NEW_BUFFER_ICON = loadIcon("new.gif");
-		DIRTY_BUFFER_ICON = loadIcon("dirty.gif");
-		READ_ONLY_BUFFER_ICON = loadIcon("readonly.gif");
-		NORMAL_BUFFER_ICON = loadIcon("normal.gif");
-		EDITOR_WINDOW_ICON = loadIcon("jedit_icon1.gif");
-		PLUGIN_WINDOW_ICON = loadIcon("jedit_icon2.gif");
-	}
+		EditPlugin[] pluginArray = jEdit.getPlugins();
+		for(int i = 0; i < pluginArray.length; i++)
+		{
+			try
+			{
+				EditPlugin plugin = pluginArray[i];
+				plugin.createMenuItems(pluginMenuItems);
+			}
+			catch(Throwable t)
+			{
+				Log.log(Log.ERROR,GUIUtilities.class,
+					"Error creating menu items"
+					+ " for plugin");
+				Log.log(Log.ERROR,GUIUtilities.class,t);
+			}
+		}
+
+		JMenu menu = new EnhancedMenu("plugins");
+
+		if(pluginMenuItems.isEmpty())
+		{
+			menu.add(GUIUtilities.loadMenuItem("no-plugins"));
+			mbar.add(menu);
+			return;
+		}
+
+		// Sort them
+		MiscUtilities.quicksort(pluginMenuItems,
+			new MiscUtilities.MenuItemCompare());
+
+		if(pluginMenuItems.size() < 20)
+		{
+			for(int i = 0; i < pluginMenuItems.size(); i++)
+			{
+				menu.add((JMenuItem)pluginMenuItems.get(i));
+			}
+			mbar.add(menu);
+		}
+		else
+		{
+			int menuCount = 1;
+
+			menu.setText(menu.getText() + " " + menuCount);
+
+			for(int i = 0; i < pluginMenuItems.size(); i++)
+			{
+				menu.add((JMenuItem)pluginMenuItems.get(i));
+				if(menu.getMenuComponentCount() == 20)
+				{
+					mbar.add(menu);
+					menu = new JMenu(String.valueOf(
+						++menuCount));
+				}
+			}
+
+			if(menu.getMenuComponentCount() != 0)
+				mbar.add(menu);
+		}
+	} //}}}
+
+	//}}}
 }

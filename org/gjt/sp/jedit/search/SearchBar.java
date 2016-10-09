@@ -1,6 +1,9 @@
 /*
  * SearchBar.java - Search & replace toolbar
- * Portions copyright (C) 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,115 +21,140 @@
  */
 
 package org.gjt.sp.jedit.search;
+
+//{{{ Imports
 import java.awt.event.*;
 import java.awt.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
-import javax.swing.text.BadLocationException;
 import javax.swing.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.jedit.gui.HistoryTextField;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
+//}}}
 
 public class SearchBar extends JPanel
 {
-	public SearchBar(View view)
+	//{{{ SearchBar constructor
+	public SearchBar(final View view)
 	{
-		super(new BorderLayout());
+		setLayout(new BoxLayout(this,BoxLayout.X_AXIS));
 
 		this.view = view;
 
-		//Font boldFont = new Font("Dialog",Font.BOLD,12);
-		//Font plainFont = new Font("Dialog",Font.PLAIN,12);
+		add(Box.createHorizontalStrut(2));
 
 		JLabel label = new JLabel(jEdit.getProperty("view.search.find"));
-		//label.setFont(boldFont);
-		label.setBorder(new EmptyBorder(0,2,0,12));
-		add(label,BorderLayout.WEST);
-		Box box = new Box(BoxLayout.Y_AXIS);
-		box.add(Box.createGlue());
-		box.add(find = new HistoryTextField("find"));
-		//find.setFont(plainFont);
-		Dimension min = find.getPreferredSize();
-		min.width = Integer.MAX_VALUE;
-		find.setMaximumSize(min);
+		add(label);
+		add(Box.createHorizontalStrut(12));
+		add(find = new HistoryTextField("find"));
+		find.setSelectAllOnFocus(true);
+		Dimension max = find.getPreferredSize();
+		max.width = Integer.MAX_VALUE;
+		find.setMaximumSize(max);
 		ActionHandler actionHandler = new ActionHandler();
 		find.addKeyListener(new KeyHandler());
 		find.addActionListener(actionHandler);
 		find.getDocument().addDocumentListener(new DocumentHandler());
-		box.add(Box.createGlue());
-		add(box,BorderLayout.CENTER);
 
 		Insets margin = new Insets(1,1,1,1);
 
-		Box buttons = new Box(BoxLayout.X_AXIS);
-		buttons.add(Box.createHorizontalStrut(12));
-		buttons.add(ignoreCase = new JCheckBox(jEdit.getProperty(
+		add(Box.createHorizontalStrut(12));
+		add(ignoreCase = new JCheckBox(jEdit.getProperty(
 			"search.case")));
-		//ignoreCase.setFont(boldFont);
 		ignoreCase.addActionListener(actionHandler);
 		ignoreCase.setMargin(margin);
-		buttons.add(Box.createHorizontalStrut(2));
-		buttons.add(regexp = new JCheckBox(jEdit.getProperty(
+		add(Box.createHorizontalStrut(2));
+		add(regexp = new JCheckBox(jEdit.getProperty(
 			"search.regexp")));
-		//regexp.setFont(boldFont);
 		regexp.addActionListener(actionHandler);
 		regexp.setMargin(margin);
-		buttons.add(Box.createHorizontalStrut(2));
-		buttons.add(hyperSearch = new JCheckBox(jEdit.getProperty(
+		add(Box.createHorizontalStrut(2));
+		add(hyperSearch = new JCheckBox(jEdit.getProperty(
 			"search.hypersearch")));
-		//hyperSearch.setFont(boldFont);
 		hyperSearch.addActionListener(actionHandler);
 		hyperSearch.setMargin(margin);
 
 		update();
 
-		add(buttons,BorderLayout.EAST);
-	}
+		//{{{ Create the timer used by incremental search
+		timer = new Timer(0,new ActionListener()
+		{
+			public void actionPerformed(ActionEvent evt)
+			{
+				if(!incrementalSearch(searchStart,searchReverse))
+				{
+					if(!incrementalSearch(
+						(searchReverse
+						? view.getBuffer().getLength()
+						: 0),searchReverse))
+					{
+						// not found at all.
+						view.getStatus().setMessageAndClear(
+							jEdit.getProperty(
+							"view.status.search-not-found"));
+					}
+				}
+			}
+		}); //}}}
+	} //}}}
 
+	//{{{ getField() method
 	public HistoryTextField getField()
 	{
 		return find;
-	}
+	} //}}}
 
+	//{{{ setHyperSearch() method
 	public void setHyperSearch(boolean hyperSearch)
 	{
 		jEdit.setBooleanProperty("view.search.hypersearch.toggle",hyperSearch);
 		this.hyperSearch.setSelected(hyperSearch);
-		find.setModel(this.hyperSearch.isSelected() ? "find" : null);
-	}
+	} //}}}
 
+	//{{{ update() method
 	public void update()
 	{
 		ignoreCase.setSelected(SearchAndReplace.getIgnoreCase());
 		regexp.setSelected(SearchAndReplace.getRegexp());
 		hyperSearch.setSelected(jEdit.getBooleanProperty(
 			"view.search.hypersearch.toggle"));
-		find.setModel(hyperSearch.isSelected() ? "find" : null);
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+
+	//{{{ Instance variables
 	private View view;
 	private HistoryTextField find;
 	private JCheckBox ignoreCase, regexp, hyperSearch;
+	private Timer timer;
+	private int searchStart;
+	private boolean searchReverse;
+	//}}}
 
+	//{{{ find() method
 	private void find(boolean reverse)
 	{
+		timer.stop();
+
 		String text = find.getText();
+		//{{{ If nothing entered, show search and replace dialog box
 		if(text.length() == 0)
 		{
 			jEdit.setBooleanProperty("search.hypersearch.toggle",
 				hyperSearch.isSelected());
 			new SearchDialog(view,null);
-		}
+		} //}}}
+		//{{{ HyperSearch
 		else if(hyperSearch.isSelected())
 		{
 			find.setText(null);
 			SearchAndReplace.setSearchString(text);
 			SearchAndReplace.setSearchFileSet(new CurrentBufferSet());
 			SearchAndReplace.hyperSearch(view);
-		}
+		} //}}}
+		//{{{ Incremental search
 		else
 		{
 			// on enter, start search from end
@@ -139,7 +167,7 @@ public class SearchBar extends JPanel
 				start = textArea.getCaretPosition();
 			else if(reverse)
 				start = s.getStart();
-			else 
+			else
 				start = s.getEnd();
 
 			if(!incrementalSearch(start,reverse))
@@ -150,12 +178,27 @@ public class SearchBar extends JPanel
 					? view.getBuffer().getLength()
 					: 0,reverse))
 				{
-					// not found at all. beep.
-					getToolkit().beep();
+					// not found at all.
+					view.getStatus().setMessageAndClear(
+						jEdit.getProperty(
+						"view.status.search-not-found"));
+				}
+				else
+				{
+					// inform user search restarted
+					view.getStatus().setMessageAndClear(
+						jEdit.getProperty("view.status.auto-wrap"));
+					// beep if beep property set
+					if(jEdit.getBooleanProperty("search.beepOnSearchAutoWrap"))
+					{
+						getToolkit().beep();
+					}
 				}
 			}
-		}
-	}
+		} //}}}
+	} //}}}
+
+	//{{{ incrementalSearch() method
 	private boolean incrementalSearch(int start, boolean reverse)
 	{
 		/* For example, if the current fileset is a directory,
@@ -172,10 +215,6 @@ public class SearchBar extends JPanel
 			if(SearchAndReplace.find(view,view.getBuffer(),start))
 				return true;
 		}
-		catch(BadLocationException bl)
-		{
-			Log.log(Log.ERROR,this,bl);
-		}
 		catch(Exception e)
 		{
 			Log.log(Log.DEBUG,this,e);
@@ -187,10 +226,28 @@ public class SearchBar extends JPanel
 		}
 
 		return false;
-	}
+	} //}}}
 
+	//{{{ timerIncrementalSearch() method
+	private void timerIncrementalSearch(int start, boolean reverse)
+	{
+		this.searchStart = start;
+		this.searchReverse = reverse;
+
+		timer.stop();
+		timer.setRepeats(false);
+		timer.setInitialDelay(150);
+		timer.start();
+	} //}}}
+
+	//}}}
+
+	//{{{ Inner classes
+
+	//{{{ ActionHandler class
 	class ActionHandler implements ActionListener
 	{
+		//{{{ actionPerformed() method
 		public void actionPerformed(ActionEvent evt)
 		{
 			Object source = evt.getSource();
@@ -212,11 +269,13 @@ public class SearchBar extends JPanel
 				SearchAndReplace.setRegexp(regexp
 					.isSelected());
 			}
-		}
-	}
+		} //}}}
+	} //}}}
 
+	//{{{ DocumentHandler class
 	class DocumentHandler implements DocumentListener
 	{
+		//{{{ insertUpdate() method
 		public void insertUpdate(DocumentEvent evt)
 		{
 			// on insert, start search from beginning of
@@ -230,20 +289,14 @@ public class SearchBar extends JPanel
 					textArea.getCaretPosition());
 				if(s == null)
 					start = textArea.getCaretPosition();
-				else 
+				else
 					start = s.getStart();
 
-				if(!incrementalSearch(start,false))
-				{
-					if(!incrementalSearch(0,false))
-					{
-						// not found at all. beep.
-						getToolkit().beep();
-					}
-				}
+				timerIncrementalSearch(start,false);
 			}
-		}
+		} //}}}
 
+		//{{{ removeUpdate() method
 		public void removeUpdate(DocumentEvent evt)
 		{
 			// on backspace, restart from beginning
@@ -260,8 +313,8 @@ public class SearchBar extends JPanel
 					{
 						// reverse regexp search
 						// not supported yet, so
-						// 'sumulate' with restart
-						incrementalSearch(0,false);
+						// 'simulate' with restart
+						timerIncrementalSearch(0,false);
 					}
 					else
 					{
@@ -271,19 +324,20 @@ public class SearchBar extends JPanel
 							textArea.getCaretPosition());
 						if(s == null)
 							start = textArea.getCaretPosition();
-						else 
+						else
 							start = s.getStart();
-						incrementalSearch(start,true);
+						timerIncrementalSearch(start,true);
 					}
 				}
 			}
-		}
+		} //}}}
 
-		public void changedUpdate(DocumentEvent evt)
-		{
-		}
-	}
+		//{{{ changedUpdate() method
+		public void changedUpdate(DocumentEvent evt) {}
+		//}}}
+	} //}}}
 
+	//{{{ KeyHandler class
 	class KeyHandler extends KeyAdapter
 	{
 		public void keyPressed(KeyEvent evt)
@@ -292,8 +346,6 @@ public class SearchBar extends JPanel
 			{
 			case KeyEvent.VK_LEFT:
 			case KeyEvent.VK_RIGHT:
-			case KeyEvent.VK_UP:
-			case KeyEvent.VK_DOWN:
 				if(!hyperSearch.isSelected())
 				{
 					evt.consume();
@@ -310,10 +362,14 @@ public class SearchBar extends JPanel
 				if(evt.isShiftDown())
 				{
 					evt.consume();
-					find(true);
+					// reverse search with regexps not
+					// supported yet
+					find(regexp.isSelected() ? false : true);
 				}
 				break;
 			}
 		}
-	}
+	} //}}}
+
+	//}}}
 }

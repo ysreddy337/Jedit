@@ -89,11 +89,11 @@ import java.io.*;
 	See the BeanShell User's Manual for more information.
 */
 public class Interpreter 
-	implements Runnable, ConsoleInterface /*,Serializable*/ 
+	implements Runnable, ConsoleInterface,Serializable
 {
 	/* --- Begin static stuff --- */
 
-	public static final String VERSION = "1.2b1";
+	public static final String VERSION = "1.2b5";
 	/* 
 		Debug utils are static so that they are reachable by code that doesn't
 		necessarily have an interpreter reference (e.g. tracing in utils).
@@ -105,7 +105,7 @@ public class Interpreter
     public static boolean DEBUG, TRACE;
 
 	// This should be per instance
-    static PrintStream debug;
+    transient static PrintStream debug;
 	static { 
 		staticInit();
 	}
@@ -120,11 +120,11 @@ public class Interpreter
 
 	/* --- Instance data --- */
 
-	Parser parser;
+	transient Parser parser;
     NameSpace globalNameSpace;
-    Reader in;
-    PrintStream out;
-    PrintStream err;
+    transient Reader in;
+    transient PrintStream out;
+    transient PrintStream err;
     ConsoleInterface console; 
 
 	/** If this interpeter is a child of another, the parent */
@@ -177,6 +177,10 @@ public class Interpreter
         	this.globalNameSpace = new NameSpace("global");
 		else
 			this.globalNameSpace = namespace;
+
+		// now done in NameSpace automatically when root
+		// The classes which are imported by default
+		//globalNameSpace.loadDefaultImports();
 
 		/* 
 			Create the root "bsh" system object if it doesn't exist.
@@ -335,6 +339,10 @@ public class Interpreter
 				interpreter.source( filename, interpreter.globalNameSpace );
 			} catch ( FileNotFoundException e ) {
 				System.out.println("File not found: "+e);
+			} catch ( TargetError e ) {
+				System.out.println("Script threw exception: "+e);
+				if ( e.inNativeCode() )
+					e.printStackTrace( DEBUG, System.err );
 			} catch ( EvalError e ) {
 				System.out.println("Evaluation Error: "+e);
 			} catch ( IOException e ) {
@@ -431,8 +439,8 @@ public class Interpreter
             catch(ParseException e)
             {
                 error("Parser Error: " + e.getMessage(DEBUG));
-                if(DEBUG)
-                    e.printStackTrace();
+				if ( DEBUG )
+                	e.printStackTrace();
                 if(!interactive)
                     eof = true;
 
@@ -448,10 +456,11 @@ public class Interpreter
             catch(TargetError e)
             {
                 error("// Uncaught Exception: " + e );
-                if(DEBUG)
-                    e.printStackTrace();
+				if ( e.inNativeCode() )
+					e.printStackTrace( DEBUG, err );
                 if(!interactive)
                     eof = true;
+				setVariable("$_e", e.getTarget());
             }
             catch (EvalError e)
             {
@@ -595,17 +604,25 @@ public class Interpreter
 					}
                 }
             } catch(ParseException e) {
+				/*
                 throw new EvalError(
 					"Sourced file: "+sourceFileInfo+" parser Error: " 
 					+ e.getMessage( DEBUG ), node );
+				*/
+				if ( DEBUG )
+					// show extra "expecting..." info
+					error( e.getMessage(DEBUG) );
+
+				// add the source file info and throw again
+				e.setErrorSourceFile( sourceFileInfo );
+				throw e;
+
             } catch(InterpreterError e) {
                 e.printStackTrace();
                 throw new EvalError(
 					"Sourced file: "+sourceFileInfo+" internal Error: " 
 					+ e.getMessage(), node);
             } catch( TargetError e ) {
-                if(DEBUG)
-                    e.printStackTrace();
 				// failsafe, set the Line as the origin of the error.
 				if ( e.getNode()==null )
 					e.setNode( node );
@@ -651,6 +668,7 @@ public class Interpreter
 		Evaluate the string in this interpreter's global namespace.
 	*/
     public Object eval( String statement ) throws EvalError {
+		debug("eval(String): "+statement);
 		return eval(statement, globalNameSpace);
 	}
 
@@ -866,6 +884,61 @@ public class Interpreter
 
 	// end primary set and get methods
 
+	/**
+		Fetch a reference to the interpreter (global namespace), and cast it 
+		to the specified type of interface type.  Assuming the appropriate 
+		methods of the interface are defined in the interpreter, then you may 
+		use this interface from Java, just like any other Java object.
+		<p>
+
+		For example:
+		<pre>
+			Interpreter interpreter = new Interpreter();
+			// define a method called run()
+			interpreter.eval("run() { ... }");
+		
+			// Fetch a reference to the interpreter as a Runnable
+			Runnable runnable = 
+				(Runnable)interpreter.getInterface( Runnable.class );
+		</pre>
+		<p>
+
+		Note that the interpreter does *not* require that any or all of the
+		methods of the interface be defined at the time the interface is
+		generated.  However if you attempt to invoke one that is not defined
+		you will get a runtime exception.
+		<p>
+
+		Note also that this convenience method has exactly the same effect as 
+		evaluating the script:
+		<pre>
+			(Type)this;
+		</pre>
+		<p>
+
+		For example, the following is identical to the previous example:
+		<p>
+
+		<pre>
+			// Fetch a reference to the interpreter as a Runnable
+			Runnable runnable = 
+				(Runnable)interpreter.eval( "(Runnable)this" );
+		</pre>
+		<p>
+
+		<em>Version requirement</em> Although standard Java interface types 
+		are always available, to be used with arbitrary interfaces this 
+		feature requires that you are using Java 1.3 or greater.
+		<p>
+
+		@throws EvalError if the interface cannot be generated because the
+		version of Java does not support the proxy mechanism. 
+	*/
+	public Object getInterface( Class interf ) throws EvalError
+	{
+		return globalNameSpace.getThis( this ).getInterface( interf );
+	}
+
 	/*	Methods for interacting with Parser */
 
 	private JJTParserState get_jjtree() {
@@ -985,6 +1058,13 @@ public class Interpreter
 
 	public Interpreter getParent() {
 		return parent;
+	}
+	
+	public void setOut( PrintStream out ) {
+		this.out = out;
+	}
+	public void setErr( PrintStream out ) {
+		this.err = err;
 	}
 
 }

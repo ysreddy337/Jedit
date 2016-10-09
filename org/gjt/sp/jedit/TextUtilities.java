@@ -1,6 +1,8 @@
 /*
  * TextUtilities.java - Various text functions
- * Copyright (C) 1998, 1999, 2000 Slava Pestov
+ * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,16 +21,59 @@
 
 package org.gjt.sp.jedit;
 
-import javax.swing.text.*;
+//{{{ Imports
+import java.awt.*;
+import java.util.*;
+import javax.swing.text.Segment;
 import org.gjt.sp.jedit.syntax.*;
+//}}}
 
 /**
- * Class with several text utility functions.
+ * Contains several text manipulation methods.
+ *
+ * <ul>
+ * <li>Bracket matching
+ * <li>Word start and end offset calculation
+ * <li>String comparison
+ * <li>Converting tabs to spaces and vice versa
+ * <li>Wrapping text
+ * <li>String case conversion
+ * </ul>
+ *
  * @author Slava Pestov
- * @version $Id: TextUtilities.java,v 1.2 2001/09/08 04:50:46 spestov Exp $
+ * @version $Id: TextUtilities.java,v 1.27 2002/04/12 03:49:45 spestov Exp $
  */
 public class TextUtilities
 {
+	//{{{ getTokenAtOffset() method
+	/**
+	 * Returns the token that contains the specified offset.
+	 * @param tokens The token list
+	 * @param offset The offset
+	 * @since jEdit 4.0pre3
+	 */
+	public static Token getTokenAtOffset(Token tokens, int offset)
+	{
+		if(offset == 0 && tokens.id == Token.END)
+			return tokens;
+
+		int tokenListOffset = 0;
+		for(;;)
+		{
+			if(tokens.id == Token.END)
+				throw new ArrayIndexOutOfBoundsException("offset > line length");
+
+			if(tokenListOffset + tokens.length > offset)
+				return tokens;
+			else
+			{
+				tokenListOffset += tokens.length;
+				tokens = tokens.next;
+			}
+		}
+	} //}}}
+
+	//{{{ findMatchingBracket() method
 	/**
 	 * Returns the offset of the bracket matching the one at the
 	 * specified offset of the buffer, or -1 if the bracket is
@@ -36,17 +81,15 @@ public class TextUtilities
 	 * @param buffer The buffer
 	 * @param line The line
 	 * @param offset The offset within that line
-	 * @exception BadLocationException If an out-of-bounds access
-	 * was attempted on the buffer's text
 	 * @since jEdit 2.6pre1
 	 */
 	public static int findMatchingBracket(Buffer buffer, int line, int offset)
-		throws BadLocationException
 	{
 		return findMatchingBracket(buffer,line,offset,0,
-			buffer.getDefaultRootElement().getElementCount());
-	}
+			buffer.getLineCount() - 1);
+	} //}}}
 
+	//{{{ findMatchingBracket() method
 	/**
 	 * Returns the offset of the bracket matching the one at the
 	 * specified offset of the buffer, or -1 if the bracket is
@@ -60,205 +103,145 @@ public class TextUtilities
 	 * @param endLine The last line to scan. This is used to speed up
 	 * on-screen bracket matching because only visible lines need to be
 	 * scanned
-	 * @exception BadLocationException If an out-of-bounds access
-	 * was attempted on the buffer's text
 	 * @since jEdit 2.7pre3
 	 */
 	public static int findMatchingBracket(Buffer buffer, int line, int offset,
-		int startLine, int endLine) throws BadLocationException
+		int startLine, int endLine)
 	{
-		if(buffer.getLength() == 0)
-			return -1;
+		if(offset < 0 || offset >= buffer.getLineLength(line))
+		{
+			throw new ArrayIndexOutOfBoundsException(offset + ":"
+				+ buffer.getLineLength(line));
+		}
 
-		Element map = buffer.getDefaultRootElement();
-		Element lineElement = map.getElement(line);
 		Segment lineText = new Segment();
-		int lineStart = lineElement.getStartOffset();
-		buffer.getText(lineStart,lineElement.getEndOffset() - lineStart - 1,
-			lineText);
+		buffer.getLineText(line,lineText);
 
 		char c = lineText.array[lineText.offset + offset];
-		char cprime; // c` - corresponding character
-		boolean direction; // true = back, false = forward
+		char cprime; // corresponding character
+		boolean direction; // false - backwards, true - forwards
 
 		switch(c)
 		{
-		case '(': cprime = ')'; direction = false; break;
-		case ')': cprime = '('; direction = true; break;
-		case '[': cprime = ']'; direction = false; break;
-		case ']': cprime = '['; direction = true; break;
-		case '{': cprime = '}'; direction = false; break;
-		case '}': cprime = '{'; direction = true; break;
+		case '(': cprime = ')'; direction = true;  break;
+		case ')': cprime = '('; direction = false; break;
+		case '[': cprime = ']'; direction = true;  break;
+		case ']': cprime = '['; direction = false; break;
+		case '{': cprime = '}'; direction = true;  break;
+		case '}': cprime = '{'; direction = false; break;
 		default: return -1;
 		}
 
-		int count;
+		// 1 because we've already 'seen' the first bracket
+		int count = 1;
+
+		Buffer.TokenList tokenList = buffer.markTokens(line);
 
 		// Get the syntax token at 'offset'
 		// only tokens with the same type will be checked for
 		// the corresponding bracket
-		byte idOfBracket = Token.NULL;
+		byte idOfBracket = getTokenAtOffset(tokenList.getFirstToken(),offset).id;
 
-		Buffer.LineInfo lineInfo = buffer.markTokens(line);
-		Token lineTokens = lineInfo.getFirstToken();
+		boolean haveTokens = true;
 
-		int tokenListOffset = 0;
-		for(;;)
-		{
-			if(lineTokens.id == Token.END)
-				throw new InternalError("offset > line length");
-	
-			if(tokenListOffset + lineTokens.length > offset)
-			{
-				idOfBracket = lineTokens.id;
-				break;
-			}
-			else
-			{
-				tokenListOffset += lineTokens.length;
-				lineTokens = lineTokens.next;
-			}
-		}
-
+		//{{{ Forward search
 		if(direction)
 		{
-			// scan backwards
+			offset++;
 
-			count = 0;
-
-			for(int i = line; i >= startLine; i--)
+			for(;;)
 			{
-				// get text
-				lineElement = map.getElement(i);
-				lineStart = lineElement.getStartOffset();
-				int lineLength = lineElement.getEndOffset()
-					- lineStart - 1;
-
-				buffer.getText(lineStart,lineLength,lineText);
-
-				int scanStartOffset;
-				if(i != line)
+				for(int i = offset; i < lineText.count; i++)
 				{
-					lineTokens = buffer.markTokens(i).getLastToken();
-					tokenListOffset = scanStartOffset = lineLength - 1;
-				}
-				else
-				{
- 					if(tokenListOffset != lineLength)
- 						tokenListOffset += lineTokens.length;
-					//lineTokens = lineInfo.lastToken;
-					scanStartOffset = offset;
-					/*System.err.println("sso=" + scanStartOffset + ",tlo=" + tokenListOffset);
-
-					Token __ = lineTokens;
-					 for(;;)
+					char ch = lineText.array[lineText.offset + i];
+					if(ch == c)
 					{
-						if(__ == null)
-							break;
-						System.err.println(__);
-						__ = __.prev;
-					} */
-				}
-
-				// only check tokens with id 'idOfBracket'
-				while(lineTokens != null)
-				{
-					byte id = lineTokens.id;
-					if(id == Token.END)
-					{
-						lineTokens = lineTokens.prev;
-						continue;
-					}
-
-					//System.err.println(lineTokens);
-					int len = lineTokens.length;
-					if(id == idOfBracket)
-					{
-						for(int j = scanStartOffset; j >= Math.max(0,tokenListOffset - len); j--)
+						if(!haveTokens)
 						{
-							if(j >= lineText.count)
-								System.err.println("WARNING: " + j + " >= " + lineText.count);
-							else if(j < 0)
-							{
-								System.err.println("sso=" + scanStartOffset + ", tlo=" + tokenListOffset + ",len=" + len);
-								System.err.println("WARNING: " + j + " < 0");
-							}
-
-							char ch = lineText.array[lineText.offset + j];
-							//System.err.print(ch);
-							if(ch == c)
-								count++;
-							else if(ch == cprime)
-							{
-								if(--count == 0)
-									return lineStart + j;
-							}
+							tokenList = buffer.markTokens(line);
+							haveTokens = true;
 						}
-						//System.err.println();
+						if(getTokenAtOffset(tokenList.getFirstToken(),i).id == idOfBracket)
+							count++;
 					}
-
-					scanStartOffset = tokenListOffset = tokenListOffset - len;
-					lineTokens = lineTokens.prev;
+					else if(ch == cprime)
+					{
+						if(!haveTokens)
+						{
+							tokenList = buffer.markTokens(line);
+							haveTokens = true;
+						}
+						if(getTokenAtOffset(tokenList.getFirstToken(),i).id == idOfBracket)
+						{
+							count--;
+							if(count == 0)
+								return buffer.getLineStartOffset(line) + i;
+						}
+					}
 				}
+
+				//{{{ Go on to next line
+				line++;
+				if(line > endLine)
+					break;
+				buffer.getLineText(line,lineText);
+				offset = 0;
+				haveTokens = false;
+				//}}}
 			}
-		}
+		} //}}}
+		//{{{ Backward search
 		else
 		{
-			// scan forwards
+			offset--;
 
-			count = 0;
-
-			for(int i = line; i < endLine; i++)
+			for(;;)
 			{
-				// get text
-				lineElement = map.getElement(i);
-				lineStart = lineElement.getStartOffset();
-				buffer.getText(lineStart,lineElement.getEndOffset()
-					- lineStart - 1,lineText);
-
-				int scanStartOffset;
-				if(i != line)
+				for(int i = offset; i >= 0; i--)
 				{
-					lineTokens = buffer.markTokens(i).getFirstToken();
-					tokenListOffset = 0;
-					scanStartOffset = 0;
-				}
-				else
-					scanStartOffset = offset + 1;
-
-				// only check tokens with id 'idOfBracket'
-				for(;;)
-				{
-					byte id = lineTokens.id;
-					if(id == Token.END)
-						break;
-
-					int len = lineTokens.length;
-					if(id == idOfBracket)
+					char ch = lineText.array[lineText.offset + i];
+					if(ch == c)
 					{
-						for(int j = scanStartOffset; j < tokenListOffset + len; j++)
+						if(!haveTokens)
 						{
-							char ch = lineText.array[lineText.offset + j];
-							if(ch == c)
-								count++;
-							else if(ch == cprime)
-							{
-								if(count-- == 0)
-									return lineStart + j;
-							}
+							tokenList = buffer.markTokens(line);
+							haveTokens = true;
+						}
+						if(getTokenAtOffset(tokenList.getFirstToken(),i).id == idOfBracket)
+							count++;
+					}
+					else if(ch == cprime)
+					{
+						if(!haveTokens)
+						{
+							tokenList = buffer.markTokens(line);
+							haveTokens = true;
+						}
+						if(getTokenAtOffset(tokenList.getFirstToken(),i).id == idOfBracket)
+						{
+							count--;
+							if(count == 0)
+								return buffer.getLineStartOffset(line) + i;
 						}
 					}
-
-					scanStartOffset = tokenListOffset = tokenListOffset + len;
-					lineTokens = lineTokens.next;
 				}
+
+				//{{{ Go on to next line
+				line--;
+				if(line < startLine)
+					break;
+				buffer.getLineText(line,lineText);
+				offset = lineText.count - 1;
+				haveTokens = false;
+				//}}}
 			}
-		}
+		} //}}}
 
 		// Nothing found
 		return -1;
-	}
+	} //}}}
 
+	//{{{ findWordStart() method
 	/**
 	 * Locates the start of the word at the specified position.
 	 * @param line The text
@@ -272,24 +255,63 @@ public class TextUtilities
 
 		if(noWordSep == null)
 			noWordSep = "";
-		boolean selectNoLetter = (!Character.isLetterOrDigit(ch)
-			&& noWordSep.indexOf(ch) == -1);
 
-		int wordStart = 0;
-		for(int i = pos; i >= 0; i--)
+		//{{{ the character under the cursor changes how we behave.
+		int type;
+		if(Character.isWhitespace(ch))
+			type = WHITESPACE;
+		else if(Character.isLetterOrDigit(ch)
+			|| noWordSep.indexOf(ch) != -1)
+			type = WORD_CHAR;
+		else
+			type = SYMBOL;
+		//}}}
+
+		int whiteSpaceEnd = 0;
+loop:		for(int i = pos; i >= 0; i--)
 		{
 			ch = line.charAt(i);
-			if(selectNoLetter ^ (!Character.isLetterOrDigit(ch) &&
-				noWordSep.indexOf(ch) == -1))
+			switch(type)
 			{
-				wordStart = i + 1;
-				break;
+			//{{{ Whitespace...
+			case WHITESPACE:
+				// only select other whitespace in this case
+				if(Character.isWhitespace(ch))
+					break;
+				else
+					return i + 1; //}}}
+			//{{{ Word character...
+			case WORD_CHAR:
+				if(Character.isLetterOrDigit(ch) ||
+					noWordSep.indexOf(ch) != -1)
+				{
+					break;
+				}
+				else
+					return i + 1; //}}}
+			//{{{ Symbol...
+			case SYMBOL:
+				// if we see whitespace, set flag.
+				if(Character.isWhitespace(ch))
+				{
+					return i + 1;
+				}
+				else if(Character.isLetterOrDigit(ch) ||
+					noWordSep.indexOf(ch) != -1)
+				{
+					return i + 1;
+				}
+				else
+				{
+					break;
+				} //}}}
 			}
 		}
 
-		return wordStart;
-	}
+		return whiteSpaceEnd;
+	} //}}}
 
+	//{{{ findWordEnd() method
 	/**
 	 * Locates the end of the word at the specified position.
 	 * @param line The text
@@ -306,23 +328,61 @@ public class TextUtilities
 
 		if(noWordSep == null)
 			noWordSep = "";
-		boolean selectNoLetter = (!Character.isLetterOrDigit(ch)
-			&& noWordSep.indexOf(ch) == -1);
 
-		int wordEnd = line.length();
-		for(int i = pos; i < line.length(); i++)
+		//{{{ the character under the cursor changes how we behave.
+		int type;
+		if(Character.isWhitespace(ch))
+			type = WHITESPACE;
+		else if(Character.isLetterOrDigit(ch)
+			|| noWordSep.indexOf(ch) != -1)
+			type = WORD_CHAR;
+		else
+			type = SYMBOL;
+		//}}}
+
+		boolean seenWhiteSpace = false;
+loop:		for(int i = pos; i < line.length(); i++)
 		{
 			ch = line.charAt(i);
-			if(selectNoLetter ^ (!Character.isLetterOrDigit(ch) &&
-				noWordSep.indexOf(ch) == -1))
+			switch(type)
 			{
-				wordEnd = i;
-				break;
+			//{{{ Whitespace...
+			case WHITESPACE:
+				// only select other whitespace in this case
+				if(Character.isWhitespace(ch))
+					break;
+				else
+					return i; //}}}
+			//{{{ Word character...
+			case WORD_CHAR:
+				if(Character.isLetterOrDigit(ch) ||
+					noWordSep.indexOf(ch) != -1)
+				{
+					break;
+				}
+				else
+					return i; //}}}
+			//{{{ Symbol...
+			case SYMBOL:
+				// if we see whitespace, set flag.
+				if(Character.isWhitespace(ch))
+				{
+					return i;
+				}
+				else if(Character.isLetterOrDigit(ch) ||
+					noWordSep.indexOf(ch) != -1)
+					return i;
+				else
+				{
+					break;
+				} //}}}
 			}
 		}
-		return wordEnd;
-	}
 
+		return line.length();
+	} //}}}
+
+	//{{{ regionMatches() method
 	/**
 	 * Checks if a subregion of a <code>Segment</code> is equal to a
 	 * character array.
@@ -352,8 +412,9 @@ public class TextUtilities
 				return false;
 		}
 		return true;
-	}
+	} //}}}
 
+	//{{{ spacesToTabs() method
 	/**
 	 * Converts consecutive spaces to tabs in the specified string.
 	 * @param in The string
@@ -406,8 +467,9 @@ public class TextUtilities
 		}
 
                 return buf.toString();
-	}
+	} //}}}
 
+	//{{{ tabsToSpaces() method
 	/**
 	 * Converts tabs to consecutive spaces in the specified string.
 	 * @param in The string
@@ -438,8 +500,9 @@ public class TextUtilities
                         }
                 }
                 return buf.toString();
-	}
+	} //}}}
 
+	//{{{ format() method
 	/**
 	 * Formats the specified text by merging and breaking lines to the
 	 * specified width.
@@ -523,5 +586,85 @@ public class TextUtilities
 			buf.append(' ');
 		buf.append(word);
 		return buf.toString();
-	}
+	} //}}}
+
+	//{{{ getStringCase() method
+	public static final int MIXED = 0;
+	public static final int LOWER_CASE = 1;
+	public static final int UPPER_CASE = 2;
+	public static final int TITLE_CASE = 3;
+
+	/**
+	 * Returns if the specified string is all upper case, all lower case,
+	 * or title case (first letter upper case, rest lower case).
+	 * @param str The string
+	 * @since jEdit 4.0pre1
+	 */
+	public static int getStringCase(String str)
+	{
+		if(str.length() == 0)
+			return MIXED;
+
+		int state = -1;
+
+		char ch = str.charAt(0);
+		if(Character.isLetter(ch))
+		{
+			if(Character.isUpperCase(ch))
+				state = UPPER_CASE;
+			else
+				state = LOWER_CASE;
+		}
+
+		for(int i = 1; i < str.length(); i++)
+		{
+			ch = str.charAt(i);
+			if(!Character.isLetter(ch))
+				continue;
+
+			switch(state)
+			{
+			case UPPER_CASE:
+				if(Character.isLowerCase(ch))
+				{
+					if(i == 1)
+						state = TITLE_CASE;
+					else
+						return MIXED;
+				}
+				break;
+			case LOWER_CASE:
+			case TITLE_CASE:
+				if(Character.isUpperCase(ch))
+					return MIXED;
+				break;
+			}
+		}
+
+		return state;
+	} //}}}
+
+	//{{{ toTitleCase() method
+	/**
+	 * Converts the specified string to title case, by capitalizing the
+	 * first letter.
+	 * @param str The string
+	 * @since jEdit 4.0pre1
+	 */
+	public static String toTitleCase(String str)
+	{
+		if(str.length() == 0)
+			return str;
+		else
+		{
+			return Character.toUpperCase(str.charAt(0))
+				+ str.substring(1).toLowerCase();
+		}
+	} //}}}
+
+	//{{{ Private members
+	private static final int WHITESPACE = 0;
+	private static final int WORD_CHAR = 1;
+	private static final int SYMBOL = 2;
+	//}}}
 }

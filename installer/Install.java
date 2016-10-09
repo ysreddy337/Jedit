@@ -19,6 +19,7 @@
 
 package installer;
 
+import javax.swing.plaf.metal.MetalLookAndFeel;
 import java.io.InputStream;
 import java.io.IOException;
 import java.util.Properties;
@@ -27,8 +28,20 @@ public class Install
 {
 	public static void main(String[] args)
 	{
+		String javaVersion = System.getProperty("java.version");
+		if(javaVersion.compareTo("1.3") < 0)
+		{
+			System.err.println("You are running Java version "
+				+ javaVersion + ".");
+			System.err.println("This installer requires Java 1.3 or later.");
+			System.exit(1);
+		}
+
 		if(args.length == 0)
+		{
+			MetalLookAndFeel.setCurrentTheme(new JEditMetalTheme());
 			new SwingInstall();
+		}
 		else if(args.length == 1 && args[0].equals("text"))
 			new ConsoleInstall();
 		else if(args.length == 3 && args[0].equals("auto"))
