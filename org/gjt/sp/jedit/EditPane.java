@@ -33,7 +33,7 @@ import org.gjt.sp.util.Log;
  * A panel containing a text area. Each edit pane can edit one buffer at
  * a time.
  * @author Slava Pestov
- * @version $Id: EditPane.java,v 1.35 2001/04/18 03:09:44 sp Exp $
+ * @version $Id: EditPane.java,v 1.47 2001/08/23 07:39:09 sp Exp $
  */
 public class EditPane extends JPanel implements EBComponent
 {
@@ -80,14 +80,12 @@ public class EditPane extends JPanel implements EBComponent
 		if(!init)
 		{
 			view.updateTitle();
-			view.updateMarkerMenus();
 
 			if(bufferSwitcher != null)
 			{
 				if(bufferSwitcher.getSelectedItem() != buffer)
 					bufferSwitcher.setSelectedItem(buffer);
 			}
-			caretStatus.repaint();
 
 			EditBus.send(new EditPaneUpdate(this,EditPaneUpdate
 				.BUFFER_CHANGED));
@@ -192,18 +190,45 @@ public class EditPane extends JPanel implements EBComponent
 	 */
 	public void saveCaretInfo()
 	{
-		buffer.putProperty(Buffer.SELECTION_START,new Integer(
-			textArea.getSelectionStart()));
-		buffer.putProperty(Buffer.SELECTION_END,new Integer(
-			textArea.getSelectionEnd()));
-		buffer.putProperty(Buffer.SELECTION_RECT,new Boolean(
-			textArea.isSelectionRectangular()));
+		buffer.putProperty(Buffer.CARET,new Integer(
+			textArea.getCaretPosition()));
+
+		Selection[] selection = textArea.getSelection();
+		if(selection != null)
+			buffer.putProperty(Buffer.SELECTION,selection);
+
 		buffer.putProperty(Buffer.SCROLL_VERT,new Integer(
 			textArea.getFirstLine()));
 		buffer.putProperty(Buffer.SCROLL_HORIZ,new Integer(
 			textArea.getHorizontalOffset()));
-		buffer.putProperty(Buffer.OVERWRITE,new Boolean(
-			textArea.isOverwriteEnabled()));
+	}
+
+	/**
+	 * Loads the caret information from the curret buffer.
+	 * @since jEdit 2.5pre2
+	 */
+	public void loadCaretInfo()
+	{
+		Integer caret = (Integer)buffer.getProperty(Buffer.CARET);
+		Selection[] selection = (Selection[])buffer.getProperty(Buffer.SELECTION);
+
+		Integer firstLine = (Integer)buffer.getProperty(Buffer.SCROLL_VERT);
+		Integer horizontalOffset = (Integer)buffer.getProperty(Buffer.SCROLL_HORIZ);
+
+		if(caret != null)
+		{
+			textArea.setCaretPosition(Math.min(caret.intValue(),
+				buffer.getLength()));
+		}
+
+		if(selection != null)
+			textArea.setSelection(selection);
+
+		if(firstLine != null)
+			textArea.setFirstLine(firstLine.intValue());
+
+		if(horizontalOffset != null)
+			textArea.setHorizontalOffset(horizontalOffset.intValue());
 	}
 
 	public void handleMessage(EBMessage msg)
@@ -213,44 +238,8 @@ public class EditPane extends JPanel implements EBComponent
 			propertiesChanged();
 			loadBufferSwitcher();
 		}
-		else if(msg instanceof RegistersChanged)
-			textArea.getGutter().repaint();
 		else if(msg instanceof BufferUpdate)
 			handleBufferUpdate((BufferUpdate)msg);
-	}
-
-	/**
-	 * Loads the caret information from the curret buffer.
-	 * @since jEdit 2.5pre2
-	 */
-	public void loadCaretInfo()
-	{
-		Integer start = (Integer)buffer.getProperty(Buffer.SELECTION_START);
-		Integer end = (Integer)buffer.getProperty(Buffer.SELECTION_END);
-		Boolean rectSel = (Boolean)buffer.getProperty(Buffer.SELECTION_RECT);
-		Integer firstLine = (Integer)buffer.getProperty(Buffer.SCROLL_VERT);
-		Integer horizontalOffset = (Integer)buffer.getProperty(Buffer.SCROLL_HORIZ);
-		Boolean overwrite = (Boolean)buffer.getProperty(Buffer.OVERWRITE);
-
-		if(start != null && end != null)
-		{
-			textArea.select(Math.min(start.intValue(),
-				buffer.getLength()),
-				Math.min(end.intValue(),
-				buffer.getLength()));
-		}
-
-		if(firstLine != null && horizontalOffset != null)
-		{
-			textArea.setFirstLine(firstLine.intValue());
-			textArea.setHorizontalOffset(horizontalOffset.intValue());
-		}
-
-		if(rectSel != null && overwrite != null)
-		{
-			textArea.setSelectionRectangular(rectSel.booleanValue());
-			textArea.setOverwriteEnabled(overwrite.booleanValue());
-		}
 	}
 
 	/**
@@ -274,9 +263,6 @@ public class EditPane extends JPanel implements EBComponent
 
 		textArea = new JEditTextArea(view);
 
-		textArea.add(JEditTextArea.LEFT_OF_SCROLLBAR,
-			caretStatus = new CaretStatus(this));
-		textArea.addCaretListener(new CaretHandler());
 		add(BorderLayout.CENTER,textArea);
 		markerHighlight = new MarkerHighlight();
 		textArea.getGutter().addCustomHighlight(markerHighlight);
@@ -306,41 +292,14 @@ public class EditPane extends JPanel implements EBComponent
 	private Buffer buffer;
 	private Buffer recentBuffer;
 	private BufferSwitcher bufferSwitcher;
-	private CaretStatus caretStatus;
 	private JEditTextArea textArea;
 	private MarkerHighlight markerHighlight;
-
-	// buttons that control folding
-	private JButton level1, level2, level3, expandAll;
 
 	private void propertiesChanged()
 	{
 		TextAreaPainter painter = textArea.getPainter();
 
-		String family = jEdit.getProperty("view.font");
-		int size;
-		try
-		{
-			size = Integer.parseInt(jEdit.getProperty(
-				"view.fontsize"));
-		}
-		catch(NumberFormatException nf)
-		{
-			size = 14;
-		}
-		int style;
-		try
-		{
-			style = Integer.parseInt(jEdit.getProperty(
-				"view.fontstyle"));
-		}
-		catch(NumberFormatException nf)
-		{
-			style = Font.PLAIN;
-		}
-		Font font = new Font(family,style,size);
-
-		painter.setFont(font);
+		painter.setFont(UIManager.getFont("TextArea.font"));
 		painter.setBracketHighlightEnabled(jEdit.getBooleanProperty(
 			"view.bracketHighlight"));
 		painter.setBracketHighlightColor(GUIUtilities.parseColor(
@@ -367,6 +326,12 @@ public class EditPane extends JPanel implements EBComponent
 			"view.lineHighlight"));
 		painter.setLineHighlightColor(GUIUtilities.parseColor(
 			jEdit.getProperty("view.lineHighlightColor")));
+		painter.setAntiAliasEnabled(jEdit.getBooleanProperty(
+			"view.antiAlias"));
+		painter.setFractionalFontMetricsEnabled(jEdit.getBooleanProperty(
+			"view.fracFontMetrics"));
+		painter.setStyles(GUIUtilities.loadStyles(jEdit.getProperty("view.font"),
+			Integer.parseInt(jEdit.getProperty("view.fontsize"))));
 
 		Gutter gutter = textArea.getGutter();
 		gutter.setExpanded(jEdit.getBooleanProperty(
@@ -393,8 +358,6 @@ public class EditPane extends JPanel implements EBComponent
 			jEdit.getProperty("view.gutter.foldColor")));
 		markerHighlight.setMarkerHighlightColor(GUIUtilities.parseColor(
 			jEdit.getProperty("view.gutter.markerColor")));
-		markerHighlight.setRegisterHighlightColor(GUIUtilities.parseColor(
-			jEdit.getProperty("view.gutter.registerColor")));
 		markerHighlight.setHighlightEnabled(jEdit.getBooleanProperty(
 			"view.gutter.markerHighlight"));
 		gutter.setCurrentLineForeground(GUIUtilities.parseColor(
@@ -456,52 +419,12 @@ public class EditPane extends JPanel implements EBComponent
 			textArea.setElectricScroll(0);
 		}
 
-		loadStyles();
-
 		// Set up the right-click popup menu
 		textArea.setRightClickPopup(GUIUtilities
 			.loadPopupMenu("view.context"));
-	}
 
-	private void loadStyles()
-	{
-		try
-		{
-			SyntaxStyle[] styles = new SyntaxStyle[Token.ID_COUNT];
-
-			styles[Token.COMMENT1] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.comment1"));
-			styles[Token.COMMENT2] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.comment2"));
-			styles[Token.LITERAL1] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.literal1"));
-			styles[Token.LITERAL2] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.literal2"));
-			styles[Token.LABEL] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.label"));
-			styles[Token.KEYWORD1] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.keyword1"));
-			styles[Token.KEYWORD2] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.keyword2"));
-			styles[Token.KEYWORD3] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.keyword3"));
-			styles[Token.FUNCTION] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.function"));
-			styles[Token.MARKUP] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.markup"));
-			styles[Token.OPERATOR] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.operator"));
-			styles[Token.DIGIT] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.digit"));
-			styles[Token.INVALID] = GUIUtilities.parseStyle(
-				jEdit.getProperty("view.style.invalid"));
-
-			textArea.getPainter().setStyles(styles);
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,this,e);
-		}
+		textArea.setMiddleMousePasteEnabled(jEdit.getBooleanProperty(
+			"view.middleMousePaste"));
 	}
 
 	private void loadBufferSwitcher()
@@ -562,7 +485,6 @@ public class EditPane extends JPanel implements EBComponent
 		{
 			if(_buffer == buffer)
 			{
-				caretStatus.repaint();
 				textArea.setCaretPosition(0);
 				textArea.getPainter().repaint();
 			}
@@ -571,7 +493,6 @@ public class EditPane extends JPanel implements EBComponent
 		{
 			if(_buffer == buffer)
 			{
-				caretStatus.repaint();
 				if(bufferSwitcher != null)
 				{
 					if(buffer.isDirty())
@@ -589,8 +510,18 @@ public class EditPane extends JPanel implements EBComponent
 				textArea.updateScrollBars();
 				if(bufferSwitcher != null)
 					bufferSwitcher.updateBufferList();
-				caretStatus.repaint();
+
+				if(view.getEditPane() == this)
+				{
+					StatusBar status = view.getStatus();
+					status.repaintCaretStatus();
+					status.updateBufferStatus();
+					status.updateMiscStatus();
+				}
+
+				loadCaretInfo();
 			}
+
 		}
 		else if(msg.getWhat() == BufferUpdate.MARKERS_CHANGED)
 		{
@@ -602,17 +533,18 @@ public class EditPane extends JPanel implements EBComponent
 			if(_buffer == buffer)
 			{
 				textArea.getPainter().repaint();
-				if(bufferSwitcher != null)
-					bufferSwitcher.repaint();
+
+				if(view.getEditPane() == this)
+					view.getStatus().updateBufferStatus();
 			}
 		}
-	}
-
-	class CaretHandler implements CaretListener
-	{
-		public void caretUpdate(CaretEvent evt)
+		else if(msg.getWhat() == BufferUpdate.ENCODING_CHANGED)
 		{
-			caretStatus.repaint();
+			if(_buffer == buffer)
+			{
+				if(view.getEditPane() == this)
+					view.getStatus().updateBufferStatus();
+			}
 		}
 	}
 }

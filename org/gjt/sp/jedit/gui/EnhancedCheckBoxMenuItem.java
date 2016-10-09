@@ -57,7 +57,7 @@ public class EnhancedCheckBoxMenuItem extends JCheckBoxMenuItem
 
 		if(shortcut != null)
 		{
-			d.width += (getToolkit().getFontMetrics(acceleratorFont)
+			d.width += (getFontMetrics(acceleratorFont)
 				.stringWidth(shortcut) + 10);
 		}
 		return d;
@@ -144,7 +144,8 @@ public class EnhancedCheckBoxMenuItem extends JCheckBoxMenuItem
 
 			try
 			{
-				return action.isSelected(EnhancedCheckBoxMenuItem.this);
+				return action.isSelected(EditAction.getView(
+					EnhancedCheckBoxMenuItem.this));
 			}
 			catch(Throwable t)
 			{

@@ -66,7 +66,7 @@ public class Gutter extends JComponent implements SwingConstants
 			- pfm.getDescent()) / 2.0);
 
 		boolean highlightCurrentLine = currentLineHighlightEnabled
-			&& (textArea.getSelectionStart() == textArea.getSelectionEnd());
+			&& textArea.selection.size() == 0;
 
 		int y = (clip.y - clip.y % lineHeight);
 
@@ -120,10 +120,13 @@ public class Gutter extends JComponent implements SwingConstants
 				break;
 			case LEFT: default:
 				offset = 0;
+				break;
 			}
 
 			if (physicalLine == textArea.getCaretLine() && highlightCurrentLine)
+			{
 				gfx.setColor(currentLineHighlight);
+			}
 			else if (interval > 1 && (line + 1) % interval == 0)
 				gfx.setColor(intervalHighlight);
 			else
@@ -400,8 +403,27 @@ public class Gutter extends JComponent implements SwingConstants
 	private int borderWidth;
 	private Border focusBorder, noFocusBorder;
 
-	class MouseHandler extends MouseAdapter implements MouseMotionListener
+	class MouseHandler implements MouseListener, MouseMotionListener
 	{
+		boolean drag;
+		int toolTipInitialDelay, toolTipReshowDelay;
+
+		public void mouseEntered(MouseEvent e)
+		{
+			ToolTipManager ttm = ToolTipManager.sharedInstance();
+			toolTipInitialDelay = ttm.getInitialDelay();
+			toolTipReshowDelay = ttm.getReshowDelay();
+			ttm.setInitialDelay(0);
+			ttm.setReshowDelay(0);
+		}
+
+		public void mouseExited(MouseEvent evt)
+		{
+			ToolTipManager ttm = ToolTipManager.sharedInstance();
+			ttm.setInitialDelay(toolTipInitialDelay);
+			ttm.setReshowDelay(toolTipReshowDelay);
+		}
+
 		public void mousePressed(MouseEvent e)
 		{
 			if(e.getX() < getWidth() - borderWidth * 2)
@@ -420,25 +442,26 @@ public class Gutter extends JComponent implements SwingConstants
 				{
 					if(e.isControlDown())
 					{
-						buffer.expandFoldAt(line,true);
+						buffer.expandFoldAt(line,true,textArea);
 						textArea.selectFoldAt(line);
 					}
 					else if(buffer.isLineVisible(line + 1))
 						buffer.collapseFoldAt(line);
 					else
-						buffer.expandFoldAt(line,e.isShiftDown());
+						buffer.expandFoldAt(line,e.isShiftDown(),textArea);
 				}
 			}
 			else
 			{
 				e.translatePoint(-getWidth(),0);
 				textArea.mouseHandler.mousePressed(e);
+				drag = true;
 			}
 		}
 
 		public void mouseDragged(MouseEvent e)
 		{
-			if(e.getX() >= getWidth() - borderWidth * 2)
+			if(drag && e.getX() >= getWidth() - borderWidth * 2)
 			{
 				e.translatePoint(-getWidth(),0);
 				textArea.mouseHandler.mouseDragged(e);
@@ -449,11 +472,15 @@ public class Gutter extends JComponent implements SwingConstants
 
 		public void mouseReleased(MouseEvent e)
 		{
-			if(e.getX() >= getWidth() - borderWidth * 2)
+			if(drag && e.getX() >= getWidth() - borderWidth * 2)
 			{
 				e.translatePoint(-getWidth(),0);
 				textArea.mouseHandler.mouseReleased(e);
 			}
+
+			drag = false;
 		}
+
+		public void mouseClicked(MouseEvent e) {}
 	}
 }

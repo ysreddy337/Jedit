@@ -32,7 +32,7 @@ import org.gjt.sp.jedit.gui.OptionsDialog;
  * plugins.
  *
  * @author Slava Pestov
- * @version $Id: EditPlugin.java,v 1.9 2001/04/18 03:09:44 sp Exp $
+ * @version $Id: EditPlugin.java,v 1.11 2001/08/27 07:03:58 sp Exp $
  * @since jEdit 2.1pre1
  */
 public abstract class EditPlugin
@@ -154,22 +154,15 @@ public abstract class EditPlugin
 			return array;
 		}
 
-		public int getIndex()
-		{
-			return index;
-		}
-
-		// package-private members
-		int index;
-
-		JAR(String path, JARClassLoader classLoader)
+		public JAR(String path, JARClassLoader classLoader)
 		{
 			this.path = path;
 			this.classLoader = classLoader;
 			plugins = new Vector();
 		}
 
-		public void getPlugins(Vector vector)
+		// package-private members
+		void getPlugins(Vector vector)
 		{
 			for(int i = 0; i < plugins.size(); i++)
 			{

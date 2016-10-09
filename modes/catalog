@@ -3,7 +3,7 @@
 <!-- This is a mode catalog. Edit modes must be listed here, -->
 <!-- otherwise they will not be available to jEdit. -->
 
-<!DOCTYPE CATALOG SYSTEM "catalog.dtd">
+<!DOCTYPE MODES SYSTEM "catalog.dtd">
 
 <MODES>
 
@@ -12,6 +12,9 @@
 
 <MODE NAME="asp"		FILE="asp.xml"
 				FILE_NAME_GLOB="*.{asp,asa}" />
+
+<MODE NAME="assembly-r2000"	FILE="assembly-r2000.xml"
+				FILE_NAME_GLOB="*.mips" />
 
 <MODE NAME="assembly-x86"	FILE="assembly-x86.xml"
 				FILE_NAME_GLOB="*.asm" />
@@ -56,6 +59,9 @@
 <MODE NAME="eiffel"		FILE="eiffel.xml"
 				FILE_NAME_GLOB="*.e" />
 
+<MODE NAME="foxpro"		FILE="foxpro.xml"
+				FILE_NAME_GLOB="*.prg" />
+
 <MODE NAME="haskell"		FILE="haskell.xml"
 				FILE_NAME_GLOB="*.hs" />
 
@@ -92,6 +98,12 @@
 <MODE NAME="netrexx"		FILE="netrexx.xml"
 				FILE_NAME_GLOB="*.nrx" />
 
+<MODE NAME="occam"		FILE="occam.xml"
+				FILE_NAME_GLOB="*.icc" />
+
+<MODE NAME="omnimark"		FILE="omnimark.xml"
+				FILE_NAME_GLOB="*.x{om,in}" />
+
 <MODE NAME="pascal"		FILE="pascal.xml"
 				FILE_NAME_GLOB="*.pas" />
 
@@ -106,14 +118,23 @@
 				FILE_NAME_GLOB="*.{php3,php,phtml}"
 				FIRST_LINE_GLOB="&lt;?php" />
 
+<MODE NAME="pl-sql"		FILE="pl-sql.xml"
+				FILE_NAME_GLOB="*.pls" />
+
 <MODE NAME="postscript"		FILE="postscript.xml"
 				FILE_NAME_GLOB="*.{ps,eps}" />
 
 <MODE NAME="povray"		FILE="povray.xml"
 				FILE_NAME_GLOB="*.{pov,povray}" />
 
+<MODE NAME="progress"           FILE="progress.xml"
+                                FILE_NAME_GLOB="*.{p,i,w,f}" />
+
 <MODE NAME="properties"		FILE="props.xml"
 				FILE_NAME_GLOB="*{properties,props}" />
+
+<MODE NAME="pvwave"		FILE="pvwave.xml"
+				FILE_NAME_GLOB="*.{pro,jou}" />
 
 <MODE NAME="python"		FILE="python.xml"
 				FILE_NAME_GLOB="*.py" />
@@ -122,7 +143,7 @@
 				FILE_NAME_GLOB="*.spec" />
 
 <MODE NAME="ruby"		FILE="ruby.xml"
-				FILE_NAME_GLOB="*.ruby" />
+				FILE_NAME_GLOB="*.rb" />
 
 <!-- Note: same XML file as LISP mode -->
 <MODE NAME="scheme"		FILE="lisp.xml"
@@ -137,6 +158,9 @@
 
 <MODE NAME="shtml"		FILE="shtml.xml"
 				FILE_NAME_GLOB="*.{shtml,shtm}" />
+
+<MODE NAME="sqr"                FILE="sqr.xml"
+                                FILE_NAME_GLOB="*.{sqr,sqc}" />
 
 <MODE NAME="tcl"		FILE="tcl.xml"
 				FILE_NAME_GLOB="*.{tcl,tsh}" />
@@ -156,6 +180,12 @@
 <MODE NAME="vbscript"		FILE="vbscript.xml"
 				FILE_NAME_GLOB="*.{vbs,bas,cls}" />
 
+<MODE NAME="velocity"		FILE="velocity.xml"
+				FILE_NAME_GLOB="*.vw" />
+
+<MODE NAME="verilog"		FILE="verilog.xml"
+				FILE_NAME_GLOB="*.{ver,v}" />
+
 <MODE NAME="vhdl"		FILE="vhdl.xml"
 				FILE_NAME_GLOB="*.vh*" />
 
@@ -164,6 +194,8 @@
 <MODE NAME="xsl"		FILE="xsl.xml"
 				FILE_NAME_GLOB="*.xsl" />
 
+<!-- Great. AElfred doesn't support entities in attribute values,
+     but all other XML parsers complain if < appears. -->
 <MODE NAME="xml"		FILE="xml.xml"
 				FILE_NAME_GLOB="*.xml"
 				FIRST_LINE_GLOB="<\?xml*" />

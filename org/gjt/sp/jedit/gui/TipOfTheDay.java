@@ -61,16 +61,17 @@ public class TipOfTheDay extends EnhancedDialog
 			JLabel label = new JLabel(jEdit.getProperty("tip.caption"));
 			label.setFont(new Font("SansSerif",Font.PLAIN,24));
 			label.setForeground(UIManager.getColor("Button.foreground"));
-			add(BorderLayout.NORTH,label);
+			TipPanel.this.add(BorderLayout.NORTH,label);
 
 			tipText = new JEditorPane();
 			tipText.setEditable(false);
 			tipText.setContentType("text/html");
+
+			nextTip();
+
 			JScrollPane scroller = new JScrollPane(tipText);
-			Dimension dim = scroller.getPreferredSize();
-			dim.height = 150;
-			scroller.setPreferredSize(dim);
-			add(BorderLayout.CENTER,scroller);
+			scroller.setPreferredSize(new Dimension(150,150));
+			TipPanel.this.add(BorderLayout.CENTER,scroller);
 
 			ActionHandler actionHandler = new ActionHandler();
 
@@ -95,14 +96,12 @@ public class TipOfTheDay extends EnhancedDialog
 			buttons.add(close);
 			TipOfTheDay.this.getRootPane().setDefaultButton(close);
 
-			dim = nextTip.getPreferredSize();
+			Dimension dim = nextTip.getPreferredSize();
 			dim.width = Math.max(dim.width,close.getPreferredSize().width);
 			nextTip.setPreferredSize(dim);
 			close.setPreferredSize(dim);
 
-			add(BorderLayout.SOUTH,buttons);
-
-			nextTip();
+			TipPanel.this.add(BorderLayout.SOUTH,buttons);
 		}
 
 		// private members
@@ -121,7 +120,7 @@ public class TipOfTheDay extends EnhancedDialog
 				tipToShow = Math.abs(new Random().nextInt()) % count;
 			try
 			{
-				tipText.setPage(getClass().getResource(
+				tipText.setPage(TipOfTheDay.class.getResource(
 					"/org/gjt/sp/jedit/tips/tip"
 					+ tipToShow + ".html"));
 			}

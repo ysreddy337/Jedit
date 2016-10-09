@@ -9,12 +9,12 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
 package org.gjt.sp.jedit.options;
@@ -28,26 +28,36 @@ import org.gjt.sp.jedit.gui.GrabKeyDialog;
 import org.gjt.sp.jedit.*;
 
 /**
- * Generic key binding editor.
+ * Key binding editor.
  * @author Slava Pestov
- * @version $Id: ShortcutsOptionPane.java,v 1.8 2001/02/05 09:15:30 sp Exp $
+ * @version $Id: ShortcutsOptionPane.java,v 1.12 2001/08/10 10:35:11 sp Exp $
  */
-public abstract class ShortcutsOptionPane extends AbstractOptionPane
+public class ShortcutsOptionPane extends AbstractOptionPane
 {
-	public ShortcutsOptionPane(String name)
+	public ShortcutsOptionPane()
 	{
-		super(name);
+		super("shortcuts");
 	}
 
 	// protected members
-	protected abstract Vector createBindings();
-
 	protected void _init()
 	{
-		setLayout(new BorderLayout());
+		allBindings = new Vector();
 
-		keyModel = new ShortcutsModel(createBindings());;
-		keyTable = new JTable(keyModel);
+		setLayout(new BorderLayout(12,12));
+
+		initModels();
+
+		selectModel = new JComboBox(models);
+		selectModel.addActionListener(new ActionHandler());
+
+		Box north = Box.createHorizontalBox();
+		north.add(new JLabel(jEdit.getProperty(
+			"options.shortcuts.select.label")));
+		north.add(Box.createHorizontalStrut(12));
+		north.add(selectModel);
+
+		keyTable = new JTable(currentModel);
 		keyTable.getTableHeader().setReorderingAllowed(false);
 		keyTable.getTableHeader().addMouseListener(new HeaderMouseHandler());
 		keyTable.addMouseListener(new TableMouseHandler());
@@ -56,6 +66,7 @@ public abstract class ShortcutsOptionPane extends AbstractOptionPane
 		JScrollPane scroller = new JScrollPane(keyTable);
 		scroller.setPreferredSize(d);
 
+		add(BorderLayout.NORTH,north);
 		add(BorderLayout.CENTER,scroller);
 	}
 
@@ -64,28 +75,90 @@ public abstract class ShortcutsOptionPane extends AbstractOptionPane
 		if(keyTable.getCellEditor() != null)
 			keyTable.getCellEditor().stopCellEditing();
 
-		keyModel.save();
+		Enumeration e = models.elements();
+		while(e.hasMoreElements())
+			((ShortcutsModel)e.nextElement()).save();
+
+		Macros.loadMacros();
+	}
+
+	private void initModels()
+	{
+		models = new Vector();
+		models.addElement(currentModel = createModel("commands",false));
+		models.addElement(createModel("plugins",true));
+		models.addElement(createMacrosModel());
+	}
+
+	private ShortcutsModel createModel(String id, boolean pluginActions)
+	{
+		EditAction[] actions = jEdit.getActions();
+		Vector bindings = new Vector(actions.length);
+
+		for(int i = 0; i < actions.length; i++)
+		{
+			EditAction action = actions[i];
+			if(action.isPluginAction() != pluginActions)
+				continue;
+
+			String name = action.getName();
+			String label = jEdit.getProperty(name + ".label");
+			// Skip certain actions this way (ENTER, TAB)
+			if(label == null)
+				continue;
+
+			label = GUIUtilities.prettifyMenuLabel(label);
+			addBindings(name,label,bindings);
+		}
+
+		return new ShortcutsModel(id,bindings);
+	}
+
+	private ShortcutsModel createMacrosModel()
+	{
+		Vector bindings = new Vector();
+		Vector macroList = Macros.getMacroList();
+
+		for(int i = 0; i < macroList.size(); i++)
+		{
+			String name = macroList.elementAt(i).toString();
+			addBindings(name,name,bindings);
+		}
+
+		return new ShortcutsModel("macros",bindings);
+	}
+
+	private void addBindings(String name, String label, Vector bindings)
+	{
+		GrabKeyDialog.KeyBinding b[] = new GrabKeyDialog.KeyBinding[2];
+
+		b[0] = createBinding(name,label,
+			jEdit.getProperty(name + ".shortcut"));
+		b[1] = createBinding(name,label,
+			jEdit.getProperty(name + ".shortcut2"));
+
+		bindings.addElement(b);
+	}
+
+	private GrabKeyDialog.KeyBinding createBinding(String name,
+		String label, String shortcut)
+	{
+		if(shortcut != null && shortcut.length() == 0)
+			shortcut = null;
+
+		GrabKeyDialog.KeyBinding binding
+			= new GrabKeyDialog.KeyBinding(name,label,shortcut,false);
+
+		allBindings.addElement(binding);
+		return binding;
 	}
 
 	// private members
 	private JTable keyTable;
-	private ShortcutsModel keyModel;
-
-	static class KeyBinding
-	{
-		KeyBinding(String name, String label,
-			String shortcut1, String shortcut2)
-		{
-			this.name = name;
-			this.label = label;
-			this.shortcut1 = shortcut1;
-			this.shortcut2 = shortcut2;
-		}
-
-		String name;
-		String label;
-		String shortcut1, shortcut2;
-	}
+	private Vector models;
+	private ShortcutsModel currentModel;
+	private JComboBox selectModel;
+	private Vector allBindings;
 
 	class HeaderMouseHandler extends MouseAdapter
 	{
@@ -94,13 +167,13 @@ public abstract class ShortcutsOptionPane extends AbstractOptionPane
 			switch(keyTable.getTableHeader().columnAtPoint(evt.getPoint()))
 			{
 			case 0:
-				keyModel.sort(0);
+				currentModel.sort(0);
 				break;
 			case 1:
-				keyModel.sort(1);
+				currentModel.sort(1);
 				break;
 			case 2:
-				keyModel.sort(2);
+				currentModel.sort(2);
 				break;
 			}
 		}
@@ -111,150 +184,181 @@ public abstract class ShortcutsOptionPane extends AbstractOptionPane
 		public void mouseClicked(MouseEvent evt)
 		{
 			int row = keyTable.getSelectedRow();
-			int column = keyTable.getSelectedColumn();
-			if(column != 0)
+			int col = keyTable.getSelectedColumn();
+			if(col != 0 && row != -1)
 			{
-				String command = (String)keyModel.getValueAt(row,0);
-
-				String shortcut = new GrabKeyDialog(
+				 GrabKeyDialog gkd = new GrabKeyDialog(
 					ShortcutsOptionPane.this,
-					command).getShortcut();
-				if(shortcut != null)
-					keyModel.setValueAt(shortcut,row,column);
+					currentModel.getBindingAt(row,col-1),
+					allBindings);
+				if(gkd.isOK())
+					currentModel.setValueAt(
+						gkd.getShortcut(),row,col);
 			}
 		}
 	}
-}
 
-class ShortcutsModel extends AbstractTableModel
-{
-	private Vector bindings;
-
-	ShortcutsModel(Vector bindings)
+	class ActionHandler implements ActionListener
 	{
-		this.bindings = bindings;
-		sort(0);
-	}
-
-	public void sort(int col)
-	{
-		MiscUtilities.quicksort(bindings,new KeyCompare(col));
-		fireTableDataChanged();
-	}
-
-	public int getColumnCount()
-	{
-		return 3;
-	}
-
-	public int getRowCount()
-	{
-		return bindings.size();
-	}
-
-	public Object getValueAt(int row, int col)
-	{
-		ShortcutsOptionPane.KeyBinding binding
-			= (ShortcutsOptionPane.KeyBinding)
-			bindings.elementAt(row);
-		switch(col)
+		public void actionPerformed(ActionEvent evt)
 		{
-		case 0:
-			return binding.label;
-		case 1:
-			return binding.shortcut1;
-		case 2:
-			return binding.shortcut2;
-		default:
-			return null;
-		}
-	}
+			ShortcutsModel newModel
+				= (ShortcutsModel)selectModel.getSelectedItem();
 
-	public void setValueAt(Object value, int row, int col)
-	{
-		if(col == 0)
-			return;
-
-		ShortcutsOptionPane.KeyBinding binding = (ShortcutsOptionPane.KeyBinding)
-			bindings.elementAt(row);
-
-		if(col == 1)
-			binding.shortcut1 = (String)value;
-		else if(col == 2)
-			binding.shortcut2 = (String)value;
-
-		fireTableRowsUpdated(row,row);
-	}
-
-	public String getColumnName(int index)
-	{
-		switch(index)
-		{
-		case 0:
-			return jEdit.getProperty("options.keys.name");
-		case 1:
-			return jEdit.getProperty("options.keys.shortcut1");
-		case 2:
-			return jEdit.getProperty("options.keys.shortcut2");
-		default:
-			return null;
-		}
-	}
-
-	public void save()
-	{
-		for(int i = 0; i < bindings.size(); i++)
-		{
-			ShortcutsOptionPane.KeyBinding binding
-				= (ShortcutsOptionPane.KeyBinding)
-				bindings.elementAt(i);
-			jEdit.setProperty(binding.name + ".shortcut",binding.shortcut1);
-			jEdit.setProperty(binding.name + ".shortcut2",binding.shortcut2);
-		}
-	}
-
-	class KeyCompare implements MiscUtilities.Compare
-	{
-		int col;
-
-		KeyCompare(int col)
-		{
-			this.col = col;
-		}
-
-		public int compare(Object obj1, Object obj2)
-		{
-			ShortcutsOptionPane.KeyBinding k1 = (ShortcutsOptionPane.KeyBinding)obj1;
-			ShortcutsOptionPane.KeyBinding k2 = (ShortcutsOptionPane.KeyBinding)obj2;
-
-			String label1 = k1.label.toLowerCase();
-			String label2 = k2.label.toLowerCase();
-
-			if(col == 0)
-				return label1.compareTo(label2);
-			else
+			if(currentModel != newModel)
 			{
-				String shortcut1, shortcut2;
+				currentModel = newModel;
+				keyTable.setModel(currentModel);
+			}
+		}
+	}
 
-				if(col == 1)
-				{
-					shortcut1 = k1.shortcut1;
-					shortcut2 = k2.shortcut1;
-				}
-				else
-				{
-					shortcut1 = k1.shortcut2;
-					shortcut2 = k2.shortcut2;
-				}
+	class ShortcutsModel extends AbstractTableModel
+	{
+		private Vector bindings;
+		private String name;
 
-				if(shortcut1 == null && shortcut2 != null)
-					return 1;
-				else if(shortcut2 == null && shortcut1 != null)
-					return -1;
-				else if(shortcut1 == null && shortcut2 == null)
+		ShortcutsModel(String name, Vector bindings)
+		{
+			this.name = name;
+			this.bindings = bindings;
+			sort(0);
+		}
+
+		public void sort(int col)
+		{
+			MiscUtilities.quicksort(bindings,new KeyCompare(col));
+			fireTableDataChanged();
+		}
+
+		public int getColumnCount()
+		{
+			return 3;
+		}
+
+		public int getRowCount()
+		{
+			return bindings.size();
+		}
+
+		public Object getValueAt(int row, int col)
+		{
+			switch(col)
+			{
+			case 0:
+				return getBindingAt(row,0).label;
+			case 1:
+				return getBindingAt(row,0).shortcut;
+			case 2:
+				return getBindingAt(row,1).shortcut;
+			default:
+				return null;
+			}
+		}
+
+		public void setValueAt(Object value, int row, int col)
+		{
+			if(col == 0)
+				return;
+
+			getBindingAt(row,col-1).shortcut = (String)value;
+
+			// redraw the whole table because a second shortcut
+			// might have changed, too
+			fireTableDataChanged();
+		}
+
+		public String getColumnName(int index)
+		{
+			switch(index)
+			{
+			case 0:
+				return jEdit.getProperty("options.shortcuts.name");
+			case 1:
+				return jEdit.getProperty("options.shortcuts.shortcut1");
+			case 2:
+				return jEdit.getProperty("options.shortcuts.shortcut2");
+			default:
+				return null;
+			}
+		}
+
+		public void save()
+		{
+			Enumeration enum = bindings.elements();
+			while(enum.hasMoreElements())
+			{
+				GrabKeyDialog.KeyBinding binding[]
+					= (GrabKeyDialog.KeyBinding[])
+						enum.nextElement();
+				jEdit.setProperty(
+					binding[0].name + ".shortcut",
+					binding[0].shortcut);
+				jEdit.setProperty(
+					binding[1].name + ".shortcut2",
+					binding[1].shortcut);
+			}
+		}
+
+		public GrabKeyDialog.KeyBinding getBindingAt(int row, int nr)
+		{
+			GrabKeyDialog.KeyBinding binding[]
+				= (GrabKeyDialog.KeyBinding[])
+					bindings.elementAt(row);
+			return binding[nr];
+		}
+
+		public String toString()
+		{
+			return jEdit.getProperty(
+				"options.shortcuts.select." + name);
+		}
+
+		class KeyCompare implements MiscUtilities.Compare
+		{
+			int col;
+
+			KeyCompare(int col)
+			{
+				this.col = col;
+			}
+
+			public int compare(Object obj1, Object obj2)
+			{
+				GrabKeyDialog.KeyBinding[] k1
+					= (GrabKeyDialog.KeyBinding[])obj1;
+				GrabKeyDialog.KeyBinding[] k2
+					= (GrabKeyDialog.KeyBinding[])obj2;
+
+				String label1 = k1[0].label.toLowerCase();
+				String label2 = k2[0].label.toLowerCase();
+
+				if(col == 0)
 					return label1.compareTo(label2);
 				else
-					return shortcut1.compareTo(shortcut2);
+				{
+					String shortcut1, shortcut2;
+
+					if(col == 1)
+					{
+						shortcut1 = k1[0].shortcut;
+						shortcut2 = k2[0].shortcut;
+					}
+					else
+					{
+						shortcut1 = k1[1].shortcut;
+						shortcut2 = k2[1].shortcut;
+					}
+
+					if(shortcut1 == null && shortcut2 != null)
+						return 1;
+					else if(shortcut2 == null && shortcut1 != null)
+						return -1;
+					else if(shortcut1 == null && shortcut2 == null)
+						return label1.compareTo(label2);
+					else
+						return shortcut1.compareTo(shortcut2);
+				}
 			}
 		}
 	}

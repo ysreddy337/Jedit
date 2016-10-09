@@ -27,7 +27,7 @@ import org.gjt.sp.jedit.*;
  * A virtual filesystem implementation. Note tha methods whose names are
  * prefixed with "_" are called from the I/O thread.
  * @param author Slava Pestov
- * @author $Id: VFS.java,v 1.24 2001/04/18 03:09:45 sp Exp $
+ * @author $Id: VFS.java,v 1.28 2001/05/29 11:30:05 sp Exp $
  */
 public abstract class VFS
 {
@@ -44,7 +44,10 @@ public abstract class VFS
 	public static final int WRITE_CAP = 1 << 1;
 
 	/**
-	 * VFS browser capability.
+	 * If set, a menu item for this VFS will appear in the browser's
+	 * 'More' menu. If not set, it will still be possible to type in
+	 * URLs in this VFS in the browser, but there won't be a user-visible
+	 * way of doing this.
 	 * @since jEdit 2.6pre2
 	 */
 	public static final int BROWSE_CAP = 1 << 2;
@@ -158,8 +161,7 @@ public abstract class VFS
 	 * a login name and password, for example.
 	 * @param path The path in question
 	 * @param comp The component that will parent error dialog boxes
-	 * @return True if everything is okay, false if the user cancelled
-	 * the operation
+	 * @return The session
 	 * @since jEdit 2.6pre3
 	 */
 	public Object createVFSSession(String path, Component comp)
@@ -215,6 +217,14 @@ public abstract class VFS
 		Object session = createVFSSession(path,view);
 		if(session == null)
 			return false;
+
+		/* When doing a 'save as', the path to save to (path)
+		 * will not be the same as the buffer's previous path
+		 * (buffer.getPath()). In that case, we want to create
+		 * a backup of the new path, even if the old path was
+		 * backed up as well (BACKED_UP property set) */
+		if(!path.equals(buffer.getPath()))
+			buffer.getDocumentProperties().remove(Buffer.BACKED_UP);
 
 		VFSManager.runInWorkThread(new BufferIORequest(
 			BufferIORequest.SAVE,view,buffer,session,this,path));
@@ -278,7 +288,6 @@ public abstract class VFS
 		Component comp)
 		throws IOException
 	{
-		VFSManager.error(comp,"vfs.not-supported.list",new String[] { name });
 		return null;
 	}
 
@@ -362,6 +371,20 @@ public abstract class VFS
 	}
 
 	/**
+	 * Backs up the specified file. This should only be overriden by
+	 * the local filesystem VFS.
+	 * @param session The VFS session
+	 * @param path The path
+	 * @param comp The component that will parent error dialog boxes
+	 * @exception IOException if an I/O error occurs
+	 * @since jEdit 3.2pre2
+	 */
+	public void _backup(Object session, String path, Component comp)
+		throws IOException
+	{
+	}
+
+	/**
 	 * Creates an input stream. This method is called from the I/O
 	 * thread.
 	 * @param session the VFS session
@@ -429,6 +452,18 @@ public abstract class VFS
 /*
  * Change Log:
  * $Log: VFS.java,v $
+ * Revision 1.28  2001/05/29 11:30:05  sp
+ * foo
+ *
+ * Revision 1.27  2001/05/17 05:00:14  sp
+ * Status bar, various minor tweaks
+ *
+ * Revision 1.26  2001/05/13 07:21:27  sp
+ * more stuff
+ *
+ * Revision 1.25  2001/04/27 11:28:46  sp
+ * new selection code started
+ *
  * Revision 1.24  2001/04/18 03:09:45  sp
  * GJT was down for a long time
  *

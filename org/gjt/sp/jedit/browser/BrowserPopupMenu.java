@@ -1,7 +1,7 @@
 /*
  * BrowserPopupMenu.java - provides popup actions for rename, del, etc.
  * Copyright (C) 1999 Jason Ginchereau
- * Portions copyright (C) 2000 Slava Pestov
+ * Portions copyright (C) 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,10 +27,11 @@ import javax.swing.*;
 import javax.swing.event.*;
 
 import org.gjt.sp.jedit.io.*;
+import org.gjt.sp.jedit.search.*;
 import org.gjt.sp.jedit.*;
 
 /**
- * @version $Id: BrowserPopupMenu.java,v 1.13 2001/04/18 03:09:45 sp Exp $
+ * @version $Id: BrowserPopupMenu.java,v 1.17 2001/08/20 06:35:02 sp Exp $
  * @author Slava Pestov and Jason Ginchereau
  */
 public class BrowserPopupMenu extends JPopupMenu
@@ -49,10 +50,14 @@ public class BrowserPopupMenu extends JPopupMenu
 
 			if(jEdit.getBuffer(file.path) != null)
 			{
-				add(createMenuItem("open"));
-				add(createMenuItem("open-view"));
-				add(createMenuItem("insert"));
-				add(createMenuItem("close"));
+				if(browser.getMode() == VFSBrowser.BROWSER)
+				{
+					add(createMenuItem("open"));
+					add(createMenuItem("insert"));
+					add(createMenuItem("close"));
+				}
+				else
+					add(createMenuItem("choose"));
 			}
 			else
 			{
@@ -69,7 +74,7 @@ public class BrowserPopupMenu extends JPopupMenu
 				else
 				{
 					add(createMenuItem("open"));
-					add(createMenuItem("open-view"));
+					add(createOpenEncodingMenu());
 					add(createMenuItem("insert"));
 				}
 	
@@ -81,6 +86,8 @@ public class BrowserPopupMenu extends JPopupMenu
 
 			addSeparator();
 		}
+		else
+			vfs = VFSManager.getVFSForPath(browser.getDirectory());
 
 		JCheckBoxMenuItem showHiddenFiles = new JCheckBoxMenuItem(
 			jEdit.getProperty("vfs.browser.menu.show-hidden-files.label"));
@@ -94,6 +101,15 @@ public class BrowserPopupMenu extends JPopupMenu
 		add(createMenuItem("new-directory"));
 
 		addSeparator();
+
+		// note that we don't display the search in directory command
+		// in open and save dialog boxes
+		if(browser.getMode() == VFSBrowser.BROWSER
+			&& vfs instanceof FileVFS)
+		{
+			add(createMenuItem("search-in-directory"));
+			addSeparator();
+		}
 
 		add(createMenuItem("add-to-favorites"));
 		add(createMenuItem("go-to-favorites"));
@@ -139,6 +155,47 @@ public class BrowserPopupMenu extends JPopupMenu
 		return mi;
 	}
 
+	private JMenu createOpenEncodingMenu()
+	{
+		ActionListener listener = new ActionHandler();
+
+		JMenu openEncoding = new JMenu(jEdit.getProperty("open-encoding.label"));
+
+		// used twice...
+		String systemEncoding = System.getProperty("file.encoding");
+
+		JMenuItem mi = new JMenuItem(jEdit.getProperty("os-encoding"));
+		mi.setActionCommand("open@" + systemEncoding);
+		mi.addActionListener(listener);
+		openEncoding.add(mi);
+
+		mi = new JMenuItem(jEdit.getProperty("jedit-encoding"));
+		mi.setActionCommand("open@" + jEdit.getProperty("buffer.encoding",systemEncoding));
+		mi.addActionListener(listener);
+		openEncoding.add(mi);
+
+		openEncoding.addSeparator();
+
+		StringTokenizer st = new StringTokenizer(jEdit.getProperty("encodings"));
+		while(st.hasMoreTokens())
+		{
+			String encoding = st.nextToken();
+			mi = new JMenuItem(encoding);
+			mi.setActionCommand("open@" + encoding);
+			mi.addActionListener(listener);
+			openEncoding.add(mi);
+		}
+
+		openEncoding.addSeparator();
+
+		mi = new JMenuItem(jEdit.getProperty("other-encoding.label"));
+		mi.setActionCommand("other-encoding");
+		mi.addActionListener(listener);
+		openEncoding.add(mi);
+
+		return openEncoding;
+	}
+
 	class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
@@ -146,14 +203,27 @@ public class BrowserPopupMenu extends JPopupMenu
 			View view = browser.getView();
 			String actionCommand = evt.getActionCommand();
 
-			if(actionCommand.equals("open"))
-				jEdit.openFile(view,file.path);
-			else if(actionCommand.equals("open-view"))
+			if(actionCommand.startsWith("open@"))
 			{
-				Buffer buffer = jEdit.openFile(null,file.path);
-				if(buffer != null)
-					jEdit.newView(view,buffer);
+				// a bit of a hack to support 'Open With Encoding' menu
+				Hashtable props = new Hashtable();
+				props.put(Buffer.ENCODING,actionCommand.substring(5));
+				jEdit.openFile(view,null,file.path,false,props);
 			}
+			else if(actionCommand.equals("other-encoding"))
+			{
+				String encoding = GUIUtilities.input(browser,
+					"encoding-prompt",null,
+					jEdit.getProperty("buffer.encoding",
+					System.getProperty("file.encoding")));
+				if(encoding == null)
+					return;
+				Hashtable props = new Hashtable();
+				props.put(Buffer.ENCODING,encoding);
+				jEdit.openFile(view,null,file.path,false,props);
+			}
+			else if(actionCommand.equals("open"))
+				jEdit.openFile(view,file.path);
 			else if(actionCommand.equals("insert"))
 				view.getBuffer().insert(view,file.path);
 			else if(actionCommand.equals("choose"))
@@ -194,6 +264,29 @@ public class BrowserPopupMenu extends JPopupMenu
 			}
 			else if(actionCommand.equals("new-directory"))
 				browser.mkdir();
+			else if(actionCommand.equals("search-in-directory"))
+			{
+				String path;
+
+				VFS.DirectoryEntry[] selected = browser.getSelectedFiles();
+				if(selected.length >= 1)
+				{
+					VFS.DirectoryEntry file = selected[0];
+					if(file.type == VFS.DirectoryEntry.DIRECTORY)
+						path = file.path;
+					else
+					{
+						VFS vfs = VFSManager.getVFSForPath(file.path);
+						path = vfs.getParentOfPath(file.path);
+					}
+				}
+				else
+					path = browser.getDirectory();
+
+				SearchAndReplace.setSearchFileSet(new DirectoryListSet(
+					path,browser.getFilenameFilter(),true));
+				new SearchDialog(browser.getView(),null,SearchDialog.DIRECTORY);
+			}
 			else if(actionCommand.equals("add-to-favorites"))
 			{
 				// if any directories are selected, add

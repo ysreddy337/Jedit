@@ -24,7 +24,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Message sent when a buffer-related change occurs.
  * @author Slava Pestov
- * @version $Id: BufferUpdate.java,v 1.5 2001/04/18 03:09:45 sp Exp $
+ * @version $Id: BufferUpdate.java,v 1.6 2001/06/26 08:50:00 sp Exp $
  *
  * @since jEdit 2.2pre6
  */
@@ -65,6 +65,12 @@ public class BufferUpdate extends EBMessage.NonVetoable
 	 * Buffer mode changed.
 	 */
 	public static final Object MODE_CHANGED = "MODE_CHANGED";
+
+	/**
+	 * Character ncoding changed.
+	 * @since jEdit 3.2pre4
+	 */
+	public static final Object ENCODING_CHANGED = "ENCODING_CHANGED";
 
 	/**
 	 * Buffer saving.

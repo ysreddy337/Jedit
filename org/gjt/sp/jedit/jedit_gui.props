@@ -5,11 +5,11 @@
 
 # Default user catalog file
 defaultCatalog=<?xml version="1.0"?>\n\
-	<!DOCTYPE CATALOG SYSTEM "catalog.dtd">\n\
+	<!DOCTYPE MODES SYSTEM "catalog.dtd">\n\
 	\n\
 	<MODES>\n\
 	\n\
-	<!-- Add lines like the following, one for each edit mode: -->\n\
+	<!-- Add lines like the following, one for each edit mode you add: -->\n\
 	<!-- <MODE NAME="foo" FILE="foo.xml" FILE_NAME_GLOB="*.foo" /> -->\n\
 	\n\
 	</MODES>
@@ -27,6 +27,13 @@ common.more=More
 lineSep.unix=Unix (\\n)
 lineSep.windows=DOS/Windows (\\r\\n)
 lineSep.mac=MacOS (\\r)
+
+# A list of common file encodings used in various places
+encodings=ASCII Cp850 Cp1251 Cp1252 ISO8859_1 ISO8859_2 MacRoman Big5 GBK \
+	KOI8_R SJIS Unicode UTF8 
+
+# History text field menu caption
+history.caption=Previously entered strings:
 
 ###
 ### TOOLBAR
@@ -164,11 +171,12 @@ view.context=undo redo - cut copy paste paste-previous - select-all \
 ###
 ### MENUBAR
 ###
-view.mbar=file edit search view utils macros plugins help-menu
+view.mbar=file edit search markers view utils macros plugins help-menu
 
 ### File menu
 file=new-file \
      open-file \
+     %open-encoding \
      %recent-files \
      %current-directory \
      insert-file \
@@ -190,6 +198,10 @@ file=new-file \
 file.label=$File
 new-file.label=$New File
 open-file.label=$Open File...
+open-encoding.label=Open With Encoding
+jedit-encoding=jEdit Default
+os-encoding=System Default
+other-encoding.label=Open With Other Encoding...
 recent-files.label=Recent Files
 current-directory.label=Current Directory
 current-directory.not-local=Cannot list directories on remote filesystems
@@ -212,6 +224,8 @@ edit=undo \
      - \
      cut \
      copy \
+     cut-append \
+     copy-append \
      paste \
      paste-previous \
      - \
@@ -226,8 +240,6 @@ edit=undo \
      goto-line \
      select-line-range \
      - \
-     toggle-rect \
-     - \
      %text \
      %source \
      %registers
@@ -236,16 +248,17 @@ undo.label=$Undo
 redo.label=$Redo
 cut.label=$Cut
 copy.label=C$opy
+cut-append.label=Cu$t Append
+copy-append.label=Copy $Append
 paste.label=$Paste
 paste-previous.label=Paste Pre$vious...
-select-all.label=Select $All
+select-all.label=$Select All
 select-none.label=Select $None
 word-count.label=$Word Count...
 complete-word.label=Co$mplete Word
 expand-abbrev.label=E$xpand Abbreviation
 goto-line.label=$Go to Line...
-select-line-range.label=Select Line Range...
-toggle-rect.label=Rectangular $Selection
+select-line-range.label=Se$lect Line Range...
 
 ### Text menu
 text=select-word \
@@ -282,9 +295,8 @@ spaces-to-tabs.label=Spaces to Tabs
 tabs-to-spaces.label=Tabs to Spaces
 
 ### Source menu
-source=wing-comment \
-       box-comment \
-       block-comment \
+source=range-comment \
+       line-comment \
        - \
        indent-lines \
        shift-left \
@@ -295,9 +307,8 @@ source=wing-comment \
        prev-bracket \
        next-bracket
 source.label=Source
-wing-comment.label=Wing Comment
-box-comment.label=Box Comment
-block-comment.label=Block Comment
+range-comment.label=Range Comment
+line-comment.label=Line Comment
 indent-lines.label=Indent Selected Lines
 shift-left.label=Shift Indent Left
 shift-right.label=Shift Indent Right
@@ -307,29 +318,19 @@ prev-bracket.label=Go to Previous Bracket
 next-bracket.label=Go to Next Bracket
 
 ### Registers menu
-registers=cut-string-register \
+registers=view-registers \
+	  - \
+	  cut-string-register \
           copy-string-register \
-	  append-string-register \
-	  paste-string-register \
-	  - \
-	  set-caret-register \
-	  goto-caret-register \
-	  select-caret-register \
-	  exchange-caret-register \
-	  - \
-	  clear-register \
-	  - \
-	  view-registers
+	  cut-append-string-register \
+	  copy-append-string-register \
+	  paste-string-register
 registers.label=Registers
-cut-string-register.label=Cut to Register [x]
-copy-string-register.label=Copy to Register [x]
-append-string-register.label=Append to Register [x]
-paste-string-register.label=Paste Register [x]
-set-caret-register.label=Save Position to Register [x]
-goto-caret-register.label=Go to Position in Register [x]
-select-caret-register.label=Select to Position in Register [x]
-exchange-caret-register.label=Swap Position with Register [x]
-clear-register.label=Clear Register [x]
+cut-string-register.label=Cut to Register
+copy-string-register.label=Copy to Register
+cut-append-string-register.label=Cut Append to Register
+copy-append-string-register.label=Copy Append to Register
+paste-string-register.label=Paste Register
 view-registers.label=View Registers...
 
 ### Search menu
@@ -338,6 +339,9 @@ search=find \
        find-next \
        find-prev \
        - \
+       search-in-open-buffers \
+       search-in-directory \
+       - \
        replace-in-selection \
        replace-and-find-next \
        replace-all \
@@ -345,33 +349,47 @@ search=find \
        quick-search \
        hypersearch \
        - \
-       hypersearch-results \
-       - \
-       set-marker \
-       prev-marker \
-       next-marker \
-       %clear-marker \
-       %goto-marker
+       hypersearch-results
 search.label=$Search
 find.label=$Find...
-find-next.label=Fin$d Next
+find-next.label=Fi$nd Next
 find-prev.label=Find Pre$vious
-find-selection.label=F$ind Selection...
+find-selection.label=Find Se$lection...
+search-in-open-buffers.label=Search in Open $Buffers...
+search-in-directory.label=Search in $Directory...
 replace-in-selection.label=$Replace in Selection
 replace-and-find-next.label=Re$place and Find Next
 replace-all.label=Replace $All
 quick-search.label=Quick $Incremental Search
 hypersearch.label=$Quick HyperSearch
 hypersearch-results.label=$HyperSearch Results
-set-marker.label=Set $Marker...
-no-markers.label=No Markers Defined
+
+### Markers menu
+markers=add-marker \
+	  add-marker-shortcut \
+	  - \
+	  goto-marker \
+	  select-marker \
+	  swap-marker \
+	  - \
+	  remove-all-markers \
+	  - \
+	  prev-marker \
+	  next-marker \
+	  -
+markers.label=$Markers
+add-marker.label=$Add/Remove Marker
+add-marker-shortcut.label=Add Marker $With Shortcut
+goto-marker.label=$Go to Marker
+select-marker.label=$Select to Marker
+swap-marker.label=Swa$p Caret and Marker
+remove-all-markers.label=Re$move All Markers
 prev-marker.label=Go to $Previous Marker
 next-marker.label=Go to $Next Marker
-clear-marker.label=Clear Marker
-goto-marker.label=Go to Marker
+no-markers.label=No Markers
+markers.blank-line=[Blank line]
 
 ### View menu
-
 view=new-view \
      close-view \
      - \
@@ -427,7 +445,7 @@ folding.label=Folding
 collapse-fold.label=Collapse Fold
 expand-one-level.label=Expand Fold One Level
 expand-fold.label=Expand Fold Fully
-expand-folds.label=Expand Folds [x]
+expand-folds.label=Expand Folds With Level
 expand-all-folds.label=Expand All Folds
 select-fold.label=Select Fold
 narrow.label=Narrow Buffer to Selection
@@ -464,15 +482,18 @@ utils=vfs-browser \
       eval \
       eval-selection \
       - \
+      reload-modes \
+      - \
       buffer-options \
       global-options
 utils.label=$Utilities
 vfs-browser.label=$File System Browser
 io-progress-monitor.label=$I/O Progress Monitor...
-log-viewer.label=$View Activity Log...
+log-viewer.label=$Activity Log
 update-log.label=Update Activity $Log on Disk
 eval.label=$Evaluate BeanShell Expression...
 eval-selection.label=E$valuate Selection
+reload-modes.label=$Reload Edit Modes
 buffer-options.label=$Buffer Options...
 global-options.label=$Global Options...
 
@@ -490,7 +511,7 @@ macros=record-macro \
        - \
        rescan-macros \
        -
-macros.label=$Macros
+macros.label=Ma$cros
 record-macro.label=$Record Macro...
 record-temp-macro.label=Record $Temporary Macro
 stop-recording.label=$Stop Recording
@@ -503,24 +524,19 @@ rescan-macros.label=Resca$n Macros
 no-macros.label=No Macros
 
 ### Plugins menu
+plugins=plugin-manager -
 plugins.label=$Plugins
-no-plugins.label=No Plugins
+plugin-manager.label=Plugin $Manager...
+no-plugins.label=No Plugins Installed
 
 ### Help menu
 help-menu=about \
      help \
      tip-of-the-day
 help-menu.label=$Help
-about.label=About jEdit...
-help.label=jEdit Help
-tip-of-the-day.label=Tip of the Day
-
-#help-readme.label=jEdit Read Me
-#help-news.label=Major Changes in jEdit 3.0
-#help-todo.label=Changes Planned for jEdit 3.1
-#help-changes.label=Version History
-#help-copying.label=GNU General Public License
-#help-copying-doc.label=GNU Free Documentation License
+about.label=$About jEdit...
+help.label=jEdit $Help
+tip-of-the-day.label=$Tip of the Day
 
 ###
 ### MACRO STRINGS
@@ -544,8 +560,8 @@ backspace-word.label=Delete Previous Word
 backspace.label=Delete Previous Character
 delete-word.label=Delete Next Word
 delete.label=Delete Next Character
-document-end.label=End of Document
-document-home.label=Beginning of Document
+document-end.label=End of Buffer
+document-home.label=Beginning of Buffer
 end.label=End of Line
 home.label=Beginning of Line
 insert-literal.label=Insert Next Character Literally
@@ -561,8 +577,8 @@ prev-page.label=Previous Page
 prev-paragraph.label=Go to Previous Paragraph
 prev-word.label=Previous Word
 repeat.label=Repeat Next Command
-select-document-end.label=Select to End of Document
-select-document-home.label=Select to Beginning of Document
+select-document-end.label=Select to End of Buffer
+select-document-home.label=Select to Beginning of Buffer
 select-end.label=Select to End of Line
 select-home.label=Select to Beginning of Line
 select-next-char.label=Select Next Character
@@ -575,6 +591,7 @@ select-prev-line.label=Select Previous Line
 select-prev-page.label=Select Previous Page
 select-prev-paragraph.label=Select Previous Paragraph
 select-prev-word.label=Select Previous Word
+toggle-multi-select.label=Multiple Selection
 
 ###
 ### VIEW STUFF
@@ -584,11 +601,20 @@ select-prev-word.label=Select Previous Word
 view.title=jEdit - 
 
 # Gutter highlight
-view.gutter.register=Register "{0}" points to this line
-view.gutter.marker=Marker "{0}" points to this line
+view.gutter.marker.no-name=Marker
+view.gutter.marker=Marker: {0}
 
 # Status messages
-view.status.recording=(recording)
+view.status.recording=Macro recording
+view.status.repeat=Enter repeat count: {0}
+view.status.register-prompt=Press key to specify register:
+view.status.marker-prompt=Press key to specify marker:
+view.status.expand-folds=Press 0-9 to specify fold level:
+view.status.insert-literal=Press key to insert literally:
+view.status.auto-wrap=Search text not found; restarting search
+view.status.replace-all=Replaced {0} occurrence(s) in {1} file(s)
+view.status.mode-tooltip=Current edit mode
+view.status.encoding-tooltip=Current encoding
 
 # Printing
 print.page=Page {0}
@@ -606,6 +632,45 @@ about.caption=jEdit web site: <http://www.jedit.org>
 ioerror.title=I/O Error
 # {0} - the error message
 ioerror.message=An I/O error occurred ({0})
+
+# Read error
+read-error.title=Read Error
+# {0} - the path name {1} - the error message
+read-error.message=The file {0}\n\
+	could not be loaded due to an I/O error.\n\
+	({1})
+
+# Write error
+write-error.title=Write Error
+# {0} - the path name {1} - the error message
+write-error.message=The file {0}\n\
+	could not be saved due to an I/O error.\n\
+	({1})
+
+# Directory error
+directory-error.title=Directory Error
+# {0} - the path name {1} - the error message
+directory-error.message=The directory {0}\n\
+	could not be listed due to an I/O error.\n\
+	({1})
+
+# Directory error with no message
+directory-error-nomsg.title=Directory Error
+# {0} - the path name
+directory-error-nomsg.message=The directory {0}\n\
+	could not be listed due to an I/O error.
+
+# Character conversion error, {0}=path, {1}=current encoding, {2}=error message
+encoding-error.title=Incompatible Encoding
+encoding-error.message=The file {0}\n\
+	could not be loaded with the "{1}" encoding.\n\
+	({2})\n\
+	\n\
+	To use a different encoding, try the commands in the\n\
+	File->Open With Encoding menu.\n\
+	\n\
+	If you are really stuck and do not know which encoding\n\
+	to use, try "ASCII" or "8859_1".
 
 # Cannot open directory dialog box
 open-directory.title=Cannot Open Directory
@@ -685,14 +750,23 @@ reload-all.message=Are you sure you want to reload all buffers from disk?\n\
 already-recording.title=Already Recording
 already-recording.message=A macro recording is already in progress.
 
+# Encoding prompt
+encoding-prompt.title=Open With Other Encoding
+encoding-prompt.message=Character encoding to use:
+
 # Record macro dialog
 record.title=Record Macro
 record.message=Macro name:
 
 # Some features don't work with -nosettings dialog
-no-settings.title=Feature Unavailable
+no-settings.title=Feature Disabled
 no-settings.message=jEdit was started with the -nosettings switch.\n\
 	To use this feature, you must start jEdit without that switch.
+
+# Some features don't work with the web start version
+no-webstart.title=Feature Disabled
+no-webstart.message=This feature is not available in the WebStart version\n\
+	of jEdit.
 
 # Search and replace dialog
 search.title=Search And Replace
@@ -701,6 +775,8 @@ search.find=Search for: (press up arrow to recall previous)
 search.find.mnemonic=s
 search.replace=Replace with:
 search.replace.mnemonic=w
+search.string-replace-btn=Text
+search.beanshell-replace-btn=Return value of a BeanShell snippet
 
 search.keep=Keep dialog
 search.keep.mnemonic=k
@@ -708,10 +784,16 @@ search.case=Ignore case
 search.case.mnemonic=g
 search.regexp=Regular expressions
 search.regexp.mnemonic=x
-search.reverse=Reverse search
-search.reverse.mnemonic=v
 search.hypersearch=HyperSearch
 search.hypersearch.mnemonic=h
+search.wrap=Auto wrap
+search.wrap.mnemonic=w
+
+search.direction=Direction:
+search.back=Backward
+search.back.mnemonic=b
+search.forward=Forward
+search.forward.mnemonic=o
 
 search.fileset=Search in:
 search.current=Current buffer
@@ -728,7 +810,7 @@ search.filterField.mnemonic=f
 search.subdirs=Search subdirectories
 search.subdirs.mnemonic=u
 search.choose=Choose...
-search.choose.mnemonic=o
+search.choose.mnemonic=e
 
 search.findBtn=Find
 search.replaceBtn=Replace
@@ -745,16 +827,18 @@ keepsearching.message=No more matches were found. Continue search from\n\
 
 # HyperSearch results dialog
 hypersearch-results.title=HyperSearch Results
+hypersearch-results.caption=Found {0} occurrence(s) in {1} file(s).
+hypersearch-results.searching=Searching...
 hypersearch.status=HyperSearch
 
-# Replace all results
-replace-results.title=Replacement Complete
-replace-results.message=Replaced {0} occurence(s) in {1} buffer(s).
+hypersearch-no-results.title=HyperSearch Complete
+hypersearch-no-results.message=No occurrences of the search string were found.
 
 # Search and replace error dialog
 searcherror.title=Search and Replace Error
 # {0} - error message
-searcherror.message=An error occurred while performing this operation. ({0})
+searcherror.message=An error occurred while performing this operation.\n\
+	({0})
 
 # Empty fileset error dialog
 empty-fileset.title=Empty File Set
@@ -800,11 +884,10 @@ selectlinerange.end=End line:
 view-registers.title=Registers
 view-registers.caption=Register:
 view-registers.clipboard=$ (clipboard)
-view-registers.type=Type:
-view-registers.text=text
-view-registers.position=position
-view-registers.other=other
+view-registers.selection=% (selection)
 view-registers.none=No registers defined
+view-registers.register=Register:
+view-registers.contents=Contents:
 
 # Close all buffers dialog
 close.title=Unsaved Changes
@@ -820,7 +903,6 @@ add-abbrev.caption=Enter an expansion for abbreviation "{0}":
 add-abbrev.mode=Add mode-specific
 add-abbrev.global=Add global
 
-<<<<<<< HEAD
 # Edit abbrev dialog
 edit-abbrev.title=Edit Abbreviation
 edit-abbrev.caption=Enter an expansion for abbreviation "{0}":
@@ -829,8 +911,6 @@ edit-abbrev.caption=Enter an expansion for abbreviation "{0}":
 abbrev-editor.before=Text to insert before caret:
 abbrev-editor.after=Text to insert after caret:
 
-=======
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 # XMode errors
 xmode-error.title=XML Parse Error
 # {2} is the column number, but it's not too useful so we don't show it
@@ -857,8 +937,6 @@ plugin.start-error.message=The plugin {0} cannot be started\n\
 	Possible reasons include:\n\
 	- the plugin is incompatible with this jEdit release; try updating\n\
 	the plugin\n\
-	- a plugin that this one depends on is not installed. Consult the\n\
-	plugin documentation to find out which plugins this one requires.\n\
 	- there is a bug in this plugin. If you suspect this is the case,\n\
 	e-mail the stack trace printed in the activity log to the plugin\n\
 	author.
@@ -904,14 +982,9 @@ macro-message.title=Macro Message
 # BeanShell stuff
 
 beanshell-error.title=BeanShell Execution Error
-beanshell-error.message=While executing "{0}",\n\
-	the following error was encountered:\n\
-	{1}\n\
-	\n\
-	More information can be found in the activity log.
-
-beanshell-notfound.title=BeanShell Script Not Found
-beanshell-notfound.message=The BeanShell script {0} does not exist.
+beanshell-error.message.1=A BeanShell execution error occurred. More details can \
+	be found
+beanshell-error.message.2=in the activity log (Utilities->Activity Log).
 
 beanshell-eval-input.title=Evaluate BeanShell Expression
 beanshell-eval-input.message=BeanShell expression:
@@ -922,10 +995,19 @@ beanshell-eval.message={0}
 macro-not-recording.title=Not Recording
 macro-not-recording.message=A macro is not currently being recorded.
 
+# Large repeat count warning
+large-repeat-count.title=Large Repeat Count
+large-repeat-count.message=Are you sure you want to invoke "{0}" {1} times?
+
+large-repeat-count.user-input.title=Large Repeat Count
+large-repeat-count.user-input.message=Are you sure you want to insert "{0}" \
+	{1} times?
+
 # Buffer options dialog
 buffer-options.title=Buffer Options
 buffer-options.mode=Edit mode:
 buffer-options.lineSeparator=Line separator:
+buffer-options.encoding=Character encoding:
 buffer-options.props=Corresponding buffer-local properties: (C+c copies)
 
 # Global options dialog
@@ -936,20 +1018,20 @@ options.plugins.label=Plugin Options
 options.general.label=General
 options.general.lf.note=Restart jEdit for look & feel changes to take effect
 options.general.lf=Swing look & feel:
-options.general.history=Maximum history list length:
+options.general.history=History entries to remember:
 options.general.saveCaret=Save caret positions in recent file list
 options.general.sortBuffers=Sort buffer list
 options.general.sortByName=Sort buffer list by file name, instead of path name
-options.general.checkModStatus=Warn if file is modified on disk by another \
-	program
-options.general.showFullPath=Show full path of buffers in title bar
+options.general.checkModStatus=Warn if file is modified on disk by another program
+options.general.showFullPath=Show full path of buffer in title bar
 options.general.showSearchbar=Show search bar
 options.general.showBufferSwitcher=Show buffer switcher
 options.general.showTips=Show tips on startup
+options.general.showSplash=Show splash screen on startup
+options.general.globalColors=Use jEdit colors in all text components (experimental)
 
 options.loadsave.label=Loading & Saving
-options.loadsave.restore=Restore previously open files on startup
-options.loadsave.encoding=File encoding:
+options.loadsave.encoding=Default character encoding:
 options.loadsave.autosave=Autosave frequency (secs):
 options.loadsave.backups=Max number of backups:
 options.loadsave.backupDirectory=Backup directory:
@@ -957,9 +1039,15 @@ options.loadsave.backupPrefix=Backup filename prefix:
 options.loadsave.backupSuffix=Backup filename suffix:
 options.loadsave.lineSeparator=Default line separator:
 options.loadsave.ioThreadCount=Number of I/O threads:
+options.loadsave.restore=Restore previously open files on startup
+options.loadsave.restore.cli=... even if file names were specified on the \
+	command line
+options.loadsave.newView=Client instances open files in new view
+options.loadsave.persistentMarkers=Save marker positions
+options.loadsave.parseFully=More accurate syntax highlighting (slows file loading)
 
 options.textarea.label=Text Area
-options.textarea.font=Text area font:
+options.textarea.font=Text font:
 options.textarea.lineHighlight=Current line highlighting
 options.textarea.bracketHighlight=Bracket highlighting
 options.textarea.eolMarkers=End of line markers
@@ -968,6 +1056,11 @@ options.textarea.blinkCaret=Blinking caret
 options.textarea.blockCaret=Block caret
 options.textarea.electricBorders=Electric (auto scroll) borders
 options.textarea.homeEnd="Smart" home/end key behaviour
+options.textarea.middleMousePaste=Middle mouse button click pastes \
+	most recent selection
+options.textarea.antiAlias=Smooth text
+options.textarea.fracFontMetrics=Fractional font metrics (for better smooth \
+	text display)
 
 options.gutter.label=Gutter
 options.gutter.font=Gutter font:
@@ -976,7 +1069,7 @@ options.gutter.numberAlignment=Line number alignment:
 options.gutter.interval=Line highlight interval:
 options.gutter.lineNumbers=Line numbering
 options.gutter.currentLineHighlight=Current line highlighting
-options.gutter.markerHighlight=Indicate markers and position registers
+options.gutter.markerHighlight=Indicate marker positions
 
 options.color.label=Colors
 options.color.object=Object
@@ -994,7 +1087,6 @@ options.color.gutterFgColor=Gutter foreground
 options.color.gutterHighlightColor=Gutter highlight
 options.color.gutterCurrentLineColor=Current line in gutter
 options.color.gutterMarkerColor=Markers in gutter
-options.color.gutterRegisterColor=Registers in gutter
 options.color.gutterFoldColor=Fold markers in gutter
 options.color.gutterFocusBorderColor=Focused gutter border
 options.color.gutterNoFocusBorderColor=Unfocused gutter border
@@ -1037,8 +1129,7 @@ options.mode.filenameGlob=File name glob:
 options.mode.firstlineGlob=First line glob:
 options.mode.commentStart=Comment start:
 options.mode.commentEnd=Comment end:
-options.mode.boxComment=Box comment:
-options.mode.blockComment=Block comment:
+options.mode.lineComment=Line comment:
 options.mode.noWordSep=Extra word characters:
 
 options.print.label=Printing
@@ -1102,18 +1193,45 @@ options.abbrevs.expandOnInput=Space bar expands abbrevs
 options.abbrevs.abbrev=Abbrev
 options.abbrevs.expand=Expansion
 
-options.keys.name=Command
-options.keys.shortcut1=Primary shortcut
-options.keys.shortcut2=Alternative shortcut
+options.shortcuts.label=Shortcuts
+options.shortcuts.select.label=Edit Shortcuts:
+options.shortcuts.select.commands=Command Shortcuts
+options.shortcuts.select.plugins=Plugin Shortcuts
+options.shortcuts.select.macros=Macro Shortcuts
+options.shortcuts.name=Command
+options.shortcuts.shortcut1=Primary shortcut
+options.shortcuts.shortcut2=Alternative shortcut
 
 grab-key.title=Specify Shortcut
 grab-key.caption=Press the desired shortcut for "{0}", then click OK.
+grab-key.assigned-to=Currently assigned to: {0}
+grab-key.assigned-to.none=<none>
+grab-key.assigned-to.prefix={0} prefix
+grab-key.clear=Clear
+grab-key.remove=Remove Current
 
-options.command-keys.label=Command Shortcuts
+grab-key.remove-ask.title=Remove Shortcut?
+grab-key.remove-ask.message=\
+	You didn't specify a new shortcut.\n\
+	Do you want to remove the current shortcut?
 
-options.plugin-keys.label=Plugin Shortcuts
+grab-key.duplicate-alt-shortcut.title=Duplicate Shortcut
+grab-key.duplicate-alt-shortcut.message=\
+	The shortcut you selected duplicates the other\n\
+	shortcut for this item. Please choose another.
 
-options.macro-keys.label=Macro Shortcuts
+grab-key.duplicate-shortcut.title=Duplicate Shortcut
+grab-key.duplicate-shortcut.message=\
+	This shortcut is already assigned to\n\
+	"{0}".\n\
+	\n\
+	Do you want to override this assignment?
+	
+grab-key.prefix-shortcut.title=Invalid Shortcut
+grab-key.prefix-shortcut.message=\
+	You cannot use this shortcut, because\n\
+	it is a prefix to other shortcuts.\n\
+	Please choose another.
 
 options.browser.label=File System Browser
 options.browser.defaultPath=Default path:
@@ -1121,6 +1239,7 @@ options.browser.defaultPath.buffer=Parent directory of current buffer
 options.browser.defaultPath.home=Home directory
 options.browser.defaultPath.favorites=Favorites
 options.browser.defaultPath.last=Most recently visited directory
+options.browser.showIcons=Show icons
 options.browser.showHiddenFiles=Show hidden files
 options.browser.sortFiles=Sort file list
 options.browser.sortIgnoreCase=Case insensitive sort
@@ -1160,8 +1279,8 @@ helpviewer.forward=Forward
 helpviewer.toc.welcome=Welcome to jEdit
 helpviewer.toc.misc=Miscellaneous Documentation
 helpviewer.toc.readme=jEdit Read Me
-helpviewer.toc.news=Major Changes in jEdit 3.1
-helpviewer.toc.todo=Changes Planned for jEdit 3.2
+helpviewer.toc.news=Major Changes in jEdit 3.2
+helpviewer.toc.todo=To Do List and Known Bugs
 helpviewer.toc.changes=Version History
 helpviewer.toc.copying=GNU General Public License
 helpviewer.toc.copying-doc=GNU Free Documentation License
@@ -1177,7 +1296,7 @@ tip.next-tip=Next Tip
 tip.show=true
 
 # Number of tips
-tip.count=34
+tip.count=54
 
 # Activity log
 log-viewer.title=Activity Log
@@ -1207,10 +1326,10 @@ buffer-multiple-io.message=Each buffer can only execute one input/output\n\
 	before starting another one.
 
 browser-multiple-io.title=I/O Error
-browser-multiple-io.message=Each VFS browser can only execute one input/output\n\
-	operation at a time. Please wait until the current\n\
-	operation finishes (or abort it in the I/O progress monitor)\n\
-	before starting another one.
+browser-multiple-io.message=Each file system browser can only execute one input/output\n\
+	operation at a time. Please wait until the current operation\n\
+	finishes (or abort it in the I/O progress monitor) before starting\n\
+	another one.
 
 # VFS browser
 vfs.browser.title=File System Browser
@@ -1246,6 +1365,7 @@ vfs.browser.menu.rename.label=Rename...
 vfs.browser.menu.show-hidden-files.label=Show Hidden Files
 vfs.browser.menu.new-file.label=New File
 vfs.browser.menu.new-directory.label=New Directory...
+vfs.browser.menu.search-in-directory.label=Search in Directory...
 vfs.browser.menu.add-to-favorites.label=Add to Favorites
 vfs.browser.menu.go-to-favorites.label=Go to Favorites
 
@@ -1316,3 +1436,91 @@ vfs.not-supported.load.message=The {0} filesystem does not support\n\
 vfs.not-supported.save.title=Operation Not Supported
 vfs.not-supported.save.message=The {0} filesystem does not support\n\
 	file saving.
+
+###
+### PLUGIN MANAGER
+###
+
+plugin-manager.title=Plugin Manager
+
+plugin-manager.url=http://plugins.jedit.org/export/new_plugin_manager.php
+
+plugin-manager.caption=Installed plugins:
+
+plugin-manager.not-loaded=Not loaded due to errors
+plugin-manager.loaded=Loaded plugins
+plugin-manager.new=Newly installed plugins
+
+plugin-manager.info.name=Plugin name:
+plugin-manager.info.author=Author:
+plugin-manager.info.version=Version:
+
+plugin-manager.remove=Remove Plugins
+plugin-manager.update=Update Plugins
+plugin-manager.install=Install Plugins
+
+plugin-manager.remove-confirm.title=Remove Plugins
+plugin-manager.remove-confirm.message=Are you sure you want to remove the \
+	following plugins?\n\
+	\n\
+	{0}
+
+### plugin list download progress
+plugin-list.progress.title=Downloading Plugin List
+plugin-list.progress.caption=Downloading plugin list from server...
+plugin-list.progress.stop=Stop
+
+### error while loading plugin list
+plugin-list.ioerror.title=I/O Error
+plugin-list.ioerror.message=An I/O error occurred ({0})\n\
+	\n\
+	If you are using Java 2 and are connected to the Internet\n\
+	through a firewall, you should configure the Firewall plugin\n\
+	in Utilities->Global Options before using the plugin manager.
+
+plugin-list.xmlerror.title=XML Parser Error
+plugin-list.xmlerror.message=An error occurred while parsing {0}, line {1}:\n\
+	{2}
+
+### plugin update
+plugin-manager.up-to-date.title=Plugins Up to Date
+plugin-manager.up-to-date.message=All installed plugins are their latest versions.
+
+### plugin installation
+install-plugins.title=Install Plugins
+update-plugins.title=Update Plugins
+install-plugins.caption=Click the check box next to plugins you wish to install:
+install-plugins.info.name=Name:
+install-plugins.info.author=Author:
+install-plugins.info.latest-version=Latest version:
+install-plugins.info.obsolete=Obsolete (will be deleted)
+install-plugins.info.installed-version=Installed version:
+install-plugins.info.updated=Last updated:
+install-plugins.info.description=Description:
+install-plugins.info.also-install=\ Installing this plugin will also install \
+	the following plugins:\ 
+install-plugins.info.obsolete-text=\ This plugin is obsolete and no longer \
+	needed. It will be deleted if you check the box next to its name.
+
+install-plugins.user=Install in user plugin directory ({0})
+install-plugins.system=Install in system plugin directory ({0})
+install-plugins.downloadSource=Download source code
+install-plugins.none=none
+install-plugins.install=Install
+
+### plugin progress
+plugin-manager.progress.removing-task=Removing Plugins
+plugin-manager.progress.updating-task=Updating Plugins
+plugin-manager.progress.installing-task=Installing Plugins
+plugin-manager.progress.removing=Removing {0}
+plugin-manager.progress.downloading=Downloading {0}
+plugin-manager.progress.installing=Installing {0}
+plugin-manager.progress.stop=Stop
+
+plugin-manager.done.title=Operations Complete
+plugin-manager.done.message=You must restart jEdit for plugin installation\n\
+	and removal to take effect.
+
+plugin-manager.remove-failed.title=Remove Failed
+plugin-manager.remove-failed.message=The plugin {0}\n\
+	could not be removed.

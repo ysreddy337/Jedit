@@ -1,6 +1,7 @@
 /*
  * FileCellRenderer.java - renders list and tree cells for the VFS browser
  * Copyright (C) 1999 Jason Ginchereau
+ * Portions copyright (C) 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,19 +26,16 @@ import javax.swing.tree.*;
 import javax.swing.border.*;
 
 import org.gjt.sp.jedit.io.VFS;
-import org.gjt.sp.jedit.GUIUtilities;
-import org.gjt.sp.jedit.jEdit;
+import org.gjt.sp.jedit.*;
 
-public final class FileCellRenderer implements javax.swing.tree.TreeCellRenderer
+public final class FileCellRenderer extends JLabel implements TreeCellRenderer
 {
-	public FileCellRenderer() {
-		font = UIManager.getFont("Tree.font");
-		font = new Font(font.getName(), Font.PLAIN, font.getSize());
-
-		treeSelectionForeground = UIManager.getColor("Tree.selectionForeground");
-		treeNoSelectionForeground = UIManager.getColor("Tree.textForeground");
-		treeSelectionBackground = UIManager.getColor("Tree.selectionBackground");
-		treeNoSelectionBackground = UIManager.getColor("Tree.textBackground");
+	public FileCellRenderer()
+	{
+		Font font = UIManager.getFont("Tree.font");
+		// make a non-UIResource copy so that updateUI() doesn't
+		// reset it
+		setFont(new Font(font.getFamily(),font.getStyle(),font.getSize()));
 
 		// use metal icons because not all looks and feels define these.
 		// note that metal is guaranteed to exist, so this shouldn't
@@ -48,31 +46,24 @@ public final class FileCellRenderer implements javax.swing.tree.TreeCellRenderer
 		dirIcon = metalDefaults.getIcon("FileView.directoryIcon");
 		filesystemIcon = metalDefaults.getIcon("FileView.hardDriveIcon");
 		loadingIcon = metalDefaults.getIcon("FileView.hardDriveIcon");
+
+		setOpaque(true);
 	}
 
 	public Component getTreeCellRendererComponent(JTree tree, Object value,
 		boolean sel, boolean expanded, boolean leaf, int row,
 		boolean focus)
 	{
-		if(treeCellRenderer == null)
-		{
-			treeCellRenderer = new JLabel();
-			treeCellRenderer.setOpaque(true);
-			treeCellRenderer.setFont(font);
-		}
-
 		if(sel)
 		{
-			treeCellRenderer.setBackground(treeSelectionBackground);
-			treeCellRenderer.setForeground(treeSelectionForeground);
+			setBackground(treeSelectionBackground);
+			setForeground(treeSelectionForeground);
 		}
 		else
 		{
-			treeCellRenderer.setBackground(treeNoSelectionBackground);
-			treeCellRenderer.setForeground(treeNoSelectionForeground);
+			setBackground(treeNoSelectionBackground);
+			setForeground(treeNoSelectionForeground);
 		}
-
-		treeCellRenderer.setEnabled(tree.isEnabled());
 
 		DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode)value;
 		Object userObject = treeNode.getUserObject();
@@ -81,25 +72,52 @@ public final class FileCellRenderer implements javax.swing.tree.TreeCellRenderer
 			VFS.DirectoryEntry file = (VFS.DirectoryEntry)userObject;
 
 			boolean opened = (jEdit.getBuffer(file.path) != null);
-			treeCellRenderer.setBorder(opened ? openBorder : closedBorder);
+			setBorder(opened ? openBorder : closedBorder);
 
-			treeCellRenderer.setIcon(getIconForFile(file));
-			treeCellRenderer.setText(file.name);
+			if(showIcons)
+			{
+				setIcon(getIconForFile(file));
+				setText(file.name);
+			}
+			else
+			{
+				setIcon(null);
+				setText(file.type == VFS.DirectoryEntry.DIRECTORY
+					? file.name + "/" : file.name);
+			}
 		}
 		else if(userObject instanceof BrowserView.LoadingPlaceholder)
 		{
-			treeCellRenderer.setIcon(loadingIcon);
-			treeCellRenderer.setText(jEdit.getProperty("vfs.browser.tree.loading"));
-			treeCellRenderer.setBorder(closedBorder);
+			if(showIcons)
+				setIcon(loadingIcon);
+			else
+				setIcon(null);
+			setText(jEdit.getProperty("vfs.browser.tree.loading"));
+			setBorder(closedBorder);
 		}
 		else if(userObject instanceof String)
 		{
-			treeCellRenderer.setIcon(dirIcon);
-			treeCellRenderer.setText((String)userObject);
-			treeCellRenderer.setBorder(closedBorder);
+			if(showIcons)
+			{
+				setIcon(dirIcon);
+				setText((String)userObject);
+			}
+			else
+			{
+				setIcon(null);
+				setText(userObject + "/");
+			}
+
+			setBorder(closedBorder);
+		}
+		else
+		{
+			// userObject is null?
+			setIcon(null);
+			setText(null);
 		}
 
-		return treeCellRenderer;
+		return this;
 	}
 
 	// protected members
@@ -113,45 +131,47 @@ public final class FileCellRenderer implements javax.swing.tree.TreeCellRenderer
 			return fileIcon;
 	}
 
+	// package-private members
+	boolean showIcons;
+
+	void propertiesChanged()
+	{
+		// bug in DefaultTreeCellRenderer?
+		setBackground(UIManager.getColor("Tree.textBackground"));
+
+		showIcons = jEdit.getBooleanProperty("vfs.browser.showIcons");
+		if(showIcons)
+		{
+			closedBorder = new EmptyBorder(0,3,0,0);
+			openBorder = new CompoundBorder(new MatteBorder(0,2,0,0,
+				UIManager.getColor("Tree.textForeground")),
+				new EmptyBorder(0,1,0,0));
+		}
+		else
+		{
+			closedBorder = new EmptyBorder(1,4,1,1);
+			openBorder = new CompoundBorder(new MatteBorder(0,2,0,0,
+				UIManager.getColor("Tree.textForeground")),
+				new EmptyBorder(1,2,1,1));
+		}
+
+		treeSelectionForeground = UIManager.getColor("Tree.selectionForeground");
+		treeNoSelectionForeground = UIManager.getColor("Tree.textForeground");
+		treeSelectionBackground = UIManager.getColor("Tree.selectionBackground");
+		treeNoSelectionBackground = UIManager.getColor("Tree.textBackground");
+	}
+
 	// private members
-	private JLabel treeCellRenderer = null;
-
-	private Font font;
-
 	private Icon fileIcon;
 	private Icon dirIcon;
 	private Icon filesystemIcon;
 	private Icon loadingIcon;
 
-	private Border closedBorder = new EmptyBorder(0,3,0,0);
-	private Border openBorder = new CompoundBorder(new EmptyBorder(0,1,0,0),
-		new MatteBorder(0,2,0,0,Color.black));
+	private Border closedBorder;
+	private Border openBorder;
 
 	private Color treeSelectionForeground;
 	private Color treeNoSelectionForeground;
 	private Color treeSelectionBackground;
 	private Color treeNoSelectionBackground;
 }
-
-/*
- * Change Log:
- * $Log: FileCellRenderer.java,v $
- * Revision 1.6  2000/10/30 07:14:04  sp
- * 2.7pre1 branched, GUI improvements
- *
- * Revision 1.5  2000/09/23 03:01:10  sp
- * pre7 yayayay
- *
- * Revision 1.4  2000/08/16 08:47:19  sp
- * Stuff
- *
- * Revision 1.3  2000/08/06 09:44:27  sp
- * VFS browser now has a tree view, rename command
- *
- * Revision 1.2  2000/07/31 11:32:09  sp
- * VFS file chooser is now in a minimally usable state
- *
- * Revision 1.1  2000/07/30 09:04:19  sp
- * More VFS browser hacking
- *
- */

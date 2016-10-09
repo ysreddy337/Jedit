@@ -25,20 +25,22 @@ import javax.swing.text.Segment;
 import javax.swing.tree.*;
 import javax.swing.SwingUtilities;
 import org.gjt.sp.jedit.io.VFSManager;
-import org.gjt.sp.jedit.jEdit;
 import org.gjt.sp.jedit.Buffer;
+import org.gjt.sp.jedit.GUIUtilities;
+import org.gjt.sp.jedit.jEdit;
 import org.gjt.sp.jedit.View;
 import org.gjt.sp.util.*;
 
 public class HyperSearchRequest extends WorkRequest
 {
 	public HyperSearchRequest(View view, SearchMatcher matcher,
-		DefaultTreeModel resultTreeModel)
+		HyperSearchResults results)
 	{
 		this.view = view;
 		this.matcher = matcher;
 
-		this.resultTreeModel = resultTreeModel;
+		this.results = results;
+		this.resultTreeModel = results.getTreeModel();
 		this.resultTreeRoot = (DefaultMutableTreeNode)resultTreeModel
 			.getRoot();
 	}
@@ -49,28 +51,28 @@ public class HyperSearchRequest extends WorkRequest
 		setProgressMaximum(fileset.getBufferCount());
 		setStatus(jEdit.getProperty("hypersearch.status"));
 
+		int resultCount = 0;
+		int bufferCount = 0;
+
 		try
 		{
 			int current = 0;
 
 			Buffer buffer = fileset.getFirstBuffer(view);
 
-			boolean retVal = false;
-
 			if(buffer != null)
 			{
 				do
 				{
 					setProgressValue(++current);
-					retVal |= doHyperSearch(buffer,matcher);
+					int thisResultCount = doHyperSearch(buffer,matcher);
+					if(thisResultCount != 0)
+					{
+						bufferCount++;
+						resultCount += thisResultCount;
+					}
 				}
 				while((buffer = fileset.getNextBuffer(view,buffer)) != null);
-			}
-
-			if(!retVal)
-			{
-				view.getToolkit().beep();
-				return;
 			}
 		}
 		catch(Exception e)
@@ -84,18 +86,33 @@ public class HyperSearchRequest extends WorkRequest
 		catch(WorkThread.Abort a)
 		{
 		}
+		finally
+		{
+			final int _resultCount = resultCount;
+			final int _bufferCount = bufferCount;
+			VFSManager.runInAWTThread(new Runnable()
+			{
+				public void run()
+				{
+					results.searchDone(_resultCount,_bufferCount);
+				}
+			});
+		}
 	}
 
 	// private members
 	private View view;
 	private SearchMatcher matcher;
+	private HyperSearchResults results;
 	private DefaultTreeModel resultTreeModel;
 	private DefaultMutableTreeNode resultTreeRoot;
 
-	private boolean doHyperSearch(Buffer buffer, SearchMatcher matcher)
+	private int doHyperSearch(Buffer buffer, SearchMatcher matcher)
 		throws Exception
 	{
 		setAbortable(false);
+
+		int resultCount = 0;
 
 		final DefaultMutableTreeNode bufferNode = new DefaultMutableTreeNode(
 			buffer.getPath());
@@ -129,6 +146,8 @@ loop:			for(;;)
 
 				line = newLine;
 
+				resultCount++;
+
 				bufferNode.insert(new DefaultMutableTreeNode(
 					new HyperSearchResult(buffer,line),false),
 					bufferNode.getChildCount());
@@ -139,21 +158,21 @@ loop:			for(;;)
 			buffer.readUnlock();
 		}
 
-		if(bufferNode.getChildCount() == 0)
-			return false;
-
-		SwingUtilities.invokeLater(new Runnable()
+		if(resultCount != 0)
 		{
-			public void run()
+			resultTreeRoot.insert(bufferNode,resultTreeRoot.getChildCount());
+
+			SwingUtilities.invokeLater(new Runnable()
 			{
-				resultTreeRoot.insert(bufferNode,
-					resultTreeRoot.getChildCount());
-				resultTreeModel.reload(resultTreeRoot);
-			}
-		});
+				public void run()
+				{
+					resultTreeModel.reload(resultTreeRoot);
+				}
+			});
+		}
 
 		setAbortable(true);
 
-		return true;
+		return resultCount;
 	}
 }

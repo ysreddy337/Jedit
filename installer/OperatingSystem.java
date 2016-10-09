@@ -1,6 +1,6 @@
 /*
  * OperatingSystem.java
- * Copyright (C) 1999, 2000 Slava Pestov
+ * Copyright (C) 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -52,8 +52,6 @@ public abstract class OperatingSystem
 		String osName = System.getProperty("os.name");
 		if(osName.indexOf("Windows") != -1)
 			os = new Windows();
-		else if(osName.indexOf("MacOS X") != -1)
-			os = new MacOSX();
 		else if(osName.indexOf("Mac") != -1)
 			os = new MacOS();
 		else if(osName.indexOf("OS/2") != -1)
@@ -64,7 +62,7 @@ public abstract class OperatingSystem
 		return os;
 	}
 
-	public static class MacOSX extends OperatingSystem
+	public static class MacOS extends OperatingSystem
 	{
 		public String getInstallDirectory(String name, String version)
 		{
@@ -100,20 +98,28 @@ public abstract class OperatingSystem
 			FileWriter out = new FileWriter(script);
 			out.write("#!/bin/sh\n");
 			out.write("# Java heap size, in megabytes (see doc/README.txt)\n");
-<<<<<<< HEAD
 			out.write("JAVA_HEAP_SIZE=32\n");
-=======
-			out.write("JAVA_HEAP_SIZE=16\n");
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 			out.write("exec "
 				+ System.getProperty("java.home")
 				+ "/bin/java -mx${JAVA_HEAP_SIZE}m ${"
-				+ name.toUpperCase()
-				+ "} -classpath \"${CLASSPATH}:"
-				+ installDir + File.separator
-				+ name.toLowerCase() + ".jar\" "
-				+ installer.getProperty("app.main.class")
-				+ " $@\n");
+				+ name.toUpperCase() + "} ");
+
+			String jar = installDir + File.separator
+				+ name.toLowerCase() + ".jar";
+
+			if(System.getProperty("java.version").compareTo("1.2") >= 0)
+			{
+				out.write("-jar \"" + jar + "\" ");
+			}
+			else
+			{
+				out.write("-classpath \"${CLASSPATH}:"
+					+ jar + "\" "
+					+ installer.getProperty("app.main.class"));
+			}
+
+			out.write(" $@\n");
+
 			out.close();
 
 			// Make it executable
@@ -155,42 +161,27 @@ public abstract class OperatingSystem
 			return "C:\\Program Files\\" + name + " " + version;
 		}
 
-		public String getShortcutDirectory(String name, String version)
-		{
-			return "C:\\Program Files\\" + name + " " + version;
-		}
-
 		public void createScript(Install installer,
 			String installDir, String binDir, String name)
 			throws IOException
 		{
-			// create app start script
-			String script = binDir + File.separatorChar
-				+ name + ".bat";
+			// run jEditLauncher installation
+			File executable = new File(installDir,"jedit.exe");
+			if(!executable.exists())
+				return;
 
-			FileWriter out = new FileWriter(script);
-			out.write("rem Java heap size, in megabytes (see doc/README.txt)\r\n");
-<<<<<<< HEAD
-			out.write("@set JAVA_HEAP_SIZE=32\r\n");
-=======
-			out.write("@set JAVA_HEAP_SIZE=16\r\n");
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
-			out.write("\"" + System.getProperty("java.home")
-				+ "\\bin\\java\" -mx%JAVA_HEAP_SIZE%m"
-				+ " -classpath \"%CLASSPATH%;"
-				+ installDir + File.separator
-				+ name.toLowerCase() + ".jar\" "
-				+ installer.getProperty("app.main.class")
-				+ " %1 %2 %3 %4 %5 %6 %7 %8 %9\r\n");
-			out.close();
-		}
-	}
+			String[] args = { executable.getPath(), "/i",
+				System.getProperty("java.home")
+				+ File.separator
+				+ "bin" };
 
-	public static class MacOS extends OperatingSystem
-	{
-		public String getInstallDirectory(String name, String version)
-		{
-			return name + " " + version;
+			try
+			{
+				Runtime.getRuntime().exec(args).waitFor();
+			}
+			catch(InterruptedException ie)
+			{
+			}
 		}
 	}
 

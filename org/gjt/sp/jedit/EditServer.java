@@ -1,6 +1,6 @@
 /*
  * EditServer.java - jEdit server
- * Copyright (C) 1999, 2000 Slava Pestov
+ * Copyright (C) 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,18 +23,30 @@ import javax.swing.SwingUtilities;
 import java.io.*;
 import java.net.*;
 import java.util.Random;
-import java.util.Vector;
 import org.gjt.sp.util.Log;
 
 /**
+ * The edit server protocol is very simple. <code>$HOME/.jedit/server</code>
+ * is an ASCII file containing two lines, the first being the port number,
+ * the second being the authorization key.<p>
+ *
+ * You connect to that port on the local machine, sending the authorization
+ * key as ASCII, followed by a newline, followed by a BeanShell script.
+ * Then close the socket and the BeanShell script will be executed by the
+ * server instance of jEdit.<p>
+ *
+ * The snippet is executed in the AWT thread. None of the usual BeanShell
+ * variables (view, buffer, textArea, editPane) are set so the script has to
+ * figure things out by itself.<p>
+ *
+ * In most cases, the script will call the static
+ * <code>EditServer.handleClient()</code> method, but of course more
+ * complicated stuff can be done too.
+ *
  * @author Slava Pestov
-<<<<<<< HEAD
- * @version $Id: EditServer.java,v 1.23 2001/04/22 04:32:31 sp Exp $
-=======
- * @version $Id: EditServer.java,v 1.20 2000/12/24 02:54:47 sp Exp $
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+ * @version $Id: EditServer.java,v 1.31 2001/08/01 07:37:11 sp Exp $
  */
-class EditServer extends Thread
+public class EditServer extends Thread
 {
 	EditServer(String portFile)
 	{
@@ -44,7 +56,10 @@ class EditServer extends Thread
 
 		try
 		{
-			socket = new ServerSocket(0); // Bind to any port
+			// Bind to any port on localhost; accept 2 simultaneous
+			// connection attempts before rejecting connections
+			socket = new ServerSocket(0, 2,
+				InetAddress.getByName("127.0.0.1"));
 			authKey = Math.abs(new Random().nextInt());
 			int port = socket.getLocalPort();
 
@@ -88,7 +103,9 @@ class EditServer extends Thread
 				Log.log(Log.MESSAGE,this,client + ": connected");
 
 				BufferedReader in = new BufferedReader(
-					new InputStreamReader(client.getInputStream()));
+					new InputStreamReader(
+					client.getInputStream(),
+					"UTF8"));
 
 				try
 				{
@@ -126,6 +143,65 @@ class EditServer extends Thread
 		}
 	}
 
+	/**
+	 * @param restore Ignored unless no views are open
+	 * @param parent The client's parent directory
+	 * @param args A list of files. Null entries are ignored, for convinience
+	 * @since jEdit 3.2pre7
+	 */
+	public static void handleClient(boolean restore, String parent,
+		String[] args)
+	{
+		String splitConfig = null;
+
+		boolean newView = jEdit.getBooleanProperty("client.newView");
+
+		// we have to deal with a huge range of possible border cases here.
+		if(jEdit.getFirstView() == null || newView)
+		{
+			// coming out of background mode.
+			// no views open.
+			// no buffers open if args empty.
+
+			Buffer buffer = jEdit.openFiles(null,parent,args);
+
+			if(restore)
+			{
+				if(jEdit.getFirstBuffer() == null)
+					splitConfig = jEdit.restoreOpenFiles();
+				else if(jEdit.getBooleanProperty("restore.cli"))
+				{
+					// no initial split config
+					jEdit.restoreOpenFiles();
+				}
+			}
+
+			// if session file is empty or -norestore specified,
+			// we need an initial buffer
+			if(jEdit.getFirstBuffer() == null)
+				buffer = jEdit.newFile(null);
+
+			if(splitConfig != null)
+				jEdit.newView(null,splitConfig);
+			else
+				jEdit.newView(null,buffer);
+		}
+		else
+		{
+			// no background mode, and reusing existing view
+			View view = jEdit.getFirstView();
+
+			jEdit.openFiles(view,parent,args);
+
+			view.requestFocus();
+			view.toFront();
+
+			// do not create a new view
+			return;
+		}
+	}
+
+	// package-private members
 	void stopServer()
 	{
 		stop();
@@ -138,214 +214,26 @@ class EditServer extends Thread
 	private int authKey;
 	private boolean ok;
 
-	// Thread-safe wrapper for jEdit.newView()
-	private void TSnewView(final Buffer buffer)
-	{
-		SwingUtilities.invokeLater(new Runnable() {
-			public void run()
-			{
-				View view = jEdit.newView(jEdit.getFirstView(),
-					buffer);
-				view.requestFocus();
-				view.toFront();
-			}
-		});
-	}
-
-	// Thread-safe wrapper for jEdit.newFile()
-	private Buffer TSnewFile()
-	{
-		final Buffer[] retVal = new Buffer[1];
-		try
-		{
-			SwingUtilities.invokeAndWait(new Runnable() {
-				public void run()
-				{
-					retVal[0] = jEdit.newFile(null);
-				}
-			});
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,this,e);
-		}
-		return retVal[0];
-	}
-
-	// Thread-safe wrapper for jEdit.openFile()
-	private Buffer TSopenFiles(final String parent, final String[] args)
-	{
-		final Buffer[] retVal = new Buffer[1];
-		try
-		{
-			SwingUtilities.invokeAndWait(new Runnable() {
-				public void run()
-				{
-					retVal[0] = jEdit.openFiles(parent,args);
-				}
-			});
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,this,e);
-		}
-		return retVal[0];
-	}
-
-	// Thread-safe wrapper for Sessions.loadSession()
-	private Buffer TSrestoreOpenFiles()
-	{
-		final Buffer[] retVal = new Buffer[0];
-		try
-		{
-			SwingUtilities.invokeAndWait(new Runnable() {
-				public void run()
-				{
-					retVal[0] = jEdit.restoreOpenFiles();
-				}
-			});
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,this,e);
-		}
-		return retVal[0];
-	}
-
-	// Thread-safe wrapper for View.setBuffer()
-	private void TSsetBuffer(final View view, final Buffer buffer)
-	{
-		SwingUtilities.invokeLater(new Runnable() {
-			public void run()
-			{
-				view.setBuffer(buffer);
-			}
-		});
-	}
-
-	private void handleClient(Socket client, BufferedReader in)
+	private void handleClient(Socket client, Reader in)
 		throws IOException
 	{
-		boolean readOnly = false;
-		boolean newView = false;
-		String parent = null;
-		boolean restore = jEdit.getBooleanProperty("restore");
-		boolean endOpts = false;
+		final StringBuffer script = new StringBuffer();
+		char[] buf = new char[1024];
+		int count;
 
-		View view = null;
-		Vector args = new Vector();
-
-		String command;
-		while((command = in.readLine()) != null)
+		while((count = in.read(buf,0,buf.length)) != -1)
 		{
-			if(endOpts)
-				args.addElement(command);
-			else
+			script.append(buf,0,count);
+		}
+
+		SwingUtilities.invokeLater(new Runnable()
+		{
+			public void run()
 			{
-				if(command.equals("--"))
-					endOpts = true;
-				else if(command.equals("readonly"))
-					readOnly = true;
-				else if(command.equals("newview"))
-					newView = true;
-				else if(command.startsWith("parent="))
-					parent = command.substring(7);
-				else if(command.startsWith("norestore"))
-					restore = false;
-				else
-				{
-					Log.log(Log.ERROR,this,client
-						+ ": unknown server"
-						+ " command: " + command);
-					in.close();
-					socket.close();
-					stopServer();
-				}
+				String scriptString = script.toString();
+				Log.log(Log.DEBUG,this,scriptString);
+				BeanShell.eval(null,scriptString,false);
 			}
-		}
-
-		String[] _args = new String[args.size()];
-		args.copyInto(_args);
-		Buffer buffer = TSopenFiles(parent,_args);
-
-		if(buffer == null && restore)
-			buffer = TSrestoreOpenFiles();
-
-		if(buffer == null)
-			buffer = TSnewFile();
-
-		// Create new view
-		if(!newView)
-			view = jEdit.getFirstView();
-
-		if(view != null)
-		{
-			TSsetBuffer(view,buffer);
-			view.requestFocus();
-			view.toFront();
-		}
-		else
-			TSnewView(buffer);
+		});
 	}
 }
-<<<<<<< HEAD
-=======
-
-/*
- * ChangeLog:
- * $Log: EditServer.java,v $
- * Revision 1.20  2000/12/24 02:54:47  sp
- * fixing bugs
- *
- * Revision 1.18  2000/11/29 06:53:00  sp
- * DSSSL syntax highlighting, documentation updates, bug fixes
- *
- * Revision 1.17  2000/10/28 00:36:58  sp
- * ML mode, Haskell mode
- *
- * Revision 1.16  2000/09/06 04:39:47  sp
- * bug fixes
- *
- * Revision 1.15  2000/08/20 07:29:30  sp
- * I/O and VFS browser improvements
- *
- * Revision 1.14  2000/06/12 02:43:29  sp
- * pre6 almost ready
- *
- * Revision 1.13  2000/04/29 03:07:37  sp
- * Indentation rules updated, VFS displays wait cursor properly, background mode
- *
- * Revision 1.12  2000/04/27 08:32:57  sp
- * VFS fixes, read only fixes, macros can prompt user for input, improved
- * backup directory feature
- *
- * Revision 1.11  2000/04/25 11:00:20  sp
- * FTP VFS hacking, some other stuff
- *
- * Revision 1.10  2000/04/21 05:32:20  sp
- * Focus tweak
- *
- * Revision 1.9  2000/03/20 03:42:55  sp
- * Smoother syntax package, opening an already open file will ask if it should be
- * reloaded, maybe some other changes
- *
- * Revision 1.8  2000/02/27 00:39:50  sp
- * Misc changes
- *
- * Revision 1.7  2000/02/20 03:14:13  sp
- * jEdit.getBrokenPlugins() method
- *
- * Revision 1.6  2000/02/03 04:53:48  sp
- * Bug fixes and small updates
- *
- * Revision 1.5  2000/01/21 00:35:29  sp
- * Various updates
- *
- * Revision 1.4  1999/10/31 07:15:34  sp
- * New logging API, splash screen updates, bug fixes
- *
- * Revision 1.3  1999/10/30 02:44:18  sp
- * Miscallaneous stuffs
- *
- */
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5

@@ -35,7 +35,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Color option pane.
  * @author Slava Pestov
- * @version $Id: ColorOptionPane.java,v 1.3 2001/01/25 02:03:37 sp Exp $
+ * @version $Id: ColorOptionPane.java,v 1.4 2001/04/24 06:52:13 sp Exp $
  */
 public class ColorOptionPane extends AbstractOptionPane
 {
@@ -110,7 +110,7 @@ class ColorTableModel extends AbstractTableModel
 
 	ColorTableModel()
 	{
-		colorChoices = new Vector(17);
+		colorChoices = new Vector(16);
 		addColorChoice("options.color.bgColor","view.bgColor");
 		addColorChoice("options.color.fgColor","view.fgColor");
 		addColorChoice("options.color.caretColor","view.caretColor");
@@ -134,8 +134,6 @@ class ColorTableModel extends AbstractTableModel
 			"view.gutter.currentLineColor");
 		addColorChoice("options.color.gutterMarkerColor",
 			"view.gutter.markerColor");
-		addColorChoice("options.color.gutterRegisterColor",
-			"view.gutter.registerColor");
 		addColorChoice("options.color.gutterFoldColor",
 			"view.gutter.foldColor");
 		addColorChoice("options.color.gutterFocusBorderColor",

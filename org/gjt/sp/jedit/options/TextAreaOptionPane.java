@@ -107,7 +107,29 @@ public class TextAreaOptionPane extends AbstractOptionPane
 		homeEnd.setSelected(jEdit.getBooleanProperty("view.homeEnd"));
 		addComponent(homeEnd);
 
-		
+		/* Middle mouse button click pastes % register */
+		middleMousePaste = new JCheckBox(jEdit.getProperty("options.textarea"
+			+ ".middleMousePaste"));
+		middleMousePaste.setSelected(jEdit.getBooleanProperty(
+			"view.middleMousePaste"));
+		addComponent(middleMousePaste);
+
+		/* Anti-aliasing */
+		antiAlias = new JCheckBox(jEdit.getProperty("options.textarea"
+			+ ".antiAlias"));
+		antiAlias.setSelected(jEdit.getBooleanProperty("view.antiAlias"));
+
+		/* Fractional font metrics */
+		fracFontMetrics = new JCheckBox(jEdit.getProperty("options.textarea"
+			+ ".fracFontMetrics"));
+		fracFontMetrics.setSelected(jEdit.getBooleanProperty(
+			"view.fracFontMetrics"));
+
+		if(System.getProperty("java.version").compareTo("1.2") >= 0)
+		{
+			addComponent(antiAlias);
+			addComponent(fracFontMetrics);
+		}
 	}
 
 	public void _save()
@@ -130,6 +152,10 @@ public class TextAreaOptionPane extends AbstractOptionPane
 		jEdit.setProperty("view.electricBorders",electricBorders
 			.isSelected() ? "3" : "0");
 		jEdit.setBooleanProperty("view.homeEnd",homeEnd.isSelected());
+		jEdit.setBooleanProperty("view.middleMousePaste",
+			middleMousePaste.isSelected());
+		jEdit.setBooleanProperty("view.antiAlias",antiAlias.isSelected());
+		jEdit.setBooleanProperty("view.fracFontMetrics",fracFontMetrics.isSelected());
 	}
 
 	// private members
@@ -142,27 +168,7 @@ public class TextAreaOptionPane extends AbstractOptionPane
 	private JCheckBox blockCaret;
 	private JCheckBox electricBorders;
 	private JCheckBox homeEnd;
+	private JCheckBox middleMousePaste;
+	private JCheckBox antiAlias;
+	private JCheckBox fracFontMetrics;
 }
-
-/*
- * Change Log:
- * $Log: TextAreaOptionPane.java,v $
- * Revision 1.5  2000/11/07 10:08:32  sp
- * Options dialog improvements, documentation changes, bug fixes
- *
- * Revision 1.4  2000/11/05 05:25:46  sp
- * Word wrap, format and remove-trailing-ws commands from TextTools moved into core
- *
- * Revision 1.3  2000/09/26 10:19:47  sp
- * Bug fixes, spit and polish
- *
- * Revision 1.2  2000/08/11 09:06:52  sp
- * Browser option pane
- *
- * Revision 1.1  2000/08/10 08:30:41  sp
- * VFS browser work, options dialog work, more random tweaks
- *
- * Revision 1.1  2000/08/05 07:16:12  sp
- * Global options dialog box updated, VFS browser now supports right-click menus
- *
- */

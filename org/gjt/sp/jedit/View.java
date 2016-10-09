@@ -25,12 +25,9 @@ import javax.swing.text.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.*;
 import org.gjt.sp.jedit.msg.*;
 import org.gjt.sp.jedit.gui.*;
-import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.search.SearchBar;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
@@ -41,11 +38,7 @@ import org.gjt.sp.util.Log;
  * class.
  *
  * @author Slava Pestov
-<<<<<<< HEAD
- * @version $Id: View.java,v 1.220 2001/04/18 03:09:44 sp Exp $
-=======
- * @version $Id: View.java,v 1.216 2001/01/22 10:39:26 sp Exp $
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+ * @version $Id: View.java,v 1.240 2001/08/18 08:37:02 sp Exp $
  */
 public class View extends JFrame implements EBComponent
 {
@@ -56,18 +49,6 @@ public class View extends JFrame implements EBComponent
 	public DockableWindowManager getDockableWindowManager()
 	{
 		return dockableWindowManager;
-	}
-
-	/**
-	 * Sets if the 'macro recording' message should be displayed.
-	 * @since jEdit 2.7pre1
-	 */
-	public void setRecordingStatus(boolean recording)
-	{
-		if(recording)
-			this.recording.setText(jEdit.getProperty("view.status.recording"));
-		else
-			this.recording.setText(null);
 	}
 
 	/**
@@ -82,8 +63,12 @@ public class View extends JFrame implements EBComponent
 			return;
 		}
 
+		String text = getTextArea().getSelectedText();
+		if(text != null && text.indexOf('\n') != -1)
+			text = null;
+
 		searchBar.setHyperSearch(false);
-		searchBar.getField().setText(getTextArea().getSelectedText());
+		searchBar.getField().setText(text);
 		searchBar.getField().selectAll();
 		searchBar.getField().requestFocus();
 	}
@@ -100,8 +85,12 @@ public class View extends JFrame implements EBComponent
 			return;
 		}
 
+		String text = getTextArea().getSelectedText();
+		if(text != null && text.indexOf('\n') != -1)
+			text = null;
+
 		searchBar.setHyperSearch(true);
-		searchBar.getField().setText(getTextArea().getSelectedText());
+		searchBar.getField().setText(text);
 		searchBar.getField().selectAll();
 		searchBar.getField().requestFocus();
 	}
@@ -168,6 +157,15 @@ public class View extends JFrame implements EBComponent
 	public void setMacroRecorder(Macros.Recorder recorder)
 	{
 		this.recorder = recorder;
+	}
+
+	/**
+	 * Returns the status bar.
+	 * @since jEdit 3.2pre2
+	 */
+	public StatusBar getStatus()
+	{
+		return status;
 	}
 
 	/**
@@ -392,6 +390,23 @@ public class View extends JFrame implements EBComponent
 	}
 
 	/**
+	 * Returns a string that can be passed to the view constructor to
+	 * recreate the current split configuration in a new view.
+	 * @since jEdit 3.2pre2
+	 */
+	public String getSplitConfig()
+	{
+		// this code isn't finished yet
+
+		StringBuffer splitConfig = new StringBuffer();
+		//if(splitPane != null)
+		//	getSplitConfig(splitPane,splitConfig);
+		//else
+			splitConfig.append(getBuffer().getPath());
+		return splitConfig.toString();
+	}
+
+	/**
 	 * Updates the borders of all gutters in this view to reflect the
 	 * currently focused text area.
 	 * @since jEdit 2.6final
@@ -568,8 +583,6 @@ public class View extends JFrame implements EBComponent
 	{
 		if(msg instanceof PropertiesChanged)
 			propertiesChanged();
-		else if(msg instanceof MacrosChanged)
-			updateMacrosMenu();
 		else if(msg instanceof SearchSettingsChanged)
 		{
 			if(searchBar != null)
@@ -577,26 +590,8 @@ public class View extends JFrame implements EBComponent
 		}
 		else if(msg instanceof BufferUpdate)
 			handleBufferUpdate((BufferUpdate)msg);
-	}
-
-	public JMenu getMenu(String name)
-	{
-		if(name.equals("recent-files"))
-			return recent;
-		else if(name.equals("current-directory"))
-			return currentDirectory;
-		else if(name.equals("clear-marker"))
-			return clearMarker;
-		else if(name.equals("goto-marker"))
-			return gotoMarker;
-		else if(name.equals("macros"))
-			return macros;
-		else if(name.equals("plugins"))
-			return plugins;
-		else if(name.equals("help-menu"))
-			return help;
-		else
-			return null;
+		else if(msg instanceof EditPaneUpdate)
+			handleEditPaneUpdate((EditPaneUpdate)msg);
 	}
 
 	/**
@@ -668,43 +663,18 @@ public class View extends JFrame implements EBComponent
 	View prev;
 	View next;
 
-	View(Buffer buffer)
+	View(Buffer buffer, String splitConfig)
 	{
 		setIconImage(GUIUtilities.getEditorIcon());
 
 		dockableWindowManager = new DockableWindowManager(this);
 
-		// Dynamic menus
-		recent = GUIUtilities.loadMenu(this,"recent-files");
-		currentDirectory = new CurrentDirectoryMenu(this);
-		clearMarker = GUIUtilities.loadMenu(this,"clear-marker");
-		gotoMarker = GUIUtilities.loadMenu(this,"goto-marker");
-		macros = GUIUtilities.loadMenu(this,"macros");
-		help = GUIUtilities.loadMenu(this,"help-menu");
-		plugins = GUIUtilities.loadMenu(this,"plugins");
-
-<<<<<<< HEAD
-		// finish persistent splits later
-		Component comp = restoreSplitConfig(buffer,"+");
-			/* jEdit.getProperty("view.splits") */;
+		Component comp = restoreSplitConfig(buffer,splitConfig);
 		dockableWindowManager.add(comp);
-=======
-		editPane = createEditPane(null,buffer);
-		dockableWindowManager.add(editPane);
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
-
-		updateMarkerMenus();
-		updateMacrosMenu();
-		updatePluginsMenu();
-		//updateHelpMenu();
 
 		EditBus.addToBus(this);
 
-		JMenuBar menuBar = GUIUtilities.loadMenuBar(this,"view.mbar");
-		menuBar.add(Box.createGlue());
-		menuBar.add(new MiniIOProgress());
-		menuBar.add(recording = new JLabel());
-		setJMenuBar(menuBar);
+		setJMenuBar(GUIUtilities.loadMenuBar("view.mbar"));
 
 		toolBars = new Box(BoxLayout.Y_AXIS);
 
@@ -715,21 +685,12 @@ public class View extends JFrame implements EBComponent
 
 		getContentPane().add(BorderLayout.NORTH,toolBars);
 		getContentPane().add(BorderLayout.CENTER,dockableWindowManager);
+		getContentPane().add(BorderLayout.SOUTH,status = new StatusBar(this));
 
 		setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 		addWindowListener(new WindowHandler());
 
 		dockableWindowManager.init();
-	}
-
-	void saveSplitConfig()
-	{
-		StringBuffer splitConfig = new StringBuffer();
-		if(splitPane != null)
-			saveSplitConfig(splitPane,splitConfig);
-		else
-			splitConfig.append('+');
-		jEdit.setProperty("view.splits",splitConfig.reverse().toString());
 	}
 
 	void close()
@@ -738,8 +699,6 @@ public class View extends JFrame implements EBComponent
 
 		// save dockable window geometry, and close 'em
 		dockableWindowManager.close();
-
-		saveSplitConfig();
 
 		GUIUtilities.saveGeometry(this,"view");
 		EditBus.removeFromBus(this);
@@ -751,8 +710,6 @@ public class View extends JFrame implements EBComponent
 
 		// null some variables so that retaining references
 		// to closed views won't hurt as much.
-		recent = currentDirectory = clearMarker
-			= gotoMarker = macros = plugins = help = null;
 		toolBars = null;
 		toolBar = null;
 		searchBar = null;
@@ -790,73 +747,10 @@ public class View extends JFrame implements EBComponent
 		setTitle(title.toString());
 	}
 
-	/**
-	 * Recreates the goto marker and clear marker menus.
-	 */
-	void updateMarkerMenus()
-	{
-		if(clearMarker.getMenuComponentCount() != 0)
-			clearMarker.removeAll();
-		if(gotoMarker.getMenuComponentCount() != 0)
-			gotoMarker.removeAll();
-
-		ActionListener clearMarkerAction = new ActionListener()
-		{
-			public void actionPerformed(ActionEvent evt)
-			{
-				Buffer buffer = getBuffer();
-				if(buffer.isReadOnly())
-					getToolkit().beep();
-				buffer.removeMarker(evt.getActionCommand());
-			}
-		};
-
-		ActionListener gotoMarkerAction = new ActionListener()
-		{
-			public void actionPerformed(ActionEvent evt)
-			{
-				JEditTextArea textArea = getTextArea();
-				Marker marker = getBuffer().getMarker(evt.getActionCommand());
-				if(marker != null)
-					textArea.select(marker.getStart(),marker.getEnd());
-			}
-		};
-
-		Vector markers = editPane.getBuffer().getMarkers();
-		if(markers.size() == 0)
-		{
-			clearMarker.add(GUIUtilities.loadMenuItem("no-markers"));
-			gotoMarker.add(GUIUtilities.loadMenuItem("no-markers"));
-			return;
-		}
-
-		for(int i = 0; i < markers.size(); i++)
-		{
-			String name = ((Marker)markers.elementAt(i)).getName();
-			JMenuItem menuItem = new JMenuItem(name);
-			menuItem.addActionListener(clearMarkerAction);
-			clearMarker.add(menuItem);
-
-			menuItem = new JMenuItem(name);
-			menuItem.addActionListener(gotoMarkerAction);
-			gotoMarker.add(menuItem);
-		}
-	}
-
 	// private members
 	private boolean closed;
 
 	private DockableWindowManager dockableWindowManager;
-
-	private JMenu recent;
-	private JMenu currentDirectory;
-	private JMenu clearMarker;
-	private JMenu gotoMarker;
-	private JMenu macros;
-	private JMenu plugins;
-	private JMenu help;
-
-	private JLabel recording;
 
 	private Box toolBars;
 	private JToolBar toolBar;
@@ -866,6 +760,8 @@ public class View extends JFrame implements EBComponent
 
 	private EditPane editPane;
 	private JSplitPane splitPane;
+
+	private StatusBar status;
 
 	private KeyListener keyEventInterceptor;
 	private InputHandler inputHandler;
@@ -889,62 +785,76 @@ public class View extends JFrame implements EBComponent
 
 	/*
 	 * The split config is recorded in a simple RPN "language":
-	 * + pushes a new edit pane onto the stack
-	 * - pops the two topmost elements off the stack, creates a
+	 * "vertical" pops the two topmost elements off the stack, creates a
 	 * vertical split
-	 * | pops the two topmost elements off the stack, creates a
+	 * "horizontal" pops the two topmost elements off the stack, creates a
 	 * horizontal split
-	 *
-	 * Note that after saveSplitConfig() is called, we have to
-	 * reverse the RPN "program" because this method appends
-	 * stuff to the end, so the bottom-most nodes end up at the
-	 * end
+	 * A path name creates an edit pane editing that buffer
 	 */
-	private void saveSplitConfig(JSplitPane splitPane,
+	private void getSplitConfig(JSplitPane splitPane,
 		StringBuffer splitConfig)
 	{
-		splitConfig.append(splitPane.getOrientation()
-			== JSplitPane.VERTICAL_SPLIT ? '-' : '|');
-
 		Component left = splitPane.getLeftComponent();
 		if(left instanceof JSplitPane)
-			saveSplitConfig((JSplitPane)left,splitConfig);
+			getSplitConfig((JSplitPane)left,splitConfig);
 		else
-			splitConfig.append('+');
+		{
+			splitConfig.append('\t');
+			splitConfig.append(((EditPane)left).getBuffer().getPath());
+		}
 
-		Component right = splitPane.getLeftComponent();
+		Component right = splitPane.getRightComponent();
 		if(right instanceof JSplitPane)
-			saveSplitConfig((JSplitPane)right,splitConfig);
+			getSplitConfig((JSplitPane)right,splitConfig);
 		else
-			splitConfig.append('+');
+		{
+			splitConfig.append('\t');
+			splitConfig.append(((EditPane)right).getBuffer().getPath());
+		}
+
+		splitConfig.append(splitPane.getOrientation()
+			== JSplitPane.VERTICAL_SPLIT ? "\tvertical" : "\thorizontal");
 	}
 
 	private Component restoreSplitConfig(Buffer buffer, String splitConfig)
 	{
+		if(buffer != null)
+			return (editPane = createEditPane(buffer));
+		else if(splitConfig == null)
+			return (editPane = createEditPane(jEdit.getFirstBuffer()));
+
 		Stack stack = new Stack();
 
-		for(int i = 0; i < splitConfig.length(); i++)
+		StringTokenizer st = new StringTokenizer(splitConfig,"\t");
+
+		while(st.hasMoreTokens())
 		{
-			switch(splitConfig.charAt(i))
+			String token = st.nextToken();
+			if(token.equals("vertical"))
 			{
-			case '+':
-				stack.push(editPane = createEditPane(buffer));
-				editPane.loadCaretInfo();
-				break;
-			case '-':
 				stack.push(splitPane = new JSplitPane(
 					JSplitPane.VERTICAL_SPLIT,
 					(Component)stack.pop(),
 					(Component)stack.pop()));
 				splitPane.setBorder(null);
-				break;
-			case '|':
+				splitPane.setDividerLocation(0.5);
+			}
+			else if(token.equals("horizontal"))
+			{
 				stack.push(splitPane = new JSplitPane(
 					JSplitPane.HORIZONTAL_SPLIT,
 					(Component)stack.pop(),
 					(Component)stack.pop()));
 				splitPane.setBorder(null);
-				break;
+				splitPane.setDividerLocation(0.5);
+			}
+			else
+			{
+				buffer = jEdit.getBuffer(token);
+				if(buffer == null)
+					buffer = jEdit.getFirstBuffer();
+
+				stack.push(editPane = createEditPane(buffer));
 			}
 		}
 
@@ -961,9 +871,9 @@ public class View extends JFrame implements EBComponent
 		showFullPath = jEdit.getBooleanProperty("view.showFullPath");
 		updateTitle();
 
-		updateRecentMenu();
-
 		dockableWindowManager.propertiesChanged();
+
+		SwingUtilities.updateComponentTreeUI(getRootPane());
 	}
 
 	private void loadToolBars()
@@ -1005,241 +915,24 @@ public class View extends JFrame implements EBComponent
 		EditPane editPane = new EditPane(this,buffer);
 		JEditTextArea textArea = editPane.getTextArea();
 		textArea.addFocusListener(new FocusHandler());
+		textArea.addCaretListener(new CaretHandler());
+		textArea.addScrollListener(new ScrollHandler());
 		EditBus.send(new EditPaneUpdate(editPane,EditPaneUpdate.CREATED));
 		return editPane;
 	}
 
 	private void setEditPane(EditPane editPane)
 	{
-		EditPane oldPane = this.editPane;
 		this.editPane = editPane;
-		if(oldPane.getBuffer() != editPane.getBuffer())
-			updateMarkerMenus();
+		status.repaintCaretStatus();
+		status.updateBufferStatus();
+		status.updateMiscStatus();
 	}
-
-	/**
-	 * Recreates the recent menu.
-	 */
-	private void updateRecentMenu()
-	{
-		if(recent.getMenuComponentCount() != 0)
-			recent.removeAll();
-		ActionListener listener = new ActionListener()
-		{
-			public void actionPerformed(ActionEvent evt)
-			{
-				jEdit.openFile(View.this,evt.getActionCommand());
-			}
-		};
-
-		Vector recentVector = BufferHistory.getBufferHistory();
-		if(recentVector.size() == 0)
-		{
-			recent.add(GUIUtilities.loadMenuItem("no-recent"));
-			return;
-		}
-
-		for(int i = 0; i < recentVector.size(); i++)
-		{
-			String path = ((BufferHistory.Entry)recentVector
-				.elementAt(i)).path;
-			VFS vfs = VFSManager.getVFSForPath(path);
-			JMenuItem menuItem = new JMenuItem(
-				vfs.getFileName(path) + " ("
-				+ vfs.getParentOfPath(path) + ")");
-			menuItem.setActionCommand(path);
-			menuItem.addActionListener(listener);
-			recent.add(menuItem);
-		}
-	}
-
-	/**
-	 * Recreates the macros menu.
-	 */
-	private void updateMacrosMenu()
-	{
-		// Because the macros menu contains normal items as
-		// well as dynamically-generated stuff, we are careful
-		// to only remove the dynamic crap here...
-		for(int i = macros.getMenuComponentCount() - 1; i >= 0; i--)
-		{
-			if(macros.getMenuComponent(i) instanceof JSeparator)
-				break;
-			else
-				macros.remove(i);
-		}
-
-		int count = macros.getMenuComponentCount();
-
-		Vector macroVector = Macros.getMacroHierarchy();
-		createMacrosMenu(macros,macroVector,0);
-
-		if(count == macros.getMenuComponentCount())
-			macros.add(GUIUtilities.loadMenuItem("no-macros"));
-	}
-
-	private void createMacrosMenu(JMenu menu, Vector vector, int start)
-	{
-		for(int i = start; i < vector.size(); i++)
-		{
-			Object obj = vector.elementAt(i);
-			if(obj instanceof Macros.Macro)
-			{
-				Macros.Macro macro = (Macros.Macro)obj;
-				String label = macro.name;
-				int index = label.lastIndexOf('/');
-				label = label.substring(index + 1)
-					.replace('_',' ');
-
-				menu.add(new EnhancedMenuItem(label,
-					macro.action));
-			}
-			else if(obj instanceof Vector)
-			{
-				Vector subvector = (Vector)obj;
-				String name = (String)subvector.elementAt(0);
-				JMenu submenu = new JMenu(name);
-				createMacrosMenu(submenu,subvector,1);
-				if(submenu.getMenuComponentCount() == 0)
-				{
-					submenu.add(GUIUtilities.loadMenuItem(
-						"no-macros"));
-				}
-				menu.add(submenu);
-			}
-		}
-	}
-
-	/**
-	 * Recreates the plugins menu.
-	 */
-	private void updatePluginsMenu()
-	{
-		if(plugins.getMenuComponentCount() != 0)
-			plugins.removeAll();
-
-		// Query plugins for menu items
-		Vector pluginMenuItems = new Vector();
-
-		EditPlugin[] pluginArray = jEdit.getPlugins();
-		for(int i = 0; i < pluginArray.length; i++)
-		{
-			try
-			{
-				EditPlugin plugin = pluginArray[i];
-
-				// major hack to put 'Plugin Manager' at the
-				// top of the 'Plugins' menu
-				if(plugin.getClassName().equals("PluginManagerPlugin"))
-				{
-					Vector vector = new Vector();
-					plugin.createMenuItems(vector);
-					plugins.add((JMenuItem)vector.elementAt(0));
-					plugins.addSeparator();
-				}
-				else
-				{
-					// call old API
-					plugin.createMenuItems(this,pluginMenuItems,
-						pluginMenuItems);
-
-					// call new API
-					plugin.createMenuItems(pluginMenuItems);
-				}
-			}
-			catch(Throwable t)
-			{
-				Log.log(Log.ERROR,this,"Error creating menu items"
-					+ " for plugin");
-				Log.log(Log.ERROR,this,t);
-			}
-		}
-
-		if(pluginMenuItems.isEmpty())
-		{
-			plugins.add(GUIUtilities.loadMenuItem("no-plugins"));
-			return;
-		}
-
-		// Sort them
-		MiscUtilities.quicksort(pluginMenuItems,
-			new MiscUtilities.MenuItemCompare());
-
-		JMenu menu = plugins;
-		for(int i = 0; i < pluginMenuItems.size(); i++)
-		{
-			if(menu.getItemCount() >= 20)
-			{
-				menu.addSeparator();
-				JMenu newMenu = new JMenu(jEdit.getProperty(
-					"common.more"));
-				menu.add(newMenu);
-				menu = newMenu;
-			}
-
-			menu.add((JMenuItem)pluginMenuItems.elementAt(i));
-		}
-	}
-
-	/* private void updateHelpMenu()
-	{
-		ActionListener listener = new ActionListener()
-		{
-			public void actionPerformed(ActionEvent evt)
-			{
-				new HelpViewer(evt.getActionCommand());
-			}
-		};
-
-		JMenu menu = help;
-
-		EditPlugin[] plugins = jEdit.getPlugins();
-		for(int i = 0; i < plugins.length; i++)
-		{
-			EditPlugin plugin = plugins[i];
-			EditPlugin.JAR jar = plugin.getJAR();
-			if(jar == null)
-				continue;
-
-			String name = plugin.getClassName();
-
-			String docs = jEdit.getProperty("plugin." + name + ".docs");
-			String label = jEdit.getProperty("plugin." + name + ".name");
-			if(docs != null)
-			{
-				if(label != null && docs != null)
-				{
-					java.net.URL url = jar.getClassLoader()
-						.getResource(docs);
-					if(url != null)
-					{
-						if(menu.getItemCount() >= 20)
-						{
-							menu.addSeparator();
-							JMenu newMenu = new JMenu(
-								jEdit.getProperty(
-								"common.more"));
-							menu.add(newMenu);
-							menu = newMenu;
-						}
-
-						JMenuItem menuItem = new JMenuItem(label);
-						menuItem.setActionCommand(url.toString());
-						menuItem.addActionListener(listener);
-						menu.add(menuItem);
-					}
-				}
-			}
-		}
-	} */
 
 	private void handleBufferUpdate(BufferUpdate msg)
 	{
 		Buffer buffer = msg.getBuffer();
-		if(msg.getWhat() == BufferUpdate.CLOSED)
-			updateRecentMenu();
-		else if(msg.getWhat() == BufferUpdate.DIRTY_CHANGED
-			|| msg.getWhat() == BufferUpdate.LOADED)
+		if(msg.getWhat() == BufferUpdate.DIRTY_CHANGED)
 		{
 			if(!buffer.isDirty())
 			{
@@ -1256,10 +949,26 @@ public class View extends JFrame implements EBComponent
 				}
 			}
 		}
-		else if(msg.getWhat() == BufferUpdate.MARKERS_CHANGED)
+	}
+
+	private void handleEditPaneUpdate(EditPaneUpdate msg)
+	{
+		if(msg.getEditPane().getView() == this
+			&& msg.getWhat() == EditPaneUpdate.BUFFER_CHANGED)
 		{
-			if(buffer == getBuffer())
-				updateMarkerMenus();
+			status.repaintCaretStatus();
+			status.updateBufferStatus();
+			status.updateMiscStatus();
+			status.updateFoldStatus();
+		}
+	}
+
+	class CaretHandler implements CaretListener
+	{
+		public void caretUpdate(CaretEvent evt)
+		{
+			status.repaintCaretStatus();
+			status.updateMiscStatus();
 		}
 	}
 
@@ -1281,6 +990,17 @@ public class View extends JFrame implements EBComponent
 		}
 	}
 
+	class ScrollHandler implements ScrollListener
+	{
+		public void scrolledVertically(JEditTextArea textArea)
+		{
+			if(getTextArea() == textArea)
+				status.repaintCaretStatus();
+		}
+
+		public void scrolledHorizontally(JEditTextArea textArea) {}
+	}
+
 	class WindowHandler extends WindowAdapter
 	{
 		boolean gotFocus;
@@ -1293,7 +1013,32 @@ public class View extends JFrame implements EBComponent
 				gotFocus = true;
 			}
 
-			editPane.getBuffer().checkModTime(View.this);
+			final Vector buffers = new Vector();
+			EditPane[] editPanes = getEditPanes();
+			for(int i = 0; i < editPanes.length; i++)
+			{
+				Buffer buffer = ((EditPane)editPanes[i])
+					.getBuffer();
+				if(buffers.contains(buffer))
+					continue;
+				else
+					buffers.addElement(buffer);
+			}
+
+			// People have reported hangs with JDK 1.4; might be
+			// caused by modal dialogs being displayed from
+			// windowActivated()
+			SwingUtilities.invokeLater(new Runnable()
+			{
+				public void run()
+				{
+					for(int i = 0; i < buffers.size(); i++)
+					{
+						((Buffer)buffers.elementAt(i))
+							.checkModTime(View.this);
+					}
+				}
+			});
 		}
 
 		public void windowClosing(WindowEvent evt)

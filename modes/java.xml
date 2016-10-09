@@ -13,8 +13,7 @@
 		<PROPERTY NAME="doubleBracketIndent" VALUE="false" />
 		<PROPERTY NAME="commentStart" VALUE="/*" />
 		<PROPERTY NAME="commentEnd" VALUE="*/" />
-		<PROPERTY NAME="boxComment" VALUE="*" />
-		<PROPERTY NAME="blockComment" VALUE="//" />
+		<PROPERTY NAME="lineComment" VALUE="//" />
 		<PROPERTY NAME="noWordSep" VALUE="_" />
 		<PROPERTY NAME="wordBreakChars" VALUE=",+-=&lt;&gt;/?^&amp;*" />
 	</PROPS>
@@ -59,7 +58,7 @@
 		<SEQ TYPE="OPERATOR">/</SEQ>
 
 		<!-- workaround to stop "*" from being colorized
-		  -- in import statements. -->
+		     in import statements. -->
 		<SEQ TYPE="NULL">.*</SEQ>
 
 		<SEQ TYPE="OPERATOR">*</SEQ>
@@ -137,10 +136,13 @@
 			<LITERAL2>super</LITERAL2>
 			<LITERAL2>this</LITERAL2>
 			<LITERAL2>true</LITERAL2>
+
+			<INVALID>goto</INVALID>
+			<INVALID>const</INVALID>
 		</KEYWORDS>
 	</RULES>
 
-	<RULES SET="JAVADOC" DEFAULT="COMMENT2">
+	<RULES SET="JAVADOC" DEFAULT="COMMENT2" IGNORE_CASE="TRUE">
 		<!-- whitespace: (space and tab) -->
 		<WHITESPACE> </WHITESPACE>
 		<WHITESPACE>	</WHITESPACE>
@@ -150,6 +152,18 @@
 
 		<!-- so that *@param is highlighted -->
 		<SEQ TYPE="COMMENT2">*</SEQ>
+
+		<!-- Javadoc ignores tags inside <pre> -->
+		<SPAN TYPE="MARKUP" DELEGATE="JAVADOC_PRE">
+			<BEGIN>&lt;pre&gt;</BEGIN>
+			<END>&lt;/pre&gt;</END>
+		</SPAN>
+
+		<!-- HTML comments -->
+		<SPAN TYPE="COMMENT1">
+			<BEGIN>&lt;!--</BEGIN>
+			<END>--&gt;</END>
+		</SPAN>
 
 		<!-- HTML tags -->
 		<SPAN TYPE="MARKUP" DELEGATE="xml::TAGS">
@@ -198,6 +212,9 @@
 			<LABEL>@since</LABEL>
 			<LABEL>@throws</LABEL>
 			<LABEL>@version</LABEL>
+			<LABEL>@spec</LABEL>
 		</KEYWORDS>
 	</RULES>
+
+	<RULES SET="JAVADOC_PRE" DEFAULT="COMMENT2" />
 </MODE>

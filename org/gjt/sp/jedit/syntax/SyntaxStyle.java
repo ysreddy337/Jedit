@@ -1,6 +1,6 @@
 /*
  * SyntaxStyle.java - A simple text style class
- * Copyright (C) 1999 Slava Pestov
+ * Copyright (C) 1999, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,20 +18,14 @@
  */
 package org.gjt.sp.jedit.syntax;
 
-import java.lang.reflect.Method;
-import java.awt.*;
-import java.util.StringTokenizer;
-import org.gjt.sp.util.Log;
+import java.awt.Font;
+import java.awt.Color;
 
 /**
  * A simple text style class. It can specify the color, italic flag,
  * and bold flag of a run of text.
  * @author Slava Pestov
-<<<<<<< HEAD
- * @version $Id: SyntaxStyle.java,v 1.9 2001/01/29 09:19:34 sp Exp $
-=======
- * @version $Id: SyntaxStyle.java,v 1.8 2001/01/22 05:35:08 sp Exp $
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+ * @version $Id: SyntaxStyle.java,v 1.12 2001/07/15 09:55:14 sp Exp $
  */
 public class SyntaxStyle
 {
@@ -39,15 +33,13 @@ public class SyntaxStyle
 	 * Creates a new SyntaxStyle.
 	 * @param fgColor The text color
 	 * @param bgColor The background color
-	 * @param italic True if the text should be italics
-	 * @param bold True if the text should be bold
+	 * @param font The text font
 	 */
-	public SyntaxStyle(Color fgColor, Color bgColor, boolean italic, boolean bold)
+	public SyntaxStyle(Color fgColor, Color bgColor, Font font)
 	{
 		this.fgColor = fgColor;
 		this.bgColor = bgColor;
-		this.italic = italic;
-		this.bold = bold;
+		this.font = font;
 	}
 
 	/**
@@ -67,121 +59,15 @@ public class SyntaxStyle
 	}
 
 	/**
-	 * Returns true if no font styles are enabled.
+	 * Returns the style font.
 	 */
-	public boolean isPlain()
+	public Font getFont()
 	{
-		return !(bold || italic);
-	}
-
-	/**
-	 * Returns true if italics is enabled for this style.
-	 */
-	public boolean isItalic()
-	{
-		return italic;
-	}
-
-	/**
-	 * Returns true if boldface is enabled for this style.
-	 */
-	public boolean isBold()
-	{
-		return bold;
-	}
-
-	/**
-	 * Returns the specified font, but with the style's bold and
-	 * italic flags applied.
-	 */
-	public Font getStyledFont(Font font)
-	{
-		if(font == null)
-			throw new NullPointerException("font param must not"
-				+ " be null");
-
-		if(font.equals(lastFont))
-			return lastStyledFont;
-		lastFont = font;
-
-		int style = (bold ? Font.BOLD : 0)
-			| (italic ? Font.ITALIC : 0);
-
-		if(method == null)
-		{
-			lastStyledFont = new Font(font.getFamily(),style,
-				font.getSize());
-		}
-		else
-		{
-			Object[] args = { new Integer(style) };
-			try
-			{
-				lastStyledFont = (Font)method.invoke(font,args);
-			}
-			catch(Exception e)
-			{
-				e.printStackTrace();
-				return null;
-			}
-		}
-
-		return lastStyledFont;
-	}
-
-	/**
-	 * Returns the font metrics for the styled font.
-	 */
-	public FontMetrics getFontMetrics(Font font)
-	{
-		if(font == null)
-			throw new NullPointerException("font param must not"
-				+ " be null");
-		if(font.equals(lastFont) && fontMetrics != null)
-			return fontMetrics;
-		lastFont = font;
-		lastStyledFont = new Font(font.getFamily(),
-			(bold ? Font.BOLD : 0)
-			| (italic ? Font.ITALIC : 0),
-			font.getSize());
-		fontMetrics = Toolkit.getDefaultToolkit().getFontMetrics(
-			lastStyledFont);
-		return fontMetrics;
-	}
-
-	/**
-	 * Returns a string representation of this object.
-	 */
-	public String toString()
-	{
-		return getClass().getName() + "[fgColor=" + fgColor +
-			((bgColor == null) ? "" : ",bgColor=" + bgColor) +
-			(italic ? ",italic" : "") +
-			(bold ? ",bold" : "") + "]";
+		return font;
 	}
 
 	// private members
 	private Color fgColor;
 	private Color bgColor;
-	private boolean italic;
-	private boolean bold;
-	private Font lastFont;
-	private Font lastStyledFont;
-	private FontMetrics fontMetrics;
-	private static Method method;
-
-	static
-	{
-		try
-		{
-			// try Java 1.2 code
-			method = Font.class.getMethod("deriveFont",
-				new Class[] { int.class });
-			Log.log(Log.DEBUG,SyntaxStyle.class,"deriveFont() available");
-		}
-		catch(Exception e)
-		{
-			// use Java 1.1 code
-		}
-	}
+	private Font font;
 }

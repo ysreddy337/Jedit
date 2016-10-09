@@ -32,7 +32,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Wraps the VFS browser in a modal dialog.
  * @author Slava Pestov
- * @version $Id: VFSFileChooserDialog.java,v 1.20 2001/04/18 03:09:45 sp Exp $
+ * @version $Id: VFSFileChooserDialog.java,v 1.24 2001/08/04 02:18:20 sp Exp $
  */
 public class VFSFileChooserDialog extends EnhancedDialog
 {
@@ -69,6 +69,7 @@ public class VFSFileChooserDialog extends EnhancedDialog
 		filenameField = new JTextField(20);
 		filenameField.setText(name);
 		filenameField.addKeyListener(new KeyHandler());
+		filenameField.selectAll();
 		Dimension dim = filenameField.getPreferredSize();
 		dim.width = Integer.MAX_VALUE;
 		filenameField.setMaximumSize(dim);
@@ -120,29 +121,16 @@ public class VFSFileChooserDialog extends EnhancedDialog
 	{
 		VFS.DirectoryEntry[] files = browser.getSelectedFiles();
 
+		String directory = browser.getDirectory();
+
 		if(files.length == 0)
 		{
-			String directory = browser.getDirectory();
-
 			filename = filenameField.getText();
 
 			if(filename.length() == 0)
 			{
 				getToolkit().beep();
 				return;
-			}
-			else if(MiscUtilities.isURL(filename))
-				return;
-			else
-			{
-				VFS vfs = VFSManager.getVFSForPath(directory);
-				filename = vfs.constructPath(directory,filename);
-
-				if(browser.getMode() == VFSBrowser.SAVE_DIALOG)
-				{
-					if(vfs instanceof FileVFS && doFileExistsWarning(filename))
-						return;
-				}
 			}
 		}
 		else
@@ -156,7 +144,18 @@ public class VFSFileChooserDialog extends EnhancedDialog
 					browser.setDirectory(file.path);
 					return;
 				}
+				else if(browser.getMode() == VFSBrowser.SAVE_DIALOG)
+					filename = file.path;
 			}
+		}
+
+		if(browser.getMode() == VFSBrowser.SAVE_DIALOG)
+		{
+			VFS vfs = VFSManager.getVFSForPath(directory);
+			filename = vfs.constructPath(directory,filename);
+
+			if(vfs instanceof FileVFS && doFileExistsWarning(filename))
+				return;
 		}
 
 		isOK = true;

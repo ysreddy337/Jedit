@@ -30,11 +30,7 @@ import org.gjt.sp.jedit.*;
  * A container for dockable windows. This class should never be used
  * directly.
  * @author Slava Pestov
-<<<<<<< HEAD
  * @version $Id: DockableWindowContainer.java,v 1.21 2001/04/18 03:09:45 sp Exp $
-=======
- * @version $Id: DockableWindowContainer.java,v 1.18 2001/01/22 05:35:08 sp Exp $
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
  * @since jEdit 2.6pre3
  */
 public interface DockableWindowContainer
@@ -50,11 +46,7 @@ public interface DockableWindowContainer
 	 */
 	public class TabbedPane extends JTabbedPane implements DockableWindowContainer
 	{
-<<<<<<< HEAD
 		public static final int SPLITTER_WIDTH = 10;
-=======
-		public static final int SPLITTER_WIDTH = 5;
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
 		String position;
 		int dimension;
@@ -98,11 +90,7 @@ public interface DockableWindowContainer
 				return;
 
 			if(dimension <= SPLITTER_WIDTH)
-<<<<<<< HEAD
 				dimension = -1;
-=======
-				collapsed = true;
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
 			this.collapsed = collapsed;
 			revalidate();
@@ -115,12 +103,6 @@ public interface DockableWindowContainer
 
 		public void saveDimension()
 		{
-<<<<<<< HEAD
-=======
-			if(dimension <= SPLITTER_WIDTH)
-				dimension = -1;
-
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 			jEdit.setProperty("view.dock." + position + ".dimension",
 				String.valueOf(dimension));
 			jEdit.setBooleanProperty("view.dock." + position
@@ -129,22 +111,7 @@ public interface DockableWindowContainer
 
 		public void propertiesChanged()
 		{
-<<<<<<< HEAD
 			setBorder(new DockBorder(position));
-=======
-			int top = position.equals(DockableWindowManager.BOTTOM)
-				? SPLITTER_WIDTH : 0;
-			int left = position.equals(DockableWindowManager.RIGHT)
-				? SPLITTER_WIDTH : 0;
-			int bottom = position.equals(DockableWindowManager.TOP)
-				? SPLITTER_WIDTH : 0;
-			int right = position.equals(DockableWindowManager.LEFT)
-				? SPLITTER_WIDTH : 0;
-
-			setBorder(new MatteBorder(top,left,bottom,right,
-				GUIUtilities.parseColor(jEdit.getProperty(
-				"view.docking.borderColor"))));
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 
 			int tabsPos = Integer.parseInt(jEdit.getProperty(
 				"view.docking.tabsPos"));

@@ -37,11 +37,7 @@ import org.gjt.sp.util.Log;
 /**
  * The main class of the VFS browser.
  * @author Slava Pestov
-<<<<<<< HEAD
- * @version $Id: VFSBrowser.java,v 1.41 2001/04/18 03:09:45 sp Exp $
-=======
- * @version $Id: VFSBrowser.java,v 1.35 2001/01/22 05:35:08 sp Exp $
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+ * @version $Id: VFSBrowser.java,v 1.46 2001/07/12 05:06:52 sp Exp $
  */
 public class VFSBrowser extends JPanel implements EBComponent, DockableWindow
 {
@@ -132,7 +128,12 @@ public class VFSBrowser extends JPanel implements EBComponent, DockableWindow
 		filterCheckbox.setBorder(new EmptyBorder(0,0,0,12));
 		filterCheckbox.setSelected(mode != BROWSER ||
 			jEdit.getBooleanProperty("vfs.browser.filter-enabled"));
-		filterCheckbox.setForeground(UIManager.getColor("Label.foreground"));
+
+		// we ensure that the foreground color is not an UIResource
+		// so that updateUI() does not reset the color back to the
+		// default...
+		filterCheckbox.setForeground(new Color(
+			UIManager.getColor("Label.foreground").getRGB()));
 		filterCheckbox.addActionListener(actionHandler);
 		cons.gridx = 0;
 		cons.weightx = 0.0f;
@@ -208,6 +209,8 @@ public class VFSBrowser extends JPanel implements EBComponent, DockableWindow
 				else
 					path = pathModel.getItem(0);
 			}
+			else if(defaultPath.equals("favorites"))
+				path = "favorites:";
 			else
 			{
 				// unknown value??!!!
@@ -460,14 +463,33 @@ public class VFSBrowser extends JPanel implements EBComponent, DockableWindow
 		this.showHiddenFiles = showHiddenFiles;
 	}
 
-	public RE getFilenameFilter()
+	/**
+	 * Returns the file name filter glob.
+	 * @since jEdit 3.2pre2
+	 */
+	public String getFilenameFilter()
 	{
-		return filenameFilter;
+		if(filterCheckbox.isSelected())
+		{
+			String filter = filterField.getText();
+			if(filter.length() == 0)
+				return "*";
+			else
+				return filter;
+		}
+		else
+			return "*";
 	}
 
-	public void setFilenameFilter(RE filenameFilter)
+	public void setFilenameFilter(String filter)
 	{
-		this.filenameFilter = filenameFilter;
+		if(filter == null || filter.length() == 0 || filter.equals("*"))
+			filterCheckbox.setSelected(false);
+		else
+		{
+			filterCheckbox.setSelected(true);
+			filterField.setText(filter);
+		}
 	}
 
 	public BrowserView getBrowserView()
@@ -722,41 +744,15 @@ public class VFSBrowser extends JPanel implements EBComponent, DockableWindow
 
 	private void propertiesChanged()
 	{
-		// only reload browser if necessary, to avoid annoying
-		// 'flickering'
-		boolean newShowHiddenFiles = jEdit.getBooleanProperty("vfs.browser.showHiddenFiles");
-		boolean newSortFiles = jEdit.getBooleanProperty("vfs.browser.sortFiles");
-		boolean newSortMixFilesAndDirs = jEdit.getBooleanProperty("vfs.browser.sortMixFilesAndDirs");
-		boolean newSortIgnoreCase = jEdit.getBooleanProperty("vfs.browser.sortIgnoreCase");
+		showHiddenFiles = jEdit.getBooleanProperty("vfs.browser.showHiddenFiles");
+		sortFiles = jEdit.getBooleanProperty("vfs.browser.sortFiles");
+		sortMixFilesAndDirs = jEdit.getBooleanProperty("vfs.browser.sortMixFilesAndDirs");
+		sortIgnoreCase = jEdit.getBooleanProperty("vfs.browser.sortIgnoreCase");
 		doubleClickClose = jEdit.getBooleanProperty("vfs.browser.doubleClickClose");
 
-		boolean reload = false;
+		browserView.propertiesChanged();
 
-		if(newShowHiddenFiles != showHiddenFiles)
-		{
-			showHiddenFiles = newShowHiddenFiles;
-			reload = true;
-		}
-
-		if(newSortFiles != sortFiles)
-		{
-			sortFiles = newSortFiles;
-			reload = true;
-		}
-
-		if(newSortMixFilesAndDirs != sortMixFilesAndDirs)
-		{
-			sortMixFilesAndDirs = newSortMixFilesAndDirs;
-			reload = true;
-		}
-
-		if(newSortIgnoreCase != sortIgnoreCase)
-		{
-			sortIgnoreCase = newSortIgnoreCase;
-			reload = true;
-		}
-
-		if(path != null && reload)
+		if(path != null)
 			reloadDirectory();
 	}
 

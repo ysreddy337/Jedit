@@ -30,11 +30,7 @@ import org.gjt.sp.util.Log;
 /**
  * Local filesystem VFS.
  * @author Slava Pestov
-<<<<<<< HEAD
- * @version $Id: FileVFS.java,v 1.33 2001/02/28 10:38:53 sp Exp $
-=======
- * @version $Id: FileVFS.java,v 1.29 2001/01/22 05:35:08 sp Exp $
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+ * @version $Id: FileVFS.java,v 1.39 2001/08/12 11:26:42 sp Exp $
  */
 public class FileVFS extends VFS
 {
@@ -142,21 +138,11 @@ public class FileVFS extends VFS
 			return false;
 		}
 
-		/* When doing a 'save as', the path to save to (path)
-		 * will not be the same as the buffer's previous path
-		 * (buffer.getPath()). In that case, we want to create
-		 * a backup of the new path, even if the old path was
-		 * backed up as well (BACKED_UP property set) */
-		if(!path.equals(buffer.getPath()))
-			buffer.getDocumentProperties().remove(BACKED_UP_PROPERTY);
-
 		// On Unix, preserve permissions
 		int permissions = getPermissions(buffer.getPath());
 		Log.log(Log.DEBUG,this,buffer.getPath() + " has permissions 0"
 			+ Integer.toString(permissions,8));
 		buffer.putProperty(PERMISSIONS_PROPERTY,new Integer(permissions));
-
-		backup(buffer,file);
 
 		return super.save(view,buffer,path);
 	}
@@ -206,7 +192,11 @@ public class FileVFS extends VFS
 		File directory = new File(path);
 		String[] list = directory.list();
 		if(list == null)
+		{
+			String[] pp = { path };
+			VFSManager.error(comp,"directory-error-nomsg",pp);
 			return null;
+		}
 
 		Vector list2 = new Vector();
 		for(int i = 0; i < list.length; i++)
@@ -271,8 +261,11 @@ public class FileVFS extends VFS
 	public boolean _rename(Object session, String from, String to,
 		Component comp)
 	{
-		boolean retVal = new File(from).renameTo(new File(to));
+		File _to = new File(to);
+		_to.delete();
+		boolean retVal = new File(from).renameTo(_to);
 		VFSManager.sendVFSUpdate(this,from,true);
+		VFSManager.sendVFSUpdate(this,to,true);
 		return retVal;
 	}
 
@@ -283,88 +276,9 @@ public class FileVFS extends VFS
 		return retVal;
 	}
 
-	public InputStream _createInputStream(Object session, String path,
-		boolean ignoreErrors, Component comp) throws IOException
+	public void _backup(Object session, String path, Component comp)
+		throws IOException
 	{
-		try
-		{
-			return new FileInputStream(path);
-		}
-		catch(IOException io)
-		{
-			if(ignoreErrors)
-				return null;
-			else
-				throw io;
-		}
-	}
-
-	public OutputStream _createOutputStream(Object session, String path,
-		Component comp) throws IOException
-	{
-		OutputStream retVal = new FileOutputStream(path);
-
-		// commented out for now, because updating VFS browsers
-		// every time file is saved gets annoying
-		//VFSManager.sendVFSUpdate(this,path,true);
-		return retVal;
-	}
-
-	public void _saveComplete(Object session, Buffer buffer, Component comp)
-	{
-		int permissions = ((Integer)buffer.getProperty(PERMISSIONS_PROPERTY))
-			.intValue();
-		setPermissions(buffer.getPath(),permissions);
-	}
-
-	// private members
-	private FileSystemView fsView;
-	private static boolean isUnix;
-
-	static
-	{
-		// If the file separator is '/', the OS is either Unix,
-		// MacOS X, or MacOS.
-		if(File.separatorChar == '/')
-		{
-			String osName = System.getProperty("os.name");
-			if(osName.indexOf("MacOS") != -1)
-			{
-				if(osName.indexOf("X") != -1)
-				{
-					// MacOS X is Unix.
-					isUnix = true;
-				}
-				else
-				{
-					// Classic MacOS is definately not Unix.
-					isUnix = false;
-				}
-			}
-			else
-			{
-				// Unix.
-				isUnix = true;
-			}
-		}
-
-		Log.log(Log.DEBUG,FileVFS.class,"Unix operating system "
-			+ (isUnix ? "detected; will" : "not detected; will not")
-			+ " use permission-preserving code");
-	}
-
-	// The BACKED_UP flag prevents more than one backup from being
-	// written per session (I guess this should be made configurable
-	// in the future)
-	//
-	// we don't fire a VFSUpdate in this message as _createOutputStream()
-	// will do it anyway
-	private void backup(Buffer buffer, File file)
-	{
-		if(buffer.getProperty(BACKED_UP_PROPERTY) != null)
-			return;
-		buffer.putProperty(BACKED_UP_PROPERTY,Boolean.TRUE);
-
 		// Fetch properties
 		int backups;
 		try
@@ -383,6 +297,8 @@ public class FileVFS extends VFS
 
 		String backupPrefix = jEdit.getProperty("backup.prefix","");
 		String backupSuffix = jEdit.getProperty("backup.suffix","~");
+
+		File file = new File(path);
 
 		// Check for backup.directory property, and create that
 		// directory if it doesn't exist
@@ -437,10 +353,49 @@ public class FileVFS extends VFS
 		}
 	}
 
-<<<<<<< HEAD
+	public InputStream _createInputStream(Object session, String path,
+		boolean ignoreErrors, Component comp) throws IOException
+	{
+		try
+		{
+			return new FileInputStream(path);
+		}
+		catch(IOException io)
+		{
+			if(ignoreErrors)
+				return null;
+			else
+				throw io;
+		}
+	}
+
+	public OutputStream _createOutputStream(Object session, String path,
+		Component comp) throws IOException
+	{
+		OutputStream retVal = new FileOutputStream(path);
+
+		// commented out for now, because updating VFS browsers
+		// every time file is saved gets annoying
+		//VFSManager.sendVFSUpdate(this,path,true);
+		return retVal;
+	}
+
+	public void _saveComplete(Object session, Buffer buffer, Component comp)
+	{
+		int permissions = ((Integer)buffer.getProperty(PERMISSIONS_PROPERTY))
+			.intValue();
+		setPermissions(buffer.getPath(),permissions);
+	}
+
 	/** Code borrowed from j text editor (http://www.armedbear.org) */
 	/** I made some changes to make it support suid, sgid and sticky files */
-	private int getPermissions(String path)
+
+	/**
+	 * Returns numeric permissions of a file. On non-Unix systems, always
+	 * returns zero.
+	 * @since jEdit 3.2pre9
+	 */
+	public static int getPermissions(String path)
 	{
 		int permissions = 0;
 
@@ -507,7 +462,12 @@ public class FileVFS extends VFS
 		return permissions;
 	}
 
-	private void setPermissions(String path, int permissions)
+	/**
+	 * Sets numeric permissions of a file. On non-Unix platforms,
+	 * does nothing.
+	 * @since jEdit 3.2pre9
+	 */
+	public static void setPermissions(String path, int permissions)
 	{
 		if(permissions != 0)
 		{
@@ -523,7 +483,7 @@ public class FileVFS extends VFS
 					process.getErrorStream().close();
 					int exitCode = process.waitFor();
 					if(exitCode != 0)
-						Log.log(Log.NOTICE,this,"chmod exited with code " + exitCode);
+						Log.log(Log.NOTICE,FileVFS.class,"chmod exited with code " + exitCode);
 				}
 
 				// Feb 4 2000 5:30 PM
@@ -535,49 +495,40 @@ public class FileVFS extends VFS
 			}
 		}
 	}
+	
+	// private members
+	private FileSystemView fsView;
+	private static boolean isUnix;
+
+	static
+	{
+		// If the file separator is '/', the OS is either Unix,
+		// MacOS X, or MacOS.
+		if(File.separatorChar == '/')
+		{
+			String osName = System.getProperty("os.name");
+			if(osName.indexOf("MacOS") != -1)
+			{
+				if(osName.indexOf("X") != -1)
+				{
+					// MacOS X is Unix.
+					isUnix = true;
+				}
+				else
+				{
+					// Classic MacOS is definately not Unix.
+					isUnix = false;
+				}
+			}
+			else
+			{
+				// Unix.
+				isUnix = true;
+			}
+		}
+
+		Log.log(Log.DEBUG,FileVFS.class,"Unix operating system "
+			+ (isUnix ? "detected; will" : "not detected; will not")
+			+ " use permission-preserving code");
+	}
 }
-=======
-/*
- * ChangeLog:
- * $Log: FileVFS.java,v $
- * Revision 1.29  2001/01/22 05:35:08  sp
- * bug fixes galore
- *
- * Revision 1.28  2000/12/02 02:44:41  sp
- * Documentation updates, complete icon set now included
- *
- * Revision 1.27  2000/11/11 02:59:30  sp
- * FTP support moved out of the core into a plugin
- *
- * Revision 1.26  2000/11/07 10:08:32  sp
- * Options dialog improvements, documentation changes, bug fixes
- *
- * Revision 1.25  2000/11/02 09:19:33  sp
- * more features
- *
- * Revision 1.24  2000/10/12 09:28:27  sp
- * debugging and polish
- *
- * Revision 1.23  2000/09/26 10:19:47  sp
- * Bug fixes, spit and polish
- *
- * Revision 1.22  2000/08/31 02:54:00  sp
- * Improved activity log, bug fixes
- *
- * Revision 1.21  2000/08/29 07:47:13  sp
- * Improved complete word, type-select in VFS browser, bug fixes
- *
- * Revision 1.20  2000/08/27 02:06:52  sp
- * Filter combo box changed to a text field in VFS browser, passive mode FTP toggle
- *
- * Revision 1.19  2000/08/23 09:51:48  sp
- * Documentation updates, abbrev updates, bug fixes
- *
- * Revision 1.18  2000/08/22 07:25:01  sp
- * Improved abbrevs, bug fixes
- *
- * Revision 1.17  2000/08/20 07:29:31  sp
- * I/O and VFS browser improvements
- *
- */
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5

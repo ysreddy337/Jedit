@@ -31,7 +31,7 @@ import org.gjt.sp.util.Log;
  * The default input handler. It maps sequences of keystrokes into actions
  * and inserts key typed events into the text area.
  * @author Slava Pestov
- * @version $Id: DefaultInputHandler.java,v 1.14 2001/02/11 10:55:39 sp Exp $
+ * @version $Id: DefaultInputHandler.java,v 1.19 2001/08/10 10:35:11 sp Exp $
  */
 public class DefaultInputHandler extends InputHandler
 {
@@ -117,6 +117,40 @@ public class DefaultInputHandler extends InputHandler
 	}
 
 	/**
+	 * Returns either an edit action, or a hashtable if the specified key
+	 * is a prefix.
+	 * @param keyBinding The key binding
+	 * @since jEdit 3.2pre5
+	 */
+	public Object getKeyBinding(String keyBinding)
+	{
+		Hashtable current = bindings;
+		StringTokenizer st = new StringTokenizer(keyBinding);
+
+		while(st.hasMoreTokens())
+		{
+			KeyStroke keyStroke = parseKeyStroke(st.nextToken());
+			if(keyStroke == null)
+				return null;
+
+			if(st.hasMoreTokens())
+			{
+				Object o = current.get(keyStroke);
+				if(o instanceof Hashtable)
+					current = (Hashtable)o;
+				else
+					return o;
+			}
+			else
+			{
+				return current.get(keyStroke);
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Returns if a prefix key has been pressed.
 	 */
 	public boolean isPrefixActive()
@@ -163,7 +197,11 @@ public class DefaultInputHandler extends InputHandler
 			}
 		}
 
-		readNextChar = null;
+		if(readNextChar != null)
+		{
+			readNextChar = null;
+			view.getStatus().setMessage(null);
+		}
 
 		KeyStroke keyStroke = KeyStroke.getKeyStroke(keyCode,
 			modifiers);
@@ -214,39 +252,38 @@ public class DefaultInputHandler extends InputHandler
 		if(c == '\b')
 			return;
 
-		if(currentBindings != bindings)
+		KeyStroke keyStroke;
+
+		// this is a hack. a literal space is impossible to
+		// insert in a key binding string, but you can write
+		// SPACE.
+		if(c == ' ')
+			keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_SPACE,0);
+		else
+			keyStroke = KeyStroke.getKeyStroke(c);
+
+		Object o = currentBindings.get(keyStroke);
+
+		if(o instanceof Hashtable)
 		{
-			KeyStroke keyStroke;
-
-			// this is a hack. a literal space is impossible to
-			// insert in a key binding string, but you can write
-			// SPACE.
-			if(c == ' ')
-				keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_SPACE,0);
-			else
-				keyStroke = KeyStroke.getKeyStroke(Character.toUpperCase(c));
-
-			Object o = currentBindings.get(keyStroke);
-
-			if(o instanceof Hashtable)
-			{
-				currentBindings = (Hashtable)o;
-				return;
-			}
-			else if(o instanceof EditAction)
-			{
-				currentBindings = bindings;
-				invokeAction((EditAction)o);
-				return;
-			}
-
-			currentBindings = bindings;
+			currentBindings = (Hashtable)o;
+			return;
 		}
+		else if(o instanceof EditAction)
+		{
+			currentBindings = bindings;
+			invokeAction((EditAction)o);
+			return;
+		}
+
+		// otherwise, reset to default map and do user input
+		currentBindings = bindings;
 
 		if(repeat && Character.isDigit(c))
 		{
 			repeatCount *= 10;
 			repeatCount += (c - '0');
+			view.getStatus().setMessage(null);
 		}
 		else
 			userInput(c);
@@ -278,10 +315,16 @@ public class DefaultInputHandler extends InputHandler
 					modifiers |= InputEvent.ALT_MASK;
 					break;
 				case 'C':
-					modifiers |= InputEvent.CTRL_MASK;
+					if(macOS)
+						modifiers |= InputEvent.META_MASK;
+					else
+						modifiers |= InputEvent.CTRL_MASK;
 					break;
 				case 'M':
-					modifiers |= InputEvent.META_MASK;
+					if(macOS)
+						modifiers |= InputEvent.CTRL_MASK;
+					else
+						modifiers |= InputEvent.META_MASK;
 					break;
 				case 'S':
 					modifiers |= InputEvent.SHIFT_MASK;
@@ -292,11 +335,14 @@ public class DefaultInputHandler extends InputHandler
 		String key = keyStroke.substring(index + 1);
 		if(key.length() == 1)
 		{
-			char ch = Character.toUpperCase(key.charAt(0));
+			char ch = key.charAt(0);
 			if(modifiers == 0)
 				return KeyStroke.getKeyStroke(ch);
 			else
-				return KeyStroke.getKeyStroke(ch,modifiers);
+			{
+				return KeyStroke.getKeyStroke(Character.toUpperCase(ch),
+					modifiers);
+			}
 		}
 		else if(key.length() == 0)
 		{
@@ -328,4 +374,11 @@ public class DefaultInputHandler extends InputHandler
 	// private members
 	private Hashtable bindings;
 	private Hashtable currentBindings;
+
+	private static boolean macOS;
+
+	static
+	{
+		macOS = (System.getProperty("os.name").indexOf("MacOS") != -1);
+	}
 }

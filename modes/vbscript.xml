@@ -5,7 +5,7 @@
 <!-- VBScript mode by Andre Kaplan -->
 <MODE>
 	<PROPS>
-		<PROPERTY NAME="blockComment" VALUE="'" />
+		<PROPERTY NAME="lineComment" VALUE="'" />
 		<PROPERTY NAME="noWordSep" VALUE="_" />
 	</PROPS>
 
@@ -25,7 +25,7 @@
 		<EOL_SPAN TYPE="KEYWORD2">#end</EOL_SPAN>
 
 		<EOL_SPAN TYPE="COMMENT1">'</EOL_SPAN>
-		<EOL_SPAN TYPE="COMMENT1">rem</EOL_SPAN>
+		<EOL_SPAN TYPE="COMMENT1">rem </EOL_SPAN>
 		<SEQ TYPE="NULL">)</SEQ>
 		<SEQ TYPE="NULL">(</SEQ>
 

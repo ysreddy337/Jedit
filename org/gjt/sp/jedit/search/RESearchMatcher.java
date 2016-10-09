@@ -1,6 +1,6 @@
 /*
  * RESearchMatcher.java - Regular expression matcher
- * Copyright (C) 1999, 2000 Slava Pestov
+ * Copyright (C) 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,14 +19,16 @@
 
 package org.gjt.sp.jedit.search;
 
+import bsh.NameSpace;
 import gnu.regexp.*;
 import javax.swing.text.Segment;
+import org.gjt.sp.jedit.BeanShell;
 import org.gjt.sp.jedit.MiscUtilities;
 
 /**
  * A regular expression string matcher.
  * @author Slava Pestov
- * @version $Id: RESearchMatcher.java,v 1.6 2001/04/18 03:09:45 sp Exp $
+ * @version $Id: RESearchMatcher.java,v 1.11 2001/07/02 09:33:02 sp Exp $
  */
 public class RESearchMatcher implements SearchMatcher
 {
@@ -41,27 +43,21 @@ public class RESearchMatcher implements SearchMatcher
 
 	/**
 	 * Creates a new regular expression string matcher.
-	 * @param search The search string
-	 * @param replace The replacement string
-	 * @param ignoreCase True if the matcher should be case insensitive,
-	 * false otherwise
 	 */
 	public RESearchMatcher(String search, String replace,
-		boolean ignoreCase)
+		boolean ignoreCase, boolean beanshell,
+		String replaceMethod) throws Exception
 	{
 		// gnu.regexp doesn't seem to support \n and \t in the replace
 		// string, so implement it here
 		this.replace = MiscUtilities.escapesToChars(replace);
 
-		try
-		{
-			re = new RE(search,(ignoreCase ? RE.REG_ICASE : 0)
-				| RE.REG_MULTILINE,RE_SYNTAX_JEDIT);
-		}
-		catch(REException e)
-		{
-			throw new IllegalArgumentException(e.getMessage());
-		}
+		this.beanshell = beanshell;
+		this.replaceMethod = replaceMethod;
+		replaceNS = new NameSpace(BeanShell.getNameSpace(),"search and replace");
+
+		re = new RE(search,(ignoreCase ? RE.REG_ICASE : 0)
+			| RE.REG_MULTILINE,RE_SYNTAX_JEDIT);
 	}
 
 	/**
@@ -74,11 +70,19 @@ public class RESearchMatcher implements SearchMatcher
 	 */
 	public int[] nextMatch(Segment text)
 	{
-		REMatch match = re.getMatch(text);
+		REMatch match = re.getMatch(new CharIndexedSegment(text,0));
 		if(match == null)
 			return null;
-		int[] result = { match.getStartIndex(),
-			match.getEndIndex() };
+
+		int start = match.getStartIndex();
+		int end = match.getEndIndex();
+		if(start == end)
+		{
+			// searched for (), or ^, or $, or other 'empty' regexp
+			return null;
+		}
+
+		int[] result = { start, end };
 		return result;
 	}
 
@@ -87,12 +91,33 @@ public class RESearchMatcher implements SearchMatcher
 	 * within this matcher performed.
 	 * @param text The text
 	 */
-	public String substitute(String text)
+	public String substitute(String text) throws Exception
 	{
-		return re.substituteAll(text,replace);
+		REMatch match = re.getMatch(text);
+		if(match == null)
+			return null;
+
+		if(beanshell)
+		{
+			int count = match.getSubCount();
+			for(int i = 0; i < count; i++)
+				replaceNS.setVariable("_" + i,match.toString(i));
+
+			Object obj = BeanShell.runCachedBlock(replaceMethod,
+				null,replaceNS);
+			if(obj == null)
+				return null;
+			else
+				return obj.toString();
+		}
+		else
+			return match.substituteInto(replace);
 	}
 
 	// private members
 	private String replace;
 	private RE re;
+	private boolean beanshell;
+	private String replaceMethod;
+	private NameSpace replaceNS;
 }

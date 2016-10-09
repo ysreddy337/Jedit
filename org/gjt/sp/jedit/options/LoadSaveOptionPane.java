@@ -20,7 +20,9 @@
 package org.gjt.sp.jedit.options;
 
 import javax.swing.*;
+import java.awt.event.*;
 import java.awt.*;
+import java.util.StringTokenizer;
 import org.gjt.sp.jedit.*;
 
 public class LoadSaveOptionPane extends AbstractOptionPane
@@ -30,21 +32,8 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 		super("loadsave");
 	}
 
-	// protected members
-	protected void _init()
+	public void _init()
 	{
-		/* Default file encoding */
-		String[] encodings = {
-			"ASCII", "8859_1", "UTF8", "Cp850", "Cp1252",
-			"MacRoman", "KOI8_R", "Unicode"
-		};
-
-		encoding = new JComboBox(encodings);
-		encoding.setEditable(true);
-		encoding.setSelectedItem(jEdit.getProperty("buffer.encoding",
-			System.getProperty("file.encoding")));
-		addComponent(jEdit.getProperty("options.loadsave.encoding"),encoding);
-
 		/* Autosave interval */
 		autosave = new JTextField(jEdit.getProperty("autosave"));
 		addComponent(jEdit.getProperty("options.loadsave.autosave"),autosave);
@@ -86,6 +75,20 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 		addComponent(jEdit.getProperty("options.loadsave.lineSeparator"),
 			lineSeparator);
 
+		/* Default file encoding */
+		DefaultComboBoxModel encodings = new DefaultComboBoxModel();
+		StringTokenizer st = new StringTokenizer(jEdit.getProperty("encodings"));
+		while(st.hasMoreTokens())
+		{
+			encodings.addElement(st.nextToken());
+		}
+
+		encoding = new JComboBox(encodings);
+		encoding.setEditable(true);
+		encoding.setSelectedItem(jEdit.getProperty("buffer.encoding",
+			System.getProperty("file.encoding")));
+		addComponent(jEdit.getProperty("options.loadsave.encoding"),encoding);
+
 		/* Number of I/O threads to start */
 		ioThreadCount = new JTextField(jEdit.getProperty("ioThreadCount"));
 		addComponent(jEdit.getProperty("options.loadsave.ioThreadCount"),
@@ -95,13 +98,43 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 		restore = new JCheckBox(jEdit.getProperty(
 			"options.loadsave.restore"));
 		restore.setSelected(jEdit.getBooleanProperty("restore"));
+		restore.addActionListener(new ActionListener()
+		{
+			public void actionPerformed(ActionEvent evt)
+			{
+				restoreCLI.setEnabled(restore.isSelected());
+			}
+		});
+
 		addComponent(restore);
+		restoreCLI = new JCheckBox(jEdit.getProperty(
+			"options.loadsave.restore.cli"));
+		restoreCLI.setSelected(jEdit.getBooleanProperty("restore.cli"));
+		restoreCLI.setEnabled(restore.isSelected());
+		addComponent(restoreCLI);
+
+		/* Clients open files in new view */
+		newView = new JCheckBox(jEdit.getProperty(
+			"options.loadsave.newView"));
+		newView.setSelected(jEdit.getBooleanProperty("client.newView"));
+		addComponent(newView);
+
+		/* Persistent markers */
+		persistentMarkers = new JCheckBox(jEdit.getProperty(
+			"options.loadsave.persistentMarkers"));
+		persistentMarkers.setSelected(jEdit.getBooleanProperty(
+			"persistentMarkers"));
+		addComponent(persistentMarkers);
+
+		/* Parse fully */
+		parseFully = new JCheckBox(jEdit.getProperty(
+			"options.loadsave.parseFully"));
+		parseFully.setSelected(jEdit.getBooleanProperty("parseFully"));
+		addComponent(parseFully);
 	}
 
 	public void _save()
 	{
-		jEdit.setProperty("buffer.encoding",(String)
-			encoding.getSelectedItem());
 		jEdit.setProperty("autosave",autosave.getText());
 		jEdit.setProperty("backups",backups.getText());
 		jEdit.setProperty("backup.directory",backupDirectory.getText());
@@ -121,18 +154,29 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 			break;
 		}
 		jEdit.setProperty("buffer.lineSeparator",lineSep);
+		jEdit.setProperty("buffer.encoding",(String)
+			encoding.getSelectedItem());
 		jEdit.setProperty("ioThreadCount",ioThreadCount.getText());
 		jEdit.setBooleanProperty("restore",restore.isSelected());
+		jEdit.setBooleanProperty("restore.cli",restoreCLI.isSelected());
+		jEdit.setBooleanProperty("client.newView",newView.isSelected());
+		jEdit.setBooleanProperty("persistentMarkers",
+			persistentMarkers.isSelected());
+		jEdit.setBooleanProperty("parseFully",parseFully.isSelected());
 	}
 
 	// private members
-	private JComboBox encoding;
 	private JTextField autosave;
 	private JTextField backups;
 	private JTextField backupDirectory;
 	private JTextField backupPrefix;
 	private JTextField backupSuffix;
 	private JComboBox lineSeparator;
+	private JComboBox encoding;
 	private JTextField ioThreadCount;
 	private JCheckBox restore;
+	private JCheckBox restoreCLI;
+	private JCheckBox newView;
+	private JCheckBox persistentMarkers;
+	private JCheckBox parseFully;
 }

@@ -1,6 +1,6 @@
 /*
  * SearchBar.java - Search & replace toolbar
- * Portions copyright (C) 2000 Slava Pestov
+ * Portions copyright (C) 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,6 +26,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.jedit.gui.HistoryTextField;
+import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
 
 public class SearchBar extends JPanel
@@ -36,17 +37,17 @@ public class SearchBar extends JPanel
 
 		this.view = view;
 
-		Font boldFont = new Font("Dialog",Font.BOLD,10);
-		Font plainFont = new Font("Dialog",Font.PLAIN,10);
+		//Font boldFont = new Font("Dialog",Font.BOLD,12);
+		//Font plainFont = new Font("Dialog",Font.PLAIN,12);
 
 		JLabel label = new JLabel(jEdit.getProperty("view.search.find"));
-		label.setFont(boldFont);
+		//label.setFont(boldFont);
 		label.setBorder(new EmptyBorder(0,2,0,12));
 		add(label,BorderLayout.WEST);
 		Box box = new Box(BoxLayout.Y_AXIS);
 		box.add(Box.createGlue());
 		box.add(find = new HistoryTextField("find"));
-		find.setFont(plainFont);
+		//find.setFont(plainFont);
 		Dimension min = find.getPreferredSize();
 		min.width = Integer.MAX_VALUE;
 		find.setMaximumSize(min);
@@ -63,19 +64,19 @@ public class SearchBar extends JPanel
 		buttons.add(Box.createHorizontalStrut(12));
 		buttons.add(ignoreCase = new JCheckBox(jEdit.getProperty(
 			"search.case")));
-		ignoreCase.setFont(boldFont);
+		//ignoreCase.setFont(boldFont);
 		ignoreCase.addActionListener(actionHandler);
 		ignoreCase.setMargin(margin);
 		buttons.add(Box.createHorizontalStrut(2));
 		buttons.add(regexp = new JCheckBox(jEdit.getProperty(
 			"search.regexp")));
-		regexp.setFont(boldFont);
+		//regexp.setFont(boldFont);
 		regexp.addActionListener(actionHandler);
 		regexp.setMargin(margin);
 		buttons.add(Box.createHorizontalStrut(2));
 		buttons.add(hyperSearch = new JCheckBox(jEdit.getProperty(
 			"search.hypersearch")));
-		hyperSearch.setFont(boldFont);
+		//hyperSearch.setFont(boldFont);
 		hyperSearch.addActionListener(actionHandler);
 		hyperSearch.setMargin(margin);
 
@@ -89,18 +90,20 @@ public class SearchBar extends JPanel
 		return find;
 	}
 
+	public void setHyperSearch(boolean hyperSearch)
+	{
+		jEdit.setBooleanProperty("view.search.hypersearch.toggle",hyperSearch);
+		this.hyperSearch.setSelected(hyperSearch);
+		find.setModel(this.hyperSearch.isSelected() ? "find" : null);
+	}
+
 	public void update()
 	{
 		ignoreCase.setSelected(SearchAndReplace.getIgnoreCase());
 		regexp.setSelected(SearchAndReplace.getRegexp());
-		setHyperSearch(hyperSearch.isSelected());
-	}
-
-	public void setHyperSearch(boolean hyperSearch)
-	{
-		jEdit.setBooleanProperty("search.hypersearch.toggle",hyperSearch);
-		this.hyperSearch.setSelected(hyperSearch);
-		find.setModel(hyperSearch ? "find" : null);
+		hyperSearch.setSelected(jEdit.getBooleanProperty(
+			"view.search.hypersearch.toggle"));
+		find.setModel(hyperSearch.isSelected() ? "find" : null);
 	}
 
 	// private members
@@ -115,7 +118,7 @@ public class SearchBar extends JPanel
 		{
 			jEdit.setBooleanProperty("search.hypersearch.toggle",
 				hyperSearch.isSelected());
-			SearchAndReplace.showSearchDialog(view,null);
+			new SearchDialog(view,null);
 		}
 		else if(hyperSearch.isSelected())
 		{
@@ -128,9 +131,16 @@ public class SearchBar extends JPanel
 		{
 			// on enter, start search from end
 			// of current match to find next one
-			int start = reverse 
-				? view.getTextArea().getSelectionStart()
-				: view.getTextArea().getSelectionEnd();
+			int start;
+			JEditTextArea textArea = view.getTextArea();
+			Selection s = textArea.getSelectionAtOffset(
+				textArea.getCaretPosition());
+			if(s == null)
+				start = textArea.getCaretPosition();
+			else if(reverse)
+				start = s.getStart();
+			else 
+				start = s.getEnd();
 
 			if(!incrementalSearch(start,reverse))
 			{
@@ -187,7 +197,11 @@ public class SearchBar extends JPanel
 			if(evt.getSource() == find)
 				find(false);
 			else if(evt.getSource() == hyperSearch)
+			{
+				jEdit.setBooleanProperty("view.search.hypersearch.toggle",
+					hyperSearch.isSelected());
 				update();
+			}
 			else if(evt.getSource() == ignoreCase)
 			{
 				SearchAndReplace.setIgnoreCase(ignoreCase
@@ -210,8 +224,16 @@ public class SearchBar extends JPanel
 			// the current match until another match is found
 			if(!hyperSearch.isSelected())
 			{
-				if(!incrementalSearch(view.getTextArea()
-					.getSelectionStart(),false))
+				int start;
+				JEditTextArea textArea = view.getTextArea();
+				Selection s = textArea.getSelectionAtOffset(
+					textArea.getCaretPosition());
+				if(s == null)
+					start = textArea.getCaretPosition();
+				else 
+					start = s.getStart();
+
+				if(!incrementalSearch(start,false))
 				{
 					if(!incrementalSearch(0,false))
 					{
@@ -243,10 +265,15 @@ public class SearchBar extends JPanel
 					}
 					else
 					{
-						incrementalSearch(
-							view.getTextArea()
-							.getSelectionStart(),
-							true);
+						int start;
+						JEditTextArea textArea = view.getTextArea();
+						Selection s = textArea.getSelectionAtOffset(
+							textArea.getCaretPosition());
+						if(s == null)
+							start = textArea.getCaretPosition();
+						else 
+							start = s.getStart();
+						incrementalSearch(start,true);
 					}
 				}
 			}
@@ -280,7 +307,7 @@ public class SearchBar extends JPanel
 				view.getEditPane().focusOnTextArea();
 				break;
 			case KeyEvent.VK_ENTER:
-				if(evt.getModifiers() == InputEvent.SHIFT_MASK)
+				if(evt.isShiftDown())
 				{
 					evt.consume();
 					find(true);

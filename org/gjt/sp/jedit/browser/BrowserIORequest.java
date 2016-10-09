@@ -29,7 +29,7 @@ import org.gjt.sp.util.WorkThread;
 /**
  * A browser I/O request.
  * @author Slava Pestov
- * @version $Id: BrowserIORequest.java,v 1.7 2001/03/26 07:09:20 sp Exp $
+ * @version $Id: BrowserIORequest.java,v 1.8 2001/06/24 10:12:14 sp Exp $
  */
 public class BrowserIORequest extends WorkRequest
 {
@@ -141,8 +141,8 @@ public class BrowserIORequest extends WorkRequest
 		catch(IOException io)
 		{
 			setAbortable(false);
-			args[0] = io.getMessage();
-			VFSManager.error(browser,"ioerror",args);
+			String[] pp = { path1, io.toString() };
+			VFSManager.error(browser,"directory-error",pp);
 		}
 		catch(WorkThread.Abort a)
 		{
@@ -156,8 +156,8 @@ public class BrowserIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				setAbortable(false);
-				args[0] = io.getMessage();
-				VFSManager.error(browser,"ioerror",args);
+				String[] pp = { path1, io.toString() };
+				VFSManager.error(browser,"directory-error",pp);
 			}
 		}
 
@@ -180,8 +180,8 @@ public class BrowserIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				args[0] = io.getMessage();
-				VFSManager.error(browser,"ioerror",args);
+				String[] pp = { path1, io.toString() };
+				VFSManager.error(browser,"directory-error",pp);
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -195,8 +195,8 @@ public class BrowserIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				String[] args = { io.getMessage() };
-				VFSManager.error(browser,"ioerror",args);
+				String[] pp = { path1, io.toString() };
+				VFSManager.error(browser,"directory-error",pp);
 			}
 		}
 	}
@@ -225,8 +225,8 @@ public class BrowserIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				args[0] = io.getMessage();
-				VFSManager.error(browser,"ioerror",args);
+				String[] pp = { path1, io.toString() };
+				VFSManager.error(browser,"directory-error",pp);
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -240,8 +240,8 @@ public class BrowserIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				String[] args = { io.getMessage() };
-				VFSManager.error(browser,"ioerror",args);
+				String[] pp = { path1, io.toString() };
+				VFSManager.error(browser,"directory-error",pp);
 			}
 		}
 	}
@@ -261,7 +261,7 @@ public class BrowserIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				args[0] = io.getMessage();
+				args[0] = io.toString();
 				VFSManager.error(browser,"ioerror",args);
 			}
 		}
@@ -276,7 +276,7 @@ public class BrowserIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				String[] args = { io.getMessage() };
+				String[] args = { io.toString() };
 				VFSManager.error(browser,"ioerror",args);
 			}
 		}

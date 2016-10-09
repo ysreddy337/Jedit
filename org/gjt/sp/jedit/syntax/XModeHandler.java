@@ -31,14 +31,9 @@ import org.gjt.sp.util.Log;
 public class XModeHandler extends HandlerBase
 {
 	// public members
-<<<<<<< HEAD
 	public XModeHandler (XmlParser parser, String modeName, String path)
 	{
 		this.modeName = modeName;
-=======
-	public XModeHandler (XmlParser parser, String path)
-	{
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 		this.parser = parser;
 		this.path = path;
 		stateStack = new Stack();
@@ -49,8 +44,6 @@ public class XModeHandler extends HandlerBase
 	{
 		if("xmode.dtd".equals(systemId))
 		{
-			String path = MiscUtilities.constructPath(
-				jEdit.getJEditHome(),"modes","xmode.dtd");
 			try
 			{
 				return new BufferedReader(new InputStreamReader(
@@ -449,10 +442,7 @@ public class XModeHandler extends HandlerBase
 
 	// private members
 	private XmlParser parser;
-<<<<<<< HEAD
 	private String modeName;
-=======
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 	private String path;
 
 	private TokenMarker marker;
@@ -531,6 +521,10 @@ public class XModeHandler extends HandlerBase
 		else if (value == "DIGIT")
 		{
 			return Token.DIGIT;
+		}
+		else if (value == "INVALID")
+		{
+			return Token.INVALID;
 		}
 		else
 		{

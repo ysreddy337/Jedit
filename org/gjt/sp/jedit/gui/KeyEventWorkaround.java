@@ -30,7 +30,6 @@ public class KeyEventWorkaround
 	public static KeyEvent processKeyEvent(KeyEvent evt)
 	{
 		int keyCode = evt.getKeyCode();
-		int modifiers = evt.getModifiers();
 		char ch = evt.getKeyChar();
 
 		switch(evt.getID())
@@ -40,39 +39,41 @@ public class KeyEventWorkaround
 			if(keyCode == KeyEvent.VK_CONTROL ||
 				keyCode == KeyEvent.VK_SHIFT ||
 				keyCode == KeyEvent.VK_ALT ||
-				keyCode == KeyEvent.VK_META)
+				keyCode == KeyEvent.VK_META ||
+				keyCode == '\0')
 				return null;
 
-			// get rid of undefined keys
-			if(keyCode == '\0')
-				return null;
-
-			handleBrokenKeys(modifiers,keyCode);
+			if(!java14)
+				handleBrokenKeys(evt.getModifiers(),keyCode);
 
 			return evt;
 		case KeyEvent.KEY_TYPED:
-			if((modifiers & (~ (ALT_GRAPH_MASK | KeyEvent.SHIFT_MASK))) != 0)
-				return null;
-
 			// need to let \b through so that backspace will work
 			// in HistoryTextFields
-			if((ch < 0x20 || ch == 0x7f) && ch != '\b')
+			if((ch < 0x20 || ch == 0x7f || ch == 0xff) && ch != '\b')
 				return null;
 
-			// if the last key was a broken key, filter
-			// out all except 'a'-'z' that occur 750 ms after.
-			if(last == LAST_BROKEN && System.currentTimeMillis()
-				- lastKeyTime < 750 && !Character.isLetter(ch))
-			{
-				last = LAST_NOTHING;
+			if((evt.isControlDown() ^ evt.isAltDown())
+				|| evt.isMetaDown())
 				return null;
-			}
-			// otherwise, if it was ALT, filter out everything.
-			else if(last == LAST_ALT && System.currentTimeMillis()
-				- lastKeyTime < 750)
+
+			if(!java14)
 			{
-				last = LAST_NOTHING;
-				return null;
+				// if the last key was a broken key, filter
+				// out all except 'a'-'z' that occur 750 ms after.
+				if(last == LAST_BROKEN && System.currentTimeMillis()
+					- lastKeyTime < 750 && !Character.isLetter(ch))
+				{
+					last = LAST_NOTHING;
+					return null;
+				}
+				// otherwise, if it was ALT, filter out everything.
+				else if(last == LAST_ALT && System.currentTimeMillis()
+					- lastKeyTime < 750)
+				{
+					last = LAST_NOTHING;
+					return null;
+				}
 			}
 
 			return evt;
@@ -82,6 +83,7 @@ public class KeyEventWorkaround
 	}
 
 	// private members
+	private static boolean java14;
 	private static long lastKeyTime;
 
 	private static int last;
@@ -89,6 +91,11 @@ public class KeyEventWorkaround
 	private static final int LAST_ALTGR = 1;
 	private static final int LAST_ALT = 2;
 	private static final int LAST_BROKEN = 3;
+
+	static
+	{
+		java14 = (System.getProperty("java.version").compareTo("1.4") >= 0);
+	}
 
 	private static void handleBrokenKeys(int modifiers, int keyCode)
 	{
@@ -122,35 +129,3 @@ public class KeyEventWorkaround
 		lastKeyTime = System.currentTimeMillis();
 	}
 }
-
-/*
- * ChangeLog:
- * $Log: KeyEventWorkaround.java,v $
- * Revision 1.9  2000/11/26 01:43:35  sp
- * x86 assembly mode, various other stuff
- *
- * Revision 1.8  2000/11/13 11:19:27  sp
- * Search bar reintroduced, more BeanShell stuff
- *
- * Revision 1.7  2000/11/12 05:36:50  sp
- * BeanShell integration started
- *
- * Revision 1.6  2000/10/28 00:36:58  sp
- * ML mode, Haskell mode
- *
- * Revision 1.5  2000/10/05 04:30:10  sp
- * *** empty log message ***
- *
- * Revision 1.4  2000/09/26 10:19:47  sp
- * Bug fixes, spit and polish
- *
- * Revision 1.3  2000/09/23 03:01:10  sp
- * pre7 yayayay
- *
- * Revision 1.2  2000/09/09 04:00:34  sp
- * 2.6pre6
- *
- * Revision 1.1  2000/09/07 04:46:08  sp
- * bug fixes
- *
- */

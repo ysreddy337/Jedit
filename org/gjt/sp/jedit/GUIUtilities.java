@@ -32,6 +32,7 @@ import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.io.VFS;
 import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.jedit.syntax.SyntaxStyle;
+import org.gjt.sp.jedit.syntax.Token;
 import org.gjt.sp.util.Log;
 
 /**
@@ -50,7 +51,7 @@ import org.gjt.sp.util.Log;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: GUIUtilities.java,v 1.87 2001/03/26 07:09:19 sp Exp $
+ * @version $Id: GUIUtilities.java,v 1.91 2001/08/04 02:18:20 sp Exp $
  */
 public class GUIUtilities
 {
@@ -64,11 +65,11 @@ public class GUIUtilities
 	public static final Icon PLUGIN_WINDOW_ICON;
 
 	/**
-	 * Creates a menubar.
-	 * @param view The view to load the menubar for
+	 * Creates a menubar. Plugins should not need to call this method.
 	 * @param name The menu bar name
+	 * @since jEdit 3.2pre5
 	 */
-	public static JMenuBar loadMenuBar(View view, String name)
+	public static JMenuBar loadMenuBar(String name)
 	{
 		String menus = jEdit.getProperty(name);
 		StringTokenizer st = new StringTokenizer(menus);
@@ -76,19 +77,9 @@ public class GUIUtilities
 		JMenuBar mbar = new JMenuBar();
 
 		while(st.hasMoreTokens())
-			mbar.add(GUIUtilities.loadMenu(view,st.nextToken()));
+			mbar.add(GUIUtilities.loadMenu(st.nextToken()));
 
 		return mbar;
-	}
-
-	/**
-	 * Creates a menu.
-	 * @param name The menu name
-	 * @since jEdit 2.6pre2
-	 */
-	public static JMenu loadMenu(String name)
-	{
-		return loadMenu(null,name);
 	}
 
 	/**
@@ -96,53 +87,24 @@ public class GUIUtilities
 	 * by plugins; use the other form instead.
 	 * @param view The view to load the menu for
 	 * @param name The menu name
+	 * @since jEdit 2.6pre2
 	 */
-	public static JMenu loadMenu(View view, String name)
+	public static JMenu loadMenu(String name)
 	{
-		if(view != null)
-		{
-			JMenu menu = view.getMenu(name);
-			if(menu != null)
-				return menu;
-		}
-
-		String label = jEdit.getProperty(name.concat(".label"));
-		if(label == null)
-			label = name;
-
-		char mnemonic;
-		int index = label.indexOf('$');
-		if(index != -1 && label.length() - index > 1)
-		{
-			mnemonic = Character.toLowerCase(label.charAt(index + 1));
-			label = label.substring(0,index).concat(label.substring(++index));
-		}
+		if(name.equals("open-encoding"))
+			return new OpenWithEncodingMenu();
+		else if(name.equals("recent-files"))
+			return new RecentFilesMenu();
+		else if(name.equals("current-directory"))
+			return new CurrentDirectoryMenu();
+		else if(name.equals("markers"))
+			return new MarkersMenu();
+		else if(name.equals("macros"))
+			return new MacrosMenu();
+		else if(name.equals("plugins"))
+			return new PluginsMenu();
 		else
-			mnemonic = '\0';
-
-		JMenu menu = new JMenu(label);
-		menu.setMnemonic(mnemonic);
-
-		String menuItems = jEdit.getProperty(name);
-		if(menuItems != null)
-		{
-			StringTokenizer st = new StringTokenizer(menuItems);
-			while(st.hasMoreTokens())
-			{
-				String menuItemName = st.nextToken();
-				if(menuItemName.equals("-"))
-					menu.addSeparator();
-				else
-				{
-					if(menuItemName.startsWith("%"))
-						menu.add(loadMenu(view,menuItemName.substring(1)));
-					else
-						menu.add(loadMenuItem(menuItemName,true));
-				}
-			}
-		}
-
-		return menu;
+			return new EnhancedMenu(name);
 	}
 
 	/**
@@ -247,19 +209,6 @@ public class GUIUtilities
 	}
 
 	/**
-	 * @deprecated If you are writing a plugin that specifically
-	 * targets jEdit 2.6pre1 or later, you should use the
-	 * <code>loadMenuItem()</code> method that doesn't take
-	 * the <code>view</code> parameter.
-	 * @param view Unused
-	 * @param name The menu item name
-	 */
-	public static JMenuItem loadMenuItem(View view, String name)
-	{
-		return loadMenuItem(name,true);
-	}
-
-	/**
 	 * Creates a toolbar.
 	 * @param name The toolbar name
 	 */
@@ -350,14 +299,6 @@ public class GUIUtilities
 			toolTip = toolTip + " (" + shortcut + ")";
 
 		return new EnhancedButton(icon,toolTip,action);
-	}
-
-	/**
-	 * @deprecated Call loadToolBarIcon() instead
-	 */
-	public static Icon loadToolBarIcon(String iconName)
-	{
-		return loadIcon(iconName);
 	}
 
 	/**
@@ -582,38 +523,6 @@ public class GUIUtilities
 	}
 
 	/**
-	 * @deprecated You should use the VFS file selected whenever
-	 * possible, instead of this one.
-	 */
-	public static String showFileDialog(View view, String file, int type)
-	{
-		if(file == null)
-			file = System.getProperty("user.dir");
-		File _file = new File(file);
-
-		JFileChooser chooser = new JFileChooser();
-
-		chooser.setCurrentDirectory(_file);
-		if(_file.isDirectory())
-			chooser.setSelectedFile(null);
-		else
-			chooser.setSelectedFile(_file);
-
-		chooser.setDialogType(type);
-		chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-
-		int retVal = chooser.showDialog(view,null);
-		if(retVal == JFileChooser.APPROVE_OPTION)
-		{
-			File selectedFile = chooser.getSelectedFile();
-			if(selectedFile != null)
-				return selectedFile.getAbsolutePath();
-		}
-
-		return null;
-	}
-
-	/**
 	 * Converts a color name to a color object. The name must either be
 	 * a known string, such as `red', `green', etc (complete list is in
 	 * the <code>java.awt.Color</code> class) or a hex color value
@@ -684,9 +593,12 @@ public class GUIUtilities
 	/**
 	 * Converts a style string to a style object.
 	 * @param str The style string
+	 * @param family Style strings only specify font style, not font family
+	 * @param size Style strings only specify font style, not font family
 	 * @exception IllegalArgumentException if the style is invalid
+	 * @since jEdit 3.2pre6
 	 */
-	public static SyntaxStyle parseStyle(String str)
+	public static SyntaxStyle parseStyle(String str, String family, int size)
 		throws IllegalArgumentException
 	{
 		Color fgColor = Color.black;
@@ -722,7 +634,10 @@ public class GUIUtilities
 				throw new IllegalArgumentException(
 					"Invalid directive: " + s);
 		}
-		return new SyntaxStyle(fgColor,bgColor,italic,bold);
+		return new SyntaxStyle(fgColor,bgColor,
+			new Font(family,
+			(italic ? Font.ITALIC : 0) | (bold ? Font.BOLD : 0),
+			size));
 	}
 
 	/**
@@ -738,13 +653,74 @@ public class GUIUtilities
 		{
 			buf.append(" bgColor:" + getColorHexString(style.getBackgroundColor()));
 		}
-		if(!style.isPlain())
+		if(!style.getFont().isPlain())
 		{
-			buf.append(" style:" + (style.isItalic() ? "i" : "")
-				+ (style.isBold() ? "b" : ""));
+			buf.append(" style:" + (style.getFont().isItalic() ? "i" : "")
+				+ (style.getFont().isBold() ? "b" : ""));
 		}
 
 		return buf.toString();
+	}
+
+	/**
+	 * Loads the syntax styles from the properties, giving them the specified
+	 * base font family and size.
+	 * @param family The font family
+	 * @param size The font size
+	 * @since jEdit 3.2pre6
+	 */
+	public static SyntaxStyle[] loadStyles(String family, int size)
+	{
+		SyntaxStyle[] styles = new SyntaxStyle[Token.ID_COUNT];
+
+		try
+		{
+			styles[Token.COMMENT1] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.comment1"),
+				family,size);
+			styles[Token.COMMENT2] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.comment2"),
+				family, size);
+			styles[Token.LITERAL1] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.literal1"),
+				family,size);
+			styles[Token.LITERAL2] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.literal2"),
+				family,size);
+			styles[Token.LABEL] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.label"),
+				family,size);
+			styles[Token.KEYWORD1] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.keyword1"),
+				family,size);
+			styles[Token.KEYWORD2] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.keyword2"),
+				family,size);
+			styles[Token.KEYWORD3] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.keyword3"),
+				family,size);
+			styles[Token.FUNCTION] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.function"),
+				family,size);
+			styles[Token.MARKUP] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.markup"),
+				family,size);
+			styles[Token.OPERATOR] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.operator"),
+				family,size);
+			styles[Token.DIGIT] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.digit"),
+				family,size);
+			styles[Token.INVALID] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.invalid"),
+				family,size);
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,GUIUtilities.class,e);
+		}
+
+		return styles;
 	}
 
 	/**
@@ -821,8 +797,14 @@ public class GUIUtilities
 // 			+ ": setting geometry to " + required);
 		win.setBounds(required);
 
-		if(File.separatorChar == '/') // ie, Unix
+		if(File.separatorChar == '/'
+			&& System.getProperty("java.version").compareTo("1.2") < 0)
+		{
+			win.setBounds(required);
 			new UnixWorkaround(win,name,desired,required);
+		}
+		else
+			win.setBounds(desired);
 	}
 
 	static class UnixWorkaround
@@ -984,6 +966,80 @@ public class GUIUtilities
 		});
 	}
 
+	/**
+	 * Returns if the specified event is the popup trigger event.
+	 * This implements precisely defined behavior, as opposed to
+	 * MouseEvent.isPopupTrigger().
+	 * @param evt The event
+	 * @since jEdit 3.2pre8
+	 */
+	public static boolean isPopupTrigger(MouseEvent evt)
+	{
+		if(macOS)
+			return evt.isControlDown();
+		else
+			return ((evt.getModifiers() & InputEvent.BUTTON3_MASK) != 0);
+	}
+
+	// deprecated APIs
+
+	/**
+	 * @deprecated Use loadMenu(name) instead
+	 */
+	public static JMenu loadMenu(View view, String name)
+	{
+		return loadMenu(name);
+	}
+
+	/**
+	 * @deprecated Use loadMenuItem(name) instead
+	 * @param view Unused
+	 * @param name The menu item name
+	 */
+	public static JMenuItem loadMenuItem(View view, String name)
+	{
+		return loadMenuItem(name,true);
+	}
+
+	/**
+	 * @deprecated Use loadToolBarIcon() instead
+	 */
+	public static Icon loadToolBarIcon(String iconName)
+	{
+		return loadIcon(iconName);
+	}
+
+	/**
+	 * @deprecated Use showVFSFileDialog()
+	 */
+	public static String showFileDialog(View view, String file, int type)
+	{
+		if(file == null)
+			file = System.getProperty("user.dir");
+		File _file = new File(file);
+
+		JFileChooser chooser = new JFileChooser();
+
+		chooser.setCurrentDirectory(_file);
+		if(_file.isDirectory())
+			chooser.setSelectedFile(null);
+		else
+			chooser.setSelectedFile(_file);
+
+		chooser.setDialogType(type);
+		chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+
+		int retVal = chooser.showDialog(view,null);
+		if(retVal == JFileChooser.APPROVE_OPTION)
+		{
+			File selectedFile = chooser.getSelectedFile();
+			if(selectedFile != null)
+				return selectedFile.getAbsolutePath();
+		}
+
+		return null;
+	}
+
 	// package-private members
 	static void showSplashScreen()
 	{
@@ -998,13 +1054,15 @@ public class GUIUtilities
 
 	// private members
 	private static SplashScreen splash;
-
+	private static boolean macOS;
 	private static Hashtable icons;
 
 	private GUIUtilities() {}
 
 	static
 	{
+		macOS = (System.getProperty("os.name").indexOf("MacOS") != -1);
+
 		icons = new Hashtable();
 		NEW_BUFFER_ICON = loadIcon("new.gif");
 		DIRTY_BUFFER_ICON = loadIcon("dirty.gif");

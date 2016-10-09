@@ -69,8 +69,9 @@ public class LatestVersionPlugin extends EditPlugin
 		}
 		catch(IOException e)
 		{
-			String[] args = { e.getMessage() };
-			GUIUtilities.error(view,"ioerror",args);
+			String[] args = { jEdit.getProperty("version-check.url"),
+				e.toString() };
+			GUIUtilities.error(view,"read-error",args);
 		}
 
 		view.hideWaitCursor();
@@ -84,6 +85,6 @@ public class LatestVersionPlugin extends EditPlugin
 			args,JOptionPane.YES_NO_OPTION,JOptionPane.INFORMATION_MESSAGE);
 
 		if(result == JOptionPane.YES_OPTION)
-			jEdit.openFile(view,null,url.toString(),true,false);
+			jEdit.openFile(view,url.toString());
 	}
 }

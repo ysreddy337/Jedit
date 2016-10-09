@@ -28,7 +28,7 @@ import org.gjt.sp.util.Log;
 /**
  * A file set for searching a user-specified list of buffers.
  * @author Slava Pestov
- * @version $Id: BufferListSet.java,v 1.18 2001/04/18 03:09:45 sp Exp $
+ * @version $Id: BufferListSet.java,v 1.19 2001/08/23 07:39:09 sp Exp $
  */
 public class BufferListSet implements SearchFileSet
 {
@@ -166,7 +166,7 @@ public class BufferListSet implements SearchFileSet
 					public void run()
 					{
 						retVal[0] = jEdit.openTemporary(null,null,
-							path,false,false);
+							path,false);
 					}
 				});
 				return retVal[0];
@@ -178,6 +178,6 @@ public class BufferListSet implements SearchFileSet
 			}
 		}
 		else
-			return jEdit.openTemporary(null,null,path,false,false);
+			return jEdit.openTemporary(null,null,path,false);
 	}
 }

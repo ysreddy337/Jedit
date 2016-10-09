@@ -60,6 +60,8 @@ public class CompleteWord extends JWindow
 
 		KeyHandler keyHandler = new KeyHandler();
 		addKeyListener(keyHandler);
+		getRootPane().addKeyListener(keyHandler);
+		words.addKeyListener(keyHandler);
 		view.setKeyEventInterceptor(keyHandler);
 	}
 

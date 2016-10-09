@@ -31,11 +31,7 @@ import org.gjt.sp.util.*;
 /**
  * A buffer I/O request.
  * @author Slava Pestov
-<<<<<<< HEAD
- * @version $Id: BufferIORequest.java,v 1.12 2001/04/18 03:09:45 sp Exp $
-=======
- * @version $Id: BufferIORequest.java,v 1.10 2001/01/22 10:39:26 sp Exp $
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+ * @version $Id: BufferIORequest.java,v 1.17 2001/06/26 08:50:00 sp Exp $
  */
 public class BufferIORequest extends WorkRequest
 {
@@ -180,26 +176,37 @@ public class BufferIORequest extends WorkRequest
 				buffer.putProperty(Buffer.LINESEP,lineSeparator);
 				buffer.setNewFile(false);
 			}
+			catch(CharConversionException ch)
+			{
+				Log.log(Log.ERROR,this,ch);
+				Object[] pp = { path,
+					buffer.getProperty(Buffer.ENCODING),
+					ch.toString() };
+				VFSManager.error(view,"encoding-error",pp);
+			}
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				Object[] args = { io.toString() };
-				VFSManager.error(view,"ioerror",args);
+				Object[] pp = { path, io.toString() };
+				VFSManager.error(view,"read-error",pp);
 			}
 
-			try
+			if(jEdit.getBooleanProperty("persistentMarkers"))
 			{
-				String[] args = { vfs.getFileName(path) };
-				setStatus(jEdit.getProperty("vfs.status.load-markers",args));
-				setAbortable(true);
+				try
+				{
+					String[] args = { vfs.getFileName(path) };
+					setStatus(jEdit.getProperty("vfs.status.load-markers",args));
+					setAbortable(true);
 
-				in = vfs._createInputStream(session,markersPath,true,view);
-				if(in != null)
-					readMarkers(buffer,in);
-			}
-			catch(IOException io)
-			{
-				// ignore
+					in = vfs._createInputStream(session,markersPath,true,view);
+					if(in != null)
+						readMarkers(buffer,in);
+				}
+				catch(IOException io)
+				{
+					// ignore
+				}
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -224,8 +231,8 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				String[] args = { io.getMessage() };
-				VFSManager.error(view,"ioerror",args);
+				String[] pp = { path, io.toString() };
+				VFSManager.error(view,"read-error",pp);
 			}
 			catch(WorkThread.Abort a)
 			{
@@ -300,8 +307,7 @@ public class BufferIORequest extends WorkRequest
 		StringBuffer sbuf = new StringBuffer((int)length);
 
 		InputStreamReader in = new InputStreamReader(_in,
-			jEdit.getProperty("buffer.encoding",
-			System.getProperty("file.encoding")));
+			(String)buffer.getProperty(Buffer.ENCODING));
 		char[] buf = new char[IOBUFSIZE];
 		// Number of characters in 'buf' array.
 		// InputStream.read() doesn't always fill the
@@ -456,68 +462,28 @@ public class BufferIORequest extends WorkRequest
 		return returnValue;
 	}
 
-	private void readMarkers(Buffer buffer, InputStream in)
+	private void readMarkers(Buffer buffer, InputStream _in)
 		throws IOException
 	{
 		// For `reload' command
 		buffer.removeAllMarkers();
 
-		StringBuffer buf = new StringBuffer();
-		int c;
-		boolean eof = false;
-		String name = null;
-		int start = -1;
-		int end = -1;
-		for(;;)
-		{
-			if(eof)
-				break;
-			switch(c = in.read())
-			{
-			case -1:
-				eof = true;
-			case ';': case '\n': case '\r':
-				if(buf.length() == 0)
-					continue;
-				String str = buf.toString();
-				buf.setLength(0);
-				if(name == null)
-					name = str;
-				else if(start == -1)
-				{
-					try
-					{
-						start = Integer.parseInt(str);
-					}
-					catch(NumberFormatException nf)
-					{
-						//Log.log(Log.ERROR,this,nf);
-						start = 0;
-					}
-				}
-				else if(end == -1)
-				{
-					try
-					{
-						end = Integer.parseInt(str);
-					}
-					catch(NumberFormatException nf)
-					{
-						//Log.log(Log.ERROR,this,nf);
-						end = 0;
-					}
+		BufferedReader in = new BufferedReader(new InputStreamReader(_in));
 
-					buffer.addMarker(name,start,end);
-					name = null;
-					start = -1;
-					end = -1;
-				}
-				break;
-			default:
-				buf.append((char)c);
-				break;
-			}
+		String line;
+		while((line = in.readLine()) != null)
+		{
+			// compatibility kludge for jEdit 3.1 and earlier
+			if(!line.startsWith("!"))
+				continue;
+
+			char shortcut = line.charAt(1);
+			int start = line.indexOf(';');
+			int end = line.indexOf(';',start + 1);
+			int position = Integer.parseInt(line.substring(start + 1,end));
+			buffer.addMarker(shortcut,position);
 		}
+
 		in.close();
 	}
 
@@ -537,7 +503,22 @@ public class BufferIORequest extends WorkRequest
 			{
 				buffer.readLock();
 
-				out = vfs._createOutputStream(session,path,view);
+				/* if the VFS supports renaming files, we first
+				 * save to #<filename>#save#, then rename that
+				 * to <filename>, so that if the save fails,
+				 * data will not be lost */
+				String savePath;
+
+				if((vfs.getCapabilities() & VFS.RENAME_CAP) != 0)
+				{
+					savePath = vfs.getParentOfPath(path)
+						+ '#' + vfs.getFileName(path)
+						+ "#save#";
+				}
+				else
+					savePath = path;
+
+				out = vfs._createOutputStream(session,savePath,view);
 				if(out != null)
 				{
 					if(path.endsWith(".gz"))
@@ -546,19 +527,32 @@ public class BufferIORequest extends WorkRequest
 					write(buffer,out);
 				}
 
+				// Only backup once per session
+				if(buffer.getProperty(Buffer.BACKED_UP) == null)
+				{
+					vfs._backup(session,path,view);
+					buffer.putProperty(Buffer.BACKED_UP,Boolean.TRUE);
+				}
+
+				if((vfs.getCapabilities() & VFS.RENAME_CAP) != 0)
+					vfs._rename(session,savePath,path,view);
+
 				// We only save markers to VFS's that support deletion.
 				// Otherwise, we will accumilate stale marks files.
-				if((vfs.getCapabilities() & VFS.DELETE_CAP) != 0
-					&& buffer.getMarkerCount() != 0)
+				if((vfs.getCapabilities() & VFS.DELETE_CAP) != 0)
 				{
-					setStatus(jEdit.getProperty("vfs.status.save-markers",args));
-					setProgressValue(0);
-					out = vfs._createOutputStream(session,markersPath,view);
-					if(out != null)
-						writeMarkers(buffer,out);
+					if(jEdit.getBooleanProperty("persistentMarkers")
+						&& buffer.getMarkers().size() != 0)
+					{
+						setStatus(jEdit.getProperty("vfs.status.save-markers",args));
+						setProgressValue(0);
+						out = vfs._createOutputStream(session,markersPath,view);
+						if(out != null)
+							writeMarkers(buffer,out);
+					}
+					else
+						vfs._delete(session,markersPath,view);
 				}
-				else
-					vfs._delete(session,markersPath,view);
 			}
 			catch(BadLocationException bl)
 			{
@@ -567,8 +561,8 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				args[0] = io.toString();
-				VFSManager.error(view,"ioerror",args);
+				String[] pp = { path, io.toString() };
+				VFSManager.error(view,"write-error",pp);
 			}
 			finally
 			{
@@ -598,8 +592,8 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				String[] args = { io.getMessage() };
-				VFSManager.error(view,"ioerror",args);
+				String[] pp = { path, io.toString() };
+				VFSManager.error(view,"write-error",pp);
 			}
 			catch(WorkThread.Abort a)
 			{
@@ -671,8 +665,7 @@ public class BufferIORequest extends WorkRequest
 	{
 		BufferedWriter out = new BufferedWriter(
 			new OutputStreamWriter(_out,
-				jEdit.getProperty("buffer.encoding",
-				System.getProperty("file.encoding"))),
+				(String)buffer.getProperty(Buffer.ENCODING)),
 				IOBUFSIZE);
 		Segment lineSegment = new Segment();
 		String newline = (String)buffer.getProperty(Buffer.LINESEP);
@@ -708,11 +701,14 @@ public class BufferIORequest extends WorkRequest
 		for(int i = 0; i < markers.size(); i++)
 		{
 			Marker marker = (Marker)markers.elementAt(i);
-			o.write(marker.getName());
+			o.write('!');
+			o.write(marker.getShortcut());
 			o.write(';');
-			o.write(String.valueOf(marker.getStart()));
+
+			String pos = String.valueOf(marker.getPosition());
+			o.write(pos);
 			o.write(';');
-			o.write(String.valueOf(marker.getEnd()));
+			o.write(pos);
 			o.write('\n');
 		}
 		o.close();
@@ -750,8 +746,8 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				Object[] args = { io.toString() };
-				VFSManager.error(view,"ioerror",args);
+				String[] pp = { path, io.toString() };
+				VFSManager.error(view,"read-error",pp);
 			}
 		}
 		catch(WorkThread.Abort a)
@@ -776,8 +772,8 @@ public class BufferIORequest extends WorkRequest
 			catch(IOException io)
 			{
 				Log.log(Log.ERROR,this,io);
-				String[] args = { io.getMessage() };
-				VFSManager.error(view,"ioerror",args);
+				String[] pp = { path, io.toString() };
+				VFSManager.error(view,"read-error",pp);
 			}
 			catch(WorkThread.Abort a)
 			{

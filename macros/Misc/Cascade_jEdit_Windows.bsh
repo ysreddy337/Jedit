@@ -19,7 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * Version 1.0 - Fri Apr 06 11:49:18 EDT 2001 @700 /Internet Time/
+ * $Id: Cascade_jEdit_Windows.bsh,v 1.3 2001/07/13 20:17:29 jgellene Exp $
  *
  * Notes on use:
  *
@@ -29,8 +29,6 @@
  * during an editing session.  It will not rearrange modeless dialog windows.
  *
  */
-
-import javax.swing.JOptionPane;
 
 void cascadeJEditWindows(int startOffset, int incrOffset, int maxWindows)
 {

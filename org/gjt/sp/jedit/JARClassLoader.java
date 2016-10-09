@@ -30,7 +30,7 @@ import org.gjt.sp.util.Log;
 /**
  * A class loader implementation that loads classes from JAR files.
  * @author Slava Pestov
- * @version $Id: JARClassLoader.java,v 1.48 2001/03/26 07:09:19 sp Exp $
+ * @version $Id: JARClassLoader.java,v 1.51 2001/08/27 10:27:45 sp Exp $
  */
 public class JARClassLoader extends ClassLoader
 {
@@ -123,7 +123,11 @@ public class JARClassLoader extends ClassLoader
 		if(zipFile == null)
 			return null;
 
-		return "jeditresource:" + jar.getIndex() + "/" + name;
+		if(!name.startsWith("/"))
+			name = "/" + name;
+
+		return "jeditresource:/" + MiscUtilities.getFileName(
+			jar.getPath()) + "!" + name;
 	}
 
 	/**
@@ -158,7 +162,7 @@ public class JARClassLoader extends ClassLoader
 	}
 
 	// package-private members
-	void loadAllPlugins()
+	void startAllPlugins()
 	{
 		for(int i = 0; i < pluginClasses.size(); i++)
 		{

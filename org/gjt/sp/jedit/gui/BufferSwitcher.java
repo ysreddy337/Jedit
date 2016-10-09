@@ -33,7 +33,7 @@ public class BufferSwitcher extends JComboBox
 	{
 		this.editPane = editPane;
 
-		setFont(new Font("Dialog",Font.BOLD,10));
+		//setFont(new Font("Dialog",Font.BOLD,10));
 		setRenderer(new BufferCellRenderer());
 		setMaximumRowCount(10);
 		addActionListener(new ActionHandler());
@@ -75,32 +75,14 @@ public class BufferSwitcher extends JComboBox
 			JList list, Object value, int index,
 			boolean isSelected, boolean cellHasFocus)
 		{
-			super.getListCellRendererComponent(list,null,index,
+			super.getListCellRendererComponent(list,value,index,
 				isSelected,cellHasFocus);
 			Buffer buffer = (Buffer)value;
 			if(buffer == null)
-			{
 				setIcon(null);
-				setText(null);
-			}
 			else
-			{
 				setIcon(buffer.getIcon());
-				setText(buffer.toString() + " ("
-					+ buffer.getMode().getName() + ")");
-				return this;
-			}
 			return this;
 		}
 	}
-
-	
 }
-
-/*
- * Change Log:
- * $Log: BufferSwitcher.java,v $
- * Revision 1.1  2000/11/13 11:19:27  sp
- * Search bar reintroduced, more BeanShell stuff
- *
- */

@@ -19,6 +19,7 @@
 
 package org.gjt.sp.jedit.gui;
 
+import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import java.awt.event.*;
 import java.awt.Component;
@@ -36,7 +37,7 @@ import org.gjt.sp.util.Log;
  * to the implementations of this class to do so.
  *
  * @author Slava Pestov
- * @version $Id: InputHandler.java,v 1.26 2001/04/18 03:09:45 sp Exp $
+ * @version $Id: InputHandler.java,v 1.31 2001/07/28 12:34:43 sp Exp $
  * @see org.gjt.sp.jedit.gui.DefaultInputHandler
  */
 public abstract class InputHandler extends KeyAdapter
@@ -96,6 +97,7 @@ public abstract class InputHandler extends KeyAdapter
 	{
 		this.repeat = repeat;
 		repeatCount = 0;
+		view.getStatus().setMessage(null);
 	}
 
 	/**
@@ -114,6 +116,7 @@ public abstract class InputHandler extends KeyAdapter
 	{
 		repeat = true;
 		this.repeatCount = repeatCount;
+		view.getStatus().setMessage(null);
 	}
 
 	/**
@@ -137,8 +140,18 @@ public abstract class InputHandler extends KeyAdapter
 	/**
 	 * Invokes the specified BeanShell code, replacing __char__ in the
 	 * code with the next input character.
+	 * @param msg The prompt to display in the status bar
 	 * @param code The code
-	 * @since jEdit 2.7pre2
+	 * @since jEdit 3.2pre2
+	 */
+	public void readNextChar(String msg, String code)
+	{
+		view.getStatus().setMessage(msg);
+		readNextChar(code);
+	}
+
+	/**
+	 * @deprecated Use the other form of this method instead
 	 */
 	public void readNextChar(String code)
 	{
@@ -175,6 +188,29 @@ public abstract class InputHandler extends KeyAdapter
 			action.invoke(view);
 		else
 		{
+			// stop people doing dumb stuff like C+ENTER 100 C+n
+			if(_repeatCount > REPEAT_COUNT_THRESHOLD)
+			{
+				String label = jEdit.getProperty(action.getName() + ".label");
+				if(label == null)
+					label = action.getName();
+				else
+					label = GUIUtilities.prettifyMenuLabel(label);
+
+				Object[] pp = { label, new Integer(_repeatCount) };
+					
+				if(GUIUtilities.confirm(view,"large-repeat-count",pp,
+					JOptionPane.WARNING_MESSAGE,
+					JOptionPane.YES_NO_OPTION)
+					!= JOptionPane.YES_OPTION)
+				{
+					repeat = false;
+					repeatCount = 0;
+					view.getStatus().setMessage(null);
+					return;
+				}
+			}
+
 			try
 			{
 				buffer.beginCompoundEdit();
@@ -204,10 +240,13 @@ public abstract class InputHandler extends KeyAdapter
 
 			repeat = false;
 			repeatCount = 0;
+			view.getStatus().setMessage(null);
 		}
 	}
 
 	// protected members
+	private static final int REPEAT_COUNT_THRESHOLD = 20;
+
 	protected View view;
 	protected boolean repeat;
 	protected int repeatCount;
@@ -235,6 +274,25 @@ public abstract class InputHandler extends KeyAdapter
 				textArea.userInput(ch);
 			else
 			{
+				// stop people doing dumb stuff like C+ENTER 100 C+n
+				if(_repeatCount > REPEAT_COUNT_THRESHOLD)
+				{
+					Object[] pp = { String.valueOf(ch),
+						new Integer(_repeatCount) };
+
+					if(GUIUtilities.confirm(view,
+						"large-repeat-count.user-input",pp,
+						JOptionPane.WARNING_MESSAGE,
+						JOptionPane.YES_NO_OPTION)
+						!= JOptionPane.YES_OPTION)
+					{
+						repeat = false;
+						repeatCount = 0;
+						view.getStatus().setMessage(null);
+						return;
+					}
+				}
+
 				for(int i = 0; i < _repeatCount; i++)
 					textArea.userInput(ch);
 			}
@@ -252,8 +310,9 @@ public abstract class InputHandler extends KeyAdapter
 	{
 		String charStr = MiscUtilities.charsToEscapes(String.valueOf(ch));
 
-		int index = readNextChar.indexOf("__char__");
-		if(index != -1)
+		// this might be a bit slow if __char__ occurs a lot
+		int index;
+		while((index = readNextChar.indexOf("__char__")) != -1)
 		{
 			readNextChar = readNextChar.substring(0,index)
 				+ '\'' + charStr + '\''
@@ -262,7 +321,7 @@ public abstract class InputHandler extends KeyAdapter
 
 		Macros.Recorder recorder = view.getMacroRecorder();
 		if(recorder != null)
-			recorder.record(repeatCount,readNextChar);
+			recorder.record(getRepeatCount(),readNextChar);
 
 		if(getRepeatCount() != 1)
 		{
@@ -285,5 +344,7 @@ public abstract class InputHandler extends KeyAdapter
 			BeanShell.eval(view,readNextChar,false);
 
 		readNextChar = null;
+
+		view.getStatus().setMessage(null);
 	}
 }

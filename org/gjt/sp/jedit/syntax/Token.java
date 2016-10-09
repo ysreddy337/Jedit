@@ -26,7 +26,7 @@ package org.gjt.sp.jedit.syntax;
  * respectively.
  *
  * @author Slava Pestov
- * @version $Id: Token.java,v 1.17 2000/07/26 07:48:45 sp Exp $
+ * @version $Id: Token.java,v 1.18 2001/05/13 07:21:27 sp Exp $
  */
 public class Token
 {
@@ -46,8 +46,7 @@ public class Token
 	public static final byte INVALID = 13;
 
 	public static final byte ID_COUNT = 14;
-	public static final byte INTERNAL_FIRST = 100;
-	public static final byte INTERNAL_LAST = 126;
+
 	public static final byte END = 127;
 
 	/**
@@ -94,6 +93,9 @@ public class Token
 /*
  * ChangeLog:
  * $Log: Token.java,v $
+ * Revision 1.18  2001/05/13 07:21:27  sp
+ * more stuff
+ *
  * Revision 1.17  2000/07/26 07:48:45  sp
  * stuff
  *

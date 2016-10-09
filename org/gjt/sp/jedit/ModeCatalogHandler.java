@@ -26,9 +26,10 @@ import org.gjt.sp.util.Log;
 
 class ModeCatalogHandler extends HandlerBase
 {
-	ModeCatalogHandler(String directory)
+	ModeCatalogHandler(String directory, boolean resource)
 	{
 		this.directory = directory;
+		this.resource = resource;
 	}
 
 	public Object resolveEntity(String publicId, String systemId)
@@ -77,7 +78,14 @@ class ModeCatalogHandler extends HandlerBase
 	public void doctypeDecl(String name, String publicId,
 		String systemId) throws Exception
 	{
-		if("CATALOG".equals(name))
+		// older jEdit versions used a DOCTYPE of CATALOG, which
+		// is incorrect since the DOCTYPE must be the name of the
+		// root element, which is MODES.
+
+		// so you the avid code reader should use MODES as the
+		// DOCTYPE instead, but we still let old catalogs through
+		// to avoid annoying users.
+		if("CATALOG".equals(name) || "MODES".equals(name))
 			return;
 
 		Log.log(Log.ERROR,this,directory + "catalog: DOCTYPE must be CATALOG");
@@ -87,17 +95,31 @@ class ModeCatalogHandler extends HandlerBase
 	{
 		if(name.equals("MODE"))
 		{
-			Mode mode = new Mode(modeName);
-			mode.setProperty("file",MiscUtilities.constructPath(
-				directory,file));
+			Mode mode = jEdit.getMode(modeName);
+			if(mode == null)
+			{
+				mode = new Mode(modeName);
+				jEdit.addMode(mode);
+			}
+
+			Object path;
+			if(resource)
+				path = jEdit.class.getResource(directory + file);
+			else
+				path = MiscUtilities.constructPath(directory,file);
+			mode.setProperty("file",path);
 
 			if(filenameGlob != null)
 				mode.setProperty("filenameGlob",filenameGlob);
+			else
+				mode.unsetProperty("filenameGlob");
 
 			if(firstlineGlob != null)
 				mode.setProperty("firstlineGlob",firstlineGlob);
+			else
+				mode.unsetProperty("firstlineGlob");
 
-			jEdit.addMode(mode);
+			mode.init();
 
 			modeName = file = filenameGlob = firstlineGlob = null;
 		}
@@ -107,6 +129,7 @@ class ModeCatalogHandler extends HandlerBase
 
 	// private members
 	private String directory;
+	private boolean resource;
 
 	private String modeName;
 	private String file;

@@ -27,16 +27,12 @@ import java.awt.*;
 import java.util.Enumeration;
 import java.util.Vector;
 import org.gjt.sp.jedit.io.*;
-import org.gjt.sp.jedit.MiscUtilities;
+import org.gjt.sp.jedit.*;
 
 /**
  * VFS browser tree view.
  * @author Slava Pestov
-<<<<<<< HEAD
- * @version $Id: BrowserView.java,v 1.15 2001/04/18 03:09:45 sp Exp $
-=======
- * @version $Id: BrowserView.java,v 1.13 2000/12/24 02:54:48 sp Exp $
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+ * @version $Id: BrowserView.java,v 1.20 2001/08/04 02:18:20 sp Exp $
  */
 public class BrowserView extends JPanel
 {
@@ -48,12 +44,10 @@ public class BrowserView extends JPanel
 		model = new DefaultTreeModel(rootNode,true);
 
 		tree = new BrowserJTree(model);
-		tree.setCellRenderer(new FileCellRenderer());
+		tree.setCellRenderer(renderer);
 		tree.setEditable(false);
 		tree.addTreeExpansionListener(new TreeHandler());
 		tree.putClientProperty("JTree.lineStyle", "Angled");
-		tree.setRowHeight(22);
-		tree.setVisibleRowCount(10);
 
 		if(browser.isMultipleSelectionEnabled())
 			tree.getSelectionModel().setSelectionMode(
@@ -63,7 +57,12 @@ public class BrowserView extends JPanel
 				TreeSelectionModel.SINGLE_TREE_SELECTION);
 
 		setLayout(new BorderLayout());
-		add(BorderLayout.CENTER, scroller = new JScrollPane(tree));
+
+		scroller = new JScrollPane(tree);
+		scroller.setPreferredSize(new Dimension(0,200));
+		add(BorderLayout.CENTER,scroller);
+
+		propertiesChanged();
 	}
 
 	public VFS.DirectoryEntry[] getSelectedFiles()
@@ -165,6 +164,12 @@ public class BrowserView extends JPanel
 		return tree;
 	}
 
+	public void propertiesChanged()
+	{
+		showIcons = jEdit.getBooleanProperty("vfs.browser.showIcons");
+		renderer.propertiesChanged();
+	}
+
 	// private members
 	private VFSBrowser browser;
 
@@ -175,7 +180,9 @@ public class BrowserView extends JPanel
 	private DefaultMutableTreeNode currentlyLoadingTreeNode;
 	private BrowserPopupMenu popup;
 
-	private static FileCellRenderer renderer = new FileCellRenderer();
+	// used for tool tips
+	private boolean showIcons;
+	private FileCellRenderer renderer = new FileCellRenderer();
 
 	private StringBuffer typeSelectBuffer = new StringBuffer();
 	private Timer timer = new Timer(0,new ClearTypeSelect());
@@ -285,7 +292,8 @@ public class BrowserView extends JPanel
 				Rectangle cellRect = getPathBounds(path);
 				if(cellRect != null && !cellRectIsVisible(cellRect))
 				{
-					return new Point(cellRect.x + 20, cellRect.y + 2);
+					return new Point(cellRect.x + (showIcons ? 20 : 1),
+						cellRect.y + (showIcons ? 1 : -1));
 				}
 			}
 			return null;
@@ -373,7 +381,7 @@ public class BrowserView extends JPanel
 						break;
 					}
 				}
-				else if((evt.getModifiers() & MouseEvent.BUTTON3_MASK) != 0)
+				else if(GUIUtilities.isPopupTrigger(evt))
 					; // do nothing
 
 				super.processMouseEvent(evt);
@@ -387,7 +395,7 @@ public class BrowserView extends JPanel
 					if(evt.getClickCount() == 2)
 						break;
 				}
-				else if((evt.getModifiers() & MouseEvent.BUTTON3_MASK) != 0)
+				else if(GUIUtilities.isPopupTrigger(evt))
 				{
 					if(popup != null && popup.isVisible())
 					{

@@ -1,6 +1,6 @@
 /*
  * BeanShell.java - BeanShell scripting support
- * Copyright (C) 2000 Slava Pestov
+ * Copyright (C) 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,15 +19,14 @@
 
 package org.gjt.sp.jedit;
 
-import bsh.BshMethod;
-import bsh.Interpreter;
-import bsh.NameSpace;
-import bsh.TargetError;
+import bsh.*;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Segment;
 import javax.swing.JFileChooser;
 import java.lang.reflect.InvocationTargetException;
 import java.io.*;
+import org.gjt.sp.jedit.io.*;
+import org.gjt.sp.jedit.gui.BeanShellErrorDialog;
 import org.gjt.sp.jedit.textarea.JEditTextArea;
 import org.gjt.sp.util.Log;
 
@@ -96,15 +95,17 @@ public class BeanShell
 	 */
 	public static void showRunScriptDialog(View view)
 	{
-		String path = GUIUtilities.showFileDialog(view,
-			null,JFileChooser.OPEN_DIALOG);
-		if(path != null)
+		String[] paths = GUIUtilities.showVFSFileDialog(view,
+			null,JFileChooser.OPEN_DIALOG,true);
+		if(paths != null)
 		{
 			Buffer buffer = view.getBuffer();
 			try
 			{
 				buffer.beginCompoundEdit();
-				runScript(view,path,true,false);
+
+				for(int i = 0; i < paths.length; i++)
+					runScript(view,paths[i],true,false);
 			}
 			finally
 			{
@@ -115,6 +116,12 @@ public class BeanShell
 
 	/**
 	 * Runs a BeanShell script.
+	 * @param view The view
+	 * @param path The path name of the script. May be a jEdit VFS path
+	 * @param ownNamespace Macros are run in their own namespace, startup
+	 * scripts are run on the global namespace
+	 * @param rethrowBshErrors Rethrow BeanShell errors, in addition to
+	 * showing an error dialog box
 	 * @since jEdit 2.7pre3
 	 */
 	public static void runScript(View view, String path,
@@ -122,60 +129,102 @@ public class BeanShell
 	{
 		Reader in;
 		Buffer buffer = jEdit.getBuffer(path);
-		if(buffer != null && buffer.isLoaded())
-		{
-			Segment seg = new Segment();
-			try
-			{
-				buffer.getText(0,buffer.getLength(),seg);
-			}
-			catch(BadLocationException e)
-			{
-				// XXX
-				throw new InternalError();
-			}
 
-			in = new CharArrayReader(seg.array,seg.offset,seg.count);
-		}
-		else
+		VFS vfs = VFSManager.getVFSForPath(path);
+		Object session = vfs.createVFSSession(path,view);
+		if(session == null)
 		{
-			try
-			{
-				in = new BufferedReader(new FileReader(path));
-			}
-			catch(FileNotFoundException e)
-			{
-				GUIUtilities.error(view,"beanshell-notfound",
-					new String[] { path });
-				return;
-			}
+			// user cancelled???
+			return;
 		}
 
-		NameSpace namespace = interp.getNameSpace();
+		try
+		{
+			if(buffer != null && buffer.isLoaded())
+			{
+				StringBuffer buf = new StringBuffer();
+				try
+				{
+					buf.append(buffer.getText(0,buffer.getLength()));
+				}
+				catch(BadLocationException e)
+				{
+					// XXX
+					throw new InternalError();
+				}
+
+				// Ugly workaround for a BeanShell bug
+				buf.append("\n");
+
+				in = new StringReader(buf.toString());
+			}
+			else
+			{
+				in = new BufferedReader(new InputStreamReader(
+					vfs._createInputStream(session,path,
+					true,view)));
+			}
+
+			runScript(view,path,in,ownNamespace,rethrowBshErrors);
+		}
+		catch(IOException e)
+		{
+			Log.log(Log.ERROR,BeanShell.class,e);
+			GUIUtilities.error(view,"read-error",
+				new String[] { path, e.toString() });
+			return;
+		}
+		finally
+		{
+			try
+			{
+				vfs._endVFSSession(session,view);
+			}
+			catch(IOException io)
+			{
+				Log.log(Log.ERROR,BeanShell.class,io);
+				GUIUtilities.error(view,"read-error",
+					new String[] { path, io.toString() });
+			}
+		}
+	}
+
+	/**
+	 * Runs a BeanShell script.
+	 * @param view The view
+	 * @param path For error reporting only
+	 * @param in The reader to read the script from
+	 * @param ownNamespace Macros are run in their own namespace, startup
+	 * scripts are run on the global namespace
+	 * @param rethrowBshErrors Rethrow BeanShell errors, in addition to
+	 * showing an error dialog box
+	 * @since jEdit 3.2pre4
+	 */
+	public static void runScript(View view, String path, Reader in,
+		boolean ownNamespace, boolean rethrowBshErrors)
+	{
+		Log.log(Log.MESSAGE,BeanShell.class,"Running script " + path);
+
+		NameSpace namespace;
 		if(ownNamespace)
-			namespace = new NameSpace(namespace,"macro namespace");
+			namespace = new NameSpace(global,"script namespace");
+		else
+			namespace = global;
+
+		Interpreter interp = createInterpreter(namespace);
 
 		try
 		{
 			if(view != null)
 			{
 				EditPane editPane = view.getEditPane();
-				namespace.setVariable("view",view);
-				namespace.setVariable("editPane",editPane);
-				namespace.setVariable("buffer",editPane.getBuffer());
-				namespace.setVariable("textArea",editPane.getTextArea());
+				interp.set("view",view);
+				interp.set("editPane",editPane);
+				interp.set("buffer",editPane.getBuffer());
+				interp.set("textArea",editPane.getTextArea());
 			}
 
 			running = true;
-
-			/* if(ownNamespace)
-			{
-				// terrible hack
-				interp.eval(new InputStreamReader(
-					BeanShell.class.getResourceAsStream(
-					"/org/gjt/sp/jedit/jedit.bsh")),
-					namespace,"jedit.bsh");
-			} */
 
 			interp.eval(in,namespace,path);
 		}
@@ -188,8 +237,8 @@ public class BeanShell
 				e = ((InvocationTargetException)e).getTargetException();
 
 			Log.log(Log.ERROR,BeanShell.class,e);
-			GUIUtilities.error(view,"beanshell-error",
-				new String[] { path, e.toString() });
+
+			new BeanShellErrorDialog(view,e.toString());
 
 			if(e instanceof Error && rethrowBshErrors)
 				throw (Error)e;
@@ -211,24 +260,38 @@ public class BeanShell
 	public static Object eval(View view, String command,
 		boolean rethrowBshErrors)
 	{
-		if(view != null)
-		{
-			EditPane editPane = view.getEditPane();
-			interp.setVariable("view",view);
-			interp.setVariable("editPane",editPane);
-			interp.setVariable("buffer",editPane.getBuffer());
-			interp.setVariable("textArea",editPane.getTextArea());
-		}
+		return eval(view,global,command,rethrowBshErrors);
+	}
 
-		Object returnValue;
+	/**
+	 * Evaluates the specified BeanShell expression.
+	 * @param view The view (may be null)
+	 * @param namespace The namespace
+	 * @param command The expression
+	 * @param rethrowBshErrors If true, BeanShell errors will
+	 * be re-thrown to the caller
+	 * @since jEdit 3.2pre7
+	 */
+	public static Object eval(View view, NameSpace namespace,
+		String command, boolean rethrowBshErrors)
+	{
+		Interpreter interp = createInterpreter(namespace);
+
 		try
 		{
-			returnValue = interp.eval(command);
+			if(view != null)
+			{
+				EditPane editPane = view.getEditPane();
+				interp.set("view",view);
+				interp.set("editPane",editPane);
+				interp.set("buffer",editPane.getBuffer());
+				interp.set("textArea",editPane.getTextArea());
+			}
+
+			return interp.eval(command);
 		}
 		catch(Throwable e)
 		{
-			returnValue = null;
-
 			if(e instanceof TargetError)
 				e = ((TargetError)e).getTarget();
 
@@ -236,61 +299,86 @@ public class BeanShell
 				e = ((InvocationTargetException)e).getTargetException();
 
 			Log.log(Log.ERROR,BeanShell.class,e);
-			GUIUtilities.error(view,"beanshell-error",
-				new String[] { command, e.toString() });
+
+			new BeanShellErrorDialog(view,e.toString());
 
 			if(e instanceof Error && rethrowBshErrors)
 				throw (Error)e;
 		}
 
-		if(view != null)
-		{
-			interp.setVariable("view",null);
-			interp.setVariable("editPane",null);
-			interp.setVariable("buffer",null);
-			interp.setVariable("textArea",null);
-		}
-
-		return returnValue;
+		return null;
 	}
 
 	/**
-	 * Returns the specified method reference.
-	 * @param method The method name
-	 * @since jEdit 2.7pre2
+	 * Caches a block of code, returning a handle that can be passed to
+	 * runCachedBlock().
+	 * @param id An identifier. If null, a unique identifier is generated
+	 * @param code The code
+	 * @param childNamespace If the method body should be run in a new
+	 * namespace (slightly faster). Note that you must pass a null namespace
+	 * to the runCachedBlock() method if you do this
+	 * @since jEdit 3.2pre5
 	 */
-	public static BshMethod getMethod(String name)
+	public static String cacheBlock(String id, String code, boolean childNamespace)
 	{
-		return interp.getNameSpace().getMethod(name);
+		String name;
+		if(id == null)
+			name = "b_" + (cachedBlockCounter++);
+		else
+			name = "b_" + id;
+
+		code = "setNameSpace(__cruft.namespace);\n"
+			+ name
+			+ "(ns) {\n"
+			+ "setNameSpace(ns);"
+			+ code
+			+ "\n}";
+
+		eval(null,code,false);
+
+		return name;
 	}
 
 	/**
-	 * Invokes the specified method reference.
+	 * Runs a cached block of code in the specified namespace. Faster than
+	 * evaluating the block each time.
+	 * @param id The identifier returned by cacheBlock()
 	 * @param view The view
-	 * @param method The method reference
-	 * @param args Arguments to pass the method
-	 * @since jEdit 2.7pre2
+	 * @param namespace The namespace to run the code in. Can only be null if
+	 * childNamespace parameter was true in cacheBlock() call
+	 * @since jEdit 3.2pre5
 	 */
-	public static Object invokeMethod(View view, BshMethod method, Object[] args)
+	public static Object runCachedBlock(String id, View view, NameSpace namespace)
 	{
-		if(view != null)
-		{
-			EditPane editPane = view.getEditPane();
-			interp.setVariable("view",view);
-			interp.setVariable("editPane",editPane);
-			interp.setVariable("buffer",editPane.getBuffer());
-			interp.setVariable("textArea",editPane.getTextArea());
-		}
+		if(namespace == null)
+			namespace = internal;
 
-		Object returnValue;
+		Object[] args = { namespace };
+
 		try
 		{
-			returnValue = method.invokeDeclaredMethod(args,interp);
+			if(view != null)
+			{
+				namespace.setVariable("view",view);
+				EditPane editPane = view.getEditPane();
+				namespace.setVariable("editPane",editPane);
+				namespace.setVariable("buffer",editPane.getBuffer());
+				namespace.setVariable("textArea",editPane.getTextArea());
+			}
+
+			Object retVal = internal.invokeMethod(id,args,interpForMethods);
+			if(retVal instanceof Primitive)
+			{
+				if(retVal == Primitive.VOID)
+					return null;
+				else
+					return ((Primitive)retVal).getValue();
+			}
+			else
+				return retVal;
 		}
 		catch(Throwable e)
 		{
-			returnValue = null;
-
 			if(e instanceof TargetError)
 				e = ((TargetError)e).getTarget();
 
@@ -298,19 +386,25 @@ public class BeanShell
 				e = ((InvocationTargetException)e).getTargetException();
 
 			Log.log(Log.ERROR,BeanShell.class,e);
-			GUIUtilities.error(view,"beanshell-error",
-				new String[] { String.valueOf(method), e.toString() });
-		}
 
-		if(view != null)
+			new BeanShellErrorDialog(view,e.toString());
+		}
+		finally
 		{
-			interp.setVariable("view",null);
-			interp.setVariable("editPane",null);
-			interp.setVariable("buffer",null);
-			interp.setVariable("textArea",null);
+			try
+			{
+				namespace.setVariable("view",null);
+				namespace.setVariable("editPane",null);
+				namespace.setVariable("buffer",null);
+				namespace.setVariable("textArea",null);
+			}
+			catch(EvalError e)
+			{
+				// can't do much
+			}
 		}
 
-		return returnValue;
+		return null;
 	}
 
 	/**
@@ -323,12 +417,12 @@ public class BeanShell
 	}
 
 	/**
-	 * Returns the BeanShell interpreter instance.
-	 * @since jEdit 3.0pre5
+	 * Returns the global namespace.
+	 * @since jEdit 3.2pre5
 	 */
-	public static Interpreter getInterpreter()
+	public static NameSpace getNameSpace()
 	{
-		return interp;
+		return global;
 	}
 
 	static void init()
@@ -336,22 +430,41 @@ public class BeanShell
 		Log.log(Log.DEBUG,BeanShell.class,"Initializing BeanShell"
 			+ " interpreter");
 
+		BshClassManager.setClassLoader(new JARClassLoader());
+
+		global = new NameSpace("jEdit embedded BeanShell Interpreter");
+		interpForMethods = createInterpreter(global);
+
 		try
 		{
-			interp = new Interpreter();
-			interp.setVariable("classLoader",new JARClassLoader());
-			interp.eval(new BufferedReader(new InputStreamReader(
-				BeanShell.class.getResourceAsStream("jedit.bsh"))));
+			Interpreter interp = createInterpreter(global);
+
+			BufferedReader in = new BufferedReader(new InputStreamReader(
+				BeanShell.class.getResourceAsStream("jedit.bsh")));
+
+			interp.eval(in,global,"jedit.bsh");
 		}
 		catch(Throwable t)
 		{
-			Log.log(Log.ERROR,BeanShell.class,"Error loading jedit.bsh from JAR file:");
 			Log.log(Log.ERROR,BeanShell.class,t);
 			System.exit(1);
 		}
+
+		// jedit object in global namespace is set up by jedit.bsh
+		internal = (NameSpace)eval(null,"__cruft.namespace;",false);
 	}
 
 	// private members
-	private static Interpreter interp;
+	private static Interpreter interpForMethods;
+	private static NameSpace global;
+	private static NameSpace internal;
 	private static boolean running;
+	private static int cachedBlockCounter;
+
+	// until Pat updates Interpreter.java
+	private static Interpreter createInterpreter(NameSpace nameSpace)
+	{
+		return new Interpreter(null,System.out,System.err,
+			false,nameSpace);
+	}
 }

@@ -4,31 +4,48 @@
 # directory!!!
 
 # jedit-program fileset
-# includes jedit.jar and *.txt docs
-
 echo jedit.jar > installer/jedit-program
-echo jars/PluginManager.jar >> installer/jedit-program
 echo jars/LatestVersion.jar >> installer/jedit-program
-echo site-props/*.props >> installer/jedit-program
+echo properties/README.txt >> installer/jedit-program
+echo startup/README.txt >> installer/jedit-program
 find modes -name \*.xml >> installer/jedit-program
-<<<<<<< HEAD
 echo modes/catalog >> installer/jedit-program
-=======
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
 find doc -type f -name \*.txt >> installer/jedit-program
-echo doc/welcome.html >> installer/jedit-program
-find macros -name \*.bsh >> installer/jedit-program
-find doc/users-guide/ -name \*.html >> installer/jedit-program
-echo doc/users-guide/toc.xml >> installer/jedit-program
 
 echo -n "jedit-program: "
-ls -l `cat installer/jedit-program` | awk 'BEGIN { size=0 } { size+=$5 } END { print size / 1024 }'
+ls -l `cat installer/jedit-program` | awk 'BEGIN { size=0 } { size+=(int($5/4096+1)*4) } END { print size }'
+
+# jedit-macros fileset
+find macros -name \*.bsh > installer/jedit-macros
+echo startup/changeUIFonts.bsh >> installer/jedit-macros
+
+echo -n "jedit-macros: "
+ls -l `cat installer/jedit-macros` | awk 'BEGIN { size=0 } { size+=(int($5/4096+1)*4) } END { print size }'
 
 # jedit-firewall fileset (Java 2 only)
-
 echo jars/Firewall.jar > installer/jedit-firewall
 echo -n "jedit-firewall: "
-ls -l `cat installer/jedit-firewall` | awk 'BEGIN { size=0 } { size+=$5 } END { print size / 1024 }'
+ls -l `cat installer/jedit-firewall` | awk 'BEGIN { size=0 } { size+=(int($5/4096+1)*4) } END { print size }'
+
+# jedit-windows fileset
+echo jedinit.exe > installer/jedit-windows
+echo jedinstl.dll >> installer/jedit-windows
+echo jedit.exe >> installer/jedit-windows
+echo jeditsrv.exe >> installer/jedit-windows
+echo jeservps.dll >> installer/jedit-windows
+echo jeshlstb.dl_ >> installer/jedit-windows
+echo unlaunch.exe >> installer/jedit-windows
+
+echo -n "jedit-windows: "
+ls -l `cat installer/jedit-windows` | awk 'BEGIN { size=0 } { size+=(int($5/4096+1)*4) } END { print size }'
+
+
+# jedit-os2 fileset
+echo jedit.cmd > installer/jedit-os2
+
+echo -n "jedit-os2: "
+ls -l `cat installer/jedit-os2` | awk 'BEGIN { size=0 } { size+=(int($5/4096+1)*4) } END { print size }'
+
 
 for file in installer/jedit-*
 do

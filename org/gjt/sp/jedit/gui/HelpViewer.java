@@ -31,6 +31,7 @@ import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 
@@ -38,9 +39,9 @@ import org.gjt.sp.util.Log;
  * jEdit's HTML viewer. It uses a Swing JEditorPane to display the HTML,
  * and implements a URL history.
  * @author Slava Pestov
- * @version $Id: HelpViewer.java,v 1.33 2001/04/18 03:09:45 sp Exp $
+ * @version $Id: HelpViewer.java,v 1.43 2001/08/27 07:03:58 sp Exp $
  */
-public class HelpViewer extends JFrame
+public class HelpViewer extends JFrame implements EBComponent
 {
 	/**
 	 * @deprecated Create a new HelpViewer instance instead
@@ -55,6 +56,7 @@ public class HelpViewer extends JFrame
 	 */
 	public HelpViewer(URL url)
 	{
+		// XXX
 		this(url.toString());
 	}
 
@@ -121,8 +123,8 @@ public class HelpViewer extends JFrame
 
 		viewer = new JEditorPane();
 		viewer.setEditable(false);
-		viewer.setFont(new Font("Monospaced", Font.PLAIN, 12));
 		viewer.addHyperlinkListener(new LinkHandler());
+		viewer.setFont(new Font("Monospaced",Font.PLAIN,12));
 
 		JSplitPane splitter = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
 			new JScrollPane(toc),new JScrollPane(viewer));
@@ -137,6 +139,8 @@ public class HelpViewer extends JFrame
 
 		setSize(800,400);
 		GUIUtilities.loadGeometry(this,"helpviewer");
+
+		EditBus.addToBus(this);
 
 		show();
 	}
@@ -153,15 +157,15 @@ public class HelpViewer extends JFrame
 		// stick around
 		viewer.setCursor(Cursor.getDefaultCursor());
 
-		if(!MiscUtilities.isURL(url))
-			url = jEdit.getDocumentationURL() + url;
-		else if(url.startsWith("file://"))
-			url = "file:" + url.substring(7);
+		int index = url.indexOf('#');
 
+		URL _url = null;
 		try
 		{
-			urlField.setText(url);
-			viewer.setPage(new URL(url));
+			_url = new URL(url);
+
+			urlField.setText(_url.toString());
+			viewer.setPage(_url);
 			if(addToHistory)
 			{
 				history[historyPos] = url;
@@ -180,35 +184,43 @@ public class HelpViewer extends JFrame
 			Log.log(Log.ERROR,this,mf);
 			String[] args = { url, mf.getMessage() };
 			GUIUtilities.error(this,"badurl",args);
+			return;
 		}
 		catch(IOException io)
 		{
 			Log.log(Log.ERROR,this,io);
-			String[] args = { io.getMessage() };
-			GUIUtilities.error(this,"ioerror",args);
+			String[] args = { url, io.toString() };
+			GUIUtilities.error(this,"read-error",args);
+			return;
 		}
 
-		// select the appropriate tree node
-		if(url.startsWith(jEdit.getDocumentationURL()))
-		{
-			DefaultMutableTreeNode node = (DefaultMutableTreeNode)
-				nodes.get(url.substring(jEdit.getDocumentationURL()
-				.length()));
+		// select the appropriate tree node.
+		index = url.lastIndexOf("/doc/");
+		if(index != -1)
+			url = url.substring(index + 5);
 
-			if(node == null)
-				return;
+		DefaultMutableTreeNode node = (DefaultMutableTreeNode)nodes.get(url);
 
-			TreePath path = new TreePath(tocModel.getPathToRoot(node));
-			toc.expandPath(path);
-			toc.setSelectionPath(path);
-			toc.scrollPathToVisible(path);
-		}
+		if(node == null)
+			return;
+
+		TreePath path = new TreePath(tocModel.getPathToRoot(node));
+		toc.expandPath(path);
+		toc.setSelectionPath(path);
+		toc.scrollPathToVisible(path);
 	}
 
 	public void dispose()
 	{
+		EditBus.removeFromBus(this);
 		GUIUtilities.saveGeometry(this,"helpviewer");
 		super.dispose();
+	}
+
+	public void handleMessage(EBMessage msg)
+	{
+		if(msg instanceof PropertiesChanged)
+			SwingUtilities.updateComponentTreeUI(getRootPane());
 	}
 
 	// private members
@@ -230,25 +242,20 @@ public class HelpViewer extends JFrame
 		root.add(createNode("welcome.html",
 			jEdit.getProperty("helpviewer.toc.welcome")));
 
-		loadUserGuideTOC(root);
-
-		DefaultMutableTreeNode misc = new DefaultMutableTreeNode(
-			jEdit.getProperty("helpviewer.toc.misc"),true);
-
-		misc.add(createNode("README.txt",
+		root.add(createNode("jeditresource:/doc/README.txt",
 			jEdit.getProperty("helpviewer.toc.readme")));
-		misc.add(createNode("NEWS.txt",
+		root.add(createNode("jeditresource:/doc/NEWS.txt",
 			jEdit.getProperty("helpviewer.toc.news")));
-		misc.add(createNode("TODO.txt",
+		root.add(createNode("jeditresource:/doc/TODO.txt",
 			jEdit.getProperty("helpviewer.toc.todo")));
-		misc.add(createNode("CHANGES.txt",
+		root.add(createNode("jeditresource:/doc/CHANGES.txt",
 			jEdit.getProperty("helpviewer.toc.changes")));
-		misc.add(createNode("COPYING.txt",
+		root.add(createNode("jeditresource:/doc/COPYING.txt",
 			jEdit.getProperty("helpviewer.toc.copying")));
-		misc.add(createNode("COPYING.DOC.txt",
+		root.add(createNode("jeditresource:/doc/COPYING.DOC.txt",
 			jEdit.getProperty("helpviewer.toc.copying-doc")));
 
-		root.add(misc);
+		loadUserGuideTOC(root);
 
 		DefaultMutableTreeNode pluginDocs = new DefaultMutableTreeNode(
 			jEdit.getProperty("helpviewer.toc.plugins"),true);
@@ -287,17 +294,20 @@ public class HelpViewer extends JFrame
 
 	private void loadUserGuideTOC(DefaultMutableTreeNode root)
 	{
+		URL resource = getClass().getResource("/doc/users-guide/toc.xml");
+		if(resource == null)
+			return;
+
 		TOCHandler h = new TOCHandler(root);
 		XmlParser parser = new XmlParser();
 		parser.setHandler(h);
 
 		try
 		{
-			parser.parse(null, null, new FileReader(
-				MiscUtilities.constructPath(
-				jEdit.getJEditHome(),"doc"
-				+ File.separator + "users-guide"
-				+ File.separator + "toc.xml")));
+			// use a URL here because with Web Start version,
+			// toc.xml is not a local file
+			parser.parse(null, null, new InputStreamReader(
+				resource.openStream()));
 		}
 		catch(XmlException xe)
 		{
@@ -305,11 +315,6 @@ public class HelpViewer extends JFrame
 			String message = xe.getMessage();
 			Log.log(Log.ERROR,this,"toc.xml:" + line
 				+ ": " + message);
-		}
-		catch(FileNotFoundException fnfe)
-		{
-			// user didn't install HTML documentation.
-			// do nothing.
 		}
 		catch(Exception e)
 		{
@@ -420,7 +425,7 @@ public class HelpViewer extends JFrame
 				Rectangle cellRect = getPathBounds(path);
 				if(cellRect != null && !cellRectIsVisible(cellRect))
 				{
-					return new Point(cellRect.x, cellRect.y + 1);
+					return new Point(cellRect.x, cellRect.y - 1);
 				}
 			}
 			return null;
@@ -445,15 +450,9 @@ public class HelpViewer extends JFrame
 				super.processMouseEvent(evt);
 				break;
 			case MouseEvent.MOUSE_CLICKED:
-				if((evt.getModifiers() & MouseEvent.BUTTON1_MASK) != 0)
+				TreePath path = getPathForLocation(evt.getX(),evt.getY());
+				if(path != null)
 				{
-					TreePath path = getPathForLocation(evt.getX(),evt.getY());
-					if(path == null)
-					{
-						super.processMouseEvent(evt);
-						break;
-					}
-
 					if(!isPathSelected(path))
 						setSelectionPath(path);
 
@@ -494,7 +493,7 @@ public class HelpViewer extends JFrame
 
 	class TOCCellRenderer extends DefaultTreeCellRenderer
 	{
-		EmptyBorder border = new EmptyBorder(3,3,3,3);
+		EmptyBorder border = new EmptyBorder(1,0,1,1);
 
 		public Component getTreeCellRendererComponent(JTree tree,
 			Object value, boolean sel, boolean expanded,

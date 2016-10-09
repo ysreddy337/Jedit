@@ -9,8 +9,7 @@
 	<PROPS>
 		<PROPERTY NAME="commentStart" VALUE="&lt;!--" />
 		<PROPERTY NAME="commentEnd" VALUE="--&gt;" />
-		<PROPERTY NAME="boxComment" VALUE="--" />
-		<PROPERTY NAME="blockComment" VALUE=";" />
+		<PROPERTY NAME="lineComment" VALUE=";" />
 	</PROPS>
 	<RULES IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
 		<WHITESPACE> </WHITESPACE>
@@ -70,6 +69,16 @@
 
 		<!-- markup tags -->
 		<SEQ TYPE="NULL">&lt;=</SEQ>
+
+		<SPAN TYPE="MARKUP" DELEGATE="xml::TAGS">
+			<BEGIN>&lt;/style-specification</BEGIN>
+			<END>&gt;</END>
+		</SPAN>
+
+		<SPAN TYPE="MARKUP" DELEGATE="xml::TAGS">
+			<BEGIN>&lt;/style-sheet</BEGIN>
+			<END>&gt;</END>
+		</SPAN>
 
 		<SPAN TYPE="MARKUP" DELEGATE="xml::TAGS">
 			<BEGIN>&lt;style-specification</BEGIN>
