@@ -42,7 +42,7 @@ import org.gjt.sp.util.Log;
 /**
  * The main class of the jEdit text editor.
  * @author Slava Pestov
- * @version $Id: jEdit.java,v 1.370 2001/08/27 07:03:58 sp Exp $
+ * @version $Id: jEdit.java,v 1.371 2001/09/01 01:26:54 sp Exp $
  */
 public class jEdit
 {
@@ -61,7 +61,7 @@ public class jEdit
 	public static String getBuild()
 	{
 		// (major).(minor).(<99 = preX, 99 = final).(bug fix)
-		return "03.02.99.00";
+		return "03.02.99.01";
 	}
 
 	/**
@@ -197,7 +197,7 @@ public class jEdit
 		}
 
 		// MacOS X GUI hacks
-		if(System.getProperty("os.name").indexOf("MacOS X") != -1)
+		if(System.getProperty("os.name").indexOf("Mac") != -1)
 		{
 			// put the menu bar at the top of the screen, as opposed to
 			// inside the jEdit window
@@ -2748,7 +2748,8 @@ loop:		for(int i = 0; i < list.length; i++)
 			if(plugin.equals("EditBuddy.jar")
 				|| plugin.equals("PluginManager.jar")
 				|| plugin.equals("jaxp.jar")
-				|| plugin.equals("crimson.jar"))
+				|| plugin.equals("crimson.jar")
+				|| plugin.equals("Tidy.jar"))
 			{
 				String[] args = { plugin };
 				GUIUtilities.error(null,"plugin.obsolete",args);

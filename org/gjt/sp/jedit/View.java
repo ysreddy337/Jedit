@@ -38,7 +38,7 @@ import org.gjt.sp.util.Log;
  * class.
  *
  * @author Slava Pestov
- * @version $Id: View.java,v 1.240 2001/08/18 08:37:02 sp Exp $
+ * @version $Id: View.java,v 1.241 2001/09/01 01:26:54 sp Exp $
  */
 public class View extends JFrame implements EBComponent
 {
@@ -49,6 +49,15 @@ public class View extends JFrame implements EBComponent
 	public DockableWindowManager getDockableWindowManager()
 	{
 		return dockableWindowManager;
+	}
+
+	/**
+	 * Returns the view's tool bar.
+	 * @since jEdit 3.2.1
+	 */
+	public JToolBar getToolBar()
+	{
+		return toolBar;
 	}
 
 	/**

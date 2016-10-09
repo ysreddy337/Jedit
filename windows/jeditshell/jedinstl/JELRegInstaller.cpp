@@ -25,7 +25,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: JELRegInstaller.cpp,v 1.5 2001/08/28 19:36:43 jgellene Exp $
+ * $Id: JELRegInstaller.cpp,v 1.6 2001/09/01 04:29:05 jgellene Exp $
  */
 
 #include "stdafx.h"
@@ -342,10 +342,10 @@ HRESULT JELRegistryInstaller::RegisterCmdLineParameters()
 		nResult = RegQueryValueEx(hVersionKey, arszValues[1], 0, 0, (LPBYTE)szBuf, &dwValueSize);
 		if(nResult != ERROR_SUCCESS || dwValueSize == 0)
 		{
-			CString strJavaOptions;
-			strJavaOptions.Format(IDS_REG_JAVAPARAM_DEFAULT,
-				pData->arPathNames[pData->nIndexSubjectVer]);
-				RegSetValueEx(hVersionKey, arszValues[1], 0,
+			CString strJavaOptions(_T("-jar -mx32m"));
+//			strJavaOptions.Format(IDS_REG_JAVAPARAM_DEFAULT,
+//				pData->arPathNames[pData->nIndexSubjectVer]);
+			RegSetValueEx(hVersionKey, arszValues[1], 0,
 				REG_SZ, (LPBYTE)(LPCTSTR)strJavaOptions,
 				InstallData::GetBufferByteLen(strJavaOptions));
 		}
@@ -360,9 +360,11 @@ HRESULT JELRegistryInstaller::RegisterCmdLineParameters()
 
 	// "jEdit Target" -- must always be set
 	nResult = RegQueryValueEx(hVersionKey, arszValues[2], 0, 0, (LPBYTE)szBuf, &dwValueSize);
-	if(nResult != ERROR_SUCCESS || dwValueSize == 0)
+	if(nResult != ERROR_SUCCESS || dwValueSize == 0 || !bUseOldParameters)
 	{
-		CString strJEditTarget(_T("org.gjt.sp.jedit.jEdit"));
+		CString strJEditTarget(_T("\""));
+		strJEditTarget += pData->strInstallPath.Left(pData->strInstallPath.GetLength() - 12);
+		strJEditTarget += _T("jedit.jar\"");
 		RegSetValueEx(hVersionKey, arszValues[2], 0,
 			REG_SZ, (LPBYTE)(LPCTSTR)strJEditTarget,
 			InstallData::GetBufferByteLen(strJEditTarget));
