@@ -9,17 +9,19 @@
         <PROPERTY NAME="lineComment" VALUE="//" />
         <PROPERTY NAME="wordBreakChars" VALUE=",+-=&lt;&gt;/?^&amp;*" />
 
-        <!-- Auto indent -->
-        <PROPERTY NAME="indentOpenBrackets" VALUE="{" />
-        <PROPERTY NAME="indentCloseBrackets" VALUE="}" />
-        <PROPERTY NAME="indentNextLine"
-            VALUE="\s*(((if|while)\s*\(|else\s*|else\s+if\s*\(|for\s*\(.*\))[^{;]*)" />
-        <!-- set this to 'true' if you want to use GNU coding style -->
-        <PROPERTY NAME="doubleBracketIndent" VALUE="false" />
-        <PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
+	<!-- Auto indent -->
+	<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
+	<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
+	<PROPERTY NAME="unalignedOpenBrackets" VALUE="(" />
+	<PROPERTY NAME="unalignedCloseBrackets" VALUE=")" />
+	<PROPERTY NAME="indentNextLine"
+		VALUE="\s*(((if|while)\s*\(|else\s*|else\s+if\s*\(|for\s*\(.*\))[^{;]*)" />
+	<PROPERTY NAME="unindentThisLine"
+		VALUE="^.*(default:\s*|case.*:.*)$" />
+	<PROPERTY NAME="electricKeys" VALUE=":" />
     </PROPS>
-    <RULES ESCAPE="\"
-        IGNORE_CASE="FALSE"
+
+    <RULES IGNORE_CASE="FALSE"
         HIGHLIGHT_DIGITS="TRUE"
         DIGIT_RE="(0x[0-9a-fA-F_]+[uUlL]?|[0-9_]+(e[0-9_]*)?[uUlLdDfF]?)">
 
@@ -44,17 +46,40 @@
             <END>*/</END>
         </SPAN>
 
+        <!-- Nested comment -->
+        <SPAN TYPE="COMMENT1" DELEGATE="NESTED_COMMENT">
+            <BEGIN>/+</BEGIN>
+            <END>+/</END>
+        </SPAN>
+
+        <EOL_SPAN TYPE="COMMENT2">//</EOL_SPAN>
+
+        <!-- Wysiwyg string literal -->
         <SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
+            <BEGIN>r"</BEGIN>
+            <END>"</END>
+        </SPAN>
+        <!-- Alternate Wysiwyg string literal -->
+        <SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
+            <BEGIN>`</BEGIN>
+            <END>`</END>
+        </SPAN>
+        <!-- Doublequoted string literal -->
+        <SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
             <BEGIN>"</BEGIN>
             <END>"</END>
         </SPAN>
-        <SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
+        <!-- Hex string literal -->
+        <SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
+            <BEGIN>x"</BEGIN>
+            <END>"</END>
+        </SPAN>
+        <!-- Character literal -->
+        <SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
             <BEGIN>'</BEGIN>
             <END>'</END>
         </SPAN>
 
-        <EOL_SPAN TYPE="COMMENT2">//</EOL_SPAN>
-        
         <SEQ TYPE="OPERATOR">=</SEQ>
         <SEQ TYPE="OPERATOR">!</SEQ>
         <SEQ TYPE="OPERATOR">&gt;=</SEQ>
@@ -73,12 +98,13 @@
         <SEQ TYPE="OPERATOR">~</SEQ>
         <SEQ TYPE="OPERATOR">}</SEQ>
         <SEQ TYPE="OPERATOR">{</SEQ>
-        
-        <MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE"
+
+        <MARK_PREVIOUS TYPE="LABEL" MATCH_TYPE="OPERATOR"
             AT_WHITESPACE_END="TRUE">:</MARK_PREVIOUS>
 
         <!-- Function calls -->
-        <MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
+        <MARK_PREVIOUS TYPE="FUNCTION" MATCH_TYPE="OPERATOR">(</MARK_PREVIOUS>
+		<SEQ TYPE="OPERATOR">)</SEQ>
 
         <!-- Annotation types -->
         <MARK_FOLLOWING TYPE="KEYWORD4">@</MARK_FOLLOWING>
@@ -94,7 +120,7 @@
             <KEYWORD4>body</KEYWORD4>
             <KEYWORD1>break</KEYWORD1>
             <KEYWORD3>byte</KEYWORD3>
-            <KEYWORD1>case></KEYWORD1>
+            <KEYWORD1>case</KEYWORD1>
             <KEYWORD3>cast</KEYWORD3>
             <KEYWORD1>catch</KEYWORD1>
             <KEYWORD3>cent</KEYWORD3>
@@ -176,5 +202,11 @@
             <KEYWORD1>while</KEYWORD1>
             <KEYWORD2>with</KEYWORD2>
         </KEYWORDS>
+    </RULES>
+    <RULES SET="NESTED_COMMENT" DEFAULT="COMMENT1">
+        <SPAN TYPE="COMMENT1" DELEGATE="NESTED_COMMENT">
+            <BEGIN>/+</BEGIN>
+            <END>+/</END>
+        </SPAN>
     </RULES>
 </MODE>

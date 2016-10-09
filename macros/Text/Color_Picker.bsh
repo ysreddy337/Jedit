@@ -17,7 +17,7 @@
  * along with the jEdit application; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: Color_Picker.bsh,v 1.3 2004/03/08 04:29:12 spestov Exp $
+ * $Id: Color_Picker.bsh 4988 2004-03-08 04:29:12Z spestov $
  */
 
 selection = textArea.getSelectedText();

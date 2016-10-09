@@ -23,110 +23,72 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import com.microstar.xml.*;
-import java.io.*;
 import java.net.URL;
 import java.util.*;
+
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.helpers.DefaultHandler;
+
+import org.gjt.sp.util.XMLUtilities;
 import org.gjt.sp.util.Log;
 //}}}
 
 /**
  * @since jEdit 4.2pre1
  * @author Slava Pestov
- * @version $Id: ServiceListHandler.java,v 1.3 2003/04/30 21:22:37 spestov Exp $
+ * @version $Id: ServiceListHandler.java 14599 2009-02-07 19:06:52Z kpouer $
  */
-class ServiceListHandler extends HandlerBase
+class ServiceListHandler extends DefaultHandler
 {
 	//{{{ ServiceListHandler constructor
 	ServiceListHandler(PluginJAR plugin, URL uri)
 	{
 		this.plugin = plugin;
 		this.uri = uri;
-		stateStack = new Stack();
-		cachedServices = new LinkedList();
+		code = new StringBuilder();
+		stateStack = new Stack<String>();
+		cachedServices = new LinkedList<ServiceManager.Descriptor>();
 	} //}}}
 
 	//{{{ resolveEntity() method
-	public Object resolveEntity(String publicId, String systemId)
+	public InputSource resolveEntity(String publicId, String systemId)
 	{
-		if("services.dtd".equals(systemId))
-		{
-			// this will result in a slight speed up, since we
-			// don't need to read the DTD anyway, as AElfred is
-			// non-validating
-			return new StringReader("<!-- -->");
-
-			/* try
-			{
-				return new BufferedReader(new InputStreamReader(
-					getClass().getResourceAsStream
-					("/org/gjt/sp/jedit/services.dtd")));
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.ERROR,this,"Error while opening"
-					+ " dockables.dtd:");
-				Log.log(Log.ERROR,this,e);
-			} */
-		}
-
-		return null;
+		return XMLUtilities.findEntity(systemId, "services.dtd", getClass());
 	} //}}}
 
-	//{{{ attribute() method
-	public void attribute(String aname, String value, boolean isSpecified)
-	{
-		if(aname.equals("NAME"))
-			serviceName = value;
-		else if(aname.equals("CLASS"))
-			serviceClass = value;
-	} //}}}
-
-	//{{{ doctypeDecl() method
-	public void doctypeDecl(String name, String publicId,
-		String systemId) throws Exception
-	{
-		if("SERVICES".equals(name))
-			return;
-
-		Log.log(Log.ERROR,this,uri + ": DOCTYPE must be SERVICES");
-	} //}}}
-
-	//{{{ charData() method
-	public void charData(char[] c, int off, int len)
+	//{{{ characters() method
+	public void characters(char[] c, int off, int len)
 	{
 		String tag = peekElement();
-		String text = new String(c, off, len);
-
 		if (tag == "SERVICE")
-		{
-			code = text;
-		}
+			code.append(c, off, len);
 	} //}}}
 
 	//{{{ startElement() method
-	public void startElement(String tag)
+	public void startElement(String uri, String localName,
+				 String tag, Attributes attrs)
 	{
 		tag = pushElement(tag);
+		serviceName = attrs.getValue("NAME");
+		serviceClass = attrs.getValue("CLASS");
 	} //}}}
 
 	//{{{ endElement() method
-	public void endElement(String name)
+	public void endElement(String uri, String localName, String name)
 	{
-		if(name == null)
-			return;
-
 		String tag = peekElement();
 
 		if(name.equals(tag))
 		{
-			if(tag == "SERVICE")
+			if (tag.equals("SERVICE"))
 			{
 				ServiceManager.Descriptor d =
 					new ServiceManager.Descriptor(
-					serviceClass,serviceName,code,plugin);
+					serviceClass,serviceName,code.toString(),plugin);
 				ServiceManager.registerService(d);
 				cachedServices.add(d);
+				code.setLength(0);
 			}
 
 			popElement();
@@ -147,14 +109,14 @@ class ServiceListHandler extends HandlerBase
 		}
 		catch (Exception e)
 		{
-			e.printStackTrace();
+			Log.log(Log.ERROR, e, e);
 		}
 	} //}}}
 
 	//{{{ getCachedServices() method
 	public ServiceManager.Descriptor[] getCachedServices()
 	{
-		return (ServiceManager.Descriptor[])cachedServices.toArray(
+		return cachedServices.toArray(
 			new ServiceManager.Descriptor[cachedServices.size()]);
 	} //}}}
 
@@ -166,11 +128,11 @@ class ServiceListHandler extends HandlerBase
 
 	private String serviceName;
 	private String serviceClass;
-	private String code;
+	private StringBuilder code;
 
-	private Stack stateStack;
+	private Stack<String> stateStack;
 
-	private List cachedServices;
+	private List<ServiceManager.Descriptor> cachedServices;
 	//}}}
 
 	//{{{ pushElement() method
@@ -186,13 +148,13 @@ class ServiceListHandler extends HandlerBase
 	//{{{ peekElement() method
 	private String peekElement()
 	{
-		return (String) stateStack.peek();
+		return stateStack.peek();
 	} //}}}
 
 	//{{{ popElement() method
 	private String popElement()
 	{
-		return (String) stateStack.pop();
+		return stateStack.pop();
 	} //}}}
 
 	//}}}

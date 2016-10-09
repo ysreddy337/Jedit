@@ -5,7 +5,7 @@
  *
  * Copyright (C) 2002-2004 Ollie Rutherfurd <oliver@rutherfurd.net>
  *
- * $Id: Next_Dirty_Buffer.bsh,v 1.1 2004/04/09 17:10:15 spestov Exp $
+ * $Id: Next_Dirty_Buffer.bsh 5450 2006-06-20 09:08:13Z vampire0 $
  */
 
 void nextDirtyBuffer(View view)

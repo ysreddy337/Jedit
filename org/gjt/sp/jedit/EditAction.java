@@ -23,11 +23,10 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
+import org.gjt.sp.util.Log;
+import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.Component;
-import org.gjt.sp.jedit.gui.InputHandler;
-import org.gjt.sp.util.Log;
 //}}}
 
 /**
@@ -38,37 +37,38 @@ import org.gjt.sp.util.Log;
  * @see ActionSet
  *
  * @author Slava Pestov
- * @version $Id: EditAction.java,v 1.23 2003/05/01 04:17:13 spestov Exp $
+ * @version $Id: EditAction.java 16334 2009-10-14 09:31:11Z kpouer $
  */
-public abstract class EditAction
+public abstract class EditAction extends JEditAbstractEditAction<View>
 {
-	//{{{ EditAction constructor
+	//{{{ EditAction constructors
 	/**
 	 * Creates a new edit action with the specified name.
 	 * @param name The action name
 	 */
 	public EditAction(String name)
 	{
-		this.name = name;
-	} //}}}
-
-	//{{{ getName() method
-	/**
-	 * Returns the internal name of this action.
-	 */
-	public String getName()
+		super(name);
+	}
+	
+	public EditAction(String name, Object[] newArgs) 
 	{
-		return name;
+		super(name, newArgs);
 	} //}}}
-
+			
 	//{{{ getLabel() method
 	/**
 	 * Returns the action's label. This returns the
 	 * value of the property named by {@link #getName()} suffixed
 	 * with <code>.label</code>.
+	 * 
 	 */
-	public final String getLabel()
+	public String getLabel()
 	{
+		if (args != null)
+		{
+			return jEdit.getProperty(name + ".label", args);
+		}
 		return jEdit.getProperty(name + ".label");
 	} //}}}
 
@@ -85,14 +85,15 @@ public abstract class EditAction
 
 	//{{{ invoke() method
 	/**
-	 * Invokes the action.
+	 * Invokes the action. This is an implementation of the Command pattern,
+	 * and concrete actions should override this.
+	 * 
 	 * @param view The view
 	 * @since jEdit 2.7pre2
+	 * abstract since jEdit 4.3pre7
 	 */
-	public void invoke(View view)
-	{
-	} //}}}
-
+	abstract public void invoke(View view);
+	
 	//{{{ getView() method
 	/**
 	 * @deprecated Call <code>GUIUtilities.getView()</code> instead.
@@ -164,21 +165,21 @@ public abstract class EditAction
 	//{{{ getCode() method
 	/**
 	 * Returns the BeanShell code that will replay this action.
+	 * BeanShellAction.getCode() returns something more interesting for Actions that were loaded
+	 * from the actions.xml file. 
+	 * You do not need to override this method if your action name is unique,
+	 * this EditAction was added to an ActionSet and that to an ActionContext of jEdit.
+	 * 
+	 * concrete since jEdit 4.3pre7
 	 * @since jEdit 2.7pre2
+	 * 
 	 */
-	public abstract String getCode();
-	//}}}
-
-	//{{{ toString() method
-	public String toString()
+	public String getCode() 
 	{
-		return name;
-	} //}}}
-
-	//{{{ Private members
-	private String name;
+		return "jEdit.getAction(" + name + ").invoke(view); ";
+	}
 	//}}}
-
+	
 	//{{{ Wrapper class
 	/**
 	 * 'Wrap' EditActions in this class to turn them into AWT
@@ -186,6 +187,10 @@ public abstract class EditAction
 	 */
 	public static class Wrapper implements ActionListener
 	{
+
+		private final ActionContext context;
+		private final String actionName;
+		
 		/**
 		 * Creates a new action listener wrapper.
 		 * @since jEdit 4.2pre1
@@ -215,8 +220,5 @@ public abstract class EditAction
 			else
 				context.invokeAction(evt,action);
 		}
-
-		private ActionContext context;
-		private String actionName;
 	} //}}}
 }

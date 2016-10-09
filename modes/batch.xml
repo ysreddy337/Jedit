@@ -24,6 +24,8 @@
 <MODE>
 	<PROPS>
 		<PROPERTY NAME="lineComment" VALUE="rem" />
+		<PROPERTY NAME="indentOpenBrackets" VALUE="(" />
+		<PROPERTY NAME="indentCloseBrackets" VALUE=")" />
 	</PROPS>
 	<RULES IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="FALSE">
 		<!-- 'echo off' statements -->
@@ -40,7 +42,7 @@
 		<MARK_FOLLOWING AT_WORD_START="TRUE" TYPE="LABEL">:</MARK_FOLLOWING>
 
 		<!-- comments -->
-		<EOL_SPAN_REGEXP AT_WHITESPACE_END="TRUE" HASH_CHAR="R" TYPE="COMMENT1">REM\s</EOL_SPAN_REGEXP>
+		<EOL_SPAN_REGEXP AT_WHITESPACE_END="TRUE" HASH_CHAR="REM" TYPE="COMMENT1">REM\s</EOL_SPAN_REGEXP>
 
 		<!-- literals -->
 		<SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
@@ -61,9 +63,9 @@
 		<SEQ TYPE="KEYWORD2">%9</SEQ>
 		<!-- for-loop variable (one char after %%) -->
 		<SEQ_REGEXP TYPE="KEYWORD2"
-					HASH_CHAR="%"
+					HASH_CHAR="%%"
 					AT_WORD_START="TRUE"
-					>%%[[:alpha:]]</SEQ_REGEXP>
+					>%%[\p{Alpha}]</SEQ_REGEXP>
 		<SPAN TYPE="KEYWORD2" NO_LINE_BREAK="TRUE">
 			<BEGIN>%</BEGIN>
 			<END>%</END>

@@ -29,7 +29,7 @@ import java.awt.*;
  * Enter is pressed) and cancel() (called when Escape is pressed, or window
  * is closed).
  * @author Slava Pestov
- * @version $Id: EnhancedDialog.java,v 1.2 2002/10/07 21:13:19 spestov Exp $
+ * @version $Id: EnhancedDialog.java 12504 2008-04-22 23:12:43Z ezust $
  */
 public abstract class EnhancedDialog extends JDialog
 {
@@ -45,12 +45,22 @@ public abstract class EnhancedDialog extends JDialog
 		_init();
 	}
 
+	public boolean getEnterEnabled()
+	{
+		return enterEnabled;
+	}
+
+	public void setEnterEnabled(boolean enterEnabled)
+	{
+		this.enterEnabled = enterEnabled;
+	}
+	
 	public abstract void ok();
 	public abstract void cancel();
 
 	//{{{ Private members
-	
-	private void _init() {
+	private void _init()
+	{
 		((Container)getLayeredPane()).addContainerListener(
 			new ContainerHandler());
 		getContentPane().addContainerListener(new ContainerHandler());
@@ -60,12 +70,14 @@ public abstract class EnhancedDialog extends JDialog
 		addWindowListener(new WindowHandler());
 
 		setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+		
+		enterEnabled = true;
 	}
-
 	//}}}
 	
 	// protected members
 	protected KeyHandler keyHandler;
+	protected boolean enterEnabled;
 
 	// Recursively adds our key listener to sub-components
 	class ContainerHandler extends ContainerAdapter
@@ -118,9 +130,9 @@ public abstract class EnhancedDialog extends JDialog
 			if(evt.isConsumed())
 				return;
 
-			if(evt.getKeyCode() == KeyEvent.VK_ENTER)
+			if(evt.getKeyCode() == KeyEvent.VK_ENTER
+				&& enterEnabled)
 			{
-				// crusty workaround
 				Component comp = getFocusOwner();
 				while(comp != null)
 				{

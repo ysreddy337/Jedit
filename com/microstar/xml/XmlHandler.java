@@ -1,6 +1,6 @@
 // XmlHandler.java: the callback interface.
 // NO WARRANTY! See README, and copyright below.
-// $Id: XmlHandler.java,v 1.1.1.1 2001/09/02 05:39:38 spestov Exp $
+// $Id: XmlHandler.java 14583 2009-02-06 05:38:53Z ezust $
 
 package com.microstar.xml;
 
@@ -17,11 +17,10 @@ package com.microstar.xml;
   * @author Copyright (c) 1997, 1998 by Microstar Software Ltd.
   * @author written by David Megginson &lt;dmeggins@microstar.com&gt;
   * @version 1.1
-  * @see XmlParser
-  * @see HandlerBase
   * @see org.xml.sax.EntityHandler
   * @see org.xml.sax.DocumentHandler
   * @see org.xml.sax.ErrorHandler
+  * @deprecated
   */
 public interface XmlHandler {
 
@@ -125,7 +124,6 @@ public interface XmlHandler {
     * <p>You may use XmlParser.getAttributeType() to find the attribute's
     * declared type.
     * @param name The name of the attribute.
-    * @param type The type of the attribute (see below).
     * @param value The value of the attribute, or null if the attribute
     *        is <code>#IMPLIED</code>.
     * @param isSpecified True if the value was specified, false if it
@@ -136,7 +134,7 @@ public interface XmlHandler {
     * @see XmlParser#getAttributeType
     * @see XmlParser#getAttributeDefaultValue
     */
-  public void attribute (String aname, String value, boolean isSpecified)
+  public void attribute (String name, String value, boolean isSpecified)
     throws java.lang.Exception;
 
 

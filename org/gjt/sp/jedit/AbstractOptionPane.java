@@ -55,7 +55,7 @@ import java.awt.*;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: AbstractOptionPane.java,v 1.18 2004/03/28 00:07:26 spestov Exp $
+ * @version $Id: AbstractOptionPane.java 13806 2008-09-26 08:45:42Z kpouer $
  */
 // even though this class is called AbstractOptionPane, it is not really
 // abstract, since BufferOptions uses an instance of it to lay out its
@@ -65,12 +65,12 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 	//{{{ AbstractOptionPane constructor
 	/**
 	 * Creates a new option pane.
-	 * @param name The internal name. The option pane's label is set to the
+	 * @param internalName The internal name. The option pane's label is set to the
 	 * value of the property named <code>options.<i>name</i>.label</code>.
 	 */
-	public AbstractOptionPane(String name)
+	public AbstractOptionPane(String internalName)
 	{
-		this.name = name;
+		this.name = internalName;
 		setLayout(gridBag = new GridBagLayout());
 	} //}}}
 
@@ -80,6 +80,7 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 	 * is set to the value of the property named
 	 * <code>options.<i>name</i>.label</code>.
 	 */
+	@Override
 	public String getName()
 	{
 		return name;
@@ -120,6 +121,31 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 			_save();
 	} //}}}
 
+	//{{{ newLabel()
+	/**
+	 * @return a label which has the same tooltiptext as the Component
+	 *    that it is a label for. This is used to create labels from inside
+	 *    AbstractOptionPane.
+	 * @since jEdit 4.3pre4
+	 */
+	public JLabel newLabel(String label, Component comp)
+	{
+		JLabel retval = new JLabel(label);
+		try /* to get the tooltip of the component */
+		{
+			JComponent jc = (JComponent) comp;
+			String tttext = jc.getToolTipText();
+			retval.setToolTipText(tttext);
+		}
+		catch (Exception e)
+		{
+			/* There probably wasn't a tooltip,
+			 * or it wasn't a JComponent.
+			   We don't care. */
+		}
+		return retval;
+	}// }}}
+
 	//{{{ addComponent() method
 	/**
 	 * Adds a labeled component to the option pane. Components are
@@ -130,7 +156,7 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 	 */
 	public void addComponent(String label, Component comp)
 	{
-		JLabel l = new JLabel(label);
+		JLabel l = newLabel(label, comp);
 		l.setBorder(new EmptyBorder(0,0,0,12));
 		addComponent(l,comp,GridBagConstraints.BOTH);
 	} //}}}
@@ -147,7 +173,7 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 	 */
 	public void addComponent(String label, Component comp, int fill)
 	{
-		JLabel l = new JLabel(label);
+		JLabel l = newLabel(label, comp);
 		l.setBorder(new EmptyBorder(0,0,0,12));
 		addComponent(l,comp,fill);
 	} //}}}
@@ -181,6 +207,7 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 	 */
 	public void addComponent(Component comp1, Component comp2, int fill)
 	{
+		copyToolTips(comp1, comp2);
 		GridBagConstraints cons = new GridBagConstraints();
 		cons.gridy = y++;
 		cons.gridheight = 1;
@@ -210,7 +237,7 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 		GridBagConstraints cons = new GridBagConstraints();
 		cons.gridy = y++;
 		cons.gridheight = 1;
-		cons.gridwidth = cons.REMAINDER;
+		cons.gridwidth = GridBagConstraints.REMAINDER;
 		cons.fill = GridBagConstraints.NONE;
 		cons.anchor = GridBagConstraints.WEST;
 		cons.weightx = 1.0f;
@@ -233,7 +260,7 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 		GridBagConstraints cons = new GridBagConstraints();
 		cons.gridy = y++;
 		cons.gridheight = 1;
-		cons.gridwidth = cons.REMAINDER;
+		cons.gridwidth = GridBagConstraints.REMAINDER;
 		cons.fill = fill;
 		cons.anchor = GridBagConstraints.WEST;
 		cons.weightx = 1.0f;
@@ -241,6 +268,49 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 
 		gridBag.setConstraints(comp,cons);
 		add(comp);
+	} //}}}
+
+	//{{{ copyToolTips() method
+	private static void copyToolTips(Component c1, Component c2)
+	{
+		int tooltips = 0;
+		int jc = 0;
+		String text = null;
+		JComponent jc1 = null;
+		try
+		{
+			jc1 = (JComponent) c1;
+			text = jc1.getToolTipText();
+			++jc;
+			if (text != null && text.length() > 0)
+				tooltips++;
+		}
+		catch (Exception e)
+		{
+		}
+
+		JComponent jc2 = null;
+		try
+		{
+			jc2 = (JComponent) c2;
+			String text2 = jc2.getToolTipText();
+			++jc;
+			if (text2 != null && text2.length() > 0)
+			{
+				text = text2;
+				tooltips++;
+			}
+		}
+		catch (Exception e)
+		{
+		}
+
+		if (tooltips == 1 && jc == 2)
+		{
+			jc1.setToolTipText(text);
+			jc2.setToolTipText(text);
+		}
+
 	} //}}}
 
 	//{{{ addSeparator() method
@@ -252,12 +322,12 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 	{
 		addComponent(Box.createVerticalStrut(6));
 
-		JSeparator sep = new JSeparator(JSeparator.HORIZONTAL);
+		JSeparator sep = new JSeparator(SwingConstants.HORIZONTAL);
 
 		GridBagConstraints cons = new GridBagConstraints();
 		cons.gridy = y++;
 		cons.gridheight = 1;
-		cons.gridwidth = cons.REMAINDER;
+		cons.gridwidth = GridBagConstraints.REMAINDER;
 		cons.fill = GridBagConstraints.BOTH;
 		cons.anchor = GridBagConstraints.WEST;
 		cons.weightx = 1.0f;
@@ -283,7 +353,7 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 		Box box = new Box(BoxLayout.X_AXIS);
 		Box box2 = new Box(BoxLayout.Y_AXIS);
 		box2.add(Box.createGlue());
-		box2.add(new JSeparator(JSeparator.HORIZONTAL));
+		box2.add(new JSeparator(SwingConstants.HORIZONTAL));
 		box2.add(Box.createGlue());
 		box.add(box2);
 		JLabel l = new JLabel(jEdit.getProperty(label));
@@ -291,14 +361,14 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 		box.add(l);
 		Box box3 = new Box(BoxLayout.Y_AXIS);
 		box3.add(Box.createGlue());
-		box3.add(new JSeparator(JSeparator.HORIZONTAL));
+		box3.add(new JSeparator(SwingConstants.HORIZONTAL));
 		box3.add(Box.createGlue());
 		box.add(box3);
 
 		GridBagConstraints cons = new GridBagConstraints();
 		cons.gridy = y++;
 		cons.gridheight = 1;
-		cons.gridwidth = cons.REMAINDER;
+		cons.gridwidth = GridBagConstraints.REMAINDER;
 		cons.fill = GridBagConstraints.BOTH;
 		cons.anchor = GridBagConstraints.WEST;
 		cons.weightx = 1.0f;

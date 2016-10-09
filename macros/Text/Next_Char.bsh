@@ -20,7 +20,7 @@
  * along with the jEdit program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: Next_Char.bsh,v 1.2 2004/03/08 04:29:12 spestov Exp $
+ * $Id: Next_Char.bsh 4988 2004-03-08 04:29:12Z spestov $
  *
  * Checked for jEdit 4.0 API
  *

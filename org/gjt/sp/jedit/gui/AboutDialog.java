@@ -23,213 +23,300 @@
 package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
-import javax.swing.border.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
+import java.awt.geom.*;
+import java.awt.image.BufferedImage;
 import java.util.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.Log;
 //}}}
 
-public class AboutDialog extends EnhancedDialog
+public class AboutDialog extends JDialog implements ActionListener
 {
 	//{{{ AboutDialog constructor
 	public AboutDialog(View view)
 	{
-		super(view,jEdit.getProperty("about.title"),true);
-
-		JPanel content = new JPanel(new BorderLayout());
-		content.setBorder(new EmptyBorder(12,12,12,12));
-		setContentPane(content);
-
-		content.add(BorderLayout.CENTER,new AboutPanel());
-
-		JPanel buttonPanel = new JPanel();
-		buttonPanel.setLayout(new BoxLayout(buttonPanel,BoxLayout.X_AXIS));
-		buttonPanel.setBorder(new EmptyBorder(12,0,0,0));
-
-		buttonPanel.add(Box.createGlue());
-		close = new JButton(jEdit.getProperty("common.close"));
-		close.addActionListener(new ActionHandler());
-		getRootPane().setDefaultButton(close);
-		buttonPanel.add(close);
-		buttonPanel.add(Box.createGlue());
-		content.add(BorderLayout.SOUTH,buttonPanel);
-
-		pack();
+		super(view,jEdit.getProperty("about.title"), true);
 		setResizable(false);
-		setLocationRelativeTo(view);
+		JButton closeBtn = new JButton(jEdit.getProperty("common.close"));
+		closeBtn.addActionListener(this);
+		getRootPane().setDefaultButton(closeBtn);
+
+		JPanel p = new JPanel(new BorderLayout());
+		final AboutPanel aboutPanel = new AboutPanel();
+		JPanel flowP = new JPanel(new FlowLayout());
+		flowP.add(closeBtn);
+		flowP.add(Box.createRigidArea(new Dimension(40, 40)));
+		Dimension dim = new Dimension(10, 0);
+		p.add(BorderLayout.WEST, Box.createRigidArea(dim));
+		p.add(BorderLayout.EAST, Box.createRigidArea(dim));
+		p.add(BorderLayout.NORTH, Box.createRigidArea(new Dimension(10, 10)));
+		p.add(BorderLayout.SOUTH, flowP);
+		p.add(BorderLayout.CENTER, aboutPanel);
+
+		closeBtn.setToolTipText(jEdit.getProperty("about.navigate"));
+		closeBtn.addKeyListener(new KeyAdapter()
+		{
+			public void keyPressed(KeyEvent e)
+			{
+				aboutPanel.handleKeyEvent(e);
+			}
+		});
+
+		setContentPane(p);
+		pack();
+		Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
+		setLocation((d.width-getWidth())/2, (d.height-getHeight())/2);
+		addWindowListener(new WindowAdapter()
+		{
+			@Override
+			public void windowClosing(WindowEvent e)
+			{
+				closeDialog();
+			}
+		});
 		setVisible(true);
 	} //}}}
 
-	//{{{ ok() method
-	public void ok()
+	//{{{ actionPerformed() method
+	public void actionPerformed(ActionEvent e)
 	{
+		closeDialog();
+	} //}}}
+
+	//{{{ closeDialog() method
+	private void closeDialog()
+	{
+		AboutPanel.stopThread();
 		dispose();
 	} //}}}
 
-	//{{{ cancel() method
-	public void cancel()
-	{
-		dispose();
-	} //}}}
-
-	// private members
-	private JButton close;
-
-	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
-	{
-		public void actionPerformed(ActionEvent evt)
-		{
-			dispose();
-		}
-	} //}}}
 
 	//{{{ AboutPanel class
-	static class AboutPanel extends JComponent
+	private static class AboutPanel extends JComponent implements Runnable
 	{
-		ImageIcon image;
-		Vector text;
-		int scrollPosition;
-		AnimationThread thread;
-		int maxWidth;
-		FontMetrics fm;
-
-		public static int TOP = 120;
-		public static int BOTTOM = 30;
+		private BufferedImage bufImage;
+		private Graphics2D g;
+		private static final Font defaultFont = UIManager.getFont("Label.font");
+		private final Font bottomLineFont = defaultFont.deriveFont(9.8f);
+		private final String sBottomLine;
+		private final ImageIcon image;
+		private final Vector<String> vLines;
+		private static boolean doWork;
+		private Thread th;
+		private final FontMetrics fm;
+		private int iLineHeight = 0, iListHeight, iLineCount = 0,
+			iBottomLineXOffset = 0, iBottomLineYOffset = 0,
+			iPipeLineCount = 0, w = 0, h = 0, y = 0;
+		private static final int
+			SLEEP_TIME = 30,
+			iBottomPadding = 36,
+			iTopPadding = 120;
+		private static Rectangle2D.Float rectangle;
+		private static GradientPaint gradientPaint;
+		private boolean skipDrain = false;
 
 		AboutPanel()
 		{
-			setFont(UIManager.getFont("Label.font"));
-			fm = getFontMetrics(getFont());
+			String mode;
+			if (jEdit.getEditServer() != null)
+			{
+				if (jEdit.isBackgroundModeEnabled())
+					mode = jEdit.getProperty("about.mode.server-background");
+				else
+					mode = jEdit.getProperty("about.mode.server");
+			}
+			else
+				mode = jEdit.getProperty("about.mode.standalone");
+			String[] args = { jEdit.getVersion(), mode, System.getProperty("java.version") };
+			sBottomLine = jEdit.getProperty("about.version",args);
+			setFont(defaultFont);
+			fm = getFontMetrics(defaultFont);
+			FontMetrics fmBottom = getFontMetrics(bottomLineFont);
+			iLineHeight = fm.getHeight();
+			vLines = new Vector<String>(50);
+			image = (ImageIcon)GUIUtilities.loadIcon("about.png");
+			MediaTracker tracker = new MediaTracker(this);
+			tracker.addImage(image.getImage(), 0);
 
-			setForeground(new Color(96,96,96));
-			image = new ImageIcon(getClass().getResource(
-				"/org/gjt/sp/jedit/icons/about.png"));
+			try
+			{
+				tracker.waitForID(0);
+			}
+			catch(Exception exc)
+			{
+				tell("AboutPanel: " + exc);
+			}
 
-			setBorder(new MatteBorder(1,1,1,1,Color.gray));
-
-			text = new Vector(50);
+			Dimension d = new Dimension(image.getIconWidth(), image.getIconHeight());
+			setSize(d);
+			setPreferredSize(d);
+			w = d.width;
+			h = d.height;
+			iBottomLineXOffset = (w / 2) - (fmBottom.stringWidth(sBottomLine) / 2);
+			iBottomLineYOffset = h-iLineHeight/2;
 			StringTokenizer st = new StringTokenizer(
 				jEdit.getProperty("about.text"),"\n");
 			while(st.hasMoreTokens())
 			{
-				String line = st.nextToken();
-				text.addElement(line);
-				maxWidth = Math.max(maxWidth,
-					fm.stringWidth(line) + 10);
+				vLines.add(st.nextToken());
 			}
 
-			scrollPosition = -250;
-
-			thread = new AnimationThread();
+			iLineCount = vLines.size();
+			iListHeight = iLineCount * iLineHeight;
+			startThread();
+			updateUI();
 		}
 
-		public void paintComponent(Graphics g)
+		private void handleKeyEvent(KeyEvent e)
 		{
-			g.setColor(new Color(96,96,96));
-			image.paintIcon(this,g,1,1);
-
-			FontMetrics fm = g.getFontMetrics();
-
-			String[] args = { jEdit.getVersion() };
-			String version = jEdit.getProperty("about.version",args);
-			g.drawString(version,(getWidth() - fm.stringWidth(version)) / 2,
-				getHeight() - 5);
-
-			g = g.create((getWidth() - maxWidth) / 2,TOP,maxWidth,
-				getHeight() - TOP - BOTTOM);
-
-			int height = fm.getHeight();
-			int firstLine = scrollPosition / height;
-
-			int firstLineOffset = height - scrollPosition % height;
-			int lines = (getHeight() - TOP - BOTTOM) / height;
-
-			int y = firstLineOffset;
-
-			for(int i = 0; i <= lines; i++)
+			if (e.getKeyCode() == KeyEvent.VK_DOWN)
 			{
-				if(i + firstLine >= 0 && i + firstLine < text.size())
+				skipDrain = false;
+				Collections.rotate(vLines, -1);
+			}
+			else if (e.getKeyCode() == KeyEvent.VK_UP)
+			{
+				skipDrain = false;
+				Collections.rotate(vLines, 1);
+			}
+			else if ((e.getKeyCode() == KeyEvent.VK_LEFT) ||
+					(e.getKeyCode() == KeyEvent.VK_RIGHT) ||
+					(e.getKeyCode() == KeyEvent.VK_ESCAPE))
+			{
+				skipDrain = ! skipDrain;
+			}
+		}
+
+		private void drain()
+		{
+			if (skipDrain)
+				return;
+			if (bufImage == null)
+			{
+				//pre-computing all data that can be known at this time
+				Dimension d = getSize();
+				bufImage = new BufferedImage(d.width, d.height,
+					BufferedImage.TYPE_INT_RGB);
+				g = bufImage.createGraphics();
+				rectangle = new Rectangle2D.Float(0, iTopPadding,
+					d.width, d.height-iBottomPadding-iTopPadding);
+				//"+1" makes sure every new line from below comes up smoothly
+				//cause it gets pre-painted and clipped as needed
+				iPipeLineCount = 1 + (int)Math.ceil(rectangle.height/iLineHeight);
+				y = d.height+iBottomPadding;
+				g.setFont(defaultFont);
+				gradientPaint = new GradientPaint(
+					rectangle.width/2, iTopPadding+80, new Color(80, 80, 80),
+					rectangle.width/2, iTopPadding, new Color(205, 205, 205)
+					);
+				g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			}
+
+			g.drawImage(image.getImage(), 0, 0, w, h, this);
+
+			g.setFont(bottomLineFont);
+
+			g.setPaint(new Color(55, 55, 55));
+			g.drawString(sBottomLine, iBottomLineXOffset, iBottomLineYOffset);
+			// Draw a highlight effect
+			g.setPaint(new Color(255, 255, 255, 50));
+			g.drawString(sBottomLine, iBottomLineXOffset + 1, iBottomLineYOffset + 1);
+
+			g.setFont(defaultFont);
+			g.setPaint(Color.black);
+
+
+			g.drawRect(0, 0, w-1, h-1);
+			g.clip(rectangle);
+			g.setPaint(gradientPaint);
+			int iDrawnLinesCount = 0, yCoor = 0;
+
+			for (int i=0; i<iLineCount; i++)
+			{
+				//check whether the text line is above the canvas, if so, the code skips it
+				yCoor = y+ i * iLineHeight;
+				if (yCoor < iTopPadding)
 				{
-					String line = (String)text.get(i + firstLine);
-					g.drawString(line,(maxWidth - fm.stringWidth(line))/2,y);
+					continue;
 				}
-				y += fm.getHeight();
-			}
-		}
 
-		public Dimension getPreferredSize()
-		{
-			return new Dimension(1 + image.getIconWidth(),
-				1 + image.getIconHeight());
-		}
-
-		public void addNotify()
-		{
-			super.addNotify();
-			thread.start();
-		}
-
-		public void removeNotify()
-		{
-			super.removeNotify();
-			thread.kill();
-		}
-
-		class AnimationThread extends Thread
-		{
-			private boolean running = true;
-			private long last;
-
-			AnimationThread()
-			{
-				super("About box animation thread");
-				setPriority(Thread.MIN_PRIORITY);
-			}
-			
-			public void kill()
-			{
-				running = false;
-			}
-
-			public void run()
-			{
-				FontMetrics fm = getFontMetrics(getFont());
-				int max = (text.size() * fm.getHeight());
-
-				while (running)
+				//good to go, now draw only iPipeLineCount lines and get out from loop
+				String sLine = vLines.get(i);
+				int x = (w - fm.stringWidth(sLine))/2;
+				g.drawString(sLine, x, yCoor);
+				if (++iDrawnLinesCount >= iPipeLineCount)
 				{
-					scrollPosition += 2;
-
-					if(scrollPosition > max)
-						scrollPosition = -250;
-
-					if(last != 0)
-					{
-						long frameDelay =
-							System.currentTimeMillis()
-							- last;
-
-						try
-						{
-							Thread.sleep(
-								75
-								- frameDelay);
-						}
-						catch(Exception e)
-						{
-						}
-					}
-
-					last = System.currentTimeMillis();
-
-					repaint(getWidth() / 2 - maxWidth,
-						TOP,maxWidth * 2,
-						getHeight() - TOP - BOTTOM);
+					break;
 				}
 			}
+
+			y--;
+			paint(getGraphics());
+
+			//check if the end of the list has been reached,
+			//if so rewind
+			if ((y + iListHeight) < iTopPadding)
+			{
+				y = h+iBottomPadding;
+			}
+		}
+
+		@Override
+		public void update(Graphics g)
+		{
+			paint(g);
+		}
+
+		@Override
+		public void paint(Graphics panelGraphics)
+		{
+			if (panelGraphics != null && bufImage != null)
+			{
+				panelGraphics.drawImage(bufImage, 0, 0, w, h, this);
+			}
+		}
+
+		public void run()
+		{
+			try
+			{
+				while(doWork)
+				{
+					drain();
+					Thread.sleep(SLEEP_TIME);
+				}
+			}
+			catch(Exception exc)
+			{
+				Log.log(Log.ERROR, this, exc);
+			}
+
+			doWork = false;
+			th = null;
+		}
+
+		public void startThread()
+		{
+			if (th == null)
+			{
+				th = new Thread(this);
+				doWork = true;
+				th.start();
+			}
+		}
+
+		public static void stopThread()
+		{
+			doWork = false;
+		}
+
+		public static void tell(Object obj)
+		{
+			String str = obj == null ? "NULL" : obj.toString();
+			JOptionPane.showMessageDialog(jEdit.getActiveView(), str, "Title", 1);
 		}
 	} //}}}
 }

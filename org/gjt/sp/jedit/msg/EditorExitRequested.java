@@ -30,12 +30,14 @@ import org.gjt.sp.jedit.View;
  * jEdit is in background mode.
  *
  * @author Dirk Moebius
- * @version $Id: EditorExitRequested.java,v 1.2 2002/05/14 07:55:48 spestov Exp $
+ * @version $Id: EditorExitRequested.java 12504 2008-04-22 23:12:43Z ezust $
  *
  * @since jEdit 3.1pre4
  */
 public class EditorExitRequested extends EBMessage
 {
+	private boolean hasBeenExitCancelled;
+	
 	/**
 	 * Creates a new editor exiting started message.
 	 * @param view The view from which this exit was called
@@ -52,4 +54,21 @@ public class EditorExitRequested extends EBMessage
 	{
 		return (View)getSource();
 	}
+	
+	/**
+	 * Cancels the exit process. If a plugin calls this method, jEdit will not
+	 * exit anymore
+	 */
+	public void cancelExit()
+	{
+		hasBeenExitCancelled = true;
+	}
+	
+	/**
+	 * Check if the exit process has been cancelled.
+	 */ 
+	 public boolean hasBeenExitCancelled()
+	 {
+		 return hasBeenExitCancelled;
+	 }
 }

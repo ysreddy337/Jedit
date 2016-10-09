@@ -23,17 +23,19 @@
 package org.gjt.sp.jedit.search;
 
 //{{{ Imports
-import gnu.regexp.*;
 import java.awt.Component;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
  * A file set for searching all open buffers.
  * @author Slava Pestov
- * @version $Id: AllBufferSet.java,v 1.4 2002/06/18 02:44:52 spestov Exp $
+ * @version $Id: AllBufferSet.java 15834 2009-08-01 05:35:05Z shlomy $
  */
 public class AllBufferSet extends BufferListSet
 {
@@ -63,9 +65,10 @@ public class AllBufferSet extends BufferListSet
 	 * Returns the BeanShell code that will recreate this file set.
 	 * @since jEdit 2.7pre3
 	 */
+	@Override
 	public String getCode()
 	{
-		return "new AllBufferSet(\"" + MiscUtilities.charsToEscapes(glob)
+		return "new AllBufferSet(\"" + StandardUtilities.charsToEscapes(glob)
 			+ "\")";
 	} //}}}
 
@@ -74,15 +77,17 @@ public class AllBufferSet extends BufferListSet
 	//}}}
 
 	//{{{ _getFiles() method
+	@Override
 	protected String[] _getFiles(Component comp)
 	{
 		Buffer[] buffers = jEdit.getBuffers();
-		ArrayList returnValue = new ArrayList(buffers.length);
+		List<String> returnValue = new ArrayList<String>(buffers.length);
 
-		RE filter;
+		Pattern filter;
 		try
 		{
-			filter = new RE(MiscUtilities.globToRE(glob));
+			filter = Pattern.compile(StandardUtilities.globToRE(glob),
+				Pattern.CASE_INSENSITIVE);
 		}
 		catch(Exception e)
 		{
@@ -93,10 +98,10 @@ public class AllBufferSet extends BufferListSet
 		for(int i = 0; i < buffers.length; i++)
 		{
 			Buffer buffer = buffers[i];
-			if(filter.isMatch(buffer.getName()))
+			if(filter.matcher(buffer.getName()).matches())
 				returnValue.add(buffer.getPath());
 		}
 
-		return (String[])returnValue.toArray(new String[returnValue.size()]);
+		return returnValue.toArray(new String[returnValue.size()]);
 	} //}}}
 }

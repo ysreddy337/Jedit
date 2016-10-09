@@ -26,33 +26,40 @@ package org.gjt.sp.jedit.browser;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.*;
 import javax.swing.*;
+
 import java.awt.event.*;
 import java.awt.*;
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
+
+import org.gjt.sp.jedit.gui.DockableWindowManager;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.Log;
 //}}}
 
 /**
  * VFS browser tree view.
  * @author Slava Pestov
- * @version $Id: BrowserView.java,v 1.79 2004/05/29 01:55:24 spestov Exp $
+ * @version $Id: BrowserView.java 16560 2009-11-29 19:06:17Z kerik-sf $
  */
 class BrowserView extends JPanel
 {
 	//{{{ BrowserView constructor
-	public BrowserView(final VFSBrowser browser)
+	BrowserView(final VFSBrowser browser)
 	{
 		this.browser = browser;
 
-		tmpExpanded = new HashSet();
+		tmpExpanded = new HashSet<String>();
+		DockableWindowManager dwm = jEdit.getActiveView().getDockableWindowManager();
+		KeyListener keyListener = dwm.closeListener(VFSBrowser.NAME);
 
-		parentDirectories = new JList();
-
-		parentDirectories.getSelectionModel().setSelectionMode(
-			ListSelectionModel.SINGLE_SELECTION);
-
+		parentDirectories = new ParentDirectoryList();
+		parentDirectories.addKeyListener(keyListener);
+		parentDirectories.setName("parent");
+		
+		parentDirectories.getSelectionModel().setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		parentDirectories.setCellRenderer(new ParentDirectoryRenderer());
 		parentDirectories.setVisibleRowCount(5);
 		parentDirectories.addMouseListener(new ParentMouseHandler());
@@ -62,6 +69,7 @@ class BrowserView extends JPanel
 
 		table = new VFSDirectoryEntryTable(this);
 		table.addMouseListener(new TableMouseHandler());
+		table.setName("file");
 		JScrollPane tableScroller = new JScrollPane(table);
 		tableScroller.setMinimumSize(new Dimension(0,0));
 		tableScroller.getViewport().setBackground(table.getBackground());
@@ -69,7 +77,8 @@ class BrowserView extends JPanel
 		splitPane = new JSplitPane(
 			browser.isHorizontalLayout()
 			? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT,
-			parentScroller,tableScroller);
+			jEdit.getBooleanProperty("appearance.continuousLayout"),
+			parentScroller, tableScroller);
 		splitPane.setOneTouchExpandable(true);
 
 		SwingUtilities.invokeLater(new Runnable()
@@ -109,6 +118,7 @@ class BrowserView extends JPanel
 	} //}}}
 
 	//{{{ removeNotify() method
+	@Override
 	public void removeNotify()
 	{
 		String prop = browser.isHorizontalLayout() ? "vfs.browser.horizontalSplitter" : "vfs.browser.splitter";
@@ -118,7 +128,7 @@ class BrowserView extends JPanel
 	} //}}}
 
 	//{{{ getSelectedFiles() method
-	public VFS.DirectoryEntry[] getSelectedFiles()
+	public VFSFile[] getSelectedFiles()
 	{
 		return table.getSelectedFiles();
 	} //}}}
@@ -143,7 +153,8 @@ class BrowserView extends JPanel
 	} //}}}
 
 	//{{{ loadDirectory() method
-	public void loadDirectory(Object node, String path)
+	public void loadDirectory(Object node, String path,
+		boolean addToHistory)
 	{
 		path = MiscUtilities.constructPath(browser.getDirectory(),path);
 		VFS vfs = VFSManager.getVFSForPath(path);
@@ -163,11 +174,18 @@ class BrowserView extends JPanel
 		VFSManager.runInWorkThread(new BrowserIORequest(
 			BrowserIORequest.LIST_DIRECTORY,browser,
 			session,vfs,path,null,loadInfo));
-		browser.directoryLoaded(node,loadInfo);
+		browser.directoryLoaded(node,loadInfo,addToHistory);
 	} //}}}
 
 	//{{{ directoryLoaded() method
-	public void directoryLoaded(Object node, String path, ArrayList directory)
+	/**
+	 * Rebuild the parent view after a directory has been loaded.
+	 *
+	 * @param node
+	 * @param path
+	 * @param directory  
+	 */
+	public void directoryLoaded(Object node, String path, java.util.List<VFSFile> directory)
 	{
 		//{{{ If reloading root, update parent directory list
 		if(node == null)
@@ -178,21 +196,48 @@ class BrowserView extends JPanel
 
 			for(;;)
 			{
-				VFS _vfs = VFSManager.getVFSForPath(
-					parent);
-				// create a DirectoryEntry manually
-				// instead of using _vfs._getDirectoryEntry()
-				// since so many VFS's have broken
-				// implementations of this method
-				parentList.insertElementAt(new VFS.DirectoryEntry(
+				VFS _vfs = VFSManager.getVFSForPath(parent);
+				VFSFile file = null;
+				if (_vfs instanceof FileVFS)
+				{
+					Object session = _vfs.createVFSSession(path, browser);
+					try
+					{
+						file = _vfs._getFile(session, parent, browser);
+						if (file != null)
+						{
+							file.setName(_vfs.getFileName(parent));
+						}
+					}
+					catch (IOException e)
+					{
+						Log.log(Log.ERROR, this, e, e);
+					}
+				}
+				if (file == null)
+				{
+					// create a DirectoryEntry manually
+					// instead of using _vfs._getFile()
+					// since so many VFS's have broken
+					// implementations of this method
+					file = new VFSFile(
+							_vfs.getFileName(parent),
+							parent,parent,
+							VFSFile.DIRECTORY,
+							0L,false);
+				}
+
+
+				/*parentList.insertElementAt(new VFSFile(
 					_vfs.getFileName(parent),
 					parent,parent,
-					VFS.DirectoryEntry.DIRECTORY,
-					0L,false),0);
+					VFSFile.DIRECTORY,
+					0L,false),0);*/
+				parentList.insertElementAt(file,0);
 				String newParent = _vfs.getParentOfPath(parent);
 
 				if(newParent == null ||
-					VFSBrowser.pathsEqual(parent,newParent))
+					MiscUtilities.pathsEqual(parent,newParent))
 					break;
 				else
 					parent = newParent;
@@ -229,10 +274,10 @@ class BrowserView extends JPanel
 				browserDir);
 		}
 
-		if(VFSBrowser.pathsEqual(path,symlinkBrowserDir))
+		if(MiscUtilities.pathsEqual(path,symlinkBrowserDir))
 		{
 			saveExpansionState();
-			loadDirectory(null,browserDir);
+			loadDirectory(null,browserDir,false);
 		}
 
 		// because this method is called for *every* VFS update,
@@ -266,7 +311,7 @@ class BrowserView extends JPanel
 	{
 		showIcons = jEdit.getBooleanProperty("vfs.browser.showIcons");
 		table.propertiesChanged();
-
+		GUIUtilities.initContinuousLayout(splitPane);
 		splitPane.setBorder(null);
 	} //}}}
 
@@ -295,18 +340,18 @@ class BrowserView extends JPanel
 	//{{{ Private members
 
 	//{{{ Instance variables
-	private VFSBrowser browser;
+	private final VFSBrowser browser;
 
-	private JSplitPane splitPane;
-	private JList parentDirectories;
-	private VFSDirectoryEntryTable table;
-	private Set tmpExpanded;
+	private final JSplitPane splitPane;
+	private final JList parentDirectories;
+	private final VFSDirectoryEntryTable table;
+	private final Set<String> tmpExpanded;
 	private BrowserCommandsMenu popup;
 	private boolean showIcons;
 	//}}}
 
 	//{{{ showFilePopup() method
-	private void showFilePopup(VFS.DirectoryEntry[] files, Component comp,
+	private void showFilePopup(VFSFile[] files, Component comp,
 		Point point)
 	{
 		popup = new BrowserCommandsMenu(browser,files);
@@ -346,7 +391,8 @@ class BrowserView extends JPanel
 	//{{{ ParentDirectoryRenderer class
 	class ParentDirectoryRenderer extends DefaultListCellRenderer
 	{
-		Font plainFont, boldFont;
+		private Font plainFont;
+		private final Font boldFont;
 
 		ParentDirectoryRenderer()
 		{
@@ -356,6 +402,7 @@ class BrowserView extends JPanel
 			boldFont = new Font(plainFont.getName(),Font.BOLD,plainFont.getSize());
 		}
 
+		@Override
 		public Component getListCellRendererComponent(
 			JList list,
 			Object value,
@@ -376,14 +423,14 @@ class BrowserView extends JPanel
 				setIcon(showIcons ? FileCellRenderer.loadingIcon : null);
 				setText(jEdit.getProperty("vfs.browser.tree.loading"));
 			}
-			else if(value instanceof VFS.DirectoryEntry)
+			else if(value instanceof VFSFile)
 			{
-				VFS.DirectoryEntry dirEntry = (VFS.DirectoryEntry)value;
+				VFSFile dirEntry = (VFSFile)value;
 				ParentDirectoryRenderer.this.setFont(boldFont);
 
 				setIcon(showIcons ? FileCellRenderer.getIconForFile(dirEntry,true)
 					: null);
-				setText(dirEntry.name);
+				setText(dirEntry.getName());
 			}
 			else if(value == null)
 				setText("VFS does not follow VFS API");
@@ -393,8 +440,9 @@ class BrowserView extends JPanel
 	} //}}}
 
 	//{{{ ParentMouseHandler class
-	class ParentMouseHandler extends MouseAdapter
+	private class ParentMouseHandler extends MouseAdapter
 	{
+		@Override
 		public void mousePressed(MouseEvent evt)
 		{
 			int row = parentDirectories.locationToIndex(evt.getPoint());
@@ -402,9 +450,9 @@ class BrowserView extends JPanel
 			{
 				Object obj = parentDirectories.getModel()
 					.getElementAt(row);
-				if(obj instanceof VFS.DirectoryEntry)
+				if(obj instanceof VFSFile)
 				{
-					VFS.DirectoryEntry dirEntry = ((VFS.DirectoryEntry)obj);
+					VFSFile dirEntry = (VFSFile)obj;
 					if(GUIUtilities.isPopupTrigger(evt))
 					{
 						if(popup != null && popup.isVisible())
@@ -415,7 +463,7 @@ class BrowserView extends JPanel
 						else
 						{
 							parentDirectories.setSelectedIndex(row);
-							showFilePopup(new VFS.DirectoryEntry[] {
+							showFilePopup(new VFSFile[] {
 								dirEntry },parentDirectories,
 								evt.getPoint());
 						}
@@ -424,6 +472,7 @@ class BrowserView extends JPanel
 			}
 		}
 
+		@Override
 		public void mouseReleased(MouseEvent evt)
 		{
 			if(evt.getClickCount() % 2 != 0 &&
@@ -435,12 +484,12 @@ class BrowserView extends JPanel
 			{
 				Object obj = parentDirectories.getModel()
 					.getElementAt(row);
-				if(obj instanceof VFS.DirectoryEntry)
+				if(obj instanceof VFSFile)
 				{
-					VFS.DirectoryEntry dirEntry = ((VFS.DirectoryEntry)obj);
+					VFSFile dirEntry = (VFSFile)obj;
 					if(!GUIUtilities.isPopupTrigger(evt))
 					{
-						browser.setDirectory(dirEntry.path);
+						browser.setDirectory(dirEntry.getPath());
 						if(browser.getMode() == VFSBrowser.BROWSER)
 						focusOnFileView();
 					}
@@ -450,9 +499,10 @@ class BrowserView extends JPanel
 	} //}}}
 
 	//{{{ TableMouseHandler class
-	class TableMouseHandler extends MouseAdapter
+	private class TableMouseHandler extends MouseAdapter
 	{
 		//{{{ mouseClicked() method
+		@Override
 		public void mouseClicked(MouseEvent evt)
 		{
 			Point p = evt.getPoint();
@@ -472,12 +522,12 @@ class BrowserView extends JPanel
 				}
 			}
 
-			if((evt.getModifiers() & MouseEvent.BUTTON1_MASK) != 0
+			if((evt.getModifiers() & InputEvent.BUTTON1_MASK) != 0
 				&& evt.getClickCount() % 2 == 0)
 			{
-				browser.filesActivated((evt.isShiftDown()
+				browser.filesActivated(evt.isShiftDown()
 					? VFSBrowser.M_OPEN_NEW_VIEW
-					: VFSBrowser.M_OPEN),true);
+					: VFSBrowser.M_OPEN,true);
 			}
 			else if(GUIUtilities.isMiddleButton(evt.getModifiers()))
 			{
@@ -485,13 +535,14 @@ class BrowserView extends JPanel
 					table.getSelectionModel().addSelectionInterval(row,row);
 				else
 					table.getSelectionModel().setSelectionInterval(row,row);
-				browser.filesActivated((evt.isShiftDown()
+				browser.filesActivated(evt.isShiftDown()
 					? VFSBrowser.M_OPEN_NEW_VIEW
-					: VFSBrowser.M_OPEN),true);
+					: VFSBrowser.M_OPEN,true);
 			}
 		} //}}}
 
 		//{{{ mousePressed() method
+		@Override
 		public void mousePressed(MouseEvent evt)
 		{
 			Point p = evt.getPoint();
@@ -546,6 +597,7 @@ class BrowserView extends JPanel
 		} //}}}
 
 		//{{{ mouseReleased() method
+		@Override
 		public void mouseReleased(MouseEvent evt)
 		{
 			if(!GUIUtilities.isPopupTrigger(evt)
@@ -556,6 +608,135 @@ class BrowserView extends JPanel
 		} //}}}
 	} //}}}
 
-	static class LoadingPlaceholder {}
+	private static class LoadingPlaceholder {}
 	//}}}
+	
+	class ParentDirectoryList extends JList
+	{
+
+		public String getPath(int row)
+		{
+			Collection<String> components = new LinkedList<String>();
+			for (int i=1; i<=row; ++i)
+				components.add(getModel().getElementAt(i).toString());
+			return getModel().getElementAt(0) + TextUtilities.join(components, File.separator);
+		}
+
+		@Override
+		protected void processKeyEvent(KeyEvent evt)
+		{
+			if (evt.getID() == KeyEvent.KEY_PRESSED)
+			{
+				ActionContext ac = VFSBrowser.getActionContext();
+				int row = parentDirectories.getSelectedIndex();
+				switch(evt.getKeyCode())
+				{
+				case KeyEvent.VK_DOWN:
+					evt.consume();			
+					if (row < parentDirectories.getSize().height-1) 
+						parentDirectories.setSelectedIndex(++row);
+					break;
+				case KeyEvent.VK_LEFT:
+					if ((evt.getModifiers() & KeyEvent.ALT_MASK)>0)
+					{
+						evt.consume();
+						browser.previousDirectory();
+					}
+					else super.processEvent(evt);
+					break;
+				case KeyEvent.VK_RIGHT:
+					if ((evt.getModifiers() & KeyEvent.ALT_MASK)>0)
+					{
+						evt.consume();
+						browser.nextDirectory();
+					}
+					else super.processEvent(evt);
+					break;
+				case KeyEvent.VK_TAB:
+					evt.consume();
+					if ((evt.getModifiers() & KeyEvent.SHIFT_MASK) > 0)
+						browser.focusOnDefaultComponent();
+					else
+						table.requestFocus();
+					break;
+				case KeyEvent.VK_UP :
+					evt.consume();
+					if (row > 0)
+					{
+						parentDirectories.setSelectedIndex(--row);
+					}
+					break;
+				case KeyEvent.VK_BACK_SPACE:
+					evt.consume();
+					EditAction up = ac.getAction("vfs.browser.up");
+					ac.invokeAction(evt, up);
+					break;
+				case KeyEvent.VK_F5: 
+					evt.consume();
+					EditAction reload = ac.getAction("vfs.browser.reload");
+					ac.invokeAction(evt, reload);
+					break;
+				case KeyEvent.VK_ENTER: 
+					evt.consume();
+					String path = getPath(row);
+					getBrowser().setDirectory(path);
+					table.requestFocus();
+					break;
+/* These actions don't work because they look at the EntryTable for the current selected
+ * 	item. We need actions that look at the parentDirectoryList item instead.
+ * 					
+				case KeyEvent.VK_DELETE:
+					evt.consume();
+					ea = ac.getAction("vfs.browser.delete");
+					ac.invokeAction(evt, ea);
+					break; 
+				case KeyEvent.CTRL_MASK | KeyEvent.VK_N:  
+					evt.consume();
+					ea = ac.getAction("vfs.browser.new-file");
+					ac.invokeAction(evt, ea);
+					break;
+				case KeyEvent.VK_INSERT:
+					evt.consume();
+					ea = ac.getAction("vfs.browser.new-directory");
+					ac.invokeAction(evt, ea);
+					break; */					
+				}
+			}
+			else if(evt.getID() == KeyEvent.KEY_TYPED)
+			{
+				if(evt.isControlDown() || evt.isAltDown()
+					|| evt.isMetaDown())
+				{
+					evt.consume();
+					return;
+				}
+				switch(evt.getKeyChar())
+				{
+				case '~':
+					evt.consume();
+					if(browser.getMode() == VFSBrowser.BROWSER)
+						browser.setDirectory(System.getProperty(
+							"user.home"));
+					break;
+				case '/':
+					evt.consume();
+					if(browser.getMode() == VFSBrowser.BROWSER)
+						browser.rootDirectory();
+					break;
+				case '-':
+					evt.consume();
+					if(browser.getMode() == VFSBrowser.BROWSER)
+					{
+						browser.setDirectory(
+							browser.getView().getBuffer()
+							.getDirectory());
+					}
+					break;
+				}
+			}
+			if (!evt.isConsumed())
+				super.processKeyEvent(evt);
+		}	
+	}
+	
 }

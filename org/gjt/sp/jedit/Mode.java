@@ -24,10 +24,22 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import gnu.regexp.*;
+import java.lang.reflect.Method;
 import java.util.Hashtable;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+import org.gjt.sp.jedit.indent.DeepIndentRule;
+import org.gjt.sp.jedit.indent.IndentRule;
+import org.gjt.sp.jedit.indent.IndentRuleFactory;
+import org.gjt.sp.jedit.indent.WhitespaceRule;
 import org.gjt.sp.jedit.syntax.TokenMarker;
+import org.gjt.sp.jedit.syntax.ModeProvider;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
@@ -35,7 +47,7 @@ import org.gjt.sp.util.Log;
  * One instance of this class is created for each supported edit mode.
  *
  * @author Slava Pestov
- * @version $Id: Mode.java,v 1.9 2003/04/28 01:35:23 spestov Exp $
+ * @version $Id: Mode.java 16022 2009-08-22 02:14:59Z daleanson $
  */
 public class Mode
 {
@@ -50,7 +62,8 @@ public class Mode
 	public Mode(String name)
 	{
 		this.name = name;
-		props = new Hashtable();
+		this.ignoreWhitespace = true;
+		props = new Hashtable<String, Object>();
 	} //}}}
 
 	//{{{ init() method
@@ -65,18 +78,18 @@ public class Mode
 			String filenameGlob = (String)getProperty("filenameGlob");
 			if(filenameGlob != null && filenameGlob.length() != 0)
 			{
-				filenameRE = new RE(MiscUtilities.globToRE(
-					filenameGlob),RE.REG_ICASE);
+				filenameRE = Pattern.compile(StandardUtilities.globToRE(filenameGlob),
+							     Pattern.CASE_INSENSITIVE);
 			}
 
 			String firstlineGlob = (String)getProperty("firstlineGlob");
 			if(firstlineGlob != null && firstlineGlob.length() != 0)
 			{
-				firstlineRE = new RE(MiscUtilities.globToRE(
-					firstlineGlob),RE.REG_ICASE);
+				firstlineRE = Pattern.compile(StandardUtilities.globToRE(firstlineGlob),
+							      Pattern.CASE_INSENSITIVE);
 			}
 		}
-		catch(REException re)
+		catch(PatternSyntaxException re)
 		{
 			Log.log(Log.ERROR,this,"Invalid filename/firstline"
 				+ " globs in mode " + name);
@@ -120,7 +133,11 @@ public class Mode
 	public void loadIfNecessary()
 	{
 		if(marker == null)
-			jEdit.loadMode(this);
+		{
+			ModeProvider.instance.loadMode(this);
+			if (marker == null)
+				Log.log(Log.ERROR, this, "Mode not correctly loaded, token marker is still null");
+		}
 	} //}}}
 
 	//{{{ getProperty() method
@@ -132,44 +149,10 @@ public class Mode
 	 */
 	public Object getProperty(String key)
 	{
-		String prefix = "mode." + name + ".";
-
-		//if(jEdit.getBooleanProperty(prefix + "customSettings"))
-		//{
-			String property = jEdit.getProperty(prefix + key);
-			if(property != null)
-			{
-				Object value;
-				try
-				{
-					value = new Integer(property);
-				}
-				catch(NumberFormatException nf)
-				{
-					value = property;
-				}
-				return value;
-			}
-		//}
-
 		Object value = props.get(key);
 		if(value != null)
 			return value;
-
-		String global = jEdit.getProperty("buffer." + key);
-		if(global != null)
-		{
-			try
-			{
-				return new Integer(global);
-			}
-			catch(NumberFormatException nf)
-			{
-				return global;
-			}
-		}
-		else
-			return null;
+		return null;
 	} //}}}
 
 	//{{{ getBooleanProperty() method
@@ -182,10 +165,7 @@ public class Mode
 	public boolean getBooleanProperty(String key)
 	{
 		Object value = getProperty(key);
-		if("true".equals(value) || "on".equals(value) || "yes".equals(value))
-			return true;
-		else
-			return false;
+		return StandardUtilities.getBoolean(value, false);
 	} //}}}
 
 	//{{{ setProperty() method
@@ -215,10 +195,13 @@ public class Mode
 	 * Should only be called by <code>XModeHandler</code>.
 	 * @since jEdit 4.0pre3
 	 */
-	public void setProperties(Hashtable props)
+	public void setProperties(Map props)
 	{
 		if(props == null)
-			props = new Hashtable();
+			props = new Hashtable<String, Object>();
+
+		ignoreWhitespace = !"false".equalsIgnoreCase(
+					(String)props.get("ignoreWhitespace"));
 
 		// need to carry over file name and first line globs because they are
 		// not given to us by the XMode handler, but instead are filled in by
@@ -237,7 +220,7 @@ public class Mode
 
 	//{{{ accept() method
 	/**
-	 * Returns if the edit mode is suitable for editing the specified
+	 * Returns true if the edit mode is suitable for editing the specified
 	 * file. The buffer name and first line is checked against the
 	 * file name and first line globs, respectively.
 	 * @param fileName The buffer's name
@@ -247,13 +230,31 @@ public class Mode
 	 */
 	public boolean accept(String fileName, String firstLine)
 	{
-		if(filenameRE != null && filenameRE.isMatch(fileName))
-			return true;
+		return acceptFilename(fileName) || acceptFirstLine(firstLine);
+	} //}}}
 
-		if(firstlineRE != null && firstlineRE.isMatch(firstLine))
-			return true;
+	//{{{ acceptFilename() method
+	/**
+	 * Returns true if the buffer name matches the file name glob.
+	 * @param fileName The buffer's name
+	 * @return true if the file name matches the file name glob.
+	 * @since jEdit 4.3pre18
+	 */
+	public boolean acceptFilename(String fileName)
+	{
+		return filenameRE != null && filenameRE.matcher(fileName).matches();
+	} //}}}
 
-		return false;
+	//{{{ acceptFirstLine() method
+	/**
+	 * Returns true if the first line matches the first line glob.
+	 * @param firstLine The first line of the buffer
+	 * @return true if the first line matches the first line glob.
+	 * @since jEdit 4.3pre18
+	 */
+	public boolean acceptFirstLine(String firstLine)
+	{
+		return firstlineRE != null && firstlineRE.matcher(firstLine).matches();
 	} //}}}
 
 	//{{{ getName() method
@@ -274,11 +275,168 @@ public class Mode
 		return name;
 	} //}}}
 
+	//{{{ getIgnoreWhitespace() method
+	public boolean getIgnoreWhitespace()
+	{
+		return ignoreWhitespace;
+	} //}}}
+
+	//{{{ Indent rules
+
+	public synchronized List<IndentRule> getIndentRules()
+	{
+		if (indentRules == null)
+		{
+			initIndentRules();
+		}
+		return indentRules;
+	}
+
+	public synchronized boolean isElectricKey(char ch)
+	{
+		if (electricKeys == null)
+		{
+			String[] props = {
+				"indentOpenBrackets",
+				"indentCloseBrackets",
+				"electricKeys"
+			};
+
+			StringBuilder buf = new StringBuilder();
+			for(int i = 0; i < props.length; i++)
+			{
+				String prop = (String) getProperty(props[i]);
+				if (prop != null)
+					buf.append(prop);
+			}
+
+			electricKeys = buf.toString();
+		}
+
+		return (electricKeys.indexOf(ch) >= 0);
+	}
+
+	private void initIndentRules()
+	{
+		List<IndentRule> rules = new LinkedList<IndentRule>();
+
+		String[] regexpProps = {
+			"indentNextLine",
+			"indentNextLines"
+		};
+
+		for(int i = 0; i < regexpProps.length; i++)
+		{
+			IndentRule rule = createRegexpIndentRule(regexpProps[i]);
+			if(rule != null)
+				rules.add(rule);
+		}
+
+		String[] bracketProps = {
+			"indentOpenBracket",
+			"indentCloseBracket",
+			"unalignedOpenBracket",
+			"unalignedCloseBracket",
+		};
+
+		for(int i = 0; i < bracketProps.length; i++)
+		{
+			createBracketIndentRules(bracketProps[i], rules);
+		}
+
+		String[] finalProps = {
+			"unindentThisLine",
+			"unindentNextLines"
+		};
+
+		for(int i = 0; i < finalProps.length; i++)
+		{
+			IndentRule rule = createRegexpIndentRule(finalProps[i]);
+			if(rule != null)
+				rules.add(rule);
+		}
+
+		if (getBooleanProperty("deepIndent"))
+		{
+			String unalignedOpenBrackets = (String) getProperty("unalignedOpenBrackets");
+			if (unalignedOpenBrackets != null)
+			{
+				for (int i = 0 ; i < unalignedOpenBrackets.length();i++)
+				{
+					char openChar = unalignedOpenBrackets.charAt(i);
+					char closeChar = TextUtilities.getComplementaryBracket(openChar, null);
+					if (closeChar != '\0')
+						rules.add(new DeepIndentRule(openChar, closeChar));
+				}
+			}
+		}
+
+		if (!getIgnoreWhitespace())
+			rules.add(new WhitespaceRule());
+
+		indentRules = Collections.unmodifiableList(rules);
+	}
+
+	private IndentRule createRegexpIndentRule(String prop)
+	{
+		String value = (String) getProperty(prop);
+
+		try
+		{
+			if(value != null)
+			{
+				Method m = IndentRuleFactory.class.getMethod(
+					prop,new Class[] { String.class });
+				return (IndentRule)m.invoke(null, value);
+			}
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,this,"Bad indent rule " + prop
+				+ '=' + value + ':');
+			Log.log(Log.ERROR,this,e);
+		}
+
+		return null;
+	}
+
+	private void createBracketIndentRules(String prop,
+						List<IndentRule> rules)
+	{
+		String value = (String) getProperty(prop + 's');
+
+		try
+		{
+			if(value != null)
+			{
+				for(int i = 0; i < value.length(); i++)
+				{
+					char ch = value.charAt(i);
+
+					Method m = IndentRuleFactory.class.getMethod(
+						prop,new Class[] { char.class });
+					rules.add((IndentRule) m.invoke(null, ch));
+				}
+			}
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,this,"Bad indent rule " + prop
+				+ '=' + value + ':');
+			Log.log(Log.ERROR,this,e);
+		}
+	}
+
+	//}}}
+
 	//{{{ Private members
-	private String name;
-	private Hashtable props;
-	private RE firstlineRE;
-	private RE filenameRE;
-	private TokenMarker marker;
+	protected String name;
+	protected Map<String, Object> props;
+	private Pattern firstlineRE;
+	private Pattern filenameRE;
+	protected TokenMarker marker;
+	private List<IndentRule> indentRules;
+	private String electricKeys;
+	private boolean ignoreWhitespace;
 	//}}}
 }

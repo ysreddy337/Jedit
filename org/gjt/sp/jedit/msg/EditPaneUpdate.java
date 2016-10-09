@@ -22,9 +22,9 @@ package org.gjt.sp.jedit.msg;
 import org.gjt.sp.jedit.*;
 
 /**
- * Message sent when an edit pane-related change occurs.
+ * Message sent when an edit pane-related change occurs. 
  * @author Slava Pestov
- * @version $Id: EditPaneUpdate.java,v 1.4 2003/01/12 03:08:24 spestov Exp $
+ * @version $Id: EditPaneUpdate.java 14916 2009-04-12 15:49:33Z ezust $
  *
  * @since jEdit 2.5pre1
  */
@@ -39,12 +39,27 @@ public class EditPaneUpdate extends EBMessage
 	 * Edit pane destroyed.
 	 */
 	public static final Object DESTROYED = "DESTROYED";
-
 	/**
-	 * Edit pane buffer changed.
+	 * The current buffer in the EditPane has changed to show a different buffer. This
+	 * happens when an action results in a call to EditPane.setBuffer().
 	 */
 	public static final Object BUFFER_CHANGED = "BUFFER_CHANGED";
+	/**
+	 * Edit pane caret position is about to change in a major way
+	 */
+	public static final Object POSITION_CHANGING = "POSITION_CHANGING";
+	/**
+	 * Edit pane buffer is about to change. You should see this before BUFFER_CHANGED.
+	 * @since 4.3pre3
+	 */
+	public static final Object BUFFER_CHANGING = "BUFFER_CHANGING";
 
+	/**
+	 * The bufferSet scope of the EditPane was changed.
+	 * @since 4.3pre15
+	 */
+	public static final Object BUFFERSET_CHANGED = "BUFFERSET_CHANGED";
+	
 	/**
 	 * Creates a new edit pane update message.
 	 * @param editPane The edit pane
@@ -53,7 +68,6 @@ public class EditPaneUpdate extends EBMessage
 	public EditPaneUpdate(EditPane editPane, Object what)
 	{
 		super(editPane);
-
 		if(what == null)
 			throw new NullPointerException("What must be non-null");
 
@@ -80,7 +94,8 @@ public class EditPaneUpdate extends EBMessage
 	{
 		return "what=" + what + "," + super.paramString();
 	}
-
+	
 	// private members
 	private Object what;
+
 }

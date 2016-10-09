@@ -24,14 +24,14 @@
 package org.gjt.sp.jedit.syntax;
 
 //{{{ Imports
-import gnu.regexp.RE;
 import java.util.*;
+import java.util.regex.Pattern;
 //}}}
 
 /**
  * A set of parser rules.
  * @author mike dillon
- * @version $Id: ParserRuleSet.java,v 1.23 2003/06/05 00:01:49 spestov Exp $
+ * @version $Id: ParserRuleSet.java 16344 2009-10-14 10:31:01Z kpouer $
  */
 public class ParserRuleSet
 {
@@ -51,9 +51,8 @@ public class ParserRuleSet
 	{
 		this.modeName = modeName;
 		this.setName = setName;
-		ruleMapFirst = new ParserRule[RULE_BUCKET_COUNT];
-		ruleMapLast = new ParserRule[RULE_BUCKET_COUNT];
-		imports = new LinkedList();
+		ruleMap = new HashMap<Character, List<ParserRule>>();
+		imports = new ArrayList<ParserRuleSet>();
 	} //}}}
 
 	//{{{ getModeName() method
@@ -75,13 +74,13 @@ public class ParserRuleSet
 	} //}}}
 
 	//{{{ getProperties() method
-	public Hashtable getProperties()
+	public Hashtable<String, String> getProperties()
 	{
 		return props;
 	} //}}}
 
 	//{{{ setProperties() method
-	public void setProperties(Hashtable props)
+	public void setProperties(Hashtable<String, String> props)
 	{
 		this.props = props;
 		_noWordSep = null;
@@ -94,23 +93,26 @@ public class ParserRuleSet
 	 */
 	public void resolveImports()
 	{
-		Iterator iter = imports.iterator();
-		while(iter.hasNext())
+		for (ParserRuleSet ruleset : imports)
 		{
-			ParserRuleSet ruleset = (ParserRuleSet)iter.next();
-			for(int i = 0; i < ruleset.ruleMapFirst.length; i++)
+			if (!ruleset.imports.isEmpty())
 			{
-				ParserRule rule = ruleset.ruleMapFirst[i];
-				while(rule != null)
+				//prevent infinite recursion
+				ruleset.imports.remove(this);
+				ruleset.resolveImports();
+			}
+
+			for (List<ParserRule> rules : ruleset.ruleMap.values())
+			{
+				for (ParserRule rule : rules)
 				{
 					addRule(rule);
-					rule = rule.next;
 				}
 			}
 
-			if(ruleset.keywords != null)
+			if (ruleset.keywords != null)
 			{
-				if(keywords == null)
+				if (keywords == null)
 					keywords = new KeywordMap(ignoreCase);
 				keywords.add(ruleset.keywords);
 			}
@@ -133,24 +135,87 @@ public class ParserRuleSet
 	public void addRule(ParserRule r)
 	{
 		ruleCount++;
-
-		int key = Character.toUpperCase(r.hashChar)
-			% RULE_BUCKET_COUNT;
-		ParserRule last = ruleMapLast[key];
-		if(last == null)
-			ruleMapFirst[key] = ruleMapLast[key] = r;
+		Character[] keys;
+		if (null == r.upHashChars)
+		{
+			keys = new Character[1];
+			if ((null == r.upHashChar) || (0 >= r.upHashChar.length()))
+			{
+				keys[0] = null;
+			}
+			else
+			{
+				keys[0] = Character.valueOf(r.upHashChar.charAt(0));
+			}
+		}
 		else
 		{
-			last.next = r;
-			ruleMapLast[key] = r;
+			keys = new Character[r.upHashChars.length];
+			int i = 0;
+			for (char upHashChar : r.upHashChars)
+			{
+				keys[i++] = upHashChar;
+			}
+		}
+		for (Character key : keys)
+		{
+			List<ParserRule> rules = ruleMap.get(key);
+			if (null == rules)
+			{
+				rules = new ArrayList<ParserRule>();
+				ruleMap.put(key,rules);
+			}
+			int ruleAmount = rules.size();
+			rules.add(r);
+			// fill the deprecated ParserRule.next pointer
+			if (ruleAmount > 0)
+			{
+				rules.get(ruleAmount).next = r;
+			}
 		}
 	} //}}}
 
 	//{{{ getRules() method
+	/**
+	* @deprecated As the linking between rules is not anymore done within the rule, use {@link #getRules(Character)} instead
+	*/
+	@Deprecated
 	public ParserRule getRules(char ch)
 	{
-		int key = Character.toUpperCase(ch) % RULE_BUCKET_COUNT;
-		return ruleMapFirst[key];
+		List<ParserRule> rules = getRules(Character.valueOf(ch));
+		return rules.get(0);
+	} //}}}
+
+	//{{{ getRules() method
+	public List<ParserRule> getRules(Character key)
+	{
+		List<ParserRule> rulesForNull = ruleMap.get(null);
+		boolean emptyForNull = (rulesForNull == null) || (rulesForNull.size() == 0);
+		Character upperKey = null == key ? null : Character.valueOf(Character.toUpperCase(key.charValue()));
+		List<ParserRule> rulesForKey = null == upperKey ? null : ruleMap.get(upperKey);
+		boolean emptyForKey = (rulesForKey == null) || (rulesForKey.size() == 0);
+		if (emptyForNull && emptyForKey)
+		{
+			return Collections.emptyList();
+		}
+		else if (emptyForKey)
+		{
+			return rulesForNull;
+		}
+		else if (emptyForNull)
+		{
+			return rulesForKey;
+		}
+		else
+		{
+			int size = rulesForNull.size() + rulesForKey.size();
+			ArrayList<ParserRule> mixed = new ArrayList<ParserRule>(size);
+			mixed.addAll(rulesForKey);
+			mixed.addAll(rulesForNull);
+			// fill the deprecated ParserRule.next pointer
+			rulesForKey.get(rulesForKey.size() - 1).next = rulesForNull.get(0);
+			return mixed;
+		}
 	} //}}}
 
 	//{{{ getRuleCount() method
@@ -160,6 +225,11 @@ public class ParserRuleSet
 	} //}}}
 
 	//{{{ getTerminateChar() method
+	/**
+	 * Returns the number of chars that can be read before the rule parsing stops.
+	 *
+	 * @return a number of chars or -1 (default value) if there is no limit
+	 */
 	public int getTerminateChar()
 	{
 		return terminateChar;
@@ -209,13 +279,13 @@ public class ParserRuleSet
 	} //}}}
 
 	//{{{ getDigitRegexp() method
-	public RE getDigitRegexp()
+	public Pattern getDigitRegexp()
 	{
 		return digitRE;
 	} //}}}
 
 	//{{{ setDigitRegexp() method
-	public void setDigitRegexp(RE digitRE)
+	public void setDigitRegexp(Pattern digitRE)
 	{
 		this.digitRE = digitRE;
 	} //}}}
@@ -229,7 +299,6 @@ public class ParserRuleSet
 	//{{{ setEscapeRule() method
 	public void setEscapeRule(ParserRule escapeRule)
 	{
-		addRule(escapeRule);
 		this.escapeRule = escapeRule;
 	} //}}}
 
@@ -277,9 +346,10 @@ public class ParserRuleSet
 	} //}}}
 
 	//{{{ toString() method
+	@Override
 	public String toString()
 	{
-		return getClass().getName() + "[" + modeName + "::" + setName + "]";
+		return getClass().getName() + '[' + modeName + "::" + setName + ']';
 	} //}}}
 
 	//{{{ Private members
@@ -288,7 +358,7 @@ public class ParserRuleSet
 	static
 	{
 		standard = new ParserRuleSet[Token.ID_COUNT];
-		for(byte i = 0; i < standard.length; i++)
+		for(byte i = 0; i < Token.ID_COUNT; i++)
 		{
 			standard[i] = new ParserRuleSet(null,null);
 			standard[i].setDefault(i);
@@ -296,27 +366,28 @@ public class ParserRuleSet
 		}
 	}
 
-	private static final int RULE_BUCKET_COUNT = 128;
-
 	private String modeName, setName;
-	private Hashtable props;
+	private Hashtable<String, String> props;
 
 	private KeywordMap keywords;
 
 	private int ruleCount;
 
-	private ParserRule[] ruleMapFirst;
-	private ParserRule[] ruleMapLast;
+	private Map<Character, List<ParserRule>> ruleMap;
 
-	private LinkedList imports;
+	private final List<ParserRuleSet> imports;
 
+	/**
+	 * The number of chars that can be read before the parsing stops.
+	 * &lt;TERMINATE AT_CHAR="1" /&gt;
+	 */
 	private int terminateChar = -1;
 	private boolean ignoreCase = true;
 	private byte defaultToken;
 	private ParserRule escapeRule;
 
 	private boolean highlightDigits;
-	private RE digitRE;
+	private Pattern digitRE;
 
 	private String _noWordSep;
 	private String noWordSep;

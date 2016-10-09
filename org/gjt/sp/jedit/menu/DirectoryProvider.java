@@ -23,15 +23,21 @@
 package org.gjt.sp.jedit.menu;
 
 //{{{ Imports
-import javax.swing.event.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.io.File;
+import java.util.Arrays;
+
 import org.gjt.sp.jedit.browser.*;
 import org.gjt.sp.jedit.io.FileVFS;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
+/**
+ * @author Slava Pestov
+ * @version $Id: DirectoryProvider.java 16207 2009-09-17 17:54:14Z shlomy $
+ */
 public class DirectoryProvider implements DynamicMenuProvider
 {
 	//{{{ DirectoryProvider constructor
@@ -51,7 +57,7 @@ public class DirectoryProvider implements DynamicMenuProvider
 	{
 		final View view = GUIUtilities.getView(menu);
 
-		final String path;
+		String path;
 		if(dir == null)
 		{
 			path = view.getBuffer().getDirectory();
@@ -59,7 +65,7 @@ public class DirectoryProvider implements DynamicMenuProvider
 		else
 			path = dir;
 
-		JMenuItem mi = new JMenuItem(path + ":");
+		JMenuItem mi = new JMenuItem(path + ':');
 		mi.setActionCommand(path);
 		mi.setIcon(FileCellRenderer.openDirIcon);
 
@@ -115,8 +121,8 @@ public class DirectoryProvider implements DynamicMenuProvider
 		{
 			int maxItems = jEdit.getIntegerProperty("menu.spillover",20);
 
-			MiscUtilities.quicksort(list,
-				new MiscUtilities.StringICaseCompare());
+			Arrays.sort(list,
+				new StandardUtilities.StringCompare<File>(true));
 			for(int i = 0; i < list.length; i++)
 			{
 				File file = list[i];
@@ -166,6 +172,6 @@ public class DirectoryProvider implements DynamicMenuProvider
 	} //}}}
 
 	//{{{ Private members
-	private String dir;
+	private final String dir;
 	//}}}
 }

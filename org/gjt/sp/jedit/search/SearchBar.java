@@ -28,6 +28,7 @@ import java.awt.*;
 import javax.swing.event.*;
 import javax.swing.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.syntax.SyntaxStyle;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
@@ -35,23 +36,33 @@ import org.gjt.sp.util.Log;
 
 /**
  * Incremental search tool bar.
+ * @version $Id: SearchBar.java 13400 2008-08-23 07:51:57Z k_satoda $
  */
-public class SearchBar extends JPanel
+public class SearchBar extends JToolBar
 {
 	//{{{ SearchBar constructor
 	public SearchBar(final View view, boolean temp)
 	{
-		setLayout(new BoxLayout(this,BoxLayout.X_AXIS));
-
 		this.view = view;
 
+		setLayout(new BoxLayout(this,BoxLayout.X_AXIS));
+
+		setFloatable(false);
 		add(Box.createHorizontalStrut(2));
 
 		JLabel label = new JLabel(jEdit.getProperty("view.search.find"));
 		add(label);
+		
 		add(Box.createHorizontalStrut(12));
+		
 		add(find = new HistoryTextField("find"));
 		find.setSelectAllOnFocus(true);
+
+		SyntaxStyle style = GUIUtilities.parseStyle(jEdit.getProperty("view.style.invalid"), "Dialog", 12);
+		errorBackground = style.getBackgroundColor();
+		errorForeground = style.getForegroundColor();
+		defaultBackground = find.getBackground();
+		defaultForeground = find.getForeground();
 		Dimension max = find.getPreferredSize();
 		max.width = Integer.MAX_VALUE;
 		find.setMaximumSize(max);
@@ -62,23 +73,29 @@ public class SearchBar extends JPanel
 
 		Insets margin = new Insets(1,1,1,1);
 
-		add(Box.createHorizontalStrut(12));
+		addSeparator(new Dimension(12, 12));
+		
 		add(ignoreCase = new JCheckBox(jEdit.getProperty(
 			"search.case")));
 		ignoreCase.addActionListener(actionHandler);
 		ignoreCase.setMargin(margin);
+		ignoreCase.setOpaque(false);
 		ignoreCase.setRequestFocusEnabled(false);
 		add(Box.createHorizontalStrut(2));
+		
 		add(regexp = new JCheckBox(jEdit.getProperty(
 			"search.regexp")));
 		regexp.addActionListener(actionHandler);
 		regexp.setMargin(margin);
+		regexp.setOpaque(false);
 		regexp.setRequestFocusEnabled(false);
 		add(Box.createHorizontalStrut(2));
+		
 		add(hyperSearch = new JCheckBox(jEdit.getProperty(
 			"search.hypersearch")));
 		hyperSearch.addActionListener(actionHandler);
 		hyperSearch.setMargin(margin);
+		hyperSearch.setOpaque(false);
 		hyperSearch.setRequestFocusEnabled(false);
 
 		update();
@@ -105,9 +122,9 @@ public class SearchBar extends JPanel
 		}); //}}}
 
 		// if 'temp' is true, hide search bar after user is done with it
-		this.temp = temp;
+		this.isRemovable = temp;
 
-		propertiesChanged();
+		setCloseButtonVisibility();
 	} //}}}
 
 	//{{{ getField() method
@@ -135,19 +152,13 @@ public class SearchBar extends JPanel
 	//{{{ propertiesChanged() method
 	public void propertiesChanged()
 	{
-		if(temp)
-		{
-			if(close == null)
-			{
-				close = new RolloverButton(GUIUtilities.loadIcon("closebox.gif"));
-				close.addActionListener(new ActionHandler());
-				close.setToolTipText(jEdit.getProperty(
-					"view.search.close-tooltip"));
-			}
-			add(close);
-		}
-		else if(close != null)
-			remove(close);
+		// Option may have been changed
+		isRemovable = !(jEdit.getBooleanProperty("view.showSearchbar"));
+		
+		Log.log(Log.DEBUG, this, "in SearchBar.propertiesChanged(), isRemovable = " + isRemovable);
+		
+		setCloseButtonVisibility();
+		
 	} //}}}
 
 	//{{{ Private members
@@ -157,13 +168,17 @@ public class SearchBar extends JPanel
 	private HistoryTextField find;
 	private JCheckBox ignoreCase, regexp, hyperSearch;
 	private Timer timer;
-
-	// close button only there if 'temp' is true
+	private boolean wasError;
+	private Color defaultBackground;
+	private Color defaultForeground;
+	private Color errorForeground;
+	private Color errorBackground;
+	// close button only there if 'isRemovable' is true
 	private RolloverButton close;
 
 	private int searchStart;
 	private boolean searchReverse;
-	private boolean temp;
+	private boolean isRemovable;
 	//}}}
 
 	//{{{ find() method
@@ -182,11 +197,11 @@ public class SearchBar extends JPanel
 		//{{{ HyperSearch
 		else if(hyperSearch.isSelected())
 		{
-			if(temp)
+			if(isRemovable)
 			{
 				view.removeToolBar(SearchBar.this);
 			}
-                        else
+			else
 				find.setText(null);
 
 			SearchAndReplace.setSearchString(text);
@@ -196,12 +211,6 @@ public class SearchBar extends JPanel
 		//{{{ Incremental search
 		else
 		{
-			if(reverse && SearchAndReplace.getRegexp())
-			{
-				GUIUtilities.error(view,"regexp-reverse",null);
-				return;
-			}
-
 			// on enter, start search from end
 			// of current match to find next one
 			int start;
@@ -255,10 +264,11 @@ public class SearchBar extends JPanel
 		SearchAndReplace.setSearchString(find.getText());
 		SearchAndReplace.setReverseSearch(reverse);
 
+		boolean ret = false;
 		try
 		{
 			if(SearchAndReplace.find(view,view.getBuffer(),start,false,reverse))
-				return true;
+				ret = true;
 		}
 		catch(Exception e)
 		{
@@ -267,23 +277,61 @@ public class SearchBar extends JPanel
 			// invalid regexp, ignore
 			// return true to avoid annoying beeping while
 			// typing a re
-			return true;
+			ret = true;
+		}
+		if (ret)
+		{
+			if (wasError)
+			{
+				find.setForeground(defaultForeground);
+				find.setBackground(defaultBackground);
+				wasError = false;
+			}
+		}
+		else
+		{
+			if (!wasError)
+			{
+				find.setForeground(errorForeground);
+				find.setBackground(errorBackground);
+				wasError = true;
+			}
 		}
 
-		return false;
+
+		return ret;
 	} //}}}
 
 	//{{{ timerIncrementalSearch() method
 	private void timerIncrementalSearch(int start, boolean reverse)
 	{
-		this.searchStart = start;
-		this.searchReverse = reverse;
+		searchStart = start;
+		searchReverse = reverse;
 
 		timer.stop();
 		timer.setRepeats(false);
 		timer.setInitialDelay(150);
 		timer.start();
 	} //}}}
+	
+	//{{{ setCloseButtonVisibility() method
+	private void setCloseButtonVisibility()
+	{
+		if(isRemovable)
+		{
+			if(close == null)
+			{
+				close = new RolloverButton(GUIUtilities.loadIcon("closebox.gif"));
+				close.addActionListener(new ActionHandler());
+				close.setToolTipText(jEdit.getProperty(
+					"view.search.close-tooltip"));
+			}
+			add(close);
+		}
+		else if(close != null)
+			remove(close);
+	}
+	//}}}
 
 	//}}}
 
@@ -395,7 +443,7 @@ public class SearchBar extends JPanel
 			switch(evt.getKeyCode())
 			{
 			case KeyEvent.VK_ESCAPE:
-				if(temp)
+				if(isRemovable)
 				{
 					view.removeToolBar(SearchBar.this);
 				}
@@ -410,6 +458,15 @@ public class SearchBar extends JPanel
 				}
 				break;
 			}
+		}
+	} //}}}
+
+	//{{{ FocusHandler class
+	class FocusHandler extends FocusAdapter
+	{
+		public void focusLost(FocusEvent e)
+		{
+			getField().addCurrentToHistory();
 		}
 	} //}}}
 

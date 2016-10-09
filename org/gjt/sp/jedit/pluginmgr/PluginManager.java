@@ -23,15 +23,12 @@
 package org.gjt.sp.jedit.pluginmgr;
 
 //{{{ Imports
-import com.microstar.xml.XmlException;
 import javax.swing.border.*;
 import javax.swing.event.*;
-import javax.swing.table.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
-import java.util.*;
-import org.gjt.sp.jedit.gui.*;
+import org.xml.sax.SAXParseException;
 import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.msg.*;
 import org.gjt.sp.jedit.options.*;
@@ -40,8 +37,12 @@ import org.gjt.sp.util.Log;
 import org.gjt.sp.util.WorkRequest;
 //}}}
 
+/**
+ * @version $Id: PluginManager.java 16343 2009-10-14 10:29:47Z kpouer $
+ */
 public class PluginManager extends JFrame implements EBComponent
 {
+	
 	//{{{ getInstance() method
 	/**
 	 * Returns the currently visible plugin manager window, or null.
@@ -55,25 +56,26 @@ public class PluginManager extends JFrame implements EBComponent
 	//{{{ dispose() method
 	public void dispose()
 	{
-		GUIUtilities.saveGeometry(this,"plugin-manager");
 		instance = null;
 		EditBus.removeFromBus(this);
+		EditBus.removeFromBus(installer);
 		super.dispose();
 	} //}}}
 
 	//{{{ handleMessage() method
 	public void handleMessage(EBMessage message)
 	{
-		// Force the install tab to refresh for possible
-		// change of mirror
 		if (message instanceof PropertiesChanged)
 		{
-			pluginList = null;
-			updatePluginList();
-			if(tabPane.getSelectedIndex() != 0)
+			if (shouldUpdatePluginList())
 			{
-				installer.updateModel();
-				updater.updateModel();
+				pluginList = null;
+				updatePluginList();
+				if(tabPane.getSelectedIndex() != 0)
+				{
+					installer.updateModel();
+					updater.updateModel();
+				}
 			}
 		}
 		else if (message instanceof PluginUpdate)
@@ -94,15 +96,12 @@ public class PluginManager extends JFrame implements EBComponent
 	} //}}}
 
 	//{{{ showPluginManager() method
-	public static void showPluginManager(Frame frame)
+	public static void showPluginManager(Frame parent)
 	{
 		if (instance == null)
-			instance = new PluginManager();
+			instance = new PluginManager(parent);
 		else
-		{
 			instance.toFront();
-			return;
-		}
 	} //}}}
 
 	//{{{ ok() method
@@ -118,7 +117,7 @@ public class PluginManager extends JFrame implements EBComponent
 	} //}}}
 
 	//{{{ getPluginList() method
-	public PluginList getPluginList()
+	PluginList getPluginList()
 	{
 		return pluginList;
 	} //}}}
@@ -137,14 +136,24 @@ public class PluginManager extends JFrame implements EBComponent
 	private PluginList pluginList;
 	private boolean queuedUpdate;
 	private boolean downloadingPluginList;
+	private final Frame parent;
 	//}}}
 
+	static public final String PROPERTY_PLUGINSET = "plugin-manager.pluginset.path";
+
 	//{{{ PluginManager constructor
-	private PluginManager()
+	private PluginManager(Frame parent)
 	{
 		super(jEdit.getProperty("plugin-manager.title"));
+		this.parent = parent;
+		init();
+	} //}}}
 
+	//{{{ init() method
+	private void init()
+	{
 		EditBus.addToBus(this);
+		
 
 		/* Setup panes */
 		JPanel content = new JPanel(new BorderLayout(12,12));
@@ -158,7 +167,7 @@ public class PluginManager extends JFrame implements EBComponent
 			updater = new InstallPanel(this,true));
 		tabPane.addTab(jEdit.getProperty("install-plugins.title"),
 			installer = new InstallPanel(this,false));
-
+		EditBus.addToBus(installer);
 		content.add(BorderLayout.CENTER,tabPane);
 
 		tabPane.addChangeListener(new ListUpdater());
@@ -191,8 +200,25 @@ public class PluginManager extends JFrame implements EBComponent
 		setIconImage(GUIUtilities.getPluginIcon());
 
 		pack();
-		GUIUtilities.loadGeometry(this,"plugin-manager");
+		GUIUtilities.loadGeometry(this, parent, "plugin-manager");
+		GUIUtilities.addSizeSaver(this, parent, "plugin-manager");
 		setVisible(true);
+	} //}}}
+
+	//{{{ shouldUpdatePluginList()
+	/**
+	* Check if the plugin list should be updated.
+	* It will return <code>true</code> if the pluginList is <code>null</code>
+	* or if the mirror id of the current plugin list is not the current preffered mirror id
+	* and will return always false if the plugin list is currently downloading
+	*
+	* @return true if the plugin list should be updated
+	*/
+	private boolean shouldUpdatePluginList()
+	{
+		return (pluginList == null ||
+			!pluginList.getMirrorId().equals(jEdit.getProperty("plugin-manager.mirror.id"))) &&
+			!downloadingPluginList;
 	} //}}}
 
 	//{{{ updatePluginList() method
@@ -204,7 +230,7 @@ public class PluginManager extends JFrame implements EBComponent
 			GUIUtilities.error(this,"no-settings",null);
 			return;
 		}
-		else if(pluginList != null || downloadingPluginList)
+		if (!shouldUpdatePluginList())
 		{
 			return;
 		}
@@ -219,8 +245,8 @@ public class PluginManager extends JFrame implements EBComponent
 				{
 					downloadingPluginList = true;
 					setStatus(jEdit.getProperty(
-						"plugin-manager.list-download"));
-					pluginList = new PluginList();
+						"plugin-manager.list-download-connect"));
+					pluginList = new PluginList(this);
 				}
 				catch(Exception e)
 				{
@@ -237,16 +263,16 @@ public class PluginManager extends JFrame implements EBComponent
 		{
 			public void run()
 			{
-				if(exception[0] instanceof XmlException)
+				if(exception[0] instanceof SAXParseException)
 				{
-					XmlException xe = (XmlException)
+					SAXParseException se = (SAXParseException)
 						exception[0];
 
-					int line = xe.getLine();
+					int line = se.getLineNumber();
 					String path = jEdit.getProperty(
 						"plugin-manager.export-url");
-					String message = xe.getMessage();
-					Log.log(Log.ERROR,this,path + ":" + line
+					String message = se.getMessage();
+					Log.log(Log.ERROR,this,path + ':' + line
 						+ ": " + message);
 					String[] pp = { path,
 						String.valueOf(line),
@@ -290,6 +316,17 @@ public class PluginManager extends JFrame implements EBComponent
 		});
 	} //}}}
 
+	//{{{ processKeyEvent() method
+	public void processKeyEvents(KeyEvent ke)
+	{
+		if ((ke.getID() == KeyEvent.KEY_PRESSED) &&
+		    (ke.getKeyCode() == KeyEvent.VK_ESCAPE))
+		{
+			cancel();
+			ke.consume();
+		}
+	} //}}}
+
 	//}}}
 
 	//{{{ Inner classes
@@ -314,7 +351,7 @@ public class PluginManager extends JFrame implements EBComponent
 	{
 		public void stateChanged(ChangeEvent e)
 		{
-			final Component selected = tabPane.getSelectedComponent();
+			Component selected = tabPane.getSelectedComponent();
 			if(selected == installer || selected == updater)
 			{
 				updatePluginList();

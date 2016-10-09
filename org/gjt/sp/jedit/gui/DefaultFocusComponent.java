@@ -29,7 +29,7 @@ package org.gjt.sp.jedit.gui;
  *
  * @since jEdit 4.2pre1
  * @author Slava Pestov
- * @version $Id: DefaultFocusComponent.java,v 1.1 2003/04/14 05:28:12 spestov Exp $
+ * @version $Id: DefaultFocusComponent.java 12504 2008-04-22 23:12:43Z ezust $
  */
 public interface DefaultFocusComponent
 {

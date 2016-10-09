@@ -1,4 +1,4 @@
-$Id: changes40.txt,v 1.4 2001/11/11 03:02:31 jgellene Exp $
+$Id: changes40.txt 3890 2001-11-11 03:02:31Z jgellene $
 
 Changes made to QuickNotepad plugin for jEdit 4.0:
 

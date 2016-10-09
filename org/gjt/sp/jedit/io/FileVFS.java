@@ -3,8 +3,9 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1998, 1999, 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 1998, 2005 Slava Pestov
  * Portions copyright (C) 1998, 1999, 2000 Peter Graves
+ * Portions copyright (C) 2007 Matthieu Casanova
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,6 +25,8 @@
 package org.gjt.sp.jedit.io;
 
 //{{{ Imports
+import javax.swing.filechooser.FileSystemView;
+import javax.swing.*;
 import java.awt.Component;
 import java.io.*;
 import java.text.*;
@@ -35,33 +38,33 @@ import org.gjt.sp.util.Log;
 /**
  * Local filesystem VFS.
  * @author Slava Pestov
- * @version $Id: FileVFS.java,v 1.47 2004/06/09 16:48:40 spestov Exp $
+ * @version $Id: FileVFS.java 15384 2009-06-03 13:49:06Z kpouer $
  */
 public class FileVFS extends VFS
 {
 	public static final String PERMISSIONS_PROPERTY = "FileVFS__perms";
 
-	//{{{ FileVFS method
+	//{{{ FileVFS constructor
 	public FileVFS()
 	{
-		super("file",READ_CAP | WRITE_CAP | DELETE_CAP
+		super("file",READ_CAP | WRITE_CAP | BROWSE_CAP | DELETE_CAP
 			| RENAME_CAP | MKDIR_CAP | LOW_LATENCY_CAP
-			| ((OperatingSystem.isMacOS()
-			|| OperatingSystem.isDOSDerived())
+			| (OperatingSystem.isCaseInsensitiveFS()
 			? CASE_INSENSITIVE_CAP : 0),
 			new String[] { EA_TYPE, EA_SIZE, EA_STATUS,
 			EA_MODIFIED });
 	} //}}}
 
 	//{{{ getParentOfPath() method
+	@Override
 	public String getParentOfPath(String path)
 	{
 		if(OperatingSystem.isDOSDerived())
 		{
 			if(path.length() == 2 && path.charAt(1) == ':')
-				return FileRootsVFS.PROTOCOL + ":";
+				return FileRootsVFS.PROTOCOL + ':';
 			else if(path.length() == 3 && path.endsWith(":\\"))
-				return FileRootsVFS.PROTOCOL + ":";
+				return FileRootsVFS.PROTOCOL + ':';
 			else if(path.startsWith("\\\\") && path.indexOf('\\',2) == -1)
 				return path;
 		}
@@ -70,6 +73,7 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ constructPath() method
+	@Override
 	public String constructPath(String parent, String path)
 	{
 		if(parent.endsWith(File.separator)
@@ -80,12 +84,41 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ getFileSeparator() method
+	@Override
 	public char getFileSeparator()
 	{
 		return File.separatorChar;
 	} //}}}
 
+	//{{{ getTwoStageSaveName() method
+	/**
+	 * Returns a temporary file name based on the given path.
+	 *
+	 * <p>If the directory where the file would be created cannot be
+	 * written (i.e., no new files can be created in that directory),
+	 * this method returns <code>null</code>.</p>
+	 *
+	 * @param path The path name
+	 */
+	@Override
+	public String getTwoStageSaveName(String path)
+	{
+		File parent = new File(getParentOfPath(path));
+		// the ignorance of the canWrite() method for windows
+		// is, because the read-only flag on windows has
+		// not the effect of preventing the creation of new files.
+		// The only way to make a directory read-only in this means
+		// the ACL of the directory has to be set to read-only,
+		// which is not checkable by java.
+		// The " || OperatingSystem.isWindows()" can be removed
+		// if the canWrite() method gives back the right value.
+		return (parent.canWrite() || OperatingSystem.isWindows())
+			? super.getTwoStageSaveName(path)
+			: null;
+	} //}}}
+
 	//{{{ save() method
+	@Override
 	public boolean save(View view, Buffer buffer, String path)
 	{
 		if(OperatingSystem.isUnix())
@@ -100,6 +133,7 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ insert() method
+	@Override
 	public boolean insert(View view, Buffer buffer, String path)
 	{
 		File file = new File(path);
@@ -125,6 +159,32 @@ public class FileVFS extends VFS
 		return super.insert(view,buffer,path);
 	} //}}}
 
+	//{{{ recursiveDelete() method
+	/**
+	 * #
+	 * @param path the directory path to recursive delete
+	 * @return true if successful, else false
+	 */
+	public static boolean recursiveDelete(File path)
+	{
+		if (path.exists())
+		{
+			File[] files = path.listFiles();
+			for (int i = 0; i < files.length; i++)
+			{
+				if (files[i].isDirectory())
+				{
+					recursiveDelete(files[i]);
+				}
+				else
+				{
+					files[i].delete();
+				}
+			}
+		}
+		return path.delete();
+	} //}}}
+
 	//{{{ _canonPath() method
 	/**
 	 * Returns the canonical form if the specified path name. For example,
@@ -135,42 +195,152 @@ public class FileVFS extends VFS
 	 * @exception IOException if an I/O error occurred
 	 * @since jEdit 4.0pre2
 	 */
+	@Override
 	public String _canonPath(Object session, String path, Component comp)
 		throws IOException
 	{
 		return MiscUtilities.canonPath(path);
 	} //}}}
 
-	//{{{ LocalDirectoryEntry class
-	public static class LocalDirectoryEntry extends VFS.DirectoryEntry
+	//{{{ LocalFile class
+	public static class LocalFile extends VFSFile
 	{
+		private File file;
+
 		// use system default short format
 		public static DateFormat DATE_FORMAT
 			= DateFormat.getInstance();
 
+		/**
+		 * @deprecated Call getModified() instead.
+		 */
+		@Deprecated
 		public long modified;
 
-		public LocalDirectoryEntry(File file)
+		//{{{ LocalFile() class
+		public LocalFile(File file)
 		{
-			super(file.getName(),file.getPath(),
-				file.getPath(),file.isDirectory() ? DIRECTORY : FILE,file.length(),file.isHidden());
-			this.modified = file.lastModified();
-			this.canRead = file.canRead();
-			this.canWrite = file.canWrite();
-			this.symlinkPath = MiscUtilities.resolveSymlinks(path);
-		}
+			this.file = file;
 
+			/* These attributes are fetched relatively
+			quickly. The rest are lazily filled in. */
+			setName(file.getName());
+			String path = file.getPath();
+			setPath(path);
+			setDeletePath(path);
+			setHidden(file.isHidden());
+			setType(file.isDirectory()
+				? VFSFile.DIRECTORY
+				: VFSFile.FILE);
+		} //}}}
+
+		//{{{ getExtendedAttribute() method
+		@Override
 		public String getExtendedAttribute(String name)
 		{
-			if(name.equals(EA_MODIFIED))
+			fetchAttrs();
+			if (name.equals(EA_MODIFIED))
+			{
 				return DATE_FORMAT.format(new Date(modified));
+			}
 			else
+			{
 				return super.getExtendedAttribute(name);
-		}
+			}
+		} //}}}
+
+		//{{{ fetchAttrs() method
+		/** Fetch the attributes of the local file. */
+		@Override
+		protected void fetchAttrs()
+		{
+			if(fetchedAttrs())
+				return;
+
+			super.fetchAttrs();
+
+			setSymlinkPath(MiscUtilities.resolveSymlinks(
+				file.getPath()));
+			setReadable(file.canRead());
+			setWriteable(file.canWrite());
+			setLength(file.length());
+			setModified(file.lastModified());
+		} //}}}
+
+		//{{{ getIcon() method
+		/**
+		 * Returns the file system icon for the file.
+		 *
+		 * @param expanded not used here
+		 * @param openBuffer not used here
+		 * @return the file system icon
+		 * @since 4.3pre9
+		 */
+		@Override
+		public Icon getIcon(boolean expanded, boolean openBuffer)
+		{
+			if (icon == null)
+			{
+				if (fsView == null)
+					fsView = FileSystemView.getFileSystemView();
+
+				icon = fsView.getSystemIcon(file);
+			}
+			return icon;  
+		} //}}}
+
+		//{{{ getSymlinkPath() method
+		@Override
+		public String getSymlinkPath()
+		{
+			fetchAttrs();
+			return super.getSymlinkPath();
+		} //}}}
+
+		//{{{ getLength() method
+		@Override
+		public long getLength()
+		{
+			fetchAttrs();
+			return super.getLength();
+		} //}}}
+
+		//{{{ isReadable() method
+		@Override
+		public boolean isReadable()
+		{
+			fetchAttrs();
+			return super.isReadable();
+		} //}}}
+
+		//{{{ isWriteable() method
+		@Override
+		public boolean isWriteable()
+		{
+			fetchAttrs();
+			return super.isWriteable();
+		} //}}}
+
+		//{{{ getModified() method
+		public long getModified()
+		{
+			fetchAttrs();
+			return modified;
+		} //}}}
+
+		//{{{ setModified() method
+		public void setModified(long modified)
+		{
+			this.modified = modified;
+		} //}}}
+
+		private transient FileSystemView fsView;
+		private transient Icon icon;
 	} //}}}
 
-	//{{{ _listDirectory() method
-	public VFS.DirectoryEntry[] _listDirectory(Object session, String path,
+	//{{{ _listFiles() method
+	@Override
+	public VFSFile[] _listFiles(Object session, String path,
 		Component comp)
 	{
 		//{{{ Windows work around
@@ -189,38 +359,43 @@ public class FileVFS extends VFS
 		} //}}}
 
 		File directory = new File(path);
-		File[] list = directory.listFiles();
+		File[] list = null;
+		if(directory.exists())
+			list = fsView.getFiles(directory,false);
+
 		if(list == null)
 		{
 			VFSManager.error(comp,path,"ioerror.directory-error-nomsg",null);
 			return null;
 		}
 
-		VFS.DirectoryEntry[] list2 = new VFS.DirectoryEntry[list.length];
+		VFSFile[] list2 = new VFSFile[list.length];
 		for(int i = 0; i < list.length; i++)
-			list2[i] = new LocalDirectoryEntry(list[i]);
+			list2[i] = new LocalFile(list[i]);
 
 		return list2;
 	} //}}}
 
-	//{{{ _getDirectoryEntry() method
-	public DirectoryEntry _getDirectoryEntry(Object session, String path,
+	//{{{ _getFile() method
+	@Override
+	public VFSFile _getFile(Object session, String path,
 		Component comp)
 	{
 		if(path.equals("/") && OperatingSystem.isUnix())
 		{
 			return new VFS.DirectoryEntry(path,path,path,
-				VFS.DirectoryEntry.DIRECTORY,0L,false);
+				VFSFile.DIRECTORY,0L,false);
 		}
 
 		File file = new File(path);
 		if(!file.exists())
 			return null;
 
-		return new LocalDirectoryEntry(file);
+		return new LocalFile(file);
 	} //}}}
 
 	//{{{ _delete() method
+	@Override
 	public boolean _delete(Object session, String path, Component comp)
 	{
 		File file = new File(path);
@@ -235,14 +410,23 @@ public class FileVFS extends VFS
 		{
 			canonPath = path;
 		}
-
-		boolean retVal = file.delete();
+		// if directory, do recursive delete
+		boolean retVal;
+		if (!file.isDirectory())
+		{
+			retVal = file.delete();
+		} 
+		else 
+		{
+			retVal = recursiveDelete(file);
+		}
 		if(retVal)
 			VFSManager.sendVFSUpdate(this,canonPath,true);
 		return retVal;
 	} //}}}
 
 	//{{{ _rename() method
+	@Override
 	public boolean _rename(Object session, String from, String to,
 		Component comp)
 	{
@@ -296,6 +480,7 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ _mkdir() method
+	@Override
 	public boolean _mkdir(Object session, String directory, Component comp)
 	{
 		String parent = getParentOfPath(directory);
@@ -322,6 +507,7 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ _backup() method
+	@Override
 	public void _backup(Object session, String path, Component comp)
 		throws IOException
 	{
@@ -338,6 +524,9 @@ public class FileVFS extends VFS
 
 		int backupTimeDistance = jEdit.getIntegerProperty("backup.minTime",0);
 		File file = new File(path);
+
+		if (!file.exists())
+			return;
 
 		// Check for backup.directory, and create that
 		// directory if it doesn't exist
@@ -364,6 +553,7 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ _createInputStream() method
+	@Override
 	public InputStream _createInputStream(Object session, String path,
 		boolean ignoreErrors, Component comp) throws IOException
 	{
@@ -381,6 +571,7 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ _createOutputStream() method
+	@Override
 	public OutputStream _createOutputStream(Object session, String path,
 		Component comp) throws IOException
 	{
@@ -388,6 +579,7 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ _saveComplete() method
+	@Override
 	public void _saveComplete(Object session, Buffer buffer, String path,
 		Component comp)
 	{
@@ -486,5 +678,9 @@ public class FileVFS extends VFS
 		}
 	} //}}}
 
+	//}}}
+
+	//{{{ Private members
+	private static final FileSystemView fsView = FileSystemView.getFileSystemView();
 	//}}}
 }

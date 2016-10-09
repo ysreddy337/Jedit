@@ -31,13 +31,19 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.gjt.sp.util.Log;
+
+import java.util.jar.Manifest;
+import java.util.jar.JarFile;
+import java.net.MalformedURLException;
+import java.util.jar.Attributes;
+import java.util.jar.Attributes.Name;
 //}}}
 
 /**
  * A class loader implementation that loads classes from JAR files. All
  * instances share the same set of classes.
  * @author Slava Pestov
- * @version $Id: JARClassLoader.java,v 1.34 2004/03/11 05:21:00 spestov Exp $
+ * @version $Id: JARClassLoader.java 16625 2009-12-10 00:00:39Z ezust $
  */
 public class JARClassLoader extends ClassLoader
 {
@@ -49,6 +55,18 @@ public class JARClassLoader extends ClassLoader
 	 */
 	public JARClassLoader()
 	{
+		this(true);
+	}
+
+	/**
+	 * Creates a class loader that will optionally delegate the
+	 * finding of classes to the parent class loader by default.
+	 *
+	 * @since jEdit 4.3pre6
+	 */
+	public JARClassLoader(boolean delegateFirst)
+	{
+		this.delegateFirst = delegateFirst;
 		// for debugging
 		id = INDEX++;
 		live++;
@@ -61,7 +79,20 @@ public class JARClassLoader extends ClassLoader
 	public Class loadClass(String clazz, boolean resolveIt)
 		throws ClassNotFoundException
 	{
-		// see what JARClassLoader this class is in
+		ClassNotFoundException pending = null;
+		if (delegateFirst)
+		{
+			try
+			{
+				return loadFromParent(clazz);
+			}
+			catch (ClassNotFoundException cnf)
+			{
+				// keep going if class was not found.
+				pending = cnf;
+			}
+		}
+
 		Object obj = classHash.get(clazz);
 		if(obj == NO_CLASS)
 		{
@@ -73,49 +104,50 @@ public class JARClassLoader extends ClassLoader
 		else if(obj instanceof JARClassLoader)
 		{
 			JARClassLoader classLoader = (JARClassLoader)obj;
-			return classLoader._loadClass(clazz,resolveIt);
+			try
+			{
+				return classLoader._loadClass(clazz,resolveIt);
+			} catch (ClassNotFoundException cnf2)
+			{
+				classHash.put(clazz,NO_CLASS);
+				throw cnf2;
+			}
 		}
-
-		// if it's not in the class hash, and not marked as
-		// non-existent, try loading it from the CLASSPATH
-		try
+		else if (delegateFirst)
 		{
-			Class cls;
-
-			/* Defer to whoever loaded us (such as JShell,
-			 * Echidna, etc) */
-			ClassLoader parentLoader = getClass().getClassLoader();
-			if (parentLoader != null)
-				cls = parentLoader.loadClass(clazz);
-			else
-				cls = findSystemClass(clazz);
-
-			return cls;
+			// if delegating, reaching this statement means
+			// the class was really not found. Otherwise
+			// we'll try loading from the parent class loader.
+			throw pending;
 		}
-		catch(ClassNotFoundException cnf)
-		{
-			// remember that this class doesn't exist for
-			// future reference
-			classHash.put(clazz,NO_CLASS);
 
-			throw cnf;
-		}
+		return loadFromParent(clazz);
 	} //}}}
 
 	//{{{ getResourceAsStream() method
 	public InputStream getResourceAsStream(String name)
 	{
-		if(jar == null)
-			return null;
-
 		try
 		{
-			ZipFile zipFile = jar.getZipFile();
-			ZipEntry entry = zipFile.getEntry(name);
-			if(entry == null)
-				return getSystemResourceAsStream(name);
-			else
-				return zipFile.getInputStream(entry);
+			// try in current jar first
+			if(jar != null)
+			{
+				ZipFile zipFile = jar.getZipFile();
+				ZipEntry entry = zipFile.getEntry(name);
+				if(entry != null)
+				{
+					return zipFile.getInputStream(entry);
+				}
+			}
+			// then try from another jar
+			Object obj = resourcesHash.get(name);
+			if(obj instanceof JARClassLoader)
+			{
+				JARClassLoader classLoader = (JARClassLoader)obj;
+				return classLoader.getResourceAsStream(name);
+			}
+			// finally try from the system class loader
+			return getSystemResourceAsStream(name);
 		}
 		catch(IOException io)
 		{
@@ -126,19 +158,39 @@ public class JARClassLoader extends ClassLoader
 	} //}}}
 
 	//{{{ getResource() method
+	/**
+	 * overriding getResource() because we want to search FIRST in this
+	 * ClassLoader, then the parent, the path, etc.
+	 */
 	public URL getResource(String name)
 	{
-		if(jar == null)
-			return null;
-
 		try
 		{
-			ZipFile zipFile = jar.getZipFile();
-			ZipEntry entry = zipFile.getEntry(name);
-			if(entry == null)
-				return getSystemResource(name);
-			else
-				return new URL(getResourceAsPath(name));
+			if(jar != null)
+			{
+				ZipFile zipFile = jar.getZipFile();
+				ZipEntry entry = zipFile.getEntry(name);
+				if(entry != null)
+				{
+					return new URL(getResourceAsPath(name));
+				}
+			}
+			
+			Object obj = resourcesHash.get(name);
+			if(obj instanceof JARClassLoader)
+			{
+				JARClassLoader classLoader = (JARClassLoader)obj;
+				return classLoader.getResource(name);
+			} else
+			{
+				URL ret = getSystemResource(name); 
+				if(ret != null)
+				{
+					Log.log(Log.DEBUG,JARClassLoader.class,"Would have returned null for getResource("+name+")");
+					Log.log(Log.DEBUG,JARClassLoader.class,"returning("+ret+")");
+				}
+				return ret;
+			}
 		}
 		catch(IOException io)
 		{
@@ -148,16 +200,28 @@ public class JARClassLoader extends ClassLoader
 	} //}}}
 
 	//{{{ getResourceAsPath() method
+	/**
+	 * construct a jeditresource:/etc path from the name
+	 * of a resource in the associated jar.
+	 * The existence of the resource is not actually checked.
+	 *
+	 * @param name name of the resource
+	 * @return jeditresource:/path_to_the_jar!name_of_the_resource
+	 * @throws UnsupportedOperationException if this is an anonymous
+	 * JARClassLoader (no associated jar).
+	 */
 	public String getResourceAsPath(String name)
 	{
+		// this must be fixed during plugin development
 		if(jar == null)
-			return null;
+			throw new UnsupportedOperationException(
+				"don't call getResourceAsPath() on anonymous JARClassLoader");
 
 		if(!name.startsWith("/"))
-			name = "/" + name;
+			name = '/' + name;
 
 		return "jeditresource:/" + MiscUtilities.getFileName(
-			jar.getPath()) + "!" + name;
+			jar.getPath()) + '!' + name;
 	} //}}}
 
 	//{{{ getZipFile() method
@@ -189,15 +253,13 @@ public class JARClassLoader extends ClassLoader
 			"Live instances: " + live);
 		synchronized(classHash)
 		{
-			Iterator entries = classHash.entrySet().iterator();
-			while(entries.hasNext())
+			for (Map.Entry<String, Object> entry : classHash.entrySet())
 			{
-				Map.Entry entry = (Map.Entry)entries.next();
-				if(entry.getValue() != NO_CLASS)
+				if (entry.getValue() != NO_CLASS)
 				{
-					Log.log(Log.DEBUG,JARClassLoader.class,
+					Log.log(Log.DEBUG, JARClassLoader.class,
 						entry.getKey() + " ==> "
-						+ entry.getValue());
+							+ entry.getValue());
 				}
 			}
 		}
@@ -207,9 +269,46 @@ public class JARClassLoader extends ClassLoader
 	public String toString()
 	{
 		if(jar == null)
-			return "<anonymous>(" + id + ")";
+			return "<anonymous>(" + id + ')';
 		else
-			return jar.getPath() + " (" + id + ")";
+			return jar.getPath() + " (" + id + ')';
+	} //}}}
+
+	//{{{ findResources() method
+	/**
+	 * @return zero or one resource, as returned by getResource()
+	 */
+	public Enumeration getResources(String name) throws IOException
+	{
+		class SingleElementEnumeration implements Enumeration
+		{
+			private Object element;
+
+			SingleElementEnumeration(Object element)
+			{
+				this.element = element;
+			}
+
+			public boolean hasMoreElements()
+			{
+				return element != null;
+			}
+
+			public Object nextElement()
+			{
+				if(element != null)
+				{
+					Object retval = element;
+					element = null;
+					return retval;
+				}
+				else
+					throw new NoSuchElementException();
+			}
+		}
+
+		URL resource = getResource(name);
+		return new SingleElementEnumeration(resource);
 	} //}}}
 
 	//{{{ finalize() method
@@ -233,6 +332,13 @@ public class JARClassLoader extends ClassLoader
 	//{{{ activate() method
 	void activate()
 	{
+		if (jar.getPlugin() != null)
+		{
+			String _delegate = jEdit.getProperty(
+				"plugin." + jar.getPlugin().getClassName() + ".class_loader_delegate");
+			delegateFirst = _delegate == null || "true".equals(_delegate);
+		}
+
 		String[] classes = jar.getClasses();
 		if(classes != null)
 		{
@@ -241,22 +347,44 @@ public class JARClassLoader extends ClassLoader
 				classHash.put(classes[i],this);
 			}
 		}
+
+		String[] resources = jar.getResources();
+		if(resources != null)
+		{
+			for(int i = 0; i < resources.length; i++)
+			{
+				resourcesHash.put(resources[i],this);
+			}
+		}
 	} //}}}
 
 	//{{{ deactivate() method
 	void deactivate()
 	{
 		String[] classes = jar.getClasses();
-		if(classes == null)
+		if(classes != null)
+		{
+			for(int i = 0; i < classes.length; i++)
+			{
+				Object loader = classHash.get(classes[i]);
+				if(loader == this)
+					classHash.remove(classes[i]);
+				else
+					/* two plugins provide same class! */;
+			}
+		}
+
+		String[] resources = jar.getResources();
+		if(resources == null)
 			return;
 
-		for(int i = 0; i < classes.length; i++)
+		for(int i = 0; i < resources.length; i++)
 		{
-			Object loader = classHash.get(classes[i]);
+			Object loader = resourcesHash.get(resources[i]);
 			if(loader == this)
-				classHash.remove(classes[i]);
+				resourcesHash.remove(resources[i]);
 			else
-				/* two plugins provide same class! */;
+				/* two plugins provide same resource! */;
 		}
 	} //}}}
 
@@ -269,9 +397,11 @@ public class JARClassLoader extends ClassLoader
 
 	private static int INDEX;
 	private static int live;
-	private static Hashtable classHash = new Hashtable();
+	private static Map<String, Object> classHash = new Hashtable<String, Object>();
+	private static Map<String, Object> resourcesHash = new HashMap<String, Object>();
 
 	private int id;
+	private boolean delegateFirst;
 	private PluginJAR jar;
 
 	//{{{ _loadClass() method
@@ -297,6 +427,7 @@ public class JARClassLoader extends ClassLoader
 
 			try
 			{
+				definePackage(clazz);
 				ZipFile zipFile = jar.getZipFile();
 				ZipEntry entry = zipFile.getEntry(name);
 
@@ -336,6 +467,80 @@ public class JARClassLoader extends ClassLoader
 				throw new ClassNotFoundException(clazz);
 			}
 		}
+	} //}}}
+
+	//{{{ definePackage(clazz) method
+	private void definePackage(String clazz) throws IOException
+	{
+		int idx = clazz.lastIndexOf('.');
+		if (idx != -1)
+		{
+			String name = clazz.substring(0, idx);
+			if (getPackage(name) == null) definePackage(name, new JarFile(jar.getFile()).getManifest());
+		}
+	} //}}}
+
+	//{{{ getMfValue() method
+	private static String getMfValue(Attributes sectionAttrs, Attributes mainAttrs, Attributes.Name name)
+	{
+		String value=null;
+		if (sectionAttrs != null)
+			value = sectionAttrs.getValue(name);
+		else if (mainAttrs != null)
+		{
+			value = mainAttrs.getValue(name);
+		}
+		return value;
+	}
+	//}}}
+
+	//{{{ definePackage(packageName, manifest) method
+	private void definePackage(String name, Manifest mf)
+	{
+		if (mf==null)
+		{
+			definePackage(name, null, null, null, null, null,
+			null, null);
+			return;
+		}
+
+		Attributes sa = mf.getAttributes(name.replace('.', '/') + '/');
+		Attributes ma = mf.getMainAttributes();
+
+		URL sealBase = null;
+		if (Boolean.valueOf(getMfValue(sa, ma, Name.SEALED)).booleanValue())
+		{
+			try
+			{
+				sealBase = jar.getFile().toURL();
+			}
+			catch (MalformedURLException e) {}
+		}
+
+		Package pkg=definePackage(
+			name,
+			getMfValue(sa, ma, Name.SPECIFICATION_TITLE),
+			getMfValue(sa, ma, Name.SPECIFICATION_VERSION),
+			getMfValue(sa, ma, Name.SPECIFICATION_VENDOR),
+			getMfValue(sa, ma, Name.IMPLEMENTATION_TITLE),
+			getMfValue(sa, ma, Name.IMPLEMENTATION_VERSION),
+			getMfValue(sa, ma, Name.IMPLEMENTATION_VENDOR),
+			sealBase);
+	} //}}}
+
+	//{{{ loadFromParent() method
+	private Class loadFromParent(String clazz)
+		throws ClassNotFoundException
+	{
+		Class cls;
+
+		ClassLoader parentLoader = getClass().getClassLoader();
+		if (parentLoader != null)
+			cls = parentLoader.loadClass(clazz);
+		else
+			cls = findSystemClass(clazz);
+
+		return cls;
 	} //}}}
 
 	//}}}

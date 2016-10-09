@@ -31,8 +31,9 @@ import org.gjt.sp.jedit.*;
 
 /**
  * A set of occurrences of the search string on a given line in a buffer.
+ * @author Slava Pestov
  */
-public class HyperSearchResult
+public class HyperSearchResult implements HyperSearchNode
 {
 	public String path;
 	public Buffer buffer;
@@ -42,10 +43,10 @@ public class HyperSearchResult
 	public int occurCount;
 
 	//{{{ getBuffer() method
-	public Buffer getBuffer()
+	public Buffer getBuffer(View view)
 	{
 		if(buffer == null)
-			buffer = jEdit.openFile(null,path);
+			buffer = jEdit.openFile(view,path);
 		return buffer;
 	} //}}}
 
@@ -77,13 +78,12 @@ public class HyperSearchResult
 	} //}}}
 
 	//{{{ goTo() method
-	public void goTo(final View view)
+	public void goTo(final EditPane editPane)
 	{
-		if(buffer == null)
-			buffer = jEdit.openFile(null,path);
-
+		final Buffer buffer = getBuffer(editPane.getView());
 		if(buffer == null)
 			return;
+		editPane.setBuffer(buffer);
 
 		VFSManager.runInAWTThread(new Runnable()
 		{
@@ -93,13 +93,12 @@ public class HyperSearchResult
 				if(s == null)
 					return;
 
-				EditPane pane = view.goToBuffer(buffer);
-				JEditTextArea textArea = pane.getTextArea();
+				JEditTextArea textArea = editPane.getTextArea();
 				if(textArea.isMultipleSelectionEnabled())
 					textArea.addToSelection(s);
 				else
 					textArea.setSelection(s);
-                
+
 				textArea.moveCaretPosition(occur.endPos.getOffset());
 			}
 		});
@@ -168,6 +167,16 @@ public class HyperSearchResult
 	{
 		return path.equals(MiscUtilities.resolveSymlinks(this.path));
 	} //}}}
+	
+	//{{{ equals() method
+	public boolean equals(Object compareObj)
+	{
+		if (!(compareObj instanceof HyperSearchResult))
+			return false;
+		HyperSearchResult otherResult = (HyperSearchResult)compareObj;
+		return pathEquals(otherResult.path) && line == otherResult.line
+			&& buffer.equals(otherResult.buffer);		
+	}//}}}
 
 	//}}}
 

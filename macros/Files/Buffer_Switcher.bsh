@@ -35,7 +35,7 @@
  * ESCAPE: closes the dialog.
  * SPACE: switches to the selected buffer but does not close the dialog.
  *
- * $Id: Buffer_Switcher.bsh,v 1.1 2004/03/19 15:57:59 spestov Exp $
+ * $Id: Buffer_Switcher.bsh 5450 2006-06-20 09:08:13Z vampire0 $
  */
 
 import javax.swing.border.EmptyBorder;

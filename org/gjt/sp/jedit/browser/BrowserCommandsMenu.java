@@ -30,36 +30,48 @@ import javax.swing.*;
 
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.menu.MenuItemTextComparator;
 //}}}
 
 /**
- * @version $Id: BrowserCommandsMenu.java,v 1.25 2004/07/12 19:25:07 spestov Exp $
+ * @version $Id: BrowserCommandsMenu.java 14254 2008-12-30 10:15:37Z shlomy $
  * @author Slava Pestov and Jason Ginchereau
  */
 public class BrowserCommandsMenu extends JPopupMenu
 {
 	//{{{ BrowserCommandsMenu constructor
-	public BrowserCommandsMenu(VFSBrowser browser, VFS.DirectoryEntry[] files)
+	public BrowserCommandsMenu(VFSBrowser browser, VFSFile[] files)
 	{
 		this.browser = browser;
 
 		if(files != null)
 		{
-			VFS vfs = VFSManager.getVFSForPath(files[0].deletePath);
-			int type = files[0].type;
-			boolean fileOpen = (jEdit.getBuffer(files[0].path) != null);
-			boolean delete = !fileOpen && (vfs.getCapabilities() & VFS.DELETE_CAP) != 0;
-			boolean rename = !fileOpen && (vfs.getCapabilities() & VFS.RENAME_CAP) != 0;
+			VFS vfs = VFSManager.getVFSForPath(
+				files[0].getDeletePath());
+			int type = files[0].getType();
+
+			boolean fileOpen = (jEdit.getBuffer(files[0].getPath()) != null);
+
+			/* We check this flag separately so that we can
+			delete open files from the favorites. */
+			boolean deletePathOpen = (jEdit.getBuffer(files[0].getDeletePath()) != null);
+
+			boolean delete = !deletePathOpen
+				&& (vfs.getCapabilities()
+				& VFS.DELETE_CAP) != 0;
+			boolean rename = !fileOpen
+				&& (vfs.getCapabilities()
+				& VFS.RENAME_CAP) != 0;
 
 			for(int i = 1; i < files.length; i++)
 			{
-				VFS.DirectoryEntry file = files[i];
+				VFSFile file = files[i];
 
-				VFS _vfs = VFSManager.getVFSForPath(file.deletePath);
+				VFS _vfs = VFSManager.getVFSForPath(file.getDeletePath());
 				delete &= (vfs == _vfs) && (_vfs.getCapabilities()
 					& VFS.DELETE_CAP) != 0;
 
-				if(type == file.type)
+				if(type == file.getType())
 					/* all good */;
 				else
 				{
@@ -73,19 +85,19 @@ public class BrowserCommandsMenu extends JPopupMenu
 
 				// show 'close' item if at least one selected
 				// file is currently open
-				if(jEdit.getBuffer(file.path) != null)
+				if(jEdit.getBuffer(file.getPath()) != null)
 					fileOpen = true;
 			}
 
-			if(type == VFS.DirectoryEntry.DIRECTORY
-				|| type == VFS.DirectoryEntry.FILESYSTEM)
+			if(type == VFSFile.DIRECTORY
+				|| type == VFSFile.FILESYSTEM)
 			{
 				if(files.length == 1)
 					add(createMenuItem("browse"));
 				if(browser.getMode() == VFSBrowser.BROWSER)
 					add(createMenuItem("browse-window"));
 			}
-			else if(type == VFS.DirectoryEntry.FILE
+			else if(type == VFSFile.FILE
 				&& (browser.getMode() == VFSBrowser.BROWSER
 				|| browser.getMode() == VFSBrowser.BROWSER_DIALOG))
 			{
@@ -103,14 +115,22 @@ public class BrowserCommandsMenu extends JPopupMenu
 
 			if(rename)
 				add(createMenuItem("rename"));
+
 			if(delete)
 				add(createMenuItem("delete"));
 
 			add(createMenuItem("copy-path"));
+			add(createMenuItem("paste"));
+			
+			if((files.length == 1) || (browser.getSelectedFiles().length != 0)) 
+		   		add(createMenuItem("properties"));
+			
 			addSeparator();
 		}
 
 		add(createMenuItem("up"));
+		add(createMenuItem("previous"));
+		add(createMenuItem("next"));
 		add(createMenuItem("reload"));
 		add(createMenuItem("roots"));
 		add(createMenuItem("home"));
@@ -138,7 +158,8 @@ public class BrowserCommandsMenu extends JPopupMenu
 			addSeparator();
 			add(createEncodingMenu());
 		}
-
+		addSeparator();
+		add(createPluginMenu(browser));
 		update();
 	} //}}}
 
@@ -147,8 +168,8 @@ public class BrowserCommandsMenu extends JPopupMenu
 	{
 		if(encodingMenuItems != null)
 		{
-			JRadioButtonMenuItem mi = (JRadioButtonMenuItem)
-				encodingMenuItems.get(browser.currentEncoding);
+			JRadioButtonMenuItem mi = encodingMenuItems.get(
+				browser.currentEncoding);
 			if(mi != null)
 			{
 				mi.setSelected(true);
@@ -167,7 +188,7 @@ public class BrowserCommandsMenu extends JPopupMenu
 
 	//{{{ Private members
 	private VFSBrowser browser;
-	private HashMap encodingMenuItems;
+	private HashMap<String, JRadioButtonMenuItem> encodingMenuItems;
 	private JCheckBoxMenuItem autoDetect;
 	private JRadioButtonMenuItem otherEncoding;
 
@@ -183,7 +204,7 @@ public class BrowserCommandsMenu extends JPopupMenu
 	{
 		ActionHandler actionHandler = new ActionHandler();
 
-		encodingMenuItems = new HashMap();
+		encodingMenuItems = new HashMap<String, JRadioButtonMenuItem>();
 		JMenu encodingMenu = new JMenu(jEdit.getProperty(
 			"vfs.browser.commands.encoding.label"));
 
@@ -200,8 +221,8 @@ public class BrowserCommandsMenu extends JPopupMenu
 
 		ButtonGroup grp = new ButtonGroup();
 
-		List encodingMenuItemList = new ArrayList();
-		String[] encodings = MiscUtilities.getEncodings();
+		List<JMenuItem> encodingMenuItemList = new ArrayList<JMenuItem>();
+		String[] encodings = MiscUtilities.getEncodings(true);
 		for(int i = 0; i < encodings.length; i++)
 		{
 			String encoding = encodings[i];
@@ -226,7 +247,7 @@ public class BrowserCommandsMenu extends JPopupMenu
 		}
 
 		Collections.sort(encodingMenuItemList,
-			new MiscUtilities.MenuItemCompare());
+			new MenuItemTextComparator());
 
 		Iterator iter = encodingMenuItemList.iterator();
 		while(iter.hasNext())
@@ -255,6 +276,16 @@ public class BrowserCommandsMenu extends JPopupMenu
 		return encodingMenu;
 	} //}}}
 
+	//{{{ createPluginsMenu() method
+	private JMenu createPluginMenu(VFSBrowser browser)
+	{
+		JMenu pluginMenu = new JMenu(jEdit.getProperty(
+			"vfs.browser.plugins.label"));
+		return (JMenu)browser.createPluginsMenu(pluginMenu,false);
+		
+	} //}}}
+
+	
 	//}}}
 
 	//{{{ ActionHandler class

@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2003 Slava Pestov
+ * Copyright (C) 2003, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,30 +23,38 @@
 package org.gjt.sp.jedit.browser;
 
 //{{{ Imports
+import javax.swing.event.*;
 import javax.swing.table.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.font.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Set;
+
+import org.gjt.sp.jedit.browser.VFSDirectoryEntryTableModel.Entry;
 import org.gjt.sp.jedit.io.VFS;
+import org.gjt.sp.jedit.io.VFSFile;
 import org.gjt.sp.jedit.io.VFSManager;
+import org.gjt.sp.jedit.msg.VFSPathSelected;
+import org.gjt.sp.jedit.ActionContext;
+import org.gjt.sp.jedit.EditAction;
+import org.gjt.sp.jedit.EditBus;
 import org.gjt.sp.jedit.MiscUtilities;
+import org.gjt.sp.jedit.GUIUtilities;
+import org.gjt.sp.jedit.jEdit;
 import org.gjt.sp.util.Log;
 //}}}
 
 /**
  * @author Slava Pestov
- * @version $Id: VFSDirectoryEntryTable.java,v 1.21 2004/02/14 19:02:48 spestov Exp $
+ * @version $Id: VFSDirectoryEntryTable.java 16348 2009-10-14 10:40:15Z kpouer $
  * @since jEdit 4.2pre1
  */
 public class VFSDirectoryEntryTable extends JTable
 {
 	//{{{ VFSDirectoryEntryTable constructor
-	public VFSDirectoryEntryTable(BrowserView browserView)
+	VFSDirectoryEntryTable(BrowserView browserView)
 	{
 		super(new VFSDirectoryEntryTableModel());
 		this.browserView = browserView;
@@ -54,20 +62,19 @@ public class VFSDirectoryEntryTable extends JTable
 
 		setIntercellSpacing(new Dimension(0,0));
 
-		/* TableColumn col1 = getColumnModel().getColumn(0);
-		col1.setMinWidth(20);
-		col1.setMaxWidth(20);
-		col1.setPreferredWidth(20); */
-
-		setDefaultRenderer(VFSDirectoryEntryTableModel.Entry.class,
+		setDefaultRenderer(Entry.class,
 			renderer = new FileCellRenderer());
 
-		JTableHeader header = getTableHeader();
+		header = getTableHeader();
 		header.setReorderingAllowed(false);
+		addMouseListener(new MainMouseHandler());
+		header.addMouseListener(new MouseHandler());
+		header.setDefaultRenderer(new HeaderRenderer(
+			(DefaultTableCellRenderer)header.getDefaultRenderer()));
 
 		setRowSelectionAllowed(true);
-		//setColumnSelectionAllowed(true);
-		//setCellSelectionEnabled(false);
+
+		getColumnModel().addColumnModelListener(new ColumnHandler());
 
 		setAutoResizeMode(AUTO_RESIZE_OFF);
 	} //}}}
@@ -77,10 +84,8 @@ public class VFSDirectoryEntryTable extends JTable
 	{
 		for(int i = 0; i < getRowCount(); i++)
 		{
-			VFSDirectoryEntryTableModel.Entry entry =
-				(VFSDirectoryEntryTableModel.Entry)
-				getValueAt(i,1);
-			if(entry.dirEntry.path.equals(path))
+			Entry entry = (Entry) getValueAt(i,1);
+			if(entry.dirEntry.getPath().equals(path))
 			{
 				setSelectedRow(i);
 				return true;
@@ -113,23 +118,22 @@ public class VFSDirectoryEntryTable extends JTable
 	} //}}}
 
 	//{{{ getSelectedFiles() method
-	public VFS.DirectoryEntry[] getSelectedFiles()
+	public VFSFile[] getSelectedFiles()
 	{
 		VFSDirectoryEntryTableModel model
 			= (VFSDirectoryEntryTableModel)getModel();
 
-		LinkedList returnValue = new LinkedList();
+		java.util.List<VFSFile> returnValue = new LinkedList<VFSFile>();
 		int[] selectedRows = getSelectedRows();
 		for(int i = 0; i < selectedRows.length; i++)
 		{
 			returnValue.add(model.files[selectedRows[i]].dirEntry);
 		}
-		return (VFS.DirectoryEntry[])returnValue.toArray(new
-		VFS.DirectoryEntry[returnValue.size()]);
+		return returnValue.toArray(new VFSFile[returnValue.size()]);
 	} //}}}
 
 	//{{{ getExpandedDirectories() method
-	public void getExpandedDirectories(Set set)
+	public void getExpandedDirectories(Set<String> set)
 	{
 		VFSDirectoryEntryTableModel model
 			= (VFSDirectoryEntryTableModel)getModel();
@@ -139,7 +143,7 @@ public class VFSDirectoryEntryTable extends JTable
 			for(int i = 0; i < model.files.length; i++)
 			{
 				if(model.files[i].expanded)
-					set.add(model.files[i].dirEntry.path);
+					set.add(model.files[i].dirEntry.getPath());
 			}
 		}
 	} //}}}
@@ -150,20 +154,21 @@ public class VFSDirectoryEntryTable extends JTable
 		VFSDirectoryEntryTableModel model
 		= (VFSDirectoryEntryTableModel)getModel();
 
-		VFSDirectoryEntryTableModel.Entry entry = model.files[row];
-		if(entry.dirEntry.type == VFS.DirectoryEntry.FILE)
+		Entry entry = model.files[row];
+		if(entry.dirEntry.getType() == VFSFile.FILE)
 			return;
 
 		if(entry.expanded)
 		{
 			model.collapse(VFSManager.getVFSForPath(
-				entry.dirEntry.path),row);
-			resizeColumnsAppropriately();
+				entry.dirEntry.getPath()),row);
+			resizeColumns();
 		}
 		else
 		{
 			browserView.clearExpansionState();
-			browserView.loadDirectory(entry,entry.dirEntry.path);
+			browserView.loadDirectory(entry,entry.dirEntry.getPath(),
+				false);
 		}
 
 		VFSManager.runInAWTThread(new Runnable()
@@ -176,13 +181,13 @@ public class VFSDirectoryEntryTable extends JTable
 	} //}}}
 
 	//{{{ setDirectory() method
-	public void setDirectory(VFS vfs, Object node, ArrayList list,
-		Set tmpExpanded)
+	public void setDirectory(VFS vfs, Object node, java.util.List<VFSFile> list,
+		Set<String> tmpExpanded)
 	{
 		timer.stop();
 		typeSelectBuffer.setLength(0);
 
-		VFSDirectoryEntryTableModel model = ((VFSDirectoryEntryTableModel)getModel());
+		VFSDirectoryEntryTableModel model = (VFSDirectoryEntryTableModel)getModel();
 		int startIndex;
 		if(node == null)
 		{
@@ -194,24 +199,23 @@ public class VFSDirectoryEntryTable extends JTable
 			startIndex =
 				model.expand(
 				vfs,
-				(VFSDirectoryEntryTableModel.Entry)node,
+				(Entry)node,
 				list);
 			startIndex++;
 		}
 
 		for(int i = 0; i < list.size(); i++)
 		{
-			VFSDirectoryEntryTableModel.Entry e
-				= model.files[startIndex + i];
-			String path = e.dirEntry.path;
+			Entry e = model.files[startIndex + i];
+			String path = e.dirEntry.getPath();
 			if(tmpExpanded.contains(path))
 			{
-				browserView.loadDirectory(e,path);
+				browserView.loadDirectory(e,path,false);
 				tmpExpanded.remove(path);
 			}
 		}
 
-		resizeColumnsAppropriately();
+		resizeColumns();
 	} //}}}
 
 	//{{{ maybeReloadDirectory() method
@@ -222,21 +226,21 @@ public class VFSDirectoryEntryTable extends JTable
 
 		for(int i = 0; i < model.files.length; i++)
 		{
-			VFSDirectoryEntryTableModel.Entry e = model.files[i];
-			if(!e.expanded || e.dirEntry.type == VFS.DirectoryEntry.FILE)
+			Entry e = model.files[i];
+			if(!e.expanded || e.dirEntry.getType() == VFSFile.FILE)
 				continue;
 
-			VFS.DirectoryEntry dirEntry = e.dirEntry;
+			VFSFile dirEntry = e.dirEntry;
 			// work around for broken FTP plugin!
 			String otherPath;
-			if(dirEntry.symlinkPath == null)
-				otherPath = dirEntry.path;
+			if(dirEntry.getSymlinkPath() == null)
+				otherPath = dirEntry.getPath();
 			else
-				otherPath = dirEntry.symlinkPath;
-			if(VFSBrowser.pathsEqual(path,otherPath))
+				otherPath = dirEntry.getSymlinkPath();
+			if(MiscUtilities.pathsEqual(path,otherPath))
 			{
 				browserView.saveExpansionState();
-				browserView.loadDirectory(e,path);
+				browserView.loadDirectory(e,path,false);
 				return;
 			}
 		}
@@ -247,10 +251,10 @@ public class VFSDirectoryEntryTable extends JTable
 	{
 		renderer.propertiesChanged();
 
-		VFS.DirectoryEntry template = new VFS.DirectoryEntry(
-			"foo","foo","foo",VFS.DirectoryEntry.FILE,0L,false);
+		VFSFile template = new VFSFile(
+			"foo","foo","foo",VFSFile.FILE,0L,false);
 		setRowHeight(renderer.getTableCellRendererComponent(
-			this,new VFSDirectoryEntryTableModel.Entry(template,0),
+			this,new Entry(template,0),
 			false,false,0,0).getPreferredSize().height);
 		Dimension prefSize = getPreferredSize();
 		setPreferredScrollableViewportSize(new Dimension(prefSize.width,
@@ -258,6 +262,7 @@ public class VFSDirectoryEntryTable extends JTable
 	} //}}}
 
 	//{{{ scrollRectToVisible() method
+	@Override
 	public void scrollRectToVisible(Rectangle rect)
 	{
 		// avoid scrolling to the right
@@ -266,6 +271,7 @@ public class VFSDirectoryEntryTable extends JTable
 	} //}}}
 
 	//{{{ processKeyEvent() method
+	@Override
 	public void processKeyEvent(KeyEvent evt)
 	{
 		if(evt.getID() == KeyEvent.KEY_PRESSED)
@@ -273,88 +279,158 @@ public class VFSDirectoryEntryTable extends JTable
 			VFSDirectoryEntryTableModel model =
 				(VFSDirectoryEntryTableModel)getModel();
 			int row = getSelectedRow();
-
+			ActionContext ac = VFSBrowser.getActionContext();
+			ActionContext jac = jEdit.getActionContext();
+			EditAction browserUp = ac.getAction("vfs.browser.up");			
+			VFSBrowser browser = browserView.getBrowser();
 			switch(evt.getKeyCode())
 			{
 			case KeyEvent.VK_LEFT:
 				evt.consume();
-				if(row != -1)
+				if ((evt.getModifiers() & InputEvent.ALT_MASK)>0)
 				{
-					if(model.files[row].expanded)
+					browser.previousDirectory();
+				}
+				else 
+				{
+					if(row != -1)
 					{
-						model.collapse(
-							VFSManager.getVFSForPath(
-							model.files[row].dirEntry.path),
-							row);
-						break;
-					}
-
-					for(int i = row - 1; i >= 0; i--)
-					{
-						if(model.files[i].expanded)
+						if(model.files[row].expanded)
 						{
-							setSelectedRow(i);
-							break;
+							toggleExpanded(row);
+							return;
+						}
+
+						for(int i = row - 1; i >= 0; i--)
+						{
+							if(model.files[i].expanded &&
+							   model.files[i].level < model.files[row].level)
+							{
+								setSelectedRow(i);
+								return;
+							}
 						}
 					}
-				}
 
-				String dir = browserView.getBrowser()
-					.getDirectory();
-				dir = MiscUtilities.getParentOfPath(dir);
-				browserView.getBrowser().setDirectory(dir);
+					String dir = browserView.getBrowser()
+						.getDirectory();
+					dir = MiscUtilities.getParentOfPath(dir);
+					browserView.getBrowser().setDirectory(dir);
+				}
 				break;
+			case KeyEvent.VK_TAB:
+				evt.consume();
+				if ((evt.getModifiers() & InputEvent.SHIFT_MASK) > 0)
+				{
+					browserView.getParentDirectoryList().requestFocus();
+				}
+				else
+				{
+					browser.focusOnDefaultComponent();	
+				}
+				break;
+			case KeyEvent.VK_BACK_SPACE:
+				evt.consume();
+				ac.invokeAction(evt, browserUp);
+				break;
+			case KeyEvent.VK_UP:
+				if ((evt.getModifiers() & InputEvent.ALT_MASK) >0)
+				{
+					evt.consume();
+					ac.invokeAction(evt, browserUp);
+				}
+				break;
+			case KeyEvent.VK_DELETE:
+				evt.consume();
+				EditAction deleteAct = ac.getAction("vfs.browser.delete");
+				ac.invokeAction(evt, deleteAct);
+				break;
+			case KeyEvent.VK_N:
+				if ((evt.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) == InputEvent.CTRL_DOWN_MASK)
+				{
+					evt.consume();
+					EditAction ea = ac.getAction("vfs.browser.new-file");
+					ac.invokeAction(evt, ea);
+				}
+				break;
+			case KeyEvent.VK_INSERT:
+				evt.consume();
+				EditAction newDir = ac.getAction("vfs.browser.new-directory");
+				ac.invokeAction(evt, newDir);
+				break;
+			case KeyEvent.VK_ESCAPE:
+				EditAction cda = jac.getAction("close-docking-area");
+				cda.invoke(jEdit.getActiveView());
+				evt.consume();
+				break;
+			case KeyEvent.VK_F2:
+				EditAction ren = ac.getAction("vfs.browser.rename");
+				evt.consume();
+				ac.invokeAction(evt, ren);
+				break;
+			case KeyEvent.VK_F5:
+				evt.consume();
+				EditAction reload= ac.getAction("vfs.browser.reload");
+				ac.invokeAction(evt, reload);
+				break;
+			case KeyEvent.VK_F6:
 			case KeyEvent.VK_RIGHT:
-				if(row != -1)
+				evt.consume();
+				if ((evt.getModifiers() & InputEvent.ALT_MASK)>0)
+				{
+					browser.nextDirectory();
+				}
+				else if(row != -1)
 				{
 					if(!model.files[row].expanded)
 						toggleExpanded(row);
 				}
-				evt.consume();
-				break;
-			case KeyEvent.VK_DOWN:
-				// stupid Swing
-				if(row == -1 && getModel().getRowCount() != 0)
-				{
-					setSelectedRow(0);
-					evt.consume();
-				}
 				break;
 			case KeyEvent.VK_ENTER:
-				browserView.getBrowser().filesActivated(
-					(evt.isShiftDown()
-					? VFSBrowser.M_OPEN_NEW_VIEW
-					: VFSBrowser.M_OPEN),false);
 				evt.consume();
+				browserView.getBrowser().filesActivated(
+					evt.isShiftDown()
+					? VFSBrowser.M_OPEN_NEW_VIEW
+					: VFSBrowser.M_OPEN,false);
+
 				break;
 			}
 		}
 		else if(evt.getID() == KeyEvent.KEY_TYPED)
 		{
+
 			if(evt.isControlDown() || evt.isAltDown()
 				|| evt.isMetaDown())
 			{
+				evt.consume();
 				return;
 			}
 
 			// hack...
 			if(evt.isShiftDown() && evt.getKeyChar() == '\n')
+			{
+				evt.consume();
 				return;
+			}
+
 
 			VFSBrowser browser = browserView.getBrowser();
 
 			switch(evt.getKeyChar())
 			{
 			case '~':
+				evt.consume();
 				if(browser.getMode() == VFSBrowser.BROWSER)
 					browser.setDirectory(System.getProperty(
 						"user.home"));
 				break;
 			case '/':
+				evt.consume();
 				if(browser.getMode() == VFSBrowser.BROWSER)
 					browser.rootDirectory();
 				break;
 			case '-':
+				evt.consume();
 				if(browser.getMode() == VFSBrowser.BROWSER)
 				{
 					browser.setDirectory(
@@ -363,6 +439,7 @@ public class VFSDirectoryEntryTable extends JTable
 				}
 				break;
 			default:
+				evt.consume();
 				typeSelectBuffer.append(evt.getKeyChar());
 				doTypeSelect(typeSelectBuffer.toString(),
 					browser.getMode() == VFSBrowser
@@ -388,43 +465,34 @@ public class VFSDirectoryEntryTable extends JTable
 	} //}}}
 
 	//{{{ Private members
-	private BrowserView browserView;
-	private FileCellRenderer renderer;
-	private StringBuffer typeSelectBuffer = new StringBuffer();
-	private Timer timer = new Timer(0,new ClearTypeSelect());
+	private final BrowserView browserView;
+	private final JTableHeader header;
+	private final FileCellRenderer renderer;
+	private final StringBuffer typeSelectBuffer = new StringBuffer();
+	private final Timer timer = new Timer(0,new ClearTypeSelect());
+	private boolean resizingColumns;
 
 	//{{{ doTypeSelect() method
 	private boolean doTypeSelect(String str, int start, int end,
 		boolean dirsOnly)
 	{
-		for(int i = start; i < end; i++)
+		VFSFile[] files = ((VFSDirectoryEntryTableModel)
+			getModel()).getFiles();
+
+		int index = VFSFile.findCompletion(files,start,end,str,dirsOnly);
+		if(index != -1)
 		{
-			VFSDirectoryEntryTableModel.Entry entry =
-				(VFSDirectoryEntryTableModel.Entry)getValueAt(i,1);
-			if(dirsOnly && entry.dirEntry.type
-				== VFS.DirectoryEntry.FILE)
-			{
-				continue;
-			}
-
-			String matchAgainst = (MiscUtilities.isAbsolutePath(str)
-				? entry.dirEntry.path : entry.dirEntry.name);
-			if(matchAgainst.regionMatches(true,
-				0,str,0,str.length()))
-			{
-				setSelectedRow(i);
-				return true;
-			}
+			setSelectedRow(index);
+			return true;
 		}
-
-		return false;
+		else
+			return false;
 	} //}}}
 
-	//{{{ resizeColumnsAppropriately() method
-	private void resizeColumnsAppropriately()
+	//{{{ resizeColumns() method
+	private void resizeColumns()
 	{
-		VFSDirectoryEntryTableModel model
-		= (VFSDirectoryEntryTableModel)getModel();
+		VFSDirectoryEntryTableModel model = (VFSDirectoryEntryTableModel)getModel();
 
 		FontRenderContext fontRenderContext = new FontRenderContext(
 			null,false,false);
@@ -440,48 +508,55 @@ public class VFSDirectoryEntryTable extends JTable
 			}
 		}
 
+		for(int i = 1; i < widths.length; i++)
+		{
+			//String extAttr = model.getExtendedAttribute(i);
+			widths[i] = Math.max(widths[i],model.getColumnWidth(i));
+		}
+
 		for(int i = 0; i < model.files.length; i++)
 		{
-			VFSDirectoryEntryTableModel.Entry entry
-				= model.files[i];
-			Font font = (entry.dirEntry.type
-				== VFS.DirectoryEntry.FILE
-				? renderer.plainFont : renderer.boldFont);
+			Entry entry = model.files[i];
+			Font font = entry.dirEntry.getType()
+				== VFSFile.FILE
+				? renderer.plainFont : renderer.boldFont;
 
 			widths[0] = Math.max(widths[0],renderer.getEntryWidth(
 				entry,font,fontRenderContext));
-
-			for(int j = 1; j < widths.length; j++)
-			{
-				String extAttr = model.getExtendedAttribute(
-					j - 1);
-				String attr = entry.dirEntry
-					.getExtendedAttribute(
-					extAttr);
-				if(attr != null)
-				{
-					widths[j] = Math.max(widths[j],
-						(int)font.getStringBounds(
-						attr,fontRenderContext)
-						.getWidth());
-				}
-			}
 		}
 
-		for(int i = 0; i < widths.length; i++)
+		widths[0] += 10;
+
+		TableColumnModel columns = getColumnModel();
+
+		try
 		{
-			int width = widths[i];
-			if(i != widths.length - 1 && width != 0)
-				width += 10;
-			else
-				width += 2;
-			getColumnModel().getColumn(i).setPreferredWidth(width);
-			getColumnModel().getColumn(i).setMinWidth(width);
-			getColumnModel().getColumn(i).setMaxWidth(width);
-			getColumnModel().getColumn(i).setWidth(width);
+			resizingColumns = true;
+			for(int i = 0; i < widths.length; i++)
+			{
+				columns.getColumn(i).setPreferredWidth(widths[i]);
+				columns.getColumn(i).setWidth(widths[i]);
+			}
+		}
+		finally
+		{
+			resizingColumns = false;
 		}
 
 		doLayout();
+	} //}}}
+
+	//{{{ saveWidths() method
+	private void saveWidths()
+	{
+		if(resizingColumns)
+			return;
+
+		VFSDirectoryEntryTableModel model = (VFSDirectoryEntryTableModel)getModel();
+		TableColumnModel columns = getColumnModel();
+
+		for(int i = 1; i < model.getColumnCount(); i++)
+			model.setColumnWidth(i,columns.getColumn(i).getWidth());
 	} //}}}
 
 	//}}}
@@ -494,4 +569,93 @@ public class VFSDirectoryEntryTable extends JTable
 			typeSelectBuffer.setLength(0);
 		}
 	} //}}}
+
+	//{{{ ColumnHandler class
+	class ColumnHandler implements TableColumnModelListener
+	{
+		public void columnAdded(TableColumnModelEvent e) {}
+		public void columnRemoved(TableColumnModelEvent e) {}
+		public void columnMoved(TableColumnModelEvent e) {}
+		public void columnSelectionChanged(ListSelectionEvent e) {}
+
+		public void columnMarginChanged(ChangeEvent e)
+		{
+			saveWidths();
+		}
+	} //}}}
+
+	//{{{ class MainMouseHandler
+	class MainMouseHandler extends MouseInputAdapter
+	{
+
+		@Override
+		public void mouseClicked(MouseEvent e)
+		{
+			super.mouseClicked(e);
+			int ind = getSelectionModel().getMinSelectionIndex();
+			Entry node = (Entry) getModel().getValueAt(ind, 0);
+			boolean isDir = node.dirEntry.getType() == VFSFile.DIRECTORY;
+			EditBus.send(new VFSPathSelected(jEdit.getActiveView(),
+							 node.dirEntry.getPath(), isDir));
+		}
+
+	} //}}}
+
+	//{{{ MouseHandler class
+	class MouseHandler extends MouseInputAdapter
+	{
+		@Override
+		public void mousePressed(MouseEvent evt)
+		{
+			// double click on columns header
+			if (evt.getSource() == header && evt.getClickCount() == 2)
+			{
+				VFSDirectoryEntryTableModel model = (VFSDirectoryEntryTableModel) header.getTable().getModel();
+				TableColumnModel columnModel = header.getColumnModel();
+				int viewColumn = columnModel.getColumnIndexAtX(evt.getX());
+				int column = columnModel.getColumn(viewColumn).getModelIndex();
+				saveWidths();
+				if(model.sortByColumn(column))
+				{
+					resizeColumns();
+					Log.log(Log.DEBUG,this,"VFSDirectoryEntryTable sorted by "
+					+ model.getColumnName(column)
+					+ (model.getAscending() ? " ascending" : " descending") );
+				}
+			}
+		}
+	} //}}}
+
+	//{{{ HeaderRenderer
+	static class HeaderRenderer extends DefaultTableCellRenderer
+	{
+		private final DefaultTableCellRenderer tcr;
+
+		HeaderRenderer(DefaultTableCellRenderer tcr)
+		{
+			this.tcr = tcr;
+		}
+
+		@Override
+		public Component getTableCellRendererComponent(JTable table, Object value,
+			boolean isSelected, boolean hasFocus, int row, int column)
+		{
+			JLabel l = (JLabel)tcr.getTableCellRendererComponent(table,value,isSelected,hasFocus,row,column);
+			VFSDirectoryEntryTableModel model = (VFSDirectoryEntryTableModel)table.getModel();
+			Icon icon = column == model.getSortColumn()
+				? model.getAscending() ? ASC_ICON : DESC_ICON
+				: null;
+			l.setIcon(icon);
+			// l.setHorizontalTextPosition(l.LEADING);
+			return l;
+		}
+	} //}}}
+
+	//{{{ SortOrder Icons
+
+	static final Icon ASC_ICON  = GUIUtilities.loadIcon("arrow-asc.png");
+	static final Icon DESC_ICON = GUIUtilities.loadIcon("arrow-desc.png");
+
+	//}}}
+
 }

@@ -2,8 +2,9 @@
 ### jEdit user interface definitions,
 ### :tabSize=8:indentSize=8:noTabs=false:
 ### :folding=explicit:collapseFolds=1:
+### :encoding=ISO-8859-1:
 ###
-### Copyright (C) 1998, 2004 Slava Pestov
+### Copyright (C) 1998, 2005 Slava Pestov
 ###
 
 #{{{ Default user catalog file
@@ -23,17 +24,27 @@ defaultCatalog=<?xml version="1.0"?>\n\
 common.ok=OK
 common.cancel=Cancel
 common.close=Close
+common.error=Error
 common.apply=Apply
 common.more=More
 common.insert=Insert
 common.add=Add
+common.add.icon=22x22/actions/list-add.png
 common.remove=Remove
+common.remove.icon=22x22/actions/list-remove.png
 common.moveUp=Move Up
+common.moveUp.icon=22x22/actions/go-up.png
 common.moveDown=Move Down
+common.moveDown.icon=22x22/actions/go-down.png
+common.clearAll=Clear All
+common.clearAll.icon=22x22/actions/edit-clear.png
 
 lineSep.unix=Unix (\\n)
 lineSep.windows=DOS/Windows (\\r\\n)
 lineSep.mac=MacOS (\\r)
+
+logo.icon.small=16x16/apps/jedit.png
+logo.icon.medium=32x32/apps/jedit.png
 
 #}}}
 
@@ -51,97 +62,109 @@ action-set.plugin=Plugin: {0}
 macro-handler.beanshell.label=BeanShell script
 macro-handler.beanshell.glob=*.bsh
 
+save-layout-failed.message=Failed to save the docking layout.
+load-layout.title=Load Docking Layout
+load-layout.message=Docking layout to load:
+save-layout.title=Save Docking Layout
+save-layout.message=Docking layout to save:
+
 # Plugin activation hooks
 defer=false
 startup=true
+
+broken-image.icon=22x22/status/image-missing.png
+dropdown-arrow.icon=ToolbarMenu.gif
 #}}}
 
 #{{{ Tool bar
-view.toolbar=new-file open-file close-buffer save - print page-setup - \
-	undo redo cut copy paste - find find-next - new-view unsplit \
-	split-horizontal split-vertical - buffer-options global-options - \
+view.toolbar=new-file open-file save close-buffer - print - \
+	undo redo - cut copy paste - find find-next - \
+	new-view unsplit split-horizontal split-vertical - \
+	buffer-options global-options - \
 	plugin-manager - help
 
-new-file.icon=New.png
-open-file.icon=Open.png
-save.icon=Save.png
-close-buffer.icon=Cancel.png
-print.icon=Print.png
-page-setup.icon=PageSetup.png
-undo.icon=Undo.png
-redo.icon=Redo.png
-cut.icon=Cut.png
-copy.icon=Copy.png
-paste.icon=Paste.png
-find.icon=Find.png
-find-next.icon=FindAgain.png
-new-view.icon=NewView.png
-unsplit.icon=UnSplit.png
-split-horizontal.icon=SplitHorizontal.png
-split-vertical.icon=SplitVertical.png
-buffer-options.icon=Properties.png
-global-options.icon=Preferences.png
-plugin-manager.icon=Plugins.png
-help.icon=Help.png
+new-file.icon=22x22/actions/document-new.png
+open-file.icon=22x22/actions/document-open.png
+save.icon=22x22/actions/document-save.png
+close-buffer.icon=22x22/actions/document-close.png
+global-close-buffer.icon=22x22/actions/document-close.png
+print.icon=22x22/actions/document-print.png
+page-setup.icon=22x22/actions/printer-setup.png
+undo.icon=22x22/actions/edit-undo.png
+redo.icon=22x22/actions/edit-redo.png
+cut.icon=22x22/actions/edit-cut.png
+copy.icon=22x22/actions/edit-copy.png
+paste.icon=22x22/actions/edit-paste.png
+find.icon=22x22/actions/edit-find.png
+find-next.icon=22x22/actions/edit-find-next.png
+new-view.icon=22x22/actions/window-new.png
+unsplit.icon=22x22/actions/window-unsplit.png
+split-horizontal.icon=22x22/actions/window-split-horizontal.png
+split-vertical.icon=22x22/actions/window-split-vertical.png
+buffer-options.icon=22x22/actions/document-properties.png
+global-options.icon=22x22/categories/preferences-system.png
+
+plugin-manager.icon=22x22/places/plugins.png
+help.icon=22x22/apps/help-browser.png
 
 #{{{ Icon list for tool bar editor
-icons=AdjustWidth.png \
-	ArrowD.png \
-	ArrowL.png \
-	ArrowR.png \
-	ArrowU.png \
-	BrokenImage.png \
-	ButtonProperties.png \
-	Cancel.png \
-	Clear.png \
-	Copy.png \
-	CopyToBuffer.png \
-	CurrentDir.png \
-	Cut.png \
-	Delete.png \
-	Drive.png \
-	FindAgain.png \
-	FindInDir.png \
-	Find.png \
-	Floppy.png \
-	Help.png \
-	Home.png \
-	Load.png \
-	Minus.png \
-	MultipleResults.png \
-	NewDir.png \
-	New.png \
-	NewView.png \
-	NextFile.png \
-	Open.png \
-	PageSetup.png \
-	ParentDir.png \
-	Parse.png \
-	Paste.png \
-	Pause.png \
-	Play.png \
-	Plugins.png \
-	Plus.png \
-	Preferences.png \
-	PreviousFile.png \
-	Print.png \
-	Properties.png \
-	Redo.png \
-	Reload.png \
-	Run.png \
-	RunAgain.png \
-	RunToBuffer.png \
-	Save.png \
-	SaveAll.png \
-	SaveAs.png \
-	SingleResult.png \
-	SplitHorizontal.png \
-	SplitVertical.png \
-	Stop.png \
-	Undo.png \
-	UnSplit.png \
-	ZoomIn.png \
-	ZoomOut.png \
+icons=22x22/actions/resize-horisontal.png \
+	22x22/actions/go-down.png \
+	22x22/actions/go-previous.png \
+	22x22/actions/go-next.png \
+	22x22/actions/go-home.png \
+	22x22/actions/go-up.png \
+	22x22/actions/go-first.png \
+	22x22/actions/go-last.png \
+	22x22/actions/go-parent.png \
+	22x22/actions/document-close.png \
+	22x22/actions/edit-undo.png \
+	22x22/actions/edit-redo.png \
+	22x22/actions/edit-cut.png \
+	22x22/actions/edit-paste.png \
+	22x22/actions/edit-delete.png \
+	22x22/actions/edit-clear.png \
+	22x22/actions/edit-find-next.png \
+	22x22/actions/edit-find-in-folder.png \
+	22x22/actions/edit-find.png \
+	22x22/actions/edit-copy.png \
+	22x22/actions/copy-to-buffer.png \
+	22x22/actions/list-remove.png \
+	22x22/actions/list-add.png \
+	22x22/actions/folder-new.png \
+	22x22/actions/window-new.png \
+	22x22/actions/document-new.png \
+	22x22/actions/document-open.png \
+	22x22/actions/document-reload2.png \
+	22x22/actions/document-properties.png \
+	22x22/actions/document-save.png \
+	22x22/actions/document-save-all.png \
+	22x22/actions/document-save-as.png \
+	22x22/actions/printer-setup.png \
+	22x22/actions/process-stop.png \
+	22x22/actions/media-playback-pause.png \
+	22x22/actions/media-playback-start.png \
+	22x22/actions/view-refresh.png \
+	22x22/actions/application-run.png \
+	22x22/actions/edit-find-multiple.png \
+	22x22/actions/edit-find-single.png \
+	22x22/actions/window-split-horizontal.png \
+	22x22/actions/window-split-vertical.png \
+	22x22/actions/window-unsplit.png \
+	22x22/actions/zoom-in.png \
+	22x22/actions/zoom-out.png \
+	22x22/apps/utilities-terminal.png \
+	22x22/apps/system-file-manager.png \
+	22x22/apps/internet-web-browser.png \
+	22x22/apps/help-browser.png \
+	22x22/apps/system-installer.png \
+	22x22/status/image-missing.png \
+	22x22/status/folder-visiting.png \
+	22x22/devices/drive-harddisk.png \
+	22x22/devices/media-floppy.png \
+	22x22/devices/printer.png \
+	22x22/places/plugins.png \
+	22x22/categories/preferences-system.png \
 	Blank24.gif
 #}}}
 
@@ -165,13 +188,16 @@ view.mbar=file edit search markers folds view utils macros plugins help-menu
 
 #{{{ File menu
 file=new-file \
+     new-file-in-mode \
      open-file \
      %recent-files \
      - \
      reload \
      reload-all \
+     %reload-encoding \
      - \
      close-buffer \
+     global-close-buffer \
      close-all \
      - \
      save \
@@ -185,16 +211,32 @@ file=new-file \
      exit
 file.label=$File
 new-file.label=$New
+new-file.icon.small=16x16/actions/document-new.png
+new-file-in-mode.label=New in $Mode
+new-file-in-mode.icon.small=16x16/actions/document-new.png
+new-file-in-mode.dialog.title=New File
+new-file-in-mode.dialog.message=With Edit Mode:
 open-file.label=$Open...
+open-file.icon.small=16x16/actions/document-open.png
 reload.label=$Reload
+reload.icon.small=16x16/actions/view-refresh.png
 reload-all.label=Reloa$d All...
 close-buffer.label=$Close
+close-buffer.icon.small=16x16/actions/document-close.png
+global-close-buffer.label=Close (global)
+closeall-except-active.label=Clear BufferSet except active
+bufferset-toggle-exclusive.label=Toggle E$xclusive BufferSets
+closeall-except-active.icon.small=16x16/actions/document-close.png
+global-close-buffer.icon.small=16x16/actions/document-close.png
 close-all.label=Clos$e All
+close-all.icon.small=16x16/actions/document-close.png
 save.label=$Save
+save.icon.small=16x16/actions/document-save.png
 save-as.label=S$ave As...
 save-a-copy-as.label=Save a Cop$y As...
 save-all.label=Save A$ll...
 print.label=$Print...
+print.icon.small=16x16/actions/document-print.png
 page-setup.label=Pa$ge Setup...
 # Print selection not yet implemented
 #print-selection.label=Prin$t Selection...
@@ -202,10 +244,15 @@ exit.label=E$xit
 
 #{{{ Recent Files menu
 recent-files.code=new RecentFilesProvider();
-recent-files.label=Recent Files
+recent-files.label=Recent $Files
+recent-files.textfield.tooltip=a filter prefix can be entered here
 no-recent-files.label=No Recent Files
+clear-recent-files.label=Clear Recent Files
 #}}}
 
+reload-encoding.code=new ReloadWithEncodingProvider();
+reload-encoding.label=Reload with $Encoding
+reload-encoding.error={0} is not a valid encoding
 #}}}
 
 #{{{ Edit menu
@@ -231,10 +278,15 @@ edit=undo \
      %source
 edit.label=$Edit
 undo.label=$Undo
+undo.icon.small=16x16/actions/edit-undo.png
 redo.label=$Redo
+redo.icon.small=16x16/actions/edit-redo.png
 cut.label=$Cut
+cut.icon.small=16x16/actions/edit-cut.png
 copy.label=C$opy
+copy.icon.small=16x16/actions/edit-copy.png
 paste.label=$Paste
+paste.icon.small=16x16/actions/edit-paste.png
 select-all.label=Select $All
 word-count.label=$Word Count...
 complete-word.label=Co$mplete Word
@@ -268,10 +320,11 @@ paste-deleted.label=Paste $Deleted...
 cut-string-register.label=Cu$t to Register
 copy-string-register.label=Co$py to Register
 paste-string-register.label=Paste $Register
+clear-string-register.label=Clear Register
 cut-append-string-register.label=Cut Appe$nd to Register
 copy-append-string-register.label=Copy $Append to Register
 vertical-paste-string-register.label=V$ertical Paste Register
-view-registers.label=Vie$w Registers...
+view-registers.label=Vie$w Registers
 #}}}
 
 #{{{ More Selection menu
@@ -308,7 +361,7 @@ text=delete-line \
      to-lower \
      to-upper
 text.label=$Text
-delete-line.label=$Delete Line
+delete-line.label=$Delete Lines
 delete-start-line.label=Delete to $Start of Line
 delete-end-line.label=Delete to $End of Line
 join-lines.label=$Join Lines
@@ -328,7 +381,7 @@ indent=indent-lines \
        tabs-to-spaces
 
 indent.label=$Indent
-indent-lines.label=$Indent Selected Lines
+indent-lines.label=$Indent Lines
 shift-left.label=Shift Indent $Left
 shift-right.label=Shift Indent $Right
 remove-trailing-ws.label=Remove Trailing $Whitespace
@@ -379,6 +432,7 @@ search=find \
        hypersearch-results
 search.label=$Search
 find.label=$Find...
+find.icon.small=16x16/actions/edit-find.png
 find-next.label=Fi$nd Next
 find-prev.label=Find Pre$vious
 search-in-open-buffers.label=Search in Open $Buffers...
@@ -407,6 +461,8 @@ markers=add-marker \
 	  - \
 	  prev-marker \
 	  next-marker \
+	  - \
+	  view-markers \
 	  -
 markers.code=new MarkersProvider();
 markers.label=$Markers
@@ -465,26 +521,40 @@ view=new-view \
      prev-buffer \
      next-buffer \
      recent-buffer \
-     show-buffer-switcher \
+     focus-buffer-switcher \
      - \
      toggle-line-numbers \
+     toggle-statusbar \
+     toggle-gutter \
+     toggle-buffer-switcher \
      - \
      %scrolling \
      %splitting \
-     %docking
+     %docking \
+     %buffersets \
+     - \
+     toggle-full-screen
 view.label=$View
 new-view.label=New $View
+new-view.icon.small=16x16/actions/window-new.png
 new-plain-view.label=Ne$w Plain View
 close-view.label=$Close View
+close-view.icon.small=16x16/actions/document-close.png
 prev-buffer.label=Go to $Previous Buffer
 next-buffer.label=Go to $Next Buffer
 recent-buffer.label=Go to $Recent Buffer
-show-buffer-switcher.label=Show $Buffer Switcher
+toggle-buffer-switcher.label=Toggle $Buffer Switcher
+focus-buffer-switcher.label=Focus Buffer S$witcher
 toggle-line-numbers.label=$Line Numbers
+toggle-statusbar.label=Toggle S$tatus Bar
+toggle-gutter.label=Toggle $Gutter
+show-context-menu.label=Show Context Menu
+toggle-full-screen.label=Toggle $full-screen mode
 
 #{{{ Scrolling menu
 scrolling=scroll-to-current-line \
 	  center-caret \
+	  scroll-and-center \
 	  - \
 	  scroll-up-line \
 	  scroll-down-line \
@@ -493,6 +563,7 @@ scrolling=scroll-to-current-line \
 	  scroll-down-page
 scrolling.label=Scrollin$g
 scroll-to-current-line.label=Scroll $to Current Line
+scroll-and-center.label=$Scroll and Center Caret
 center-caret.label=$Center Caret on Screen
 scroll-up-line.label=Line Scroll $Up
 scroll-down-line.label=Line Scroll $Down
@@ -505,6 +576,8 @@ splitting=unsplit-current \
           unsplit \
           split-horizontal \
           split-vertical \
+	  resplit \
+	  - \
           prev-textarea \
           next-textarea
 splitting.label=$Splitting
@@ -512,8 +585,16 @@ split-horizontal.label=Split $Horizontally
 split-vertical.label=Split $Vertically
 unsplit-current.label=$Unsplit Current
 unsplit.label=Unsplit $All
+resplit.label=$Restore Split
 prev-textarea.label=Go to $Previous Text Area
 next-textarea.label=Go to $Next Text Area
+buffersets.label=$Buffer Sets
+buffersets=global-bufferset view-bufferset editpane-bufferset bufferset-toggle-exclusive - closeall-except-active
+global-bufferset.label=$Global Scope
+view-bufferset.label=$View Scope
+editpane-bufferset.label=$EditPane Scope
+
+
 #}}}
 
 #{{{ Docking menu
@@ -522,13 +603,26 @@ docking=left-docking-area \
 	right-docking-area \
 	bottom-docking-area \
 	- \
-	close-docking-area
+	toggle-dock-areas \
+	close-docking-area \
+	- \
+	layout-load \
+	layout-save \
+	layout-load-current-mode \
+	layout-save-current-mode
 docking.label=$Docking
+docking.menu.label=Dockable Menu
+toggle-dock-areas.label=Toggle Docked $Areas
 left-docking-area.label=Go to $Left Docking Area
 top-docking-area.label=Go to $Top Docking Area
 right-docking-area.label=Go to $Right Docking Area
 bottom-docking-area.label=Go to $Bottom Docking Area
 close-docking-area.label=$Close Current Docking Area
+layout-load.label=$Load docking layout ...
+layout-save.label=$Save docking layout ...
+layout-load-current-mode.label=Load docking layout of current mode
+layout-save-current-mode.label=Save docking layout of current mode
+
 #}}}
 
 #}}}
@@ -549,13 +643,18 @@ utils=vfs.browser \
       last-action \
       - \
       buffer-options \
-      global-options
+      global-options \
+      - \
+      %quick-options
 utils.label=$Utilities
 vfs.browser.label=$File System Browser
+vfs.browser.icon.small=16x16/apps/system-file-manager.png
 action-bar.label=$Action Bar
 last-action.label=Re$peat Last Action
 buffer-options.label=$Buffer Options...
+buffer-options.icon.small=16x16/actions/document-properties.png
 global-options.label=$Global Options...
+global-options.icon.small=16x16/categories/preferences-system.png
 
 #{{{ Recent Directories menu
 recent-directories.label=$Recent Directories
@@ -610,10 +709,17 @@ troubleshooting=log-viewer \
 troubleshooting.label=$Troubleshooting
 log-viewer.label=$Activity Log
 update-log.label=$Update Activity Log on Disk
-io-progress-monitor.label=$I/O Progress Monitor
+io-progress-monitor.label=$I/O Progress
 keyboard-tester.label=$Keyboard Tester...
 memory-status.label=$Memory Status...
 reload-modes.label=$Reload Edit Modes
+#}}}
+
+#{{{ Quick options menu
+quick-options=edit-syntax-style
+quick-options.label=$Quick settings
+edit-syntax-style.label=Edit syntax style of token under caret
+
 #}}}
 
 #}}}
@@ -621,6 +727,8 @@ reload-modes.label=$Reload Edit Modes
 #{{{ Macros menu
 macros=record-macro \
        stop-recording \
+       - \
+       last-macro \
        - \
        record-temp-macro \
        run-temp-macro \
@@ -631,8 +739,11 @@ macros=record-macro \
 macros.code=new MacrosProvider();
 macros.label=Ma$cros
 record-macro.label=$Record Macro...
-record-temp-macro.label=Record $Temporary Macro
+record-macro.icon.small=16x16/actions/media-record.png
 stop-recording.label=$Stop Recording
+stop-recording.icon.small=16x16/actions/media-playback-stop.png
+last-macro.label=Repeat Last Macro
+record-temp-macro.label=Record $Temporary Macro
 run-temp-macro.label=Run Tem$porary Macro
 run-other-macro.label=Run $Other Macro...
 rescan-macros.label=Resca$n Macros
@@ -683,8 +794,10 @@ delete-word-std.label=Delete Next Word (Eat Whitespace)
 delete.label=Delete Next Character
 document-end.label=Go to End of Buffer
 document-home.label=Go to Start of Buffer
-end.label=Smart End
-home.label=Smart Home
+end.label=End
+home.label=Home
+smart-end.label=Smart End
+smart-home.label=Smart Home
 insert-literal.label=Insert Next Character Literally
 insert-newline.label=Insert Newline
 insert-newline-indent.label=Insert Newline and Indent
@@ -767,7 +880,7 @@ view.gutter.marker=Marker: {0}
 view.status.add-marker=Shortcut for new marker? [{0}]
 view.status.auto-wrap=Search string not found; wrapping around!
 view.status.bracket=Matches line {0}: {1}
-view.status.caret-tooltip=Line and column number (line,column[-virtual] relative%)
+view.status.caret-tooltip=Offset, line and column number (offset,line,column[-virtual] relative%)
 view.status.copy-append-string-register=Register name to copy append to? [{0}]
 view.status.copy-string-register=Register to copy to? [{0}]
 view.status.cut-append-string-register=Register to cut append to? [{0}]
@@ -783,7 +896,7 @@ view.status.linesep-changed=Line separator set to {0}
 view.status.linesep-tooltip=Line separator (click to change)
 view.status.memory-tooltip=Java heap memory: {0}Kb/{1}Kb
 view.status.mode-tooltip=Current edit mode, fold mode, and encoding
-view.st,atus.multi-changed=Multiple selection mode is {0,choice,0#off|1#on}
+view.status.multi-changed=Multiple selection mode is {0,choice,0#off|1#on}
 view.status.multi-tooltip=Multiple selection mode (click to change)
 view.status.narrow=Invoke "Expand All Folds" to make all text visible again
 view.status.no-markers=no markers set
@@ -805,18 +918,13 @@ view.status.vertical-paste-string-register=Register to vertical paste \
 	from? [{0}]
 view.status.wrap-changed=Word wrap mode is now "{0}"
 view.status.wrap-tooltip=Word wrap mode (click to change)
+view.status.bufferset-tooltip=BufferSet scope is {0}
 #}}}
 
 #{{{ Status bar component visibility
+view.status=( mode , fold , encoding ) wrap multiSelect rectSelect overwrite lineSep buffersets memory-status errors clock
+
 view.status.show-caret-status=true
-view.status.show-edit-mode=true
-view.status.show-fold-mode=true
-view.status.show-encoding=true
-view.status.show-wrap=true
-view.status.show-multi-select=true
-view.status.show-overwrite=true
-view.status.show-line-seperator=true
-view.status.show-memory=true
 #}}}
 
 #}}}
@@ -835,16 +943,22 @@ print-error.message=An error occurred while trying to print:\n\
 
 #{{{ About dialog
 about.title=About jEdit
-about.version=jEdit version {0}
+about.version=jEdit {0} {1} mode, using Java {2}
+about.mode.standalone=standalone
+about.mode.server=server
+about.mode.server-background=server-background
+about.navigate=Press arrow keys to navigate about text
 
 # This text scrolls by in the about dialog box.
 # Hack: Since StringTokenizer treats two consequent \n as one token, we
 # insert a space by itself in the text to create blank lines.
 about.text=jEdit is brought to you by\n\
-	\ \n\
+	\n\
 	Slava Pestov\n\
 	Aaron Bell\n\
+	Adam Sawicki\n\
 	Adrian Baker\n\
+	Alan Ezust\n\
 	Alessandro Falappa\n\
 	Alex Levin\n\
 	Alexander Maryanovsky\n\
@@ -852,6 +966,7 @@ about.text=jEdit is brought to you by\n\
 	Alwyn Barry\n\
 	Amedeo Farello\n\
 	Andre Kaplan\n\
+	Andrey Khalyavin\n\
 	Anthony Roy\n\
 	Artur Biesiadowski\n\
 	Aziz Sharif\n\
@@ -860,8 +975,10 @@ about.text=jEdit is brought to you by\n\
 	Ben Glazer\n\
 	Ben Sarsgard\n\
 	Ben Williams\n\
+	Bernhard Walle\n\
 	Bertalan Fodor\n\
 	Bill McMilleon\n\
+	Bj\u00f6rn "Vampire" Kautler\n\
 	Brad Mace\n\
 	Brant Langer Gurganus\n\
 	Brett Smith\n\
@@ -869,12 +986,17 @@ about.text=jEdit is brought to you by\n\
 	Calvin Yu\n\
 	Carlos Quiroz\n\
 	Carmine Lucarelli\n\
+	Chris Grindstaff\n\
 	Chris Kent\n\
+	Chris Petersen\n\
 	Chris Scott\n\
 	Christoph Daniel Schulze\n\
 	Claude Eisenhut\n\
 	Cullen Linn\n\
+	Dakshinamurthy Karra\n\
 	Dale Anson\n\
+	Daniel Hahler\n\
+	Daniel Johnson\n\
 	Danny Dig\n\
 	Dante Fabrizio\n\
 	David Askew\n\
@@ -886,6 +1008,7 @@ about.text=jEdit is brought to you by\n\
 	Dusty Phillips\n\
 	Ed Stewart\n\
 	Eric Benoit\n\
+	Eric Berry\n\
 	Eric Ladner\n\
 	Fan Ho Yin\n\
 	Francesc Roses\n\
@@ -896,30 +1019,42 @@ about.text=jEdit is brought to you by\n\
 	Giulio Piancastelli\n\
 	Greg Cooper\n\
 	Greg Merrill\n\
+	Horst Eff\n\
 	Ian Maclean\n\
+	Igor Lesik\n\
 	Israel Olalla\n\
+	Jakub Rozto\u010dil\n\
 	Jamie LaScolea\n\
 	Jason Ginchereau\n\
+	Jean-Francois Larvoire\n\
+	Jeffrey Hoyt\n\
+	Jeff Robertson\n\
 	Jerry McBride\n\
 	Jiger Patel\n\
 	Jim Lawton\n\
+	Jim Morris\n\
 	Jim Wissner\n\
+	J\u00f6rg Spieler\n\
 	John Gellene\n\
 	John Perry\n\
 	Jonathan Revusky\n\
 	Jorg Winter\n\
+	Joseph Erickson\n\
 	Joseph Schroer\n\
 	Juha Lindfors\n\
 	Justin Dieters\n\
 	Justin Hagstrom\n\
 	Kasper Graversen\n\
+	Kazutoshi Satoda\n\
 	Kenrick Drew\n\
 	Kevin Burton\n\
+	Kevin Hunter\n\
 	Kevin McWhirter\n\
 	Ken Gentry\n\
 	Ken Turner\n\
 	Klaus Hartlage\n\
 	Konstantin Pribluda\n\
+	Krassimir Berov\n\
 	Kris Kopicki\n\
 	Kristian Ovaska\n\
 	Krzysztof Krzyzaniak\n\
@@ -932,6 +1067,7 @@ about.text=jEdit is brought to you by\n\
 	Marco Hunsicker\n\
 	Marco Gotze\n\
 	Marcus Jonason\n\
+	Martin Raspe\n\
 	Matija Kejzar\n\
 	Matt Albrecht\n\
 	Matt Price\n\
@@ -939,16 +1075,22 @@ about.text=jEdit is brought to you by\n\
 	Matthew Payne\n\
 	Matthew Price\n\
 	Matthias Schneider\n\
+	Matthieu Casanova\n\
 	Michael Jacobson\n\
 	Michael Taft\n\
+	Michael Schlotter\n\
 	Mike Dillon\n\
+	Mike Gorski\n\
 	Mike Hansen\n\
 	Mirco Bova\n\
 	Nahuel Foronda\n\
+	Neil Bertram\n\
 	Nicholas O'Leary\n\
 	Nils Krahnstoever\n\
+	Nils Nordman\n\
 	Nitsan Vardi\n\
 	Ollie Rutherfurd\n\
+	Orhan Alkan\n\
 	Patrick Tingen\n\
 	Paul Libbrecht\n\
 	Peter Cox\n\
@@ -965,6 +1107,7 @@ about.text=jEdit is brought to you by\n\
 	Rick Owen\n\
 	Rob Watson\n\
 	Robert McKinnon\n\
+	Robert Schwenn\n\
 	Robert Swarr\n\
 	Romain Guy\n\
 	Rudolf Widmann\n\
@@ -976,7 +1119,9 @@ about.text=jEdit is brought to you by\n\
 	Scott Willy\n\
 	Scott Wyatt\n\
 	Sebastien Pierre\n\
+	Seph Soliman\n\
 	Sergey Udaltsov\n\
+	Shlomy Reinstein\n\
 	Silas Smith\n\
 	Stefan Kost\n\
 	Stefano Maestri\n\
@@ -998,8 +1143,8 @@ about.text=jEdit is brought to you by\n\
 	Will Varfar\n\
 	Wiktor Adamski\n\
 	Wojciech Stryjewski\n\
-	Wolfgang Chico-Töpfer\n\
-	\ \n\
+	Wolfgang Chico-T\u00f6pfer\n\
+	\n\
 	I'd also like to thank the users for their\n\
 	comments, feedback and bug reports.
 #}}}
@@ -1016,17 +1161,24 @@ ioerror.caption-1=The following I/O operation could not be completed:
 ioerror={0}
 ioerror.directory-error=Cannot list directory: {0}
 ioerror.directory-error-nomsg=Cannot list directory.
-ioerror.encoding-error=Cannot load with "{0}" encoding.\n\
+ioerror.encoding-error=The file could not be loaded correctly (some data might be lost) with\n\
+	the encoding "{0}".\n\
 	({1})\n\
-	Try disabling selecting a different encoding and\n\
-	disabling auto-detection in the Commands menu\n\
-	of the file system browser.
+	Try selecting a different encoding.\n\
+	It can be selected with the menu File->Reload with Encoding.\n\
+	If you want it to be done automatically, add the candidates into\n\
+	"List of fallback encodings" in Encodings pane of Global Options.
+ioerror.write-encoding-error=Failed to encode the character\n\
+	{3} at column {2} in line {1} with the encoding "{0}".
 ioerror.read-error=Cannot load: {0}
 ioerror.write-error=Cannot save: {0}
+ioerror.unsupported-encoding-error={0} charset is not supported by your JVM
 ioerror.open-directory=Cannot open directory as a buffer.
 ioerror.save-directory=Cannot save buffer over a directory.
 ioerror.no-read=Insufficent permissions to load file.
 ioerror.no-write=Insufficent permissions to save file.
+ioerror.write-error-readonly=Unable to save, the file is readonly.
+ioerror.save-readonly-twostagefail=Unable to save, the file is readonly and it two stage save is impossible.
 ioerror.badurl=Malformed URL: {0}
 ioerror.delete-error=Cannot delete file.
 ioerror.rename-exists=Cannot overwrite existing file {0}.
@@ -1036,6 +1188,15 @@ ioerror.mkdir-error=Cannot create directory.
 vfs.not-supported.list=Directories on the "{0}" filesystem cannot be browsed.
 vfs.not-supported.load=Files on the "{0}" filesystem cannot be opened.
 vfs.not-supported.save=Files cannot be saved to the "{0}" filesystem.
+
+vfs.overwrite-readonly.title=File is readonly
+vfs.overwrite-readonly.message=The file {0} is readonly.\n\
+	Would you like to save it anyway, resetting the readonly flag\n\
+	it will use two stage save (resets file owner on Unix)
+
+vfs.twostageimpossible.title=Two stage save cannot be used
+vfs.twostageimpossible.message=Two stage save cannot be used, do you want to\n\
+	save anyway ?
 
 out-of-memory-error=There was insufficent Java heap memory to complete\n\
 	this request. Try increasing the maximum heap size.\n\
@@ -1101,7 +1262,7 @@ no-write.message=Cannot save to {0}.\n\
 badurl.title=Invalid URL
 # {0} - the URL
 # {1} - the error
-badurl.message=The following URL is invalid: {0}\n
+badurl.message=The following URL is invalid: {0}\n\
 	({1})
 #}}}
 
@@ -1196,7 +1357,8 @@ no-webstart.message=This feature is not available in the WebStart version\n\
 #{{{ Search and replace dialog
 search.title=Search And Replace
 
-search.find=Search for: (press up arrow to recall previous)
+search.find=Search for:
+search.find.tooltip=PgUp/PgDown or right-click to recall previous
 search.find.mnemonic=s
 search.replace=Replace with:
 search.replace.mnemonic=w
@@ -1230,19 +1392,25 @@ search.all=All buffers
 search.all.mnemonic=l
 search.directory=Directory:
 search.directory.mnemonic=d
+search.skipHidden=Skip hiddens/backups
+search.skipBinary=Skip binary files
+search.skipHidden.mnemonic=h
+search.skipBinary.mnemonic=b
 
 search.directoryField=Directory:
 search.directoryField.mnemonic=y
 search.filterField=Filter:
 search.filterField.mnemonic=f
+glob.tooltip={*.c,*.h} for multiple extensions
 search.subdirs=Search subdirectories
 search.subdirs.mnemonic=u
 search.choose=Choose...
 search.choose.mnemonic=e
 search.synchronize=Synchronize
 search.synchronize.mnemonic=z
-
+search.synchronize.tooltip=Sets filter and directory to current buffer's extension/location.
 search.findBtn=Find
+search.findBtn.mnemonic=f
 search.replaceAndFindBtn=Replace & Find
 search.replaceAndFindBtn.mnemonic=r
 search.replaceAllBtn=Replace All
@@ -1260,20 +1428,43 @@ keepsearching.message=No more matches were found. Continue search from\n\
 
 #{{{ HyperSearch results dialog
 hypersearch-results.title=HyperSearch Results
-hypersearch-results.result-caption={0} ({1} occurrences in {2} files)
-hypersearch-results.result-caption1={0} ({1} occurrence in {2} file)
-hypersearch-results.result-caption2={0} ({1} occurrences in {2} file)
+hypersearch-results.result-caption={0} ({1,choice,1#1 occurrence|1<{1,number,integer} occurrences in '{2,choice,1#1 file|1<{2,number,integer} files}'})
+hypersearch-results.open=Open
+hypersearch-results.open-view=Open in New View
+hypersearch-results.open-plain-view=Open in New Plain View
+hypersearch-results.open-split=Open in New Split
 hypersearch-results.remove-node=Remove Node
+hypersearch-results.new-search=New Search From Here
+hypersearch-results.expand-child-nodes=Expand Child Nodes
+hypersearch-results.collapse-child-nodes=Collapse Child Nodes
+hypersearch-results.copy-to-clipboard=Copy to clipboard
+hypersearch-results.redo=Redo HyperSearch
+hypersearch-results.tree-view=Toggle Tree View
 hypersearch-results.clear.label=Remove All Nodes
+hypersearch-results.clear.icon=22x22/actions/edit-clear.png
+hypersearch-results.stop.label=Stop HyperSearch and show current results
+hypersearch-results.stop.icon=22x22/actions/process-stop.png
 hypersearch-results.multi.label=Toggle Multiple Results
-hypersearch-results.file-caption={0} ({1} occurrences)
-hypersearch-results.file-caption1={0} (1 occurrence)
-hypersearch-results.searching=Searching...
-hypersearch-results.no-results=Not found.
-hypersearch-results.done=Done.
+hypersearch-results.multi.multiple.icon=22x22/actions/edit-find-multiple.png
+hypersearch-results.multi.single.icon=22x22/actions/edit-find-single.png
+hypersearch-results.highlight.label=Set Match Highlight Style
+hypersearch-results.match.highlight.icon=22x22/actions/edit-find-highlight-match.png
+hypersearch-results.match.normal.icon=22x22/actions/edit-find-normal-match.png
+hypersearch-results.file-caption={0} ({1,choice,1#1 occurrence|1<{1,number,integer} occurrences in '{2,choice,1#1 line|1<{2,number,integer} lines}'})
+hypersearch-results.searching=Searching for "{0}"...
+hypersearch-results.no-results=No results found for "{0}".
+hypersearch-results.done=Results for "{0}":
 
 hypersearch-status=Searching
 #}}}
+
+#{{{ HyperSearch too many results
+hypersearch.tooManyResults.label=Too many results
+hypersearch.tooManyResults.title=Too many results
+hypersearch.tooManyResults.message=The search you asked returned {0} \
+	results and is not yet finished. Do you want to stop it ?
+#}}}
+
 
 #{{{ Search and replace error dialog
 searcherror.title=Search and Replace Error
@@ -1295,12 +1486,6 @@ empty-fileset.title=Empty File Set
 empty-fileset.message=The specified search file set contains no files.\n\
 	Please ensure that the file name filter and directory to search\n\
 	(if applicable) are set correctly.
-#}}}
-
-#{{{ Reverse regular expression search not supported dialog
-regexp-reverse.title=Not Supported
-regexp-reverse.message=Cannot search backwards for a regular expression.\n\
-	Either search forwards or disable regular expressions.
 #}}}
 
 #{{{ Can only search local directories dialog
@@ -1352,6 +1537,7 @@ view-registers.selection=% (selection)
 view-registers.none=No registers defined
 view-registers.register=Register:
 view-registers.contents=Contents:
+view-registers.undefined=__UNDEFINED__
 #}}}
 
 #{{{ Close all buffers dialog
@@ -1377,6 +1563,8 @@ files-changed.select-all=Select All
 files-changed.select-all.mnemonic=a
 files-changed.reload=Reload
 files-changed.reload.mnemonic=r
+files-changed.ignore=Ignore
+files-changed.ignore.mnemonic=i
 #}}}
 
 #{{{ Abbrev dialogs
@@ -1402,7 +1590,6 @@ xmode-error.title=XML Parse Error
 # {2} is the column number, but it's not too useful so we don't show it
 xmode-error.message=An error occurred while parsing {0}, line {1}:\n\
 	{3}
-
 xmode-error.dtd=The DTD could not be loaded\n({0})
 xmode-error.termchar-invalid=The value of the AT_CHAR attribute is invalid ({0})
 xmode-error.doctype-invalid=Expected a document type of MODE, found {0}
@@ -1410,7 +1597,7 @@ xmode-error.empty-tag=The {0} tag cannot be empty
 xmode-error.token-invalid=The token type {0} is invalid
 xmode-error.empty-keyword=The keyword text cannot be empty
 xmode-error.regexp=Invalid regular expression\n({0})
-xmode-error.hash-char-invalid=HASH_CHAR must be exactly one character
+xmode-error.hash-char-and-hash-chars-mutually-exclusive=HASH_CHAR and HASH_CHARS may not be specified both
 xmode-error.delegate-invalid=Invalid delegate: {0}
 #}}}
 
@@ -1445,6 +1632,9 @@ plugin-error.missing-jar=Requires JAR file {0}.\n\
 plugin-error.obsolete=This plugin is obsolete. Please remove it.
 plugin-error.not-42=This plugin does not support dynamic loading.\n\
 	You must restart jEdit after removing or installing this plugin.
+
+plugin-error-download.title=Plugin error
+plugin-error-download.message=Error while downloading the plugin, please try another mirror\n{0}
 #}}}
 
 #{{{ Macro dialogs
@@ -1529,13 +1719,19 @@ format-maxlinelen.message=The wrap margin must be set to a non-zero value\n\
 	for this command to work.
 #}}}
 
+#{{{ Text under caret does not have a syntax style (token type)
+syntax-style-no-token.title=Syntax Style Configuration
+syntax-style-no-token.message=The text under the caret has no associated \
+	syntax style to configure.
+#}}}
+
 #}}}
 
 #{{{ Buffer options dialog
 buffer-options.title=Buffer Options
 buffer-options.caption=This dialog box changes settings for the current buffer\n\
-	only. To change settings on an editor-wide basis, see\n\
-	the Utilities->Global Options dialog box.
+	only. To change the default settings for an edit mode, see\n\
+	the Utilities->Global Options->Editing dialog.
 buffer-options.loading-saving=Loading and Saving
 buffer-options.lineSeparator=Line separator:
 buffer-options.encoding=Character encoding:
@@ -1552,6 +1748,39 @@ options.jedit.label=jEdit
 # Option pane to show by default
 options.last=editing
 
+#{{{ General pane
+options.general.label=General
+options.general.code=new GeneralOptionPane();
+options.general.lineSeparator=Default line separator:
+options.general.encoding=Default character encoding:
+options.general.encodingAutodetect=Auto-detect file encoding when possible
+options.general.checkModStatus=If open files are changed on disk:
+options.general.checkModStatus.nothing=do nothing
+options.general.checkModStatus.prompt=prompt
+options.general.checkModStatus.reload=automatically reload and notify user
+options.general.checkModStatus.silentReload=autoreload without notification
+options.general.checkModStatusUpon=Check for file change upon:
+options.general.checkModStatusUpon.focus=application focus
+options.general.checkModStatusUpon.all=application focus, visiting the buffer or saving any buffer
+options.general.checkModStatusUpon.operations=visiting the buffer or saving any buffer
+options.general.checkModStatusUpon.focusBuffer=visiting or saving the buffer
+options.general.checkModStatusUpon.none=saving the buffer
+options.general.recentFiles=Recent files to remember:
+options.general.hypersearch.maxWarningResults=Max Hypersearch Results:
+options.general.sortRecent=Sort recent file list
+options.general.saveCaret=Save caret positions in recent file list
+options.general.persistentMarkers=Save marker positions
+options.general.resetUndo=Reset undo history on save
+options.general.restore=Restore previously open files on startup
+options.general.restore.remote=... including remote files over VFS
+options.general.restore.cli=... including file names specified on the command line
+options.general.newkeyhandling=Use simplified keyboard handling
+options.general.newkeyhandling.tooltip=(Experimental) some international Linux users prefer this mode, but it may go away soon since regular keyboard handling works better.
+options.general.encodingDetectors=List of encoding autodetectors:
+options.general.fallbackEncodings=List of fallback encodings:
+options.general.fallbackEncodings.tooltip=(Experimental) A whitespace-separated list of encodings to try against encoding errors on loading
+#}}}
+
 #{{{ Abbreviations pane
 options.abbrevs.label=Abbreviations
 options.abbrevs.code=new AbbrevsOptionPane();
@@ -1562,17 +1791,22 @@ options.abbrevs.expand=Expansion
 options.abbrevs.add=Add...
 options.abbrevs.edit=Edit...
 options.abbrevs.remove=Remove
+options.abbrevs.add.icon=22x22/actions/list-add.png
+options.abbrevs.edit.icon=22x22/actions/document-properties.png
+options.abbrevs.remove.icon=22x22/actions/list-remove.png
 #}}}
 
 #{{{ Appearance pane
 options.appearance.label=Appearance
 options.appearance.code=new AppearanceOptionPane();
+options.appearance.iconTheme=Icon Theme:
+options.appearance.fonts.antialias=Anti-alias Non-TextArea fonts
 options.appearance.lf.note=Restart jEdit for look & feel changes to take effect
 options.appearance.lf=Swing look & feel:
 options.appearance.primaryFont=Button, menu and label font:
 options.appearance.secondaryFont=List and text field font:
 options.appearance.history=History text field entries to remember:
-options.appearance.menuSpillover=Number of items before menus spill over:    
+options.appearance.menuSpillover=Number of items before menus spill over:
 options.appearance.startup.label=Startup options
 options.appearance.showSplash=Show splash screen on startup
 options.appearance.showTips=Show tips on startup
@@ -1585,17 +1819,7 @@ options.appearance.textColors=Use jEdit text area colors in all text \
 	components
 options.appearance.decorateFrames=Draw window borders using Swing look & feel
 options.appearance.decorateDialogs=Draw dialog box borders using Swing look & feel
-#}}}
-
-#{{{ Autosave & Backup pane
-options.auto-back.label=Autosave & Backup
-options.auto-back.code=new AutosaveBackupOptionPane();
-options.auto-back.autosave=Autosave frequency (secs):
-options.auto-back.backups=Max number of backups:
-options.auto-back.backupDirectory=Backup directory:
-options.auto-back.backupPrefix=Backup filename prefix:
-options.auto-back.backupSuffix=Backup filename suffix:
-options.auto-back.backupEverySave=Backup on every save
+options.appearance.continuousLayout.label=Use continuous layout in split panes
 #}}}
 
 #{{{ Context Menu pane
@@ -1603,13 +1827,22 @@ options.context.label=Context Menu
 options.context.code=new ContextOptionPane();
 options.context.caption=Items in text area right click menu:
 options.context.add=Add...
+options.context.add.icon=22x22/actions/list-add.png
 options.context.remove=Remove
+options.context.remove.icon=22x22/actions/list-remove.png
 options.context.moveUp=Move Up
+options.context.moveUp.icon=22x22/actions/go-up.png
 options.context.moveDown=Move Down
+options.context.moveDown.icon=22x22/actions/go-down.png
+options.context.reset=Reset to Default
+options.context.reset.icon=22x22/actions/edit-clear.png
 options.context.add.title=Add to Context Menu
 options.context.add.caption=Add to context menu:
 options.context.add.separator=Separator
 options.context.add.action=Command or macro:
+
+options.context.reset.dialog.title=Reset to Default
+options.context.reset.dialog.message=Are you sure you want to reset the context menu to the installation default?
 #}}}
 
 #{{{ Docking pane
@@ -1617,6 +1850,10 @@ options.docking.label=Docking
 options.docking.code=new DockingOptionPane();
 options.docking.title=Window
 options.docking.dockPosition=Docking position
+options.appearance.selectFramework.label=Docking framework:
+options.docking.autoSaveModeLayout.label=Automatically save mode-specific docking layout
+options.docking.autoLoadModeLayout.label=Automatically load mode-specific docking layout
+options.docking.selectSet.label=Dockable set:
 #}}}
 
 #{{{ Editing pane
@@ -1641,47 +1878,39 @@ options.editing.folding=Folding mode:
 options.editing.collapseFolds=Initially collapse folds with level:
 options.editing.wrap=Word wrap:
 options.editing.maxLineLen=Wrap margin:
+options.editing.maxLineLen.tooltip=Select 0 for text area width (soft wrap only)
 options.editing.tabSize=Tab width:
 options.editing.indentSize=Indent width:
 options.editing.noWordSep=Extra word characters:
+options.editing.camelCasedWords=Separate "CamelCased" words
 options.editing.noTabs=Soft (emulated with spaces) tabs
 options.editing.deepIndent=Deep indent
 #}}}
 
-#{{{ General pane
-options.general.label=General
-options.general.code=new GeneralOptionPane();
-options.general.lineSeparator=Default line separator:
-options.general.encoding=Default character encoding:
-options.general.encodingAutodetect=Auto-detect file encoding when possible
-options.general.checkModStatus=If open files are changed on disk:
-options.general.checkModStatus.nothing=do nothing
-options.general.checkModStatus.prompt=prompt
-options.general.checkModStatus.reload=automatically reload
-options.general.recentFiles=Recent files to remember:
-options.general.sortRecent=Sort recent file list
-options.general.saveCaret=Save caret positions in recent file list
-options.general.persistentMarkers=Save marker positions
-options.general.restore=Restore previously open files on startup
-options.general.restore.cli=... even if file names were specified on the \
-	command line
-options.general.sortBuffers=Sort buffer list (takes effect after restart)
-options.general.sortByName=Sort buffer list by file name, instead of path name
-options.general.twoStageSave=Two-stage save (safer but resets file owner on Unix)
-options.general.confirmSaveAll="Save All Buffers" asks for confirmation
-options.general.stripTrailingEOL=Hide final end of line (if any)
+#{{{ Encodings pane
+options.encodings.label=Encodings
+options.encodings.code=new EncodingsOptionPane();
+options.encodings.selectEncodings=Select the encodings that should be shown in encoding dialogs:
+options.encodings.selectAll=Select All
+options.encodings.selectNone=Select None
 #}}}
 
 #{{{ Gutter pane
 options.gutter.label=Gutter
 options.gutter.code=new GutterOptionPane();
-options.gutter.lineNumbers=Line numbering
+options.gutter.enabled=Show gutter
+options.gutter.optionalComponents=Optional gutter components
+options.gutter.lineNumbers=Line numbers
+options.gutter.minLineNumberDigits=Minimal number of digits to reserve for line numbers:
+options.gutter.selectionAreaEnabled=Line selection area when line numbers are not shown
+options.gutter.selectionAreaBgColor=Selection area background color:
+options.gutter.selectionAreaWidth=Selection area width (in pixels):
 options.gutter.font=Gutter font:
 options.gutter.foreground=Line number color:
 options.gutter.background=Background color:
 options.gutter.borderWidth=Gutter border width:
 options.gutter.numberAlignment=Line number alignment:
-options.gutter.interval-1=Highlight every\ 
+options.gutter.interval-1=Highlight every\u0020
 options.gutter.interval-2=lines:
 options.gutter.currentLineHighlight=Highlight current line:
 options.gutter.structureHighlight=Show structure scope:
@@ -1689,15 +1918,19 @@ options.gutter.markerHighlight=Show marker positions:
 options.gutter.foldColor=Fold markers:
 options.gutter.focusBorderColor=Focused gutter border:
 options.gutter.noFocusBorderColor=Unfocused gutter border:
+options.gutter.foldStyle.label=Fold style:
+options.gutter.foldStyleNames.Triangle=Triangle
+options.gutter.foldStyleNames.Square=Square
+options.gutter.foldStyleNames.Circle=Circle
 #}}}
 
 #{{{ Mouse pane
 options.mouse.label=Mouse
 options.mouse.code=new MouseOptionPane();
 options.mouse.dragAndDrop=Drag and drop in text area
-options.mouse.joinNonWordChars=Double-click drag joins non-alphanumeric \
-	characters
+options.mouse.joinNonWordChars=Double-click drag joins non-alphanumeric characters
 options.mouse.middleMousePaste=Quick copy using middle mouse button
+options.mouse.ctrlForRectangularSelection=Switch to rectangular selection while Ctrl is pressed
 options.mouse.gutter.foldClick=Click in gutter:
 options.mouse.gutter.SfoldClick=Shift-click in gutter:
 options.mouse.gutter.toggle-fold=Collapse/expand fold
@@ -1708,6 +1941,7 @@ options.mouse.gutter.toggle-fold-fully=Collapse/expand fold fully
 options.plugin-manager.label=Plugin Manager
 options.plugin-manager.code=new PluginManagerOptionPane();
 options.plugin-manager.updateMirrors=Update mirror list
+options.plugin-manager.workthread=Updating mirror list ...
 options.plugin-manager.downloadSource=Download plugin source code
 options.plugin-manager.deleteDownloads=Delete archives from download \
 	directory after install
@@ -1733,6 +1967,7 @@ options.print.workarounds=Workarounds for Java bugs
 options.print.glyphVector=Print spacing workaround (increases spool file size)
 options.print.force13=Use old printing API (enable this if jEdit hangs when \
 	printing)
+options.print.folds=Print folded regions
 #}}}
 
 #{{{ Proxy pane
@@ -1749,13 +1984,35 @@ options.firewall.socks.host=SOCKS proxy host:
 options.firewall.socks.port=SOCKS proxy port:
 #}}}
 
+#{{{ Save & Backup pane
+options.save-back.label=Saving & Backup
+options.save-back.code=new SaveBackupOptionPane();
+options.save-back.autosave=Autosave frequency (secs):
+options.save-back.backups=Max number of backups:
+options.save-back.backupDirectory=Backup directory:
+options.save-back.backupPrefix=Backup filename prefix:
+options.save-back.backupSuffix=Backup filename suffix:
+options.save-back.backupEverySave=Backup on every save
+options.save-back.twoStageSave=Two-stage save (safer but resets file owner on Unix)
+options.save-back.twoStageSave.tooltip=Stage 1: Rename the old file. Stage 2: create a new file in its place.
+options.save-back.confirmSaveAll="Save All Buffers" asks for confirmation
+options.save-back.autosaveUntitled=Autosave untitled buffers
+options.save-back.suppressNotSavedConfirmUntitled=Never mark Untitled buffers dirty.
+options.save-back.useMD5forDirtyCalculation=Never mark buffers dirty if contents are unchanged.
+options.save-back.useMD5forDirtyCalculation.tooltip=Compare with length and MD5 hash of  buffer at load time, to decide if an edited buffer is still dirty.
+#}}}
+
 #{{{ Shortcuts pane
 options.shortcuts.label=Shortcuts
 options.shortcuts.code=new ShortcutsOptionPane();
 options.shortcuts.select.label=Edit Shortcuts:
+options.shortcuts.select.tooltip=You can select globals, macros, or plugin shortcuts
 options.shortcuts.name=Command
 options.shortcuts.shortcut1=Primary shortcut
 options.shortcuts.shortcut2=Alternative shortcut
+options.shortcuts.filter.label=Filter:
+options.shortcuts.filter.tooltip=Show only actions whose name contains this text
+options.shortcuts.clear.label=Clear
 
 grab-key.title=Specify Shortcut
 grab-key.caption=Press the desired shortcut for "{0}", then click OK.
@@ -1782,7 +2039,7 @@ grab-key.duplicate-shortcut.message=\
 	"{0}".\n\
 	\n\
 	Do you want to override this assignment?
-	
+
 grab-key.prefix-shortcut.title=Invalid Shortcut
 grab-key.prefix-shortcut.message=\
 	You cannot use this shortcut, because\n\
@@ -1794,21 +2051,21 @@ grab-key.prefix-shortcut.message=\
 options.status.label=Status Bar
 options.status.code=new StatusBarOptionPane();
 options.status.visible=Show status bar
+options.status.plainview.visible=Show status bar in plain views
 options.status.foreground=Status bar text:
 options.status.background=Status bar background:
-options.status.show-caret-status=Show caret status
-options.status.show-encoding=Show buffer encoding
-options.status.show-edit-mode=Show edit mode
-options.status.show-fold-mode=Show fold mode
-options.status.show-wrap=Show wrap mode
-options.status.show-multi-select=Show multiple selection status
-options.status.show-rect-select=Show rectangular selection status
-options.status.show-overwrite=Show overwrite status
-options.status.show-line-seperator=Show buffer line seperator
-options.status.show-memory=Show memory indicator
 options.status.memory.foreground=Memory indicator foreground:
 options.status.memory.background=Memory indicator background:
-options.status.show-clock=Show time
+options.status.edit.title=Edit Status Bar Entry
+options.status.edit.labelRadioButton=label
+options.status.edit.widgetRadioButton=widget
+options.status.edit.labelLabel=Type a label:
+options.status.edit.widgetLabel=Choose a widget:
+options.status.caret.linenumber=Show caret line number
+options.status.caret.dot=Show caret offset from start of line
+options.status.caret.virtual=Show caret virtual offset from start of line
+options.status.caret.offset=Show caret offset from start of file
+options.status.caret.bufferlength=Show length of file
 #}}}
 
 #{{{ Syntax Highlighting pane
@@ -1831,6 +2088,7 @@ options.textarea.background=Background color:
 options.textarea.caret=Caret:
 options.textarea.blinkCaret=blinking
 options.textarea.blockCaret=block
+options.textarea.thickCaret=thick
 options.textarea.selection=Single selection:
 options.textarea.multipleSelection=Multiple selection:
 options.textarea.lineHighlight=Highlight current line:
@@ -1839,9 +2097,14 @@ options.textarea.eolMarkers=End of line markers:
 options.textarea.wrapGuide=Wrap guide:
 options.textarea.electricBorders=Electric (auto scroll) borders
 options.textarea.stdNextPrevWord=Go to next/previous word commands eat whitespace
-options.textarea.antiAlias=Smooth text (slow on some systems)
+options.textarea.antiAlias=Anti Aliased smooth text
+options.textarea.antiAlias.tooltip=Anti-aliased fonts slow down display on some systems. \
+Subpixel supported in JDK 1.6 and later.
 options.textarea.fracFontMetrics=Fractional font metrics (for better smooth \
 	text display)
+options.textArea.stripTrailingEOL=Hide final end of line (if any)
+options.textArea.completeFromAllBuffers=Complete words from all open buffers (default is \
+    to limit search to currently visible buffers)
 #}}}
 
 #{{{ Tool Bar pane
@@ -1849,20 +2112,29 @@ options.toolbar.label=Tool Bar
 options.toolbar.code=new ToolBarOptionPane();
 options.toolbar.showToolbar=Show tool bar
 options.toolbar.caption=Buttons to display on tool bar:
+options.toolbar.add.icon=22x22/actions/list-add.png
 options.toolbar.add=Add...
 options.toolbar.edit=Edit...
 options.toolbar.remove=Remove
+options.toolbar.remove.icon=22x22/actions/list-remove.png
 options.toolbar.moveUp=Move Up
+options.toolbar.moveUp.icon=22x22/actions/go-up.png
 options.toolbar.moveDown=Move Down
+options.toolbar.moveDown.icon=22x22/actions/go-down.png
+options.toolbar.reset=Reset to Default
+options.toolbar.reset.icon=22x22/actions/edit-clear.png
 options.toolbar.edit.title=Edit Tool Bar Entry
 options.toolbar.edit.caption=Type:
 options.toolbar.edit.separator=Separator
 options.toolbar.edit.action=Command or macro:
-options.toolbar.edit.icon=Icon:
+options.toolbar.edit.icon=22x22/actions/document-properties.png
 options.toolbar.edit.builtin=Use built-in icon:
 options.toolbar.edit.file=Load icon from file:
 options.toolbar.edit.choose=Choose
 options.toolbar.edit.no-icon=No icon selected
+
+options.toolbar.reset.dialog.title=Reset to Default
+options.toolbar.reset.dialog.message=Are you sure you want to reset the toolbar to the installation default?
 #}}}
 
 #{{{ View pane
@@ -1875,7 +2147,24 @@ options.view.showFullPath=Show full path of buffer in title bar
 options.view.showSearchbar=Always show search bar
 options.view.beepOnSearchAutoWrap=Beep when searching automatically wraps
 options.view.showBufferSwitcher=Show buffer switcher
+options.view.bufferSwitcherMaxRowsCount=Visible rows in buffer switcher:
+options.view.sortBuffers=Sort buffer sets
+options.view.sortByName=Sort buffer sets by file name, instead of path name
+options.view.fullScreenIncludesMenu=Show the menu bar in full-screen mode
+options.view.fullScreenIncludesToolbar=Show the toolbars in full-screen mode
+options.view.fullScreenIncludesStatus=Show the status bar in full-screen mode
+options.editpane.bufferset.default=BufferSet scope for new EditPanes:
+options.editpane.bufferset.contain=New BufferSets contain:
+options.editpane.bufferset.newbufferset.copy=copy of current BufferSet
+options.editpane.bufferset.newbufferset.empty=an empty buffer
+options.editpane.bufferset.newbufferset.currentbuffer=current buffer only
+
+fullScreenIncludesMenu=true
+fullScreenIncludesToolbars=true
+fullScreenIncludesStatus=true
 #}}}
+
+
 
 #{{{ File System Browser panes
 options.browser.label=File System Browser
@@ -1904,6 +2193,7 @@ options.browser.general.sortMixFilesAndDirs=Mix files and directories
 options.browser.general.doubleClickClose=Double-clicking an open file closes it
 options.browser.general.currentBufferFilter=Filter in file dialogs is \
 	current buffer extension
+options.browser.general.useDefaultIcons=Use default icons
 #}}}
 
 #{{{ Font selector
@@ -1916,7 +2206,7 @@ font-selector.bold=Bold
 font-selector.italic=Italic
 font-selector.bolditalic=Bold italic
 font-selector.preview=Preview
-font-selector.long-text=The quick brown fox jumped over the lazy dog.
+font-selector.long-text=The quick brown fox jumps over the lazy dog.
 #}}}
 
 #{{{ Color chooser, used by options.syntaxs
@@ -1925,6 +2215,7 @@ colorChooser.title=Pick a Color
 
 #{{{ Style editor, used by options.syntaxs
 style-editor.title=Style Editor
+style-editor.tokenType=Token type:
 style-editor.italics=Italics
 style-editor.bold=Bold
 style-editor.fgColor=Text color:
@@ -1983,6 +2274,11 @@ log-viewer.copy=Copy
 log-viewer.tail.label=Tail
 #}}}
 
+#{{{ Marker Viewer
+view-markers.label=Vie$w Markers
+view-markers.title=Markers
+#}}}
+
 #{{{ I/O progress monitor
 io-progress-monitor.title=I/O Progress Monitor
 io-progress-monitor.caption={0} pending request(s).
@@ -1999,13 +2295,22 @@ abort.message=Are you sure you want to abort the currently executing\n\
 #}}}
 
 #{{{ VFS browser
-vfs.browser.title=File System Browser
+vfs.browser.title=File Browser
+vfs.browser.longtitle=File System Browser
 vfs.browser.path=Path:
 vfs.browser.path.mnemonic=p
 vfs.browser.filter=Filter:
 vfs.browser.default-filter=*[^~#]
 vfs.browser.filter-enabled=true
 vfs.browser.tree.loading=Loading...
+vfs.browser.file.icon=16x16/mimetypes/text-x-generic.png
+vfs.browser.open-file.icon=16x16/actions/edit-select-all.png
+vfs.browser.dir.icon=16x16/places/folder.png
+vfs.browser.open-dir.icon=16x16/status/folder-open.png
+vfs.browser.filesystem.icon=16x16/devices/drive-harddisk.png
+vfs.browser.loading.icon=16x16/status/image-loading.png
+vfs.browser.expand.icon=16x16/actions/group-expand.png
+vfs.browser.collapse.icon=16x16/actions/group-collapse.png
 
 vfs.browser.name=Name
 vfs.browser.type=Type
@@ -2020,49 +2325,75 @@ vfs.browser.status.rw=Read/write
 vfs.browser.size=Size
 vfs.browser.modified=Last modified
 
+vfs.browser.file_filter.glob=Glob File Filter
+vfs.browser.file_filter.dir_only=Directories Only
+
 #{{{ Actions
 vfs.browser.browse-window.label=Browse in New Window
 vfs.browser.browse.label=Browse
 vfs.browser.close.label=Close
 vfs.browser.copy-path.label=Copy Path Name
 vfs.browser.delete.label=Delete...
-vfs.browser.home.icon=Home.png
+vfs.browser.delete.shortcut=DELETE
+vfs.browser.home.icon=22x22/actions/go-home.png
 vfs.browser.home.label=Home Directory
+vfs.browser.home.shortcut=~
+vfs.browser.properties.label=Properties
+vfs.browser.properties.title=File/Directory Properties
 vfs.browser.insert.label=Insert
-vfs.browser.new-directory.icon=NewDir.png
+vfs.browser.new-directory.icon=22x22/actions/folder-new.png
 vfs.browser.new-directory.label=New Directory...
-vfs.browser.new-file.icon=New.png
+vfs.browser.new-directory.shortcut=INSERT
+vfs.browser.new-file.icon=22x22/actions/document-new.png
 vfs.browser.new-file.label=New File
+vfs.browser.new-file.shortcut=C+n
 vfs.browser.open.label=Open
 vfs.browser.other-encoding-2.label=Other ({0})...
 vfs.browser.other-encoding.label=Other...
-vfs.browser.reload.icon=Reload.png
+vfs.browser.reload.icon=22x22/actions/view-refresh.png
 vfs.browser.reload.label=Reload Directory
+vfs.browser.reload.shortcut=F5
 vfs.browser.rename.label=Rename...
-vfs.browser.roots.icon=Drive.png
+vfs.browser.rename.shortcut=F2
+vfs.browser.roots.icon=22x22/devices/drive-harddisk.png
 vfs.browser.roots.label=Root Directory
-vfs.browser.search-directory.icon=FindInDir.png
+vfs.browser.roots.shortcut=/
+vfs.browser.search-directory.icon=22x22/actions/edit-find-in-folder.png
 vfs.browser.search-directory.label=Search in Directory...
 vfs.browser.show-hidden-files.label=Show Hidden Files
-vfs.browser.synchronize.icon=CurrentDir.png
+vfs.browser.synchronize.icon=22x22/status/folder-visiting.png
 vfs.browser.synchronize.label=Directory of Current Buffer
-vfs.browser.up.icon=ParentDir.png
+vfs.browser.synchronize.shortcut=-
+vfs.browser.up.icon=22x22/actions/go-parent.png
 vfs.browser.up.label=Parent Directory
+vfs.browser.up.shortcut=A+Up
+vfs.browser.paste.label=Paste File Here
+vfs.browser.previous.label=Previous Directory
+vfs.browser.previous.shortcut=A+Left
+vfs.browser.next.label=Next Directory
+vfs.browser.next.shortcut=A+Right
+vfs.browser.next.icon=22x22/actions/go-next.png
+vfs.browser.previous.icon=22x22/actions/go-previous.png
 #}}}
 
 #{{{ Tool bar
-vfs.browser.toolbar-browser=vfs.browser.up \
+vfs.browser.toolbar-browser=vfs.browser.previous \
+			    vfs.browser.next \
+			    vfs.browser.up \
 			    vfs.browser.reload \
-			    vfs.browser.roots \
 			    vfs.browser.home \
+			    vfs.browser.roots \
 			    vfs.browser.synchronize \
 			    vfs.browser.new-file \
 			    vfs.browser.new-directory \
 			    vfs.browser.search-directory
-vfs.browser.toolbar-dialog=vfs.browser.up \
+
+vfs.browser.toolbar-dialog=vfs.browser.previous \
+			   vfs.browser.next \
+			   vfs.browser.up \
 			   vfs.browser.reload \
-			   vfs.browser.roots \
 			   vfs.browser.home \
+			   vfs.browser.roots \
 			   vfs.browser.synchronize \
 			   vfs.browser.new-directory
 #}}}
@@ -2109,11 +2440,11 @@ vfs.browser.recurse-favorites.title=Cannot Add Favorites to Itself
 vfs.browser.recurse-favorites.message=The favorites list cannot be added to itself.
 
 vfs.browser.delete-confirm.title=Delete File Confirmation
-vfs.browser.delete-confirm.message=Are you sure you want to delete the following files?\n\n\
+vfs.browser.delete-confirm.message=Are you sure you want to delete the following {1}?\n\n\
 	{0}
 
 vfs.browser.delete-favorites.title=Delete From Favorites
-vfs.browser.delete-favorites.message=Are you sure you want to remove the following directories \
+vfs.browser.delete-favorites.message=Are you sure you want to remove the following files \
 	from the favorites?\n\n\
 	{0}
 
@@ -2156,18 +2487,38 @@ plugin-manager.remove-confirm.message=Are you sure you want to remove the \
 
 plugin-manager.dependency.title=Plugin Dependency
 plugin-manager.dependency.message={0} is required by the following plugins.\n\
-	Deselecting {0} will also deselect the below plugins.
+	Deselecting {0} will also deselect the below plugins:
+
+plugin-manager.remove-dependencies.title=Plugin Dependency
+plugin-manager.remove-dependencies.message=The removed plugins are required by the following plugins.\n\
+	Removing them will also deselect the below plugins:
+
+plugin-manager.cleanup.label=Cleanup
+plugin-manager.cleanup.title=Cleanup plugin data
+plugin-manager.cleanup.message=Remove the data of the following plugins:
+
+plugin-manager.noOrphan.label=Find orphan
+plugin-manager.noOrphan.title=No orphan jars found
+plugin-manager.noOrphan.message=There was no orphan jars in your jEdit installation
+
+plugin-manager.findOrphan.label=Find orphan
+plugin-manager.findOrphan.title=Find orphan jars
+plugin-manager.findOrphan.message=The following jars do not belong to any plugin\n\
+	remove them ?\n (be careful, they can be declared dynamically in some \n\
+  plugins like JDBC drivers):
 
 install-plugins.depend.title=Dependency Required
 install-plugins.depend.message=One or more of the plugins you are installing\n\
 	require additional plugins. They will be automatically\n\
 	installed if you continue.
-	
+
 plugin-manager.status.loaded=Loaded
 plugin-manager.status.not-loaded=Not loaded
 plugin-manager.status.error=Error
 
+plugin-manager.list-download-connect=Connecting to plugins.jedit.org
 plugin-manager.list-download=Downloading plugin list from plugins.jedit.org
+plugin-manager.filterField=Show only plugins whose name contains this text
 
 #{{{ Error while loading plugin list
 plugin-list.ioerror.title=I/O Error
@@ -2190,9 +2541,14 @@ manage-plugins.title=Manage
 manage-plugins.info.name=Name
 manage-plugins.info.version=Version
 manage-plugins.info.status=Status
+manage-plugins.info.data=Data
+
+manage-plugins.data-size.unknown=<unknown>
 
 manage-plugins.remove=Remove...
 manage-plugins.help=Help...
+manage-plugins.restore.icon=22x22/actions/document-open.png
+manage-plugins.save.icon=22x22/actions/document-save.png
 #}}}
 
 #{{{ Plugin installation
@@ -2207,6 +2563,8 @@ install-plugins.totalSize=Total Size:\
 install-plugins.select-all=Select All
 install-plugins.install=Install
 install-plugins.show-updates=Show Updates
+install-plugins.choose-plugin-set.icon=22x22/actions/document-open.png
+install-plugins.clear-plugin-set.icon=22x22/actions/edit-clear.png
 
 install-plugins.info=Author: {0}\n\
 	Released: {1}\n\
@@ -2214,7 +2572,7 @@ install-plugins.info=Author: {0}\n\
 
 update-plugins.title=Update
 
-plugin-manager.progress=Downloading selected plugins from plugins.jedit.org...
+plugin-manager.progress=Downloading {0} from mirror {1}
 plugin-manager.progress.stop=Stop
 #}}}
 
@@ -2225,3 +2583,22 @@ plugin-manager.remove-failed.message=The plugin {0}\n\
 #}}}
 
 #}}}
+
+#{{{ File Properties Dialog
+fileprop.name=Name
+fileprop.path=Path
+fileprop.lastmod=Last Modified
+fileprop.size=Size
+fileprop.properties=Properties
+fileprop.readable=Readable
+fileprop.writeable=Writeable
+fileprop.attribute=Attribute
+fileprop.okBtn=OK
+fileprop.cancelBtn=Cancel
+fileprop.selectedFiles=Selected files
+fileprop.selectedDirectories=Selected directories
+#}}}
+
+errorwidget.popupmenu=logs-remove-all-errors
+logs-remove-all-errors.label=Remove all errors
+

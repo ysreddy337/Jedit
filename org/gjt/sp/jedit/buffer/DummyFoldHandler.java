@@ -23,12 +23,11 @@
 package org.gjt.sp.jedit.buffer;
 
 import javax.swing.text.Segment;
-import org.gjt.sp.jedit.Buffer;
 
 /**
  * A fold handler that does nothing.
  * @author Slava Pestov
- * @version $Id: DummyFoldHandler.java,v 1.3 2002/02/09 09:13:20 spestov Exp $
+ * @version $Id: DummyFoldHandler.java 12504 2008-04-22 23:12:43Z ezust $
  * @since jEdit 4.0pre1
  */
 public class DummyFoldHandler extends FoldHandler
@@ -50,7 +49,7 @@ public class DummyFoldHandler extends FoldHandler
 	 * @return The fold level of the specified line
 	 * @since jEdit 4.0pre1
 	 */
-	public int getFoldLevel(Buffer buffer, int lineIndex, Segment seg)
+	public int getFoldLevel(JEditBuffer buffer, int lineIndex, Segment seg)
 	{
 		return 0;
 	} //}}}

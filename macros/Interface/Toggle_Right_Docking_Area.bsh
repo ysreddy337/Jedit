@@ -5,7 +5,7 @@
  *
  * Copyright (C) 2003 Ollie Rutherfurd <oliver@rutherfurd.net>
  *
- * $Id: Toggle_Right_Docking_Area.bsh,v 1.2 2003/12/22 04:14:54 spestov Exp $
+ * $Id: Toggle_Right_Docking_Area.bsh 4937 2003-12-22 04:14:55Z spestov $
  */
 
 toggleRightDockingArea()

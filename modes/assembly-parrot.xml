@@ -6,9 +6,9 @@
         <PROPS>
                 <PROPERTY NAME="lineComment" VALUE="#" />
         </PROPS>
-        <RULES IGNORE_CASE="FALSE" 
+        <RULES IGNORE_CASE="FALSE"
                 HIGHLIGHT_DIGITS="TRUE"
-                DIGIT_RE="(0x[[:xdigit:]]+|[[:digit:]]+)"
+                DIGIT_RE="(0x[\p{XDigit}]+|[\p{Digit}]+)"
         >
 
                 <SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
@@ -18,27 +18,15 @@
 
                 <EOL_SPAN TYPE="COMMENT1">#</EOL_SPAN>
 
-                <MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE"
+                <MARK_PREVIOUS TYPE="LABEL" MATCH_TYPE="OPERATOR"
                                 AT_LINE_START="TRUE">:</MARK_PREVIOUS>
 
                 <SEQ TYPE="OPERATOR">,</SEQ>
 
-                <SEQ_REGEXP TYPE="LITERAL2" 
-                        HASH_CHAR="I"
+                <SEQ_REGEXP TYPE="LITERAL2"
+                        HASH_CHARS="ISNP"
                         AT_WORD_START="TRUE"
-                >I\d{1,2}</SEQ_REGEXP>
-                <SEQ_REGEXP TYPE="LITERAL2" 
-                        HASH_CHAR="S"
-                        AT_WORD_START="TRUE"
-                >S\d{1,2}</SEQ_REGEXP>
-                <SEQ_REGEXP TYPE="LITERAL2" 
-                        HASH_CHAR="N"
-                        AT_WORD_START="TRUE"
-                >N\d{1,2}</SEQ_REGEXP>
-                <SEQ_REGEXP TYPE="LITERAL2" 
-                        HASH_CHAR="P"
-                        AT_WORD_START="TRUE"
-                >P\d{1,2}</SEQ_REGEXP>
+                >[ISNP]\d{1,2}</SEQ_REGEXP>
 
                 <KEYWORDS>
                         <KEYWORD1>abs</KEYWORD1>

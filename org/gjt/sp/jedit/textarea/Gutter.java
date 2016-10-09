@@ -29,12 +29,15 @@ import java.awt.event.*;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
-import org.gjt.sp.jedit.*;
+
+import org.gjt.sp.jedit.buffer.BufferAdapter;
+import org.gjt.sp.jedit.buffer.BufferListener;
+import org.gjt.sp.jedit.buffer.JEditBuffer;
 import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * The gutter is the component that displays folding triangles and line
+ * The gutter is the component that displays folding indicators and line
  * numbers to the left of the text area. The only methods in this class
  * that should be called by plugins are those for adding and removing
  * text area extensions.
@@ -43,10 +46,10 @@ import org.gjt.sp.util.Log;
  * @see #addExtension(int,TextAreaExtension)
  * @see #removeExtension(TextAreaExtension)
  * @see TextAreaExtension
- * @see JEditTextArea
+ * @see TextArea
  *
  * @author Mike Dillon and Slava Pestov
- * @version $Id: Gutter.java,v 1.51 2004/08/12 22:42:44 spestov Exp $
+ * @version $Id: Gutter.java 16346 2009-10-14 10:35:10Z kpouer $
  */
 public class Gutter extends JComponent implements SwingConstants
 {
@@ -72,11 +75,34 @@ public class Gutter extends JComponent implements SwingConstants
 	public static final int HIGHEST_LAYER = Integer.MAX_VALUE;
 	//}}}
 
-	//{{{ Gutter constructor
-	public Gutter(View view, JEditTextArea textArea)
+	//{{{ Fold painters
+	/**
+	 * Fold painter service.
+	 * @since jEdit 4.3pre16
+	 */
+	public static final String FOLD_PAINTER_PROPERTY = "foldPainter";
+	public static final String FOLD_PAINTER_SERVICE = "org.gjt.sp.jedit.textarea.FoldPainter";
+	public static final String DEFAULT_FOLD_PAINTER_SERVICE = "Triangle";
+
+	//{{{ setFolderPainter() method
+	public void setFoldPainter(FoldPainter painter)
 	{
-		this.view = view;
+		if (painter == null)
+			foldPainter = new TriangleFoldPainter();
+		else
+			foldPainter = painter;
+	}
+	//}}}
+	
+	//}}} Fold painters
+	
+	//{{{ Gutter constructor
+	public Gutter(TextArea textArea)
+	{
 		this.textArea = textArea;
+		enabled = true;
+		selectionAreaEnabled = true;
+		selectionAreaWidth = SELECTION_GUTTER_WIDTH;
 
 		setAutoscrolls(true);
 		setOpaque(true);
@@ -84,27 +110,55 @@ public class Gutter extends JComponent implements SwingConstants
 
 		extensionMgr = new ExtensionManager();
 
-		MouseHandler ml = new MouseHandler();
-		addMouseListener(ml);
-		addMouseMotionListener(ml);
+		mouseHandler = new MouseHandler();
+		addMouseListener(mouseHandler);
+		addMouseMotionListener(mouseHandler);
 
-		addExtension(new MarkerHighlight());
+		bufferListener = new BufferAdapter()
+		{
+			public void bufferLoaded(JEditBuffer buffer)
+			{
+				updateLineNumberWidth();
+			}
+
+			public void contentInserted(JEditBuffer buffer, int startLine,
+					int offset, int numLines, int length)
+			{
+				updateLineNumberWidth();
+			}
+
+			public void contentRemoved(JEditBuffer buffer, int startLine,
+					int offset, int numLines, int length) 
+			{
+				updateLineNumberWidth();
+			}
+		};
 
 		updateBorder();
+		setFoldPainter(textArea.getFoldPainter());
 	} //}}}
 
 	//{{{ paintComponent() method
 	public void paintComponent(Graphics _gfx)
 	{
 		Graphics2D gfx = (Graphics2D)_gfx;
-
+		gfx.setRenderingHints(textArea.getPainter().renderingHints);
 		// fill the background
 		Rectangle clip = gfx.getClipBounds();
 		gfx.setColor(getBackground());
-		gfx.fillRect(clip.x, clip.y, clip.width, clip.height);
-
+		int bgColorWidth = isSelectionAreaEnabled() ? FOLD_MARKER_SIZE :
+			clip.width; 
+		gfx.fillRect(clip.x, clip.y, bgColorWidth, clip.height);
+		if (isSelectionAreaEnabled())
+		{
+			if (selectionAreaBgColor == null)
+				selectionAreaBgColor = getBackground();
+			gfx.setColor(selectionAreaBgColor);
+			gfx.fillRect(clip.x + FOLD_MARKER_SIZE, clip.y,
+				clip.width - FOLD_MARKER_SIZE, clip.height);
+		}
 		// if buffer is loading, don't paint anything
-		if (!textArea.getBuffer().isLoaded())
+		if (textArea.getBuffer().isLoading())
 			return;
 
 		int lineHeight = textArea.getPainter().getFontMetrics()
@@ -128,7 +182,7 @@ public class Gutter extends JComponent implements SwingConstants
 			Log.log(Log.ERROR,this,"     lineHeight=" + lineHeight);
 		}
 	
-		int y = (clip.y - clip.y % lineHeight);
+		int y = clip.y - clip.y % lineHeight;
 
 		extensionMgr.paintScreenLineRange(textArea,gfx,
 			firstLine,lastLine,y,lineHeight);
@@ -199,7 +253,7 @@ public class Gutter extends JComponent implements SwingConstants
 	 */
 	public String getToolTipText(MouseEvent evt)
 	{
-		if(!textArea.getBuffer().isLoaded())
+		if(textArea.getBuffer().isLoading())
 			return null;
 
 		return extensionMgr.getToolTipText(evt.getX(),evt.getY());
@@ -216,7 +270,7 @@ public class Gutter extends JComponent implements SwingConstants
 	 */
 	public void setBorder(int width, Color color1, Color color2, Color color3)
 	{
-		this.borderWidth = width;
+		borderWidth = width;
 
 		focusBorder = new CompoundBorder(new MatteBorder(0,0,0,width,color3),
 			new MatteBorder(0,0,0,width,color1));
@@ -231,9 +285,7 @@ public class Gutter extends JComponent implements SwingConstants
 	 */
 	public void updateBorder()
 	{
-		if(view.getEditPane() == null)
-			setBorder(noFocusBorder);
-		else if(view.getEditPane().getTextArea() == textArea)
+		if (textArea.hasFocus())
 			setBorder(focusBorder);
 		else
 			setBorder(noFocusBorder);
@@ -258,20 +310,82 @@ public class Gutter extends JComponent implements SwingConstants
 		{
 			Insets insets = border.getBorderInsets(this);
 			collapsedSize.width = FOLD_MARKER_SIZE + insets.right;
+			if (isSelectionAreaEnabled())
+				 collapsedSize.width += selectionAreaWidth;
 			collapsedSize.height = gutterSize.height
 				= insets.top + insets.bottom;
+			lineNumberWidth = fm.charWidth('5') * getLineNumberDigitCount(); 
 			gutterSize.width = FOLD_MARKER_SIZE + insets.right
-				+ fm.stringWidth("12345");
+				+ lineNumberWidth;
 		}
 
 		revalidate();
 	} //}}}
 
+	//{{{ setMinLineNumberDigitCount() method
+	public void setMinLineNumberDigitCount(int min)
+	{
+		if (min == minLineNumberDigits)
+			return;
+		minLineNumberDigits = min;
+		if (textArea.getBuffer() != null)
+			updateLineNumberWidth();
+	} //}}}
+
+	//{{{ getMinLineNumberDigitCount() method
+	private int getMinLineNumberDigitCount()
+	{
+		return minLineNumberDigits;
+	} //}}}
+
+	//{{{ getLineNumberDigitCount() method
+	private int getLineNumberDigitCount()
+	{
+		JEditBuffer buf = textArea.getBuffer();
+		int minDigits = getMinLineNumberDigitCount();
+		if (buf == null)
+			return minDigits;
+		int count = buf.getLineCount();
+		int digits;
+		for (digits = 0; count > 0; digits++)
+			count /= 10;
+		return (digits < minDigits) ? minDigits : digits;
+	} //}}}
+
+	//{{{ setBuffer() method
+	void setBuffer(JEditBuffer newBuffer)
+	{
+		if (buffer != null)
+			buffer.removeBufferListener(bufferListener);
+		buffer = newBuffer;
+		if (buffer != null)
+			buffer.addBufferListener(bufferListener);
+		updateLineNumberWidth();
+	} //}}}
+
+	//{{{ updateLineNumberWidth() method
+	private void updateLineNumberWidth()
+	{
+		Font f = getFont();
+		if (f != null)
+			setFont(getFont());
+	} //}}}
+
+	//{{{ dispose() method
+	void dispose()
+	{
+		if (buffer != null)
+		{
+			buffer.removeBufferListener(bufferListener);
+			buffer = null;
+		}
+	} //}}}
+
 	//{{{ setFont() method
 	/*
-	 * JComponent.setFont(Font) is overridden here to cache the baseline for
-	 * the font. This avoids having to get the font metrics during every
-	 * repaint.
+	 * JComponent.setFont(Font) is overridden here to cache the font
+	 * metrics for the font. This avoids having to get the font metrics
+	 * during every repaint.
 	 */
 	public void setFont(Font font)
 	{
@@ -279,19 +393,59 @@ public class Gutter extends JComponent implements SwingConstants
 
 		fm = getFontMetrics(font);
 
-		baseline = fm.getAscent();
-
 		Border border = getBorder();
 		if(border != null)
 		{
+			lineNumberWidth = fm.charWidth('5') * getLineNumberDigitCount(); 
 			gutterSize.width = FOLD_MARKER_SIZE
 				+ border.getBorderInsets(this).right
-				+ fm.stringWidth("12345");
+				+ lineNumberWidth;
 			revalidate();
 		}
 	} //}}}
 
 	//{{{ Getters and setters
+
+	//{{{ setGutterEnabled() method
+	/* Enables showing or hiding the gutter. */
+	public void setGutterEnabled(boolean enabled)
+	{
+		this.enabled = enabled;
+		revalidate();
+	} //}}}
+
+	//{{{ isSelectionAreaEnabled() method
+	public boolean isSelectionAreaEnabled()
+	{
+		return selectionAreaEnabled;
+	} //}}}
+
+	//{{{ setSelectionAreaEnabled() method
+	public void setSelectionAreaEnabled(boolean enabled)
+	{
+		if (isSelectionAreaEnabled() == enabled)
+			return;
+		selectionAreaEnabled = enabled;
+		if (enabled)
+			collapsedSize.width += selectionAreaWidth;
+		else
+			collapsedSize.width -= selectionAreaWidth;
+		revalidate();
+	} //}}}
+
+	//{{{ setSelectionAreaBackground() method
+	public void setSelectionAreaBackground(Color bgColor)
+	{
+		selectionAreaBgColor = bgColor;
+		repaint();
+	} //}}}
+
+	//{{{ setSelectionAreaWidth() method
+	public void setSelectionAreaWidth(int width)
+	{
+		selectionAreaWidth = width;
+		revalidate();
+	} //}}}
 
 	//{{{ getHighlightedForeground() method
 	/**
@@ -340,6 +494,8 @@ public class Gutter extends JComponent implements SwingConstants
 	 */
 	public Dimension getPreferredSize()
 	{
+		if (! enabled)
+			return disabledSize;
 		if (expanded)
 			return gutterSize;
 		else
@@ -496,50 +652,38 @@ public class Gutter extends JComponent implements SwingConstants
 		repaint();
 	} //}}}
 
-	//{{{ getMarkerHighlightColor() method
-	public Color getMarkerHighlightColor()
+	public void setSelectionPopupHandler(GutterPopupHandler handler)
 	{
-		return markerHighlightColor;
-	} //}}}
+		mouseHandler.selectionPopupHandler = handler;
+	}
 
-	//{{{ setMarkerHighlightColor() method
-	public void setMarkerHighlightColor(Color markerHighlightColor)
+	public void setMouseActionsProvider(MouseActionsProvider mouseActionsProvider)
 	{
-		this.markerHighlightColor = markerHighlightColor;
-	} //}}}
-
-	//{{{ isMarkerHighlightEnabled() method
-	public boolean isMarkerHighlightEnabled()
-	{
-		return markerHighlight;
-	} //}}}
-
-	//{{{ isMarkerHighlightEnabled()
-	public void setMarkerHighlightEnabled(boolean markerHighlight)
-	{
-		this.markerHighlight = markerHighlight;
-	} //}}}
-
+		mouseHandler.mouseActions = mouseActionsProvider;
+	}
 	//}}}
 
 	//{{{ Private members
 
 	//{{{ Instance variables
 	private static final int FOLD_MARKER_SIZE = 12;
+	private static final int SELECTION_GUTTER_WIDTH = 12;
+		// The selection gutter exists only if the gutter is not expanded
 
-	private View view;
-	private JEditTextArea textArea;
-
+	private boolean enabled;
+	private final TextArea textArea;
+	private MouseHandler mouseHandler;
 	private ExtensionManager extensionMgr;
-
-	private int baseline;
 
 	private Dimension gutterSize = new Dimension(0,0);
 	private Dimension collapsedSize = new Dimension(0,0);
+	private int lineNumberWidth;
+	private Dimension disabledSize = new Dimension(0,0);
 
 	private Color intervalHighlight;
 	private Color currentLineHighlight;
 	private Color foldColor;
+	private Color selectionAreaBgColor;
 
 	private FontMetrics fm;
 
@@ -548,26 +692,31 @@ public class Gutter extends JComponent implements SwingConstants
 	private int interval;
 	private boolean currentLineHighlightEnabled;
 	private boolean expanded;
+	private boolean selectionAreaEnabled;
 
 	private boolean structureHighlight;
 	private Color structureHighlightColor;
 
-	private boolean markerHighlight;
-	private Color markerHighlightColor;
-
 	private int borderWidth;
 	private Border focusBorder, noFocusBorder;
+	
+	private FoldPainter foldPainter;
+	private JEditBuffer buffer;
+	private BufferListener bufferListener;
+	private int minLineNumberDigits;
+	private int selectionAreaWidth;
 	//}}}
 
 	//{{{ paintLine() method
 	private void paintLine(Graphics2D gfx, int line, int y)
 	{
-		Buffer buffer = textArea.getBuffer();
-		if(!buffer.isLoaded())
+		JEditBuffer buffer = textArea.getBuffer();
+		if(buffer.isLoading())
 			return;
 
-		int lineHeight = textArea.getPainter().getFontMetrics()
-			.getHeight();
+		FontMetrics textAreaFm = textArea.getPainter().getFontMetrics();
+		int lineHeight = textAreaFm.getHeight();
+		int baseline = textAreaFm.getAscent();
 
 		ChunkCache.LineInfo info = textArea.chunkCache.getLineInfo(line);
 		int physicalLine = info.physicalLine;
@@ -576,35 +725,20 @@ public class Gutter extends JComponent implements SwingConstants
 		if(physicalLine == -1)
 			return;
 
-		//{{{ Paint fold triangles
+		boolean drawFoldMiddle = true;
+		//{{{ Paint fold start and end indicators
 		if(info.firstSubregion && buffer.isFoldStart(physicalLine))
 		{
-			int _y = y + lineHeight / 2;
-			gfx.setColor(foldColor);
-			if(textArea.displayManager
-				.isLineVisible(physicalLine + 1))
-			{
-				gfx.drawLine(1,_y - 3,10,_y - 3);
-				gfx.drawLine(2,_y - 2,9,_y - 2);
-				gfx.drawLine(3,_y - 1,8,_y - 1);
-				gfx.drawLine(4,_y,7,_y);
-				gfx.drawLine(5,_y + 1,6,_y + 1);
-			}
-			else
-			{
-				gfx.drawLine(4,_y - 5,4,_y + 4);
-				gfx.drawLine(5,_y - 4,5,_y + 3);
-				gfx.drawLine(6,_y - 3,6,_y + 2);
-				gfx.drawLine(7,_y - 2,7,_y + 1);
-				gfx.drawLine(8,_y - 1,8,_y);
-			}
+			drawFoldMiddle = false;
+			foldPainter.paintFoldStart(this, gfx, line, physicalLine,
+					textArea.displayManager.isLineVisible(physicalLine+1),
+					y, lineHeight, buffer);
 		}
 		else if(info.lastSubregion && buffer.isFoldEnd(physicalLine))
 		{
-			gfx.setColor(foldColor);
-			int _y = y + lineHeight / 2;
-			gfx.drawLine(4,_y,4,_y + 3);
-			gfx.drawLine(4,_y + 3,7,_y + 3);
+			drawFoldMiddle = false;
+			foldPainter.paintFoldEnd(this, gfx, line, physicalLine, y,
+					lineHeight, buffer);
 		} //}}}
 		//{{{ Paint bracket scope
 		else if(structureHighlight)
@@ -654,9 +788,11 @@ public class Gutter extends JComponent implements SwingConstants
 				}
 
 				gfx.setColor(structureHighlightColor);
+				drawFoldMiddle = false;
 				if(structScreenLine == caretScreenLine)
 				{
 					// do nothing
+					drawFoldMiddle = true;
 				}
 				// draw |^
 				else if(line == caretScreenLine)
@@ -695,6 +831,11 @@ public class Gutter extends JComponent implements SwingConstants
 				}
 			}
 		} //}}}
+		if(drawFoldMiddle && buffer.getFoldLevel(physicalLine) > 0)
+		{
+			foldPainter.paintFoldMiddle(this, gfx, line, physicalLine,
+					y, lineHeight, buffer);
+		}
 
 		//{{{ Paint line numbers
 		if(info.firstSubregion && expanded)
@@ -705,27 +846,21 @@ public class Gutter extends JComponent implements SwingConstants
 			switch (alignment)
 			{
 			case RIGHT:
-				offset = gutterSize.width - collapsedSize.width
-					- (fm.stringWidth(number) + 1);
+				offset = lineNumberWidth - (fm.stringWidth(number) + 1);
 				break;
 			case CENTER:
-				offset = ((gutterSize.width - collapsedSize.width)
-					- fm.stringWidth(number)) / 2;
+				offset = (lineNumberWidth - fm.stringWidth(number)) / 2;
 				break;
 			case LEFT: default:
 				offset = 0;
 				break;
 			}
 
-			boolean highlightCurrentLine = currentLineHighlightEnabled
-				&& textArea.selection.size() == 0;
-			if (physicalLine == textArea.getCaretLine() && highlightCurrentLine)
+			if (physicalLine == textArea.getCaretLine() && currentLineHighlightEnabled)
 			{
 				gfx.setColor(currentLineHighlight);
 			}
-			else if (interval > 1 && (line
-				+ textArea.getFirstLine() + 1)
-				% interval == 0)
+			else if (interval > 1 && (physicalLine + 1) % interval == 0)
 				gfx.setColor(intervalHighlight);
 			else
 				gfx.setColor(getForeground());
@@ -740,9 +875,12 @@ public class Gutter extends JComponent implements SwingConstants
 	//{{{ MouseHandler class
 	class MouseHandler extends MouseInputAdapter
 	{
-		MouseActions mouseActions = new MouseActions("gutter");
+		MouseActionsProvider mouseActions;
 		boolean drag;
 		int toolTipInitialDelay, toolTipReshowDelay;
+		boolean selectLines;
+		int selAnchorLine;
+		GutterPopupHandler selectionPopupHandler;
 
 		//{{{ mouseEntered() method
 		public void mouseEntered(MouseEvent e)
@@ -767,16 +905,32 @@ public class Gutter extends JComponent implements SwingConstants
 		{
 			textArea.requestFocus();
 
-			if(GUIUtilities.isPopupTrigger(e)
-				|| e.getX() >= getWidth() - borderWidth * 2)
+			boolean outsideGutter =
+				(e.getX() >= getWidth() - borderWidth * 2);
+			if(TextAreaMouseHandler.isPopupTrigger(e) || outsideGutter)
 			{
+				if ((selectionPopupHandler != null) &&
+					(! outsideGutter) &&
+					(e.getX() > FOLD_MARKER_SIZE))
+				{
+					int screenLine = e.getY() / textArea.getPainter()
+						.getFontMetrics().getHeight();
+					int line = textArea.chunkCache.getLineInfo(screenLine)
+						.physicalLine;
+					if (line >= 0)
+					{
+						selectionPopupHandler.handlePopup(
+							e.getX(), e.getY(), line);
+						return;
+					}
+				}
 				e.translatePoint(-getWidth(),0);
 				textArea.mouseHandler.mousePressed(e);
 				drag = true;
 			}
 			else
 			{
-				Buffer buffer = textArea.getBuffer();
+				JEditBuffer buffer = textArea.getBuffer();
 
 				int screenLine = e.getY() / textArea.getPainter()
 					.getFontMetrics().getHeight();
@@ -786,6 +940,20 @@ public class Gutter extends JComponent implements SwingConstants
 
 				if(line == -1)
 					return;
+
+				if (e.getX() >= FOLD_MARKER_SIZE)
+				{
+					Selection s = new Selection.Range(
+						textArea.getLineStartOffset(line),
+						getFoldEndOffset(line));
+					if(textArea.isMultipleSelectionEnabled())
+						textArea.addToSelection(s);
+					else
+						textArea.setSelection(s);
+					selectLines = true;
+					selAnchorLine = line;
+					return;
+				}
 
 				//{{{ Determine action
 				String defaultAction;
@@ -805,8 +973,11 @@ public class Gutter extends JComponent implements SwingConstants
 				else
 					return;
 
-				String action = mouseActions.getActionForEvent(
-					e,variant);
+				String action = null;
+
+				if (mouseActions != null)
+					action = mouseActions.getActionForEvent(
+						e,variant);
 
 				if(action == null)
 					action = defaultAction;
@@ -831,7 +1002,7 @@ public class Gutter extends JComponent implements SwingConstants
 					if(textArea.displayManager
 						.isLineVisible(line + 1))
 					{
-						textArea.displayManager.collapseFold(line);
+						textArea.collapseFold(line);
 					}
 					else
 					{
@@ -886,6 +1057,61 @@ public class Gutter extends JComponent implements SwingConstants
 				e.translatePoint(-getWidth(),0);
 				textArea.mouseHandler.mouseDragged(e);
 			}
+			else if(selectLines)
+			{
+				int screenLine = e.getY() / textArea.getPainter()
+					.getFontMetrics().getHeight();
+				int line;
+				if(e.getY() < 0)
+				{
+					textArea.scrollUpLine();
+					line = textArea.getFirstPhysicalLine();
+				}
+				else if(e.getY() >= getHeight())
+				{
+					textArea.scrollDownLine();
+					line = textArea.getLastPhysicalLine();
+				}
+				else
+					line = textArea.chunkCache.getLineInfo(screenLine)
+						.physicalLine;
+
+				int selStart, selEnd;
+				if(line < selAnchorLine)
+				{
+					selStart = textArea.getLineStartOffset(line);
+					selEnd = getFoldEndOffset(selAnchorLine);
+				}
+				else
+				{
+					selStart = textArea.getLineStartOffset(selAnchorLine);
+					selEnd = getFoldEndOffset(line);
+				}
+
+				textArea.resizeSelection(selStart, selEnd, 0, false);
+			}
+		} //}}}
+
+		//{{{ getFoldEndOffset() method
+		private int getFoldEndOffset(int line)
+		{
+			JEditBuffer buffer = textArea.getBuffer();
+			int endLine;
+			if ((line == buffer.getLineCount() - 1) ||
+				(textArea.displayManager.isLineVisible(line + 1)))
+			{
+				endLine = line;
+			}
+			else
+			{
+				int[] lines = buffer.getFoldAtLine(line);
+				endLine = lines[1];
+			}
+
+			if(endLine == buffer.getLineCount() - 1)
+				return buffer.getLineEndOffset(endLine) - 1;
+			else
+				return buffer.getLineEndOffset(endLine);
 		} //}}}
 
 		//{{{ mouseReleased() method
@@ -898,59 +1124,7 @@ public class Gutter extends JComponent implements SwingConstants
 			}
 
 			drag = false;
-		} //}}}
-	} //}}}
-
-	//{{{ MarkerHighlight class
-	class MarkerHighlight extends TextAreaExtension
-	{
-		//{{{ paintValidLine() method
-		public void paintValidLine(Graphics2D gfx, int screenLine,
-			int physicalLine, int start, int end, int y)
-		{
-			if(isMarkerHighlightEnabled())
-			{
-				Buffer buffer = textArea.getBuffer();
-				if(buffer.getMarkerInRange(start,end) != null)
-				{
-					gfx.setColor(getMarkerHighlightColor());
-					FontMetrics fm = textArea.getPainter().getFontMetrics();
-					gfx.fillRect(0,y,textArea.getGutter()
-						.getWidth(),fm.getHeight());
-				}
-			}
-		} //}}}
-
-		//{{{ getToolTipText() method
-		public String getToolTipText(int x, int y)
-		{
-			if(isMarkerHighlightEnabled())
-			{
-				int lineHeight = textArea.getPainter().getFontMetrics().getHeight();
-				if(lineHeight == 0)
-					return null;
-
-				int line = y / lineHeight;
-				int start = textArea.getScreenLineStartOffset(line);
-				int end = textArea.getScreenLineEndOffset(line);
-				if(start == -1 || end == -1)
-					return null;
-
-				Marker marker = textArea.getBuffer().getMarkerInRange(start,end);
-				if(marker != null)
-				{
-					char shortcut = marker.getShortcut();
-					if(shortcut == '\0')
-						return jEdit.getProperty("view.gutter.marker.no-name");
-					else
-					{
-						String[] args = { String.valueOf(shortcut) };
-						return jEdit.getProperty("view.gutter.marker",args);
-					}
-				}
-			}
-
-			return null;
+			selectLines = false;
 		} //}}}
 	} //}}}
 }

@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2001, 2003 Slava Pestov
+ * Copyright (C) 2001, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -33,16 +33,22 @@ import org.gjt.sp.util.Log;
  * directly.
  *
  * @author Slava Pestov
- * @version $Id: PositionManager.java,v 1.35 2003/11/18 20:51:57 spestov Exp $
+ * @version $Id: PositionManager.java 13125 2008-07-31 09:55:38Z kpouer $
  * @since jEdit 4.2pre3
  */
 public class PositionManager
 {
+	//{{{ PositionManager constructor
+	public PositionManager(JEditBuffer buffer)
+	{
+		this.buffer = buffer;
+	} //}}}
+	
 	//{{{ createPosition() method
 	public synchronized Position createPosition(int offset)
 	{
 		PosBottomHalf bh = new PosBottomHalf(offset);
-		PosBottomHalf existing = (PosBottomHalf)positions.get(bh);
+		PosBottomHalf existing = positions.get(bh);
 		if(existing == null)
 		{
 			positions.put(bh,bh);
@@ -55,18 +61,17 @@ public class PositionManager
 	//{{{ contentInserted() method
 	public synchronized void contentInserted(int offset, int length)
 	{
-		if(positions.size() == 0)
+		if(positions.isEmpty())
 			return;
 
 		/* get all positions from offset to the end, inclusive */
-		Iterator iter = positions.tailMap(new PosBottomHalf(offset))
+		Iterator<PosBottomHalf> iter = positions.tailMap(new PosBottomHalf(offset))
 			.keySet().iterator();
 
 		iteration = true;
 		while(iter.hasNext())
 		{
-			PosBottomHalf bh = (PosBottomHalf)iter.next();
-			bh.offset += length;
+			iter.next().contentInserted(offset,length);
 		}
 		iteration = false;
 	} //}}}
@@ -74,21 +79,17 @@ public class PositionManager
 	//{{{ contentRemoved() method
 	public synchronized void contentRemoved(int offset, int length)
 	{
-		if(positions.size() == 0)
+		if(positions.isEmpty())
 			return;
 
 		/* get all positions from offset to the end, inclusive */
-		Iterator iter = positions.tailMap(new PosBottomHalf(offset))
+		Iterator<PosBottomHalf> iter = positions.tailMap(new PosBottomHalf(offset))
 			.keySet().iterator();
 
 		iteration = true;
 		while(iter.hasNext())
 		{
-			PosBottomHalf bh = (PosBottomHalf)iter.next();
-			if(bh.offset <= offset + length)
-				bh.offset = offset;
-			else
-				bh.offset -= length;
+			iter.next().contentRemoved(offset,length);
 		}
 		iteration = false;
 
@@ -97,7 +98,8 @@ public class PositionManager
 	boolean iteration;
 
 	//{{{ Private members
-	private SortedMap positions = new TreeMap();
+	private JEditBuffer buffer;
+	private SortedMap<PosBottomHalf, PosBottomHalf> positions = new TreeMap<PosBottomHalf, PosBottomHalf>();
 	//}}}
 
 	//{{{ Inner classes
@@ -105,7 +107,7 @@ public class PositionManager
 	//{{{ PosTopHalf class
 	class PosTopHalf implements Position
 	{
-		PosBottomHalf bh;
+		final PosBottomHalf bh;
 
 		//{{{ PosTopHalf constructor
 		PosTopHalf(PosBottomHalf bh)
@@ -121,6 +123,7 @@ public class PositionManager
 		} //}}}
 
 		//{{{ finalize() method
+		@Override
 		protected void finalize()
 		{
 			synchronized(PositionManager.this)
@@ -131,7 +134,7 @@ public class PositionManager
 	} //}}}
 
 	//{{{ PosBottomHalf class
-	class PosBottomHalf implements Comparable
+	class PosBottomHalf implements Comparable<PosBottomHalf>
 	{
 		int offset;
 		int ref;
@@ -155,7 +158,29 @@ public class PositionManager
 				positions.remove(this);
 		} //}}}
 
+		//{{{ contentInserted() method
+		void contentInserted(int offset, int length)
+		{
+			if(offset > this.offset)
+				throw new ArrayIndexOutOfBoundsException();
+			this.offset += length;
+			checkInvariants();
+		} //}}}
+
+		//{{{ contentRemoved() method
+		void contentRemoved(int offset, int length)
+		{
+			if(offset > this.offset)
+				throw new ArrayIndexOutOfBoundsException();
+			if(this.offset <= offset + length)
+				this.offset = offset;
+			else
+				this.offset -= length;
+			checkInvariants();
+		} //}}}
+
 		//{{{ equals() method
+		@Override
 		public boolean equals(Object o)
 		{
 			if(!(o instanceof PosBottomHalf))
@@ -165,11 +190,18 @@ public class PositionManager
 		} //}}}
 
 		//{{{ compareTo() method
-		public int compareTo(Object o)
+		public int compareTo(PosBottomHalf posBottomHalf)
 		{
 			if(iteration)
 				Log.log(Log.ERROR,this,"Consistency failure");
-			return offset - ((PosBottomHalf)o).offset;
+			return offset - posBottomHalf.offset;
+		} //}}}
+		
+		//{{{ checkInvariants() method
+		private void checkInvariants()
+		{
+			if(offset < 0 || offset > buffer.getLength())
+				throw new ArrayIndexOutOfBoundsException();
 		} //}}}
 	} //}}}
 

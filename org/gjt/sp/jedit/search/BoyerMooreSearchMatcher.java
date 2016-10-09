@@ -25,21 +25,17 @@
 
 package org.gjt.sp.jedit.search;
 
-//{{{ Imports
-import bsh.BshMethod;
-import bsh.NameSpace;
-import gnu.regexp.CharIndexed;
-import org.gjt.sp.jedit.BeanShell;
-//}}}
-
 /**
  * Implements literal search using the Boyer-Moore algorithm.
+ * @version $Id: BoyerMooreSearchMatcher.java 13837 2008-10-01 07:47:17Z shlomy $
  */
 public class BoyerMooreSearchMatcher extends SearchMatcher
 {
 	//{{{ BoyerMooreSearchMatcher constructor
 	/**
 	 * Creates a new string literal matcher.
+	 * @param pattern the search pattern
+	 * @param ignoreCase <code>true</code> if you want to ignore case
 	 */
 	public BoyerMooreSearchMatcher(String pattern, boolean ignoreCase)
 	{
@@ -75,7 +71,7 @@ public class BoyerMooreSearchMatcher extends SearchMatcher
 	 * the match
 	 * @since jEdit 4.2pre4
 	 */
-	public SearchMatcher.Match nextMatch(CharIndexed text,
+	public SearchMatcher.Match nextMatch(CharSequence text,
 		boolean start, boolean end, boolean firstTime,
 		boolean reverse)
 	{
@@ -94,14 +90,15 @@ public class BoyerMooreSearchMatcher extends SearchMatcher
 	} //}}}
 
 	//{{{ match() method
-	/*
+	/**
 	 *  a good introduction to the Boyer-Moore fast string matching
 	 *  algorithm may be found on Moore's website at:
 	 *
 	 *   http://www.cs.utexas.edu/users/moore/best-ideas/string-searching/
 	 *
+	 * @since jEdit 4.3pre5
 	 */
-	public int match(CharIndexed text, boolean reverse)
+	public int match(CharSequence text, boolean reverse)
 	{
 		//{{{
 		// lazily create skip and suffix arrays for either the
@@ -156,12 +153,12 @@ public class BoyerMooreSearchMatcher extends SearchMatcher
 		// based on the mismatch character and its position in the
 		// pattern to determine the furthest we can move the anchor
 		// without missing any potential pattern matches.
-SEARCH:
-		while (text.isValid())
+		SEARCH:
+		while (anchor + pattern_end < text.length())
 		{
 			for (pos = pattern_end; pos >= 0; --pos)
 			{
-				ch = text.charAt(pos);
+				ch = text.charAt(pos + anchor);
 				if(ignoreCase)
 					ch = Character.toUpperCase(ch);
 
@@ -181,7 +178,6 @@ SEARCH:
 					// heuristics
 					int skip_index = (bad_char > good_suffix) ? bad_char : good_suffix;
 					anchor += skip_index;
-					text.move(skip_index);
 
 					// go back to the while loop
 					continue SEARCH;
@@ -196,6 +192,12 @@ SEARCH:
 		return -1;
 	} //}}}
 
+	//{{{ toString() method
+	public String toString()
+	{
+		return "BoyerMooreSearchMatcher[" + new String(pattern) + ',' + ignoreCase + ']';
+	} //}}}
+
 	//{{{ Private members
 	private char[] pattern;
 	private int pattern_end;
@@ -206,7 +208,6 @@ SEARCH:
 	private int[] fwd_suffix;
 	private int[] back_skip;
 	private int[] back_suffix;
-	//}}}
 
 	// Boyer-Moore helper methods
 
@@ -255,7 +256,7 @@ SEARCH:
 	 */
 	private static final int getSkipIndex(char ch)
 	{
-		return ((int) ch) & 0x000000FF;
+		return ch & 0x000000FF;
 	} //}}}
 
 	//{{{ generateSuffixArray() method

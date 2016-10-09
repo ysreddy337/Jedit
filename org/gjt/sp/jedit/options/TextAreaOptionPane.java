@@ -27,10 +27,17 @@ import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.*;
-import org.gjt.sp.jedit.gui.*;
-import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.textarea.AntiAlias;
+import org.gjt.sp.jedit.jEdit;
+import org.gjt.sp.jedit.AbstractOptionPane;
+import org.gjt.sp.jedit.gui.FontSelector;
+import org.gjt.sp.jedit.gui.ColorWellButton;
 //}}}
 
+/**
+ * @author Slava Pestov
+ * @version $Id: TextAreaOptionPane.java 15360 2009-05-28 23:16:42Z k_satoda $
+ */
 public class TextAreaOptionPane extends AbstractOptionPane
 {
 	//{{{ TextAreaOptionPane constructor
@@ -68,12 +75,17 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			+ ".blockCaret"));
 		blockCaret.setSelected(jEdit.getBooleanProperty("view.blockCaret"));
 
+		thickCaret = new JCheckBox(jEdit.getProperty("options.textarea"
+			+ ".thickCaret"));
+		thickCaret.setSelected(jEdit.getBooleanProperty("view.thickCaret"));
+
 		Box caretSettings = new Box(BoxLayout.X_AXIS);
 		caretSettings.add(new JLabel(jEdit.getProperty(
 			"options.textarea.caret")));
 		caretSettings.add(Box.createHorizontalStrut(6));
 		caretSettings.add(blinkCaret);
 		caretSettings.add(blockCaret);
+		caretSettings.add(thickCaret);
 
 		addComponent(caretSettings,caretColor = new ColorWellButton(
 			jEdit.getColorProperty("view.caretColor")),
@@ -132,29 +144,40 @@ public class TextAreaOptionPane extends AbstractOptionPane
 		addComponent(electricBorders);
 
 		/* Anti-aliasing */
-		antiAlias = new JCheckBox(jEdit.getProperty("options.textarea"
-			+ ".antiAlias"));
-		boolean antiAliasEnabled = jEdit.getBooleanProperty(
-			"view.antiAlias");
-		font.setAntiAliasEnabled(antiAliasEnabled);
+
+		antiAlias = new JComboBox(AntiAlias.comboChoices);
+		antiAlias.setToolTipText(jEdit.getProperty("options.textarea.antiAlias.tooltip"));
+		AntiAlias antiAliasValue = new AntiAlias(jEdit.getProperty("view.antiAlias"));
+		font.setAntiAliasEnabled(antiAliasValue.val()>0);
 		antiAlias.addActionListener(new ActionListener()
-		{
-			public void actionPerformed(ActionEvent evt)
 			{
-				font.setAntiAliasEnabled(
-					antiAlias.isSelected());
-				font.repaint();
-			}
-		});
-		antiAlias.setSelected(antiAliasEnabled);
-		addComponent(antiAlias);
+				public void actionPerformed(ActionEvent evt)
+				{
+					int idx = antiAlias.getSelectedIndex();
+					font.setAntiAliasEnabled(idx > 0);
+					font.repaint();
+				}
+			});
+		antiAlias.setSelectedIndex(antiAliasValue.val());
+		addComponent(jEdit.getProperty("options.textarea"+ ".antiAlias"), antiAlias);
 
 		/* Fractional font metrics */
 		fracFontMetrics = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".fracFontMetrics"));
-		fracFontMetrics.setSelected(jEdit.getBooleanProperty(
-			"view.fracFontMetrics"));
+		fracFontMetrics.setSelected(jEdit.getBooleanProperty("view.fracFontMetrics"));
 		addComponent(fracFontMetrics);
+
+		/* Strip trailing EOL */
+		stripTrailingEOL = new JCheckBox(jEdit.getProperty(
+			"options.textArea.stripTrailingEOL"));
+		stripTrailingEOL.setSelected(jEdit.getBooleanProperty("stripTrailingEOL"));
+		addComponent(stripTrailingEOL);
+
+		completeFromAllBuffers = new JCheckBox(jEdit.getProperty(
+			"options.textArea.completeFromAllBuffers"));
+		completeFromAllBuffers.setSelected(jEdit.getBooleanProperty("completeFromAllBuffers"));
+		addComponent(completeFromAllBuffers);
+
 	} //}}}
 
 	//{{{ _save() method
@@ -168,6 +191,7 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			.getSelectedColor());
 		jEdit.setBooleanProperty("view.caretBlink",blinkCaret.isSelected());
 		jEdit.setBooleanProperty("view.blockCaret",blockCaret.isSelected());
+		jEdit.setBooleanProperty("view.thickCaret",thickCaret.isSelected());
 		jEdit.setColorProperty("view.caretColor",caretColor
 			.getSelectedColor());
 		jEdit.setColorProperty("view.selectionColor",selectionColor
@@ -192,8 +216,12 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			wrapGuideColor.getSelectedColor());
 		jEdit.setIntegerProperty("view.electricBorders",electricBorders
 			.isSelected() ? 3 : 0);
-		jEdit.setBooleanProperty("view.antiAlias",antiAlias.isSelected());
+		AntiAlias nv = new AntiAlias(jEdit.getProperty("view.antiAlias"));
+		nv.set(antiAlias.getSelectedIndex());
+		jEdit.setProperty("view.antiAlias", nv.toString());
 		jEdit.setBooleanProperty("view.fracFontMetrics",fracFontMetrics.isSelected());
+		jEdit.setBooleanProperty("stripTrailingEOL", stripTrailingEOL.isSelected());
+		jEdit.setBooleanProperty("completeFromAllBuffers", completeFromAllBuffers.isSelected());
 	} //}}}
 
 	//{{{ Private members
@@ -202,6 +230,7 @@ public class TextAreaOptionPane extends AbstractOptionPane
 	private ColorWellButton backgroundColor;
 	private JCheckBox blinkCaret;
 	private JCheckBox blockCaret;
+	private JCheckBox thickCaret;
 	private ColorWellButton caretColor;
 	private ColorWellButton selectionColor;
 	private ColorWellButton multipleSelectionColor;
@@ -214,7 +243,10 @@ public class TextAreaOptionPane extends AbstractOptionPane
 	private JCheckBox wrapGuide;
 	private ColorWellButton wrapGuideColor;
 	private JCheckBox electricBorders;
-	private JCheckBox antiAlias;
+	// private JCheckBox antiAlias;
+	private JComboBox antiAlias;
 	private JCheckBox fracFontMetrics;
+	private JCheckBox stripTrailingEOL;
+	private JCheckBox completeFromAllBuffers;
 	//}}}
 }

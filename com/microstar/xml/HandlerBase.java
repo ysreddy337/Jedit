@@ -1,6 +1,6 @@
 // HandlerBase.java: Simple base class for AElfred processors.
 // NO WARRANTY! See README, and copyright below.
-// $Id: HandlerBase.java,v 1.1.1.1 2001/09/02 05:39:36 spestov Exp $
+// $Id: HandlerBase.java 12845 2008-06-13 19:42:59Z ezust $
 
 package com.microstar.xml;
 
@@ -37,6 +37,7 @@ import java.io.Reader;
   * @see XmlHandler
   * @see XmlException
   * @see org.xml.sax.HandlerBase
+  * @deprecated use org.xml.sax.helpers.DefaultHandler
   */
 public class HandlerBase implements XmlHandler {
 

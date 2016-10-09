@@ -6,25 +6,25 @@
     <PROPS>
         <PROPERTY NAME="lineComment" VALUE="#" />
     </PROPS>
-    <RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
+    <RULES IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
         <!-- Comment -->
         <EOL_SPAN TYPE="COMMENT1">#</EOL_SPAN>
 
         <MARK_PREVIOUS TYPE="KEYWORD1"
-            AT_LINE_START="TRUE" EXCLUDE_MATCH="TRUE">=</MARK_PREVIOUS>
+            AT_LINE_START="TRUE" MATCH_TYPE="OPERATOR">=</MARK_PREVIOUS>
         <MARK_PREVIOUS TYPE="KEYWORD1"
-            AT_LINE_START="TRUE" EXCLUDE_MATCH="TRUE">+=</MARK_PREVIOUS>
+            AT_LINE_START="TRUE" MATCH_TYPE="OPERATOR">+=</MARK_PREVIOUS>
 
         <!-- Literals -->
-        <SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
+        <SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
             <BEGIN>"</BEGIN>
             <END>"</END>
         </SPAN>
-        <SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
+        <SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
             <BEGIN>'</BEGIN>
             <END>'</END>
         </SPAN>
-        <SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
+        <SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
             <BEGIN>`</BEGIN>
             <END>`</END>
         </SPAN>

@@ -1,5 +1,4 @@
 <?xml version="1.0"?>
-
 <!DOCTYPE MODE SYSTEM "xmode.dtd">
 
 <!-- ====================================================================== -->
@@ -42,7 +41,13 @@
     <PROPERTY NAME="indentCloseBrackets" VALUE="}" />
   </PROPS>
 
-  <RULES ESCAPE="~" IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE">
+  <RULES SET="COMMENT" DEFAULT="COMMENT1" IGNORE_CASE="TRUE">
+      <SPAN TYPE="COMMENT1" DELEGATE="COMMENT">
+      <BEGIN>/*</BEGIN> <END>*/</END>
+      </SPAN>
+  </RULES>
+
+  <RULES IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE">
     <!-- COMMENT1   : Normal Progress comments -->
     <!-- LITERAL1   : text between ' or " -->
     <!-- LITERAL2   :  -->
@@ -54,18 +59,17 @@
     <!-- NON INVALID: Correction for non-invalid keywords -->
 
     <!-- COMMENT1   : Normal Progress comments -->
-      <SPAN TYPE="COMMENT1">
-        <BEGIN>/*</BEGIN>
-        <END>*/</END>
-      </SPAN>
-
+    <SPAN TYPE="COMMENT1" DELEGATE="COMMENT">
+     <BEGIN>/*</BEGIN>
+     <END>*/</END>
+    </SPAN>
     <!-- LITERAL1   : text between ' or " -->
-      <SPAN TYPE="LITERAL1">
+      <SPAN TYPE="LITERAL1" ESCAPE="~">
         <BEGIN>'</BEGIN>
         <END>'</END>
       </SPAN>
 
-      <SPAN TYPE="LITERAL1">
+      <SPAN TYPE="LITERAL1" ESCAPE="~">
         <BEGIN>"</BEGIN>
         <END>"</END>
       </SPAN>
@@ -96,7 +100,7 @@
       <!-- Better would be to search for regexp  ^[[:blank:]]*[[:graph:]]+:$ -->
       <!-- but this is not (yet) implemented since regexps cannot match     -->
       <!-- anything that does not have a fixed starting character.          -->
-      <MARK_PREVIOUS TYPE="LABEL" AT_WHITESPACE_END="TRUE" EXCLUDE_MATCH="TRUE">:</MARK_PREVIOUS>
+      <MARK_PREVIOUS TYPE="LABEL" AT_WHITESPACE_END="TRUE" MATCH_TYPE="OPERATOR">:</MARK_PREVIOUS>
 
     <!-- FUNCTION   : attributes and methods -->
       <MARK_FOLLOWING TYPE="FUNCTION">:accelerator</MARK_FOLLOWING>
@@ -874,12 +878,12 @@
       <MARK_FOLLOWING TYPE="FUNCTION">:_dcm</MARK_FOLLOWING>
 
     <!-- INVALID    : Deprecated keywords -->
-      <SEQ_REGEXP TYPE="INVALID" HASH_CHAR="p" AT_WORD_START="TRUE">put\s+screen</SEQ_REGEXP>
+      <SEQ_REGEXP TYPE="INVALID" HASH_CHAR="put" AT_WORD_START="TRUE">put\s+screen</SEQ_REGEXP>
       <MARK_FOLLOWING TYPE="INVALID">:WHERE-STRING</MARK_FOLLOWING>
       <MARK_FOLLOWING TYPE="INVALID">:REPOSITION-PARENT-RELATION</MARK_FOLLOWING>
 
     <!-- NON INVALID: Correction for non-invalid keywords -->
-      <SEQ_REGEXP TYPE="KEYWORD3" HASH_CHAR="c" AT_WORD_START="TRUE">choose\s+of</SEQ_REGEXP>
+      <SEQ_REGEXP TYPE="KEYWORD3" HASH_CHAR="choose" AT_WORD_START="TRUE">choose\s+of</SEQ_REGEXP>
 
     <KEYWORDS>
       <!-- Keep the following sections in the specified order since -->
@@ -3738,5 +3742,7 @@
 
     </KEYWORDS>
   </RULES>
+
+
 </MODE>
 

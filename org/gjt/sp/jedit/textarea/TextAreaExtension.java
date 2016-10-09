@@ -36,7 +36,7 @@ import java.awt.Graphics2D;
  * @since jEdit 4.0pre4
  *
  * @author Slava Pestov
- * @version $Id: TextAreaExtension.java,v 1.5 2004/03/28 00:07:27 spestov Exp $
+ * @version $Id: TextAreaExtension.java 15570 2009-06-25 00:43:57Z ezust $
  */
 public abstract class TextAreaExtension
 {

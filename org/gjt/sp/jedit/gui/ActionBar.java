@@ -23,29 +23,29 @@
 package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
-import bsh.NameSpace;
+import org.gjt.sp.jedit.bsh.NameSpace;
 import java.awt.event.*;
 import java.awt.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import javax.swing.event.*;
 import javax.swing.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
  * Action invocation bar.
  */
-public class ActionBar extends JPanel
+public class ActionBar extends JToolBar
 {
 	//{{{ ActionBar constructor
-	public ActionBar(final View view, boolean temp)
+	public ActionBar(View view, boolean temp)
 	{
-		setLayout(new BoxLayout(this,BoxLayout.X_AXIS));
-
 		this.view = view;
 		this.temp = temp;
-
+		
+		setLayout(new BoxLayout(this,BoxLayout.X_AXIS));
+		setFloatable(false);
 		add(Box.createHorizontalStrut(2));
 
 		JLabel label = new JLabel(jEdit.getProperty("view.action.prompt"));
@@ -124,36 +124,36 @@ public class ActionBar extends JPanel
 					if(propName.equals("buffer.mode"))
 					{
 						code = "buffer.setMode(\""
-							+ MiscUtilities.charsToEscapes(
+							+ StandardUtilities.charsToEscapes(
 							propValue) + "\");";
 					}
 					else
 					{
 						code = "buffer.setStringProperty(\""
-							+ MiscUtilities.charsToEscapes(
+							+ StandardUtilities.charsToEscapes(
 							propName.substring("buffer.".length())
 							) + "\",\""
-							+ MiscUtilities.charsToEscapes(
+							+ StandardUtilities.charsToEscapes(
 							propValue) + "\");";
 					}
 
-					code = code + "\nbuffer.propertiesChanged();";
+					code += "\nbuffer.propertiesChanged();";
 				}
 				else if(propName.startsWith("!buffer."))
 				{
 					code = "jEdit.setProperty(\""
-						+ MiscUtilities.charsToEscapes(
+						+ StandardUtilities.charsToEscapes(
 						propName.substring(1)) + "\",\""
-						+ MiscUtilities.charsToEscapes(
+						+ StandardUtilities.charsToEscapes(
 						propValue) + "\");\n"
 						+ "jEdit.propertiesChanged();";
 				}
 				else
 				{
 					code = "jEdit.setProperty(\""
-						+ MiscUtilities.charsToEscapes(
+						+ StandardUtilities.charsToEscapes(
 						propName) + "\",\""
-						+ MiscUtilities.charsToEscapes(
+						+ StandardUtilities.charsToEscapes(
 						propValue) + "\");\n"
 						+ "jEdit.propertiesChanged();";
 				}
@@ -185,7 +185,7 @@ public class ActionBar extends JPanel
 		final String finalCmd = cmd;
 		final EditAction act = (finalCmd == null ? null : jEdit.getAction(finalCmd));
 		if(temp)
-			view.removeToolBar(ActionBar.this);
+			view.removeToolBar(this);
 
 		SwingUtilities.invokeLater(new Runnable()
 		{
@@ -211,18 +211,18 @@ public class ActionBar extends JPanel
 	} //}}}
 
 	//{{{ getCompletions() method
-	private String[] getCompletions(String str)
+	private static String[] getCompletions(String str)
 	{
 		str = str.toLowerCase();
 		String[] actions = jEdit.getActionNames();
-		ArrayList returnValue = new ArrayList(actions.length);
+		ArrayList<String> returnValue = new ArrayList<String>(actions.length);
 		for(int i = 0; i < actions.length; i++)
 		{
-			if(actions[i].toLowerCase().indexOf(str) != -1)
+			if(actions[i].toLowerCase().contains(str))
 				returnValue.add(actions[i]);
 		}
 
-		return (String[])returnValue.toArray(new String[returnValue.size()]);
+		return returnValue.toArray(new String[returnValue.size()]);
 	} //}}}
 
 	//{{{ complete() method
@@ -241,7 +241,7 @@ public class ActionBar extends JPanel
 			{
 				String prefix = MiscUtilities.getLongestPrefix(
 					completions,true);
-				if(prefix.indexOf(text) != -1)
+				if(prefix.contains(text))
 					action.setText(prefix);
 			}
 
@@ -264,7 +264,7 @@ public class ActionBar extends JPanel
 	//{{{ Inner classes
 
 	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
+	private class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
 		{
@@ -276,7 +276,7 @@ public class ActionBar extends JPanel
 	} //}}}
 
 	//{{{ DocumentHandler class
-	class DocumentHandler implements DocumentListener
+	private class DocumentHandler implements DocumentListener
 	{
 		//{{{ insertUpdate() method
 		public void insertUpdate(DocumentEvent evt)
@@ -298,7 +298,7 @@ public class ActionBar extends JPanel
 	} //}}}
 
 	//{{{ ActionTextField class
-	class ActionTextField extends HistoryTextField
+	private class ActionTextField extends HistoryTextField
 	{
 		boolean repeat;
 		boolean nonDigit;
@@ -309,16 +309,19 @@ public class ActionBar extends JPanel
 			setSelectAllOnFocus(true);
 		}
 
+		@Override
 		public boolean isManagingFocus()
 		{
 			return false;
 		}
 
+		@Override
 		public boolean getFocusTraversalKeysEnabled()
 		{
 			return false;
 		}
 
+		@Override
 		public void processKeyEvent(KeyEvent evt)
 		{
 			evt = KeyEventWorkaround.processKeyEvent(evt);
@@ -410,12 +413,13 @@ public class ActionBar extends JPanel
 				{
 					view.getTextArea().requestFocus();
 					view.getInputHandler().setRepeatCount(repeatCount);
-					view.processKeyEvent(evt,
-						View.ACTION_BAR);
+					view.getInputHandler().processKeyEvent(evt,
+						View.ACTION_BAR, false);
 				}
 			});
 		}
 
+		@Override
 		public void addNotify()
 		{
 			super.addNotify();
@@ -424,7 +428,7 @@ public class ActionBar extends JPanel
 	} //}}}
 
 	//{{{ CompletionPopup class
-	class CompletionPopup extends JWindow
+	private class CompletionPopup extends JWindow
 	{
 		CompletionList list;
 
@@ -439,6 +443,7 @@ public class ActionBar extends JPanel
 				 * Returns if this component can be traversed by pressing the
 				 * Tab key. This returns false.
 				 */
+				@Override
 				public boolean isManagingFocus()
 				{
 					return false;
@@ -447,6 +452,7 @@ public class ActionBar extends JPanel
 				/**
 				 * Makes the tab key work in Java 1.4.
 				 */
+				@Override
 				public boolean getFocusTraversalKeysEnabled()
 				{
 					return false;
@@ -462,8 +468,8 @@ public class ActionBar extends JPanel
 			// stupid scrollbar policy is an attempt to work around
 			// bugs people have been seeing with IBM's JDK -- 7 Sep 2000
 			JScrollPane scroller = new JScrollPane(list,
-				JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
-				JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+				ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
+				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
 			getContentPane().add(scroller, BorderLayout.CENTER);
 
@@ -488,8 +494,9 @@ public class ActionBar extends JPanel
 		} //}}}
 
 		//{{{ MouseHandler class
-		class MouseHandler extends MouseAdapter
+		private class MouseHandler extends MouseAdapter
 		{
+			@Override
 			public void mouseClicked(MouseEvent evt)
 			{
 				invoke();
@@ -505,6 +512,7 @@ public class ActionBar extends JPanel
 			}
 
 			// we need this public not protected
+			@Override
 			public void processKeyEvent(KeyEvent evt)
 			{
 				super.processKeyEvent(evt);
@@ -512,13 +520,15 @@ public class ActionBar extends JPanel
 		} //}}}
 
 		//{{{ KeyHandler class
-		class KeyHandler extends KeyAdapter
+		private class KeyHandler extends KeyAdapter
 		{
+			@Override
 			public void keyTyped(KeyEvent evt)
 			{
 				action.processKeyEvent(evt);
 			}
 
+			@Override
 			public void keyPressed(KeyEvent evt)
 			{
 				int keyCode = evt.getKeyCode();

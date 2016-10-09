@@ -27,7 +27,7 @@ import java.lang.reflect.Field;
  * A linked list of syntax tokens.
  *
  * @author Slava Pestov
- * @version $Id: Token.java,v 1.10 2003/03/16 20:55:48 spestov Exp $
+ * @version $Id: Token.java 15712 2009-07-19 19:40:40Z shlomy $
  */
 public class Token
 {
@@ -42,7 +42,7 @@ public class Token
 		try
 		{
 			Field f = Token.class.getField(value);
-			return (byte)f.getByte(null);
+			return f.getByte(null);
 		}
 		catch(Exception e)
 		{
@@ -57,7 +57,7 @@ public class Token
 	 */
 	public static String tokenToString(byte token)
 	{
-		return TOKEN_TYPES[token];
+		return (token == Token.END) ? "END" : TOKEN_TYPES[token];
 	} //}}}
 
 	//{{{ Token types

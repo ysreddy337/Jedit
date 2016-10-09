@@ -24,7 +24,7 @@ import org.gjt.sp.jedit.*;
 /**
  * An abstract interface representing a set of files.
  * @author Slava Pestov
- * @version $Id: SearchFileSet.java,v 1.5 2004/03/28 00:07:27 spestov Exp $
+ * @version $Id: SearchFileSet.java 12504 2008-04-22 23:12:43Z ezust $
  */
 public interface SearchFileSet
 {

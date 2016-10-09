@@ -24,17 +24,21 @@
 package org.gjt.sp.jedit.search;
 
 //{{{ Imports
-import bsh.*;
+import org.gjt.sp.jedit.bsh.*;
 import java.awt.*;
+import java.util.regex.Pattern;
 import javax.swing.JOptionPane;
-import javax.swing.text.Segment;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.buffer.JEditBuffer;
 import org.gjt.sp.jedit.gui.TextAreaDialog;
 import org.gjt.sp.jedit.io.VFSManager;
+import org.gjt.sp.jedit.msg.PositionChanging;
 import org.gjt.sp.jedit.msg.SearchSettingsChanged;
 import org.gjt.sp.jedit.textarea.*;
-import org.gjt.sp.util.CharIndexedSegment;
+import org.gjt.sp.jedit.textarea.TextArea;
+import org.gjt.sp.util.ReverseCharSequence;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
@@ -62,7 +66,7 @@ import org.gjt.sp.util.Log;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: SearchAndReplace.java,v 1.64 2004/08/08 03:41:34 spestov Exp $
+ * @version $Id: SearchAndReplace.java 13907 2008-10-19 08:22:44Z k_satoda $
  */
 public class SearchAndReplace
 {
@@ -276,25 +280,28 @@ public class SearchAndReplace
 	//{{{ getSearchMatcher() method
 	/**
 	 * Returns the current search string matcher.
+	 * @return a SearchMatcher or null if there is no search or if the matcher can match empty String
+	 *
 	 * @exception IllegalArgumentException if regular expression search
 	 * is enabled, the search string or replacement string is invalid
 	 * @since jEdit 4.1pre7
 	 */
 	public static SearchMatcher getSearchMatcher()
-		throws Exception
-	{
-		if(matcher != null)
+		throws Exception {
+		if (matcher != null)
 			return matcher;
 
-		if(search == null || "".equals(search))
+		if (search == null || "".equals(search))
 			return null;
 
-		if(regexp)
-			matcher = new RESearchMatcher(search,ignoreCase);
-		else
+		if (regexp)
 		{
-			matcher = new BoyerMooreSearchMatcher(search,ignoreCase);
+			Pattern re = Pattern.compile(search, 
+				PatternSearchMatcher.getFlag(ignoreCase));
+			matcher = new PatternSearchMatcher(re, ignoreCase);
 		}
+		else
+			matcher = new BoyerMooreSearchMatcher(search, ignoreCase);
 
 		return matcher;
 	} //}}}
@@ -367,12 +374,12 @@ public class SearchAndReplace
 		if(comp == null)
 			comp = view;
 
-		record(view,"hyperSearch(view," + selection + ")",false,
+		record(view,"hyperSearch(view," + selection + ')',false,
 			!selection);
 
 		view.getDockableWindowManager().addDockableWindow(
 			HyperSearchResults.NAME);
-		final HyperSearchResults results = (HyperSearchResults)
+		HyperSearchResults results = (HyperSearchResults)
 			view.getDockableWindowManager()
 			.getDockable(HyperSearchResults.NAME);
 		results.searchStarted();
@@ -413,7 +420,7 @@ public class SearchAndReplace
 
 	//{{{ find() method
 	/**
-	 * Finds the next occurance of the search string.
+	 * Finds the next occurrence of the search string.
 	 * @param view The view
 	 * @return True if the operation was successful, false otherwise
 	 */
@@ -424,7 +431,6 @@ public class SearchAndReplace
 		if(comp == null || !comp.isShowing())
 			comp = view;
 
-		boolean repeat = false;
 		String path = fileset.getNextFile(view,null);
 		if(path == null)
 		{
@@ -433,11 +439,6 @@ public class SearchAndReplace
 		}
 
 		boolean _reverse = reverse && fileset instanceof CurrentBufferSet;
-		if(_reverse && regexp)
-		{
-			GUIUtilities.error(comp,"regexp-reverse",null);
-			return false;
-		}
 
 		try
 		{
@@ -452,6 +453,7 @@ public class SearchAndReplace
 
 			record(view,"find(view)",false,true);
 
+			boolean repeat = false;
 loop:			for(;;)
 			{
 				while(path != null)
@@ -537,7 +539,7 @@ loop:			for(;;)
 				}
 				else
 				{
-					Integer[] args = { new Integer(_reverse ? 1 : 0) };
+					Integer[] args = {Integer.valueOf(_reverse ? 1 : 0)};
 					int result = GUIUtilities.confirm(comp,
 						"keepsearching",args,
 						JOptionPane.YES_NO_OPTION,
@@ -588,13 +590,15 @@ loop:			for(;;)
 	 * @param view The view
 	 * @param buffer The buffer
 	 * @param start Location where to start the search
-	 * @param firstTime See {@link SearchMatcher#nextMatch(CharIndexed,
-	 * boolean,boolean,boolean,boolean)}.
+	 * @param firstTime See {@link SearchMatcher#nextMatch(CharSequence,boolean,boolean,boolean,boolean)}.
 	 * @since jEdit 4.1pre7
 	 */
 	public static boolean find(View view, Buffer buffer, int start,
 		boolean firstTime, boolean reverse) throws Exception
 	{
+		
+		EditBus.send(new PositionChanging(view.getEditPane()));
+		
 		SearchMatcher matcher = getSearchMatcher();
 		if(matcher == null)
 		{
@@ -602,24 +606,27 @@ loop:			for(;;)
 			return false;
 		}
 
-		Segment text = new Segment();
+		CharSequence text;
+		boolean startOfBuffer;
+		boolean endOfBuffer;
 		if(reverse)
-			buffer.getText(0,start,text);
+		{
+			text = new ReverseCharSequence(buffer.getSegment(0,start));
+			startOfBuffer = true;
+			endOfBuffer = (start == buffer.getLength());
+		}
 		else
-			buffer.getText(start,buffer.getLength() - start,text);
-
-		// the start and end flags will be wrong with reverse search enabled,
-		// but they are only used by the regexp matcher, which doesn't
-		// support reverse search yet.
-		//
-		// REMIND: fix flags when adding reverse regexp search.
-		SearchMatcher.Match match = matcher.nextMatch(new CharIndexedSegment(text,reverse),
-			start == 0,true,firstTime,reverse);
-
+		{
+			text = buffer.getSegment(start,buffer.getLength() - start);
+			startOfBuffer = (start == 0);
+			endOfBuffer = true;
+		}
+		SearchMatcher.Match match = matcher.nextMatch(text,
+			startOfBuffer,endOfBuffer,firstTime,reverse);
 		if(match != null)
 		{
 			jEdit.commitTemporary(buffer);
-			view.setBuffer(buffer);
+			view.setBuffer(buffer,true);
 			JEditTextArea textArea = view.getTextArea();
 
 			if(reverse)
@@ -669,7 +676,7 @@ loop:			for(;;)
 		boolean smartCaseReplace = getSmartCaseReplace();
 
 		Selection[] selection = textArea.getSelection();
-		if(selection.length == 0)
+		if (selection.length == 0)
 		{
 			view.getToolkit().beep();
 			return false;
@@ -699,7 +706,7 @@ loop:			for(;;)
 			{
 				s = selection[i];
 
-				retVal += replaceInSelection(textArea,
+				retVal += replaceInSelection(view,textArea,
 					buffer,matcher,smartCaseReplace,s);
 			}
 
@@ -716,6 +723,14 @@ loop:			for(;;)
 					textArea.getCaretPosition());
 				if(s != null)
 					textArea.moveCaretPosition(s.getEnd());
+			}
+
+			if(!BeanShell.isScriptRunning())
+			{
+				Object[] args = {Integer.valueOf(retVal),
+				                 Integer.valueOf(1)};
+				view.getStatus().setMessageAndClear(jEdit.getProperty(
+					"view.status.replace-all",args));
 			}
 
 			if(retVal == 0)
@@ -771,7 +786,7 @@ loop:			for(;;)
 
 			int retVal = 0;
 
-			retVal += _replace(buffer,matcher,start,end,
+			retVal += _replace(view,buffer,matcher,start,end,
 				smartCaseReplace);
 
 			if(retVal != 0)
@@ -791,19 +806,30 @@ loop:			for(;;)
 
 	//{{{ replaceAll() method
 	/**
-	 * Replaces all occurances of the search string with the replacement
+	 * Replaces all occurrences of the search string with the replacement
 	 * string.
 	 * @param view The view
+	 * @return the number of modified files
 	 */
 	public static boolean replaceAll(View view)
+	{
+		return replaceAll(view,false);
+	} //}}}
+	
+	//{{{ replaceAll() method
+	/**
+	 * Replaces all occurrences of the search string with the replacement
+	 * string.
+	 * @param view The view
+	 * @param dontOpenChangedFiles Whether to open changed files or to autosave them quietly
+	 * @return the number of modified files
+	 */
+	public static boolean replaceAll(View view, boolean dontOpenChangedFiles)
 	{
 		// component that will parent any dialog boxes
 		Component comp = SearchDialog.getSearchDialog(view);
 		if(comp == null)
 			comp = view;
-
-		int fileCount = 0;
-		int occurCount = 0;
 
 		if(fileset.getFileCount(view) == 0)
 		{
@@ -819,6 +845,8 @@ loop:			for(;;)
 			&& TextUtilities.getStringCase(replace)
 			== TextUtilities.LOWER_CASE);
 
+		int fileCount = 0;
+		int occurCount = 0;
 		try
 		{
 			SearchMatcher matcher = getSearchMatcher();
@@ -860,7 +888,7 @@ loop:			while(path != null)
 				try
 				{
 					buffer.beginCompoundEdit();
-					retVal = _replace(buffer,matcher,
+					retVal = _replace(view,buffer,matcher,
 						0,buffer.getLength(),
 						smartCaseReplace);
 				}
@@ -873,7 +901,15 @@ loop:			while(path != null)
 				{
 					fileCount++;
 					occurCount += retVal;
-					jEdit.commitTemporary(buffer);
+					if (dontOpenChangedFiles)
+					{
+						buffer.save(null,null);
+					}
+					else
+					{
+						jEdit.commitTemporary(buffer);
+						jEdit.getBufferSetManager().addBuffer(view, buffer);
+					}
 				}
 			}
 		}
@@ -889,8 +925,8 @@ loop:			while(path != null)
 		/* Don't do this when playing a macro, cos it's annoying */
 		if(!BeanShell.isScriptRunning())
 		{
-			Object[] args = { new Integer(occurCount),
-				new Integer(fileCount) };
+			Object[] args = {Integer.valueOf(occurCount),
+			                 Integer.valueOf(fileCount)};
 			view.getStatus().setMessageAndClear(jEdit.getProperty(
 				"view.status.replace-all",args));
 			if(occurCount == 0)
@@ -901,6 +937,21 @@ loop:			while(path != null)
 	} //}}}
 
 	//}}}
+
+	//{{{ escapeRegexp() method
+	/**
+	 * Escapes characters with special meaning in a regexp.
+	 * @param str the string to escape
+	 * @param multiline Should \n be escaped?
+	 * @return the string with escaped characters
+	 * @since jEdit 4.3pre1
+	 */
+	public static String escapeRegexp(String str, boolean multiline)
+	{
+		return StandardUtilities.charsToEscapes(str,
+			"\r\t\\()[]{}$^*+?|."
+			+ (multiline ? "" : "\n"));
+	} //}}}
 
 	//{{{ load() method
 	/**
@@ -999,12 +1050,12 @@ loop:			while(path != null)
 		if(recorder != null)
 		{
 			recorder.record("SearchAndReplace.setSearchString(\""
-				+ MiscUtilities.charsToEscapes(search) + "\");");
+				+ StandardUtilities.charsToEscapes(search) + "\");");
 
 			if(replaceAction)
 			{
 				recorder.record("SearchAndReplace.setReplaceString(\""
-					+ MiscUtilities.charsToEscapes(replace) + "\");");
+					+ StandardUtilities.charsToEscapes(replace) + "\");");
 				recorder.record("SearchAndReplace.setBeanShellReplace("
 					+ beanshell + ");");
 			}
@@ -1028,12 +1079,12 @@ loop:			while(path != null)
 					+ fileset.getCode() + ");");
 			}
 
-			recorder.record("SearchAndReplace." + action + ";");
+			recorder.record("SearchAndReplace." + action + ';');
 		}
 	} //}}}
 
 	//{{{ replaceInSelection() method
-	private static int replaceInSelection(JEditTextArea textArea,
+	private static int replaceInSelection(View view, TextArea textArea,
 		Buffer buffer, SearchMatcher matcher, boolean smartCaseReplace,
 		Selection s) throws Exception
 	{
@@ -1047,7 +1098,7 @@ loop:			while(path != null)
 
 		if(s instanceof Selection.Range)
 		{
-			returnValue = _replace(buffer,matcher,
+			returnValue = _replace(view,buffer,matcher,
 				s.getStart(),s.getEnd(),
 				smartCaseReplace);
 
@@ -1066,7 +1117,7 @@ loop:			while(path != null)
 			returnValue = 0;
 			for(int j = s.getStartLine(); j <= s.getEndLine(); j++)
 			{
-				returnValue += _replace(buffer,matcher,
+				returnValue += _replace(view,buffer,matcher,
 					getColumnOnOtherLine(buffer,j,startCol),
 					getColumnOnOtherLine(buffer,j,endCol),
 					smartCaseReplace);
@@ -1082,8 +1133,9 @@ loop:			while(path != null)
 
 	//{{{ _replace() method
 	/**
-	 * Replaces all occurances of the search string with the replacement
+	 * Replaces all occurrences of the search string with the replacement
 	 * string.
+	 * @param view The view
 	 * @param buffer The buffer
 	 * @param start The start offset
 	 * @param end The end offset
@@ -1091,7 +1143,7 @@ loop:			while(path != null)
 	 * @param smartCaseReplace See user's guide
 	 * @return The number of occurrences replaced
 	 */
-	private static int _replace(Buffer buffer,
+	private static int _replace(View view, JEditBuffer buffer,
 		SearchMatcher matcher, int start, int end,
 		boolean smartCaseReplace)
 		throws Exception
@@ -1101,28 +1153,23 @@ loop:			while(path != null)
 		boolean endOfLine = (buffer.getLineEndOffset(
 			buffer.getLineOfOffset(end)) - 1 == end);
 
-		Segment text = new Segment();
 		int offset = start;
 loop:		for(int counter = 0; ; counter++)
 		{
-			buffer.getText(offset,end - offset,text);
-
 			boolean startOfLine = (buffer.getLineStartOffset(
 				buffer.getLineOfOffset(offset)) == offset);
 
+			CharSequence text = buffer.getSegment(offset,end - offset);
 			SearchMatcher.Match occur = matcher.nextMatch(
-				new CharIndexedSegment(text,false),
-				startOfLine,endOfLine,counter == 0,
-				false);
+				text,startOfLine,endOfLine,counter == 0,false);
 			if(occur == null)
 				break loop;
 
-			String found = new String(text.array,
-				text.offset + occur.start,
-				occur.end - occur.start);
+			String found = text.subSequence(
+				occur.start, occur.end).toString();
 
-			int length = replaceOne(buffer,occur,offset,found,
-				smartCaseReplace);
+			int length = replaceOne(view,buffer,occur,offset,
+				found,smartCaseReplace);
 			if(length == -1)
 				offset += occur.end;
 			else
@@ -1141,11 +1188,12 @@ loop:		for(int counter = 0; ; counter++)
 	 * Replace one occurrence of the search string with the
 	 * replacement string.
 	 */
-	private static int replaceOne(Buffer buffer, SearchMatcher.Match occur,
-		int offset, String found, boolean smartCaseReplace)
+	private static int replaceOne(View view, JEditBuffer buffer,
+		SearchMatcher.Match occur, int offset, String found,
+		boolean smartCaseReplace)
 		throws Exception
 	{
-		String subst = replaceOne(occur,found);
+		String subst = replaceOne(view,occur,found);
 		if(smartCaseReplace && ignoreCase)
 		{
 			int strCase = TextUtilities.getStringCase(found);
@@ -1162,7 +1210,8 @@ loop:		for(int counter = 0; ; counter++)
 			int start = offset + occur.start;
 			int end = offset + occur.end;
 
-			buffer.remove(start,end - start);
+			if (end - start > 0)
+				buffer.remove(start,end - start);
 			buffer.insert(start,subst);
 			return subst.length();
 		}
@@ -1171,28 +1220,29 @@ loop:		for(int counter = 0; ; counter++)
 	} //}}}
 
 	//{{{ replaceOne() method
-	private static String replaceOne(SearchMatcher.Match occur,
-		String found) throws Exception
+	private static String replaceOne(View view,
+		SearchMatcher.Match occur, String found)
+		throws Exception
 	{
 		if(regexp)
 		{
 			if(replaceMethod != null)
-				return regexpBeanShellReplace(occur);
+				return regexpBeanShellReplace(view,occur);
 			else
 				return regexpReplace(occur,found);
 		}
 		else
 		{
 			if(replaceMethod != null)
-				return literalBeanShellReplace(found);
+				return literalBeanShellReplace(view,found);
 			else
 				return replace;
 		}
 	} //}}}
 
 	//{{{ regexpBeanShellReplace() method
-	private static String regexpBeanShellReplace(SearchMatcher.Match occur)
-		throws Exception
+	private static String regexpBeanShellReplace(View view,
+		SearchMatcher.Match occur) throws Exception
 	{
 		for(int i = 0; i < occur.substitutions.length; i++)
 		{
@@ -1201,7 +1251,7 @@ loop:		for(int counter = 0; ; counter++)
 		}
 
 		Object obj = BeanShell.runCachedBlock(
-			replaceMethod,null,replaceNS);
+			replaceMethod,view,replaceNS);
 		if(obj == null)
 			return "";
 		else
@@ -1212,7 +1262,7 @@ loop:		for(int counter = 0; ; counter++)
 	private static String regexpReplace(SearchMatcher.Match occur,
 		String found) throws Exception
 	{
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 
 		for(int i = 0; i < replace.length(); i++)
 		{
@@ -1222,27 +1272,50 @@ loop:		for(int counter = 0; ; counter++)
 			case '$':
 				if(i == replace.length() - 1)
 				{
+					// last character of the replace string, 
+					// it is not a capturing group
 					buf.append(ch);
 					break;
 				}
 
 				ch = replace.charAt(++i);
 				if(ch == '$')
+				{
+					// It was $$, so it is an escaped $
 					buf.append('$');
+				}
 				else if(ch == '0')
+				{
+					// $0 meaning the first capturing group :
+					// the found value
 					buf.append(found);
+				}
 				else if(Character.isDigit(ch))
 				{
 					int n = ch - '0';
+					while (i < replace.length() - 1)
+					{
+						ch = replace.charAt(++i);
+						if (Character.isDigit(ch))
+						{
+							n = n * 10 + (ch - '0');
+						}
+						else
+						{
+							// The character is not 
+							// a digit, going back and
+							// end loop
+							i--;
+							break;
+						}
+					}
 					if(n < occur
 						.substitutions
 						.length)
 					{
-						buf.append(
-							occur
-							.substitutions
-							[n]
-						);
+						String subs = occur.substitutions[n];
+						if (subs != null)
+							buf.append(subs);
 					}
 				}
 				break;
@@ -1276,13 +1349,13 @@ loop:		for(int counter = 0; ; counter++)
 	} //}}}
 
 	//{{{ literalBeanShellReplace() method
-	private static String literalBeanShellReplace(String found)
+	private static String literalBeanShellReplace(View view, String found)
 		throws Exception
 	{
 		replaceNS.setVariable("_0",found);
 		Object obj = BeanShell.runCachedBlock(
 			replaceMethod,
-			null,replaceNS);
+			view,replaceNS);
 		if(obj == null)
 			return "";
 		else

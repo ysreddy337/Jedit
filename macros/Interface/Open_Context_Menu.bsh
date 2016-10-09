@@ -5,16 +5,11 @@
 *
 * Copyright (C) 2003 Nitsan Vardi
 *
-* $Id: Open_Context_Menu.bsh,v 1.2 2003/12/22 04:14:54 spestov Exp $
+* $Id: Open_Context_Menu.bsh 9820 2007-06-17 20:59:58Z vanza $
 */
 
 openContextMenu(){
-	// Get the caret's position
-	caretOffset = textArea.getCaretPosition();
-	caretPos = textArea.offsetToXY(caretOffset);
-	// Open the context menu near the caret
-	GUIUtilities.showPopupMenu(textArea.getRightClickPopup(),
-		textArea,caretPos.x+10,caretPos.y+20);
+	textArea.showPopupMenu();
 }
 
 openContextMenu();
@@ -25,8 +20,7 @@ openContextMenu();
 <listitem>
     <para><filename>Open_Context_Menu.bsh</filename></para>
     <abstract><para>
-        Opens the text area context menu just below and to 
-		the right of the caret.
+        Opens the text area context menu just below the caret.
     </para></abstract>
 </listitem>
 

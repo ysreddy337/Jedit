@@ -26,7 +26,7 @@ import org.gjt.sp.jedit.EBMessage;
  * Message sent when properties are changed using the global options or
  * plugin options dialog box.
  * @author Slava Pestov
- * @version $Id: PropertiesChanged.java,v 1.2 2002/05/14 07:55:49 spestov Exp $
+ * @version $Id: PropertiesChanged.java 12504 2008-04-22 23:12:43Z ezust $
  *
  * @since jEdit 2.2pre6
  */

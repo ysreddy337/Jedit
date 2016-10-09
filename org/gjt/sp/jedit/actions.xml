@@ -1,12 +1,11 @@
 <?xml version="1.0"?>
-
 <!DOCTYPE ACTIONS SYSTEM "actions.dtd">
 
 <!-- jEdit action table                                                      -->
 <!-- Copyright (C) 2000, 2003 Slava Pestov                                   -->
 
 <!-- :tabSize=8:indentSize=8:noTabs=false:                                   -->
-<!-- :folding=indent:collapseFolds=1:                                        -->
+<!-- :folding=indent:collapseFolds=1:mode=jedit-actions:		     -->
 
 <!-- Actions are the 'glue' that binds menu item selections and keystrokes   -->
 <!-- to jEdit's APIs. For simplicity and compactness, they are written in    -->
@@ -46,7 +45,7 @@
 
 <ACTION NAME="add-marker">
 	<CODE>
-		textArea.addMarker();
+		editPane.addMarker();
 	</CODE>
 </ACTION>
 
@@ -100,7 +99,25 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="closeall-except-active">
+        <CODE>
+		org.gjt.sp.jedit.bufferset.BufferSet bufferSet = editPane.getBufferSet();
+		Buffer[] buffers = bufferSet.getAllBuffers();
+		for (Buffer buff:buffers)
+		{
+			if (buff != buffer)
+				jEdit.closeBuffer(editPane,buff);
+		}
+	</CODE>
+</ACTION>
+
 <ACTION NAME="close-buffer">
+	<CODE>
+		jEdit.closeBuffer(editPane,buffer);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="global-close-buffer">
 	<CODE>
 		jEdit.closeBuffer(view,buffer);
 	</CODE>
@@ -151,7 +168,7 @@
 <ACTION NAME="copy-append-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			Registers.getRegisterStatusPrompt("copy-append-string-register"),
+			jEdit.getRegisterStatusPrompt("copy-append-string-register"),
 			"Registers.append(textArea,__char__,\"\\n\",false);");
 	</CODE>
 </ACTION>
@@ -159,7 +176,7 @@
 <ACTION NAME="copy-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			Registers.getRegisterStatusPrompt("copy-string-register"),
+			jEdit.getRegisterStatusPrompt("copy-string-register"),
 			"Registers.copy(textArea,__char__);");
 	</CODE>
 </ACTION>
@@ -179,7 +196,7 @@
 <ACTION NAME="cut-append-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			Registers.getRegisterStatusPrompt("cut-append-string-register"),
+			jEdit.getRegisterStatusPrompt("cut-append-string-register"),
 			"Registers.append(textArea,__char__,\"\\n\",true);");
 	</CODE>
 </ACTION>
@@ -187,7 +204,7 @@
 <ACTION NAME="cut-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			Registers.getRegisterStatusPrompt("cut-string-register"),
+			jEdit.getRegisterStatusPrompt("cut-string-register"),
 			"Registers.cut(textArea,__char__);");
 	</CODE>
 </ACTION>
@@ -252,7 +269,19 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="edit-syntax-style">
+	<CODE>
+		buffer.editSyntaxStyle(textArea);
+	</CODE>
+</ACTION>
+
 <ACTION NAME="end" NO_RECORD="TRUE">
+	<CODE>
+		textArea.end(false);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="smart-end" NO_RECORD="TRUE">
 	<CODE>
 		textArea.smartEnd(false);
 	</CODE>
@@ -336,7 +365,7 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="format-paragraph" NO_RECORD="TRUE">
+<ACTION NAME="format-paragraph">
 	<CODE>
 		textArea.formatParagraph();
 	</CODE>
@@ -345,6 +374,32 @@
 <ACTION NAME="global-options">
 	<CODE>
 		new GlobalOptions(view);
+	</CODE>
+</ACTION>
+<ACTION NAME="global-bufferset">
+	<CODE>
+		editPane.setBufferSetScope(BufferSet.Scope.global);
+	</CODE>
+</ACTION>
+<ACTION NAME="view-bufferset">
+	<CODE>
+		editPane.setBufferSetScope(BufferSet.Scope.view);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="bufferset-toggle-exclusive">
+<CODE>
+    jEdit.setBooleanProperty("buffersets.exclusive",
+        !jEdit.getBooleanProperty("buffersets.exclusive"));
+</CODE>
+<IS_SELECTED>
+    jEdit.getBooleanProperty("buffersets.exclusive");
+</IS_SELECTED>
+</ACTION>
+
+<ACTION NAME="editpane-bufferset">
+	<CODE>
+		editPane.setBufferSetScope(BufferSet.Scope.editpane);
 	</CODE>
 </ACTION>
 
@@ -358,7 +413,7 @@
 	<CODE>
 		view.getInputHandler().readNextChar(
 			buffer.getMarkerStatusPrompt("goto-marker"),
-			"textArea.goToMarker(__char__,false);");
+			"editPane.goToMarker(__char__,false);");
 	</CODE>
 </ACTION>
 
@@ -368,11 +423,18 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="home" NO_RECORD="TRUE">
+<ACTION NAME="smart-home" NO_RECORD="TRUE">
 	<CODE>
 		textArea.smartHome(false);
 	</CODE>
 </ACTION>
+
+<ACTION NAME="home" NO_RECORD="TRUE">
+	<CODE>
+		textArea.home(false);
+	</CODE>
+</ACTION>
+
 
 <ACTION NAME="hypersearch" NO_RECORD="TRUE">
 	<CODE>
@@ -457,6 +519,15 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="last-macro" NO_RECORD="TRUE" NO_REMEMBER_LAST="TRUE">
+	<CODE>
+		if(Macros.getLastMacro() == null)
+			view.getToolkit().beep();
+		else
+			Macros.getLastMacro().invoke(view);
+	</CODE>
+</ACTION>
+
 <ACTION NAME="left-docking-area">
 	<CODE>
 		wm.getLeftDockingArea().showMostRecent();
@@ -478,6 +549,12 @@
 <ACTION NAME="line-home">
 	<CODE>
 		textArea.goToStartOfLine(false);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="logs-remove-all-errors">
+	<CODE>
+		Log.throwables.clear();
 	</CODE>
 </ACTION>
 
@@ -508,6 +585,28 @@
 <ACTION NAME="new-file">
 	<CODE>
 		jEdit.newFile(view);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="new-file-in-mode">
+	<CODE>
+		Mode[] modes = jEdit.getModes();
+		Mode currentMode = buffer.getMode();
+		String dialogTitle = jEdit.getProperty("new-file-in-mode.dialog.title");
+		String dialogMessage = jEdit.getProperty("new-file-in-mode.dialog.message");
+		Mode choice = (Mode)JOptionPane.showInputDialog(
+			view,
+			dialogMessage,
+			dialogTitle,
+			JOptionPane.QUESTION_MESSAGE,
+			null,
+			modes,
+			currentMode);
+		if(choice != null) {
+			Buffer newBuffer = jEdit.newFile(view);
+			view.goToBuffer(newBuffer);
+			newBuffer.setMode(choice);
+		}
 	</CODE>
 </ACTION>
 
@@ -555,7 +654,7 @@
 
 <ACTION NAME="next-marker">
 	<CODE>
-		textArea.goToNextMarker(false);
+		editPane.goToNextMarker(false);
 	</CODE>
 </ACTION>
 
@@ -606,10 +705,7 @@
 
 <ACTION NAME="page-setup">
 	<CODE>
-		if(OperatingSystem.hasJava14())
-			BufferPrinter1_4.pageSetup(view);
-		else
-			BufferPrinter1_3.pageSetup(view);
+		BufferPrinter1_4.pageSetup(view);
 	</CODE>
 </ACTION>
 
@@ -628,7 +724,7 @@
 <ACTION NAME="paste-deleted">
 	<CODE>
 		new PasteFromListDialog("paste-deleted",view,
-			KillRing.getListModel());
+			KillRing.getInstance());
 	</CODE>
 </ACTION>
 
@@ -642,8 +738,32 @@
 <ACTION NAME="paste-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			Registers.getRegisterStatusPrompt("paste-string-register"),
+			jEdit.getRegisterStatusPrompt("paste-string-register"),
 			"Registers.paste(textArea,__char__,false);");
+	</CODE>
+</ACTION>
+
+<ACTION NAME="layout-save" NO_REPEAT="TRUE">
+	<CODE>
+		DockingLayoutManager.saveAs(view);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="layout-load" NO_REPEAT="TRUE">
+	<CODE>
+		DockingLayoutManager.load(view);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="layout-save-current-mode" NO_REPEAT="TRUE">
+	<CODE>
+		DockingLayoutManager.saveCurrentModeLayout(view);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="layout-load-current-mode" NO_REPEAT="TRUE">
+	<CODE>
+		DockingLayoutManager.loadCurrentModeLayout(view);
 	</CODE>
 </ACTION>
 
@@ -691,7 +811,7 @@
 
 <ACTION NAME="prev-marker">
 	<CODE>
-		textArea.goToPrevMarker(false);
+		editPane.goToPrevMarker(false);
 	</CODE>
 </ACTION>
 
@@ -727,12 +847,10 @@
 
 <ACTION NAME="print">
 	<CODE>
-
-	if(OperatingSystem.hasJava14() &amp;&amp;
-		!jEdit.getBooleanProperty("print.force13"))
-		BufferPrinter1_4.print(view,buffer,false);
-	else
+	if(jEdit.getBooleanProperty("print.force13"))
 		BufferPrinter1_3.print(view,buffer,false);
+	else
+		BufferPrinter1_4.print(view,buffer,false);
 	</CODE>
 </ACTION>
 
@@ -856,6 +974,12 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="resplit">
+	<CODE>
+		view.resplit();
+	</CODE>
+</ACTION>
+
 <ACTION NAME="right-docking-area">
 	<CODE>
 		wm.getRightDockingArea().showMostRecent();
@@ -910,6 +1034,12 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="scroll-and-center">
+   <CODE>
+   	textArea.scrollAndCenterCaret();
+   </CODE>
+</ACTION>
+
 <ACTION NAME="scroll-to-current-line">
 	<CODE>
 		if(!textArea.getDisplayManager().isLineVisible(
@@ -920,6 +1050,7 @@
 		}
 		textArea.scrollToCaret(true);
 		textArea.requestFocus();
+
 	</CODE>
 </ACTION>
 
@@ -987,7 +1118,7 @@
 
 <ACTION NAME="select-line-range">
 	<CODE>
-		textArea.showSelectLineRangeDialog();
+		new SelectLineRange(view);
 	</CODE>
 </ACTION>
 
@@ -1031,7 +1162,7 @@
 	<CODE>
 		view.getInputHandler().readNextChar(
 			buffer.getMarkerStatusPrompt("select-marker"),
-			"textArea.goToMarker(__char__,true);");
+			"editPane.goToMarker(__char__,true);");
 	</CODE>
 </ACTION>
 
@@ -1177,9 +1308,28 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="show-buffer-switcher">
+<ACTION NAME="toggle-buffer-switcher">
+<CODE>
+    b = !jEdit.getBooleanProperty("view.showBufferSwitcher");
+    jEdit.setBooleanProperty("view.showBufferSwitcher", b);
+    view.updateBufferSwitcherStates();
+    if (b) editPane.focusBufferSwitcher();
+</CODE>
+<IS_SELECTED>
+    jEdit.getBooleanProperty("view.showBufferSwitcher");
+</IS_SELECTED>
+</ACTION>
+
+
+<ACTION NAME="focus-buffer-switcher">
 	<CODE>
-		editPane.showBufferSwitcher();
+		editPane.focusBufferSwitcher();
+	</CODE>
+</ACTION>
+
+<ACTION NAME="show-context-menu">
+	<CODE>
+		textArea.showPopupMenu();
 	</CODE>
 </ACTION>
 
@@ -1211,7 +1361,7 @@
 	<CODE>
 		view.getInputHandler().readNextChar(
 			buffer.getMarkerStatusPrompt("swap-marker"),
-			"textArea.swapMarkerAndCaret(__char__);");
+			"editPane.swapMarkerAndCaret(__char__);");
 	</CODE>
 </ACTION>
 
@@ -1245,12 +1395,57 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="toggle-dock-areas">
+	<CODE>
+		wm.toggleDockAreas();
+	</CODE>
+</ACTION>
+
+<ACTION NAME="toggle-full-screen">
+	<CODE>
+		view.toggleFullScreen();
+	</CODE>
+</ACTION>
+
+<ACTION NAME="toggle-gutter">
+	<CODE>
+		boolean showing = jEdit.getBooleanProperty("view.gutter.enabled");
+		jEdit.setBooleanProperty("view.gutter.enabled", !showing);
+		jEdit.propertiesChanged();
+	</CODE>
+	<IS_SELECTED>
+		return jEdit.getBooleanProperty("view.gutter.enabled");
+	</IS_SELECTED>
+</ACTION>
+
 <ACTION NAME="toggle-line-numbers">
 	<CODE>
-		textArea.getGutter().toggleExpanded();
+		boolean shown = jEdit.getBooleanProperty("view.gutter.lineNumbers");
+		jEdit.setBooleanProperty("view.gutter.lineNumbers", !shown);
+		if (! shown)
+			jEdit.setBooleanProperty("view.gutter.enabled", !shown);
+		jEdit.propertiesChanged();
 	</CODE>
 	<IS_SELECTED>
 		return textArea.getGutter().isExpanded();
+	</IS_SELECTED>
+</ACTION>
+
+<ACTION NAME="toggle-statusbar">
+	<CODE>
+		boolean showing = view.getStatus().isShowing();
+		if (view.isPlainView())
+		{
+			jEdit.setBooleanProperty("view.status.plainview.visible", !showing);
+		}
+		else
+		{
+			jEdit.setBooleanProperty("view.status.visible", !showing);
+		}
+		jEdit.propertiesChanged();
+	</CODE>
+	<IS_SELECTED>
+		return view.getStatus().isShowing();
 	</IS_SELECTED>
 </ACTION>
 
@@ -1317,14 +1512,8 @@
 <ACTION NAME="vertical-paste-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			Registers.getRegisterStatusPrompt("vertical-paste-string-register"),
+			jEdit.getRegisterStatusPrompt("vertical-paste-string-register"),
 			"Registers.paste(textArea,__char__,true);");
-	</CODE>
-</ACTION>
-
-<ACTION NAME="view-registers">
-	<CODE>
-		new ViewRegisters(view);
 	</CODE>
 </ACTION>
 

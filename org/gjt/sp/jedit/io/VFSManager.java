@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2003 Slava Pestov
+ * Copyright (C) 2000, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,18 +27,15 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Frame;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Vector;
+import java.io.IOException;
+import java.util.*;
+
 import org.gjt.sp.jedit.gui.ErrorListDialog;
 import org.gjt.sp.jedit.msg.VFSUpdate;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 import org.gjt.sp.util.WorkThreadPool;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
@@ -53,7 +50,7 @@ import org.gjt.sp.util.WorkThreadPool;
  * {@link #waitForRequests()}.
  *
  * @author Slava Pestov
- * @version $Id: VFSManager.java,v 1.15 2004/05/10 03:21:11 spestov Exp $
+ * @version $Id: VFSManager.java 14125 2008-12-01 10:06:24Z kpouer $
  */
 public class VFSManager
 {
@@ -119,7 +116,7 @@ public class VFSManager
 		// in new api, protocol always equals name
 		VFS vfs = (VFS)ServiceManager.getService(SERVICE,name);
 		if(vfs == null)
-			return (VFS)vfsHash.get(name);
+			return vfsHash.get(name);
 		else
 			return vfs;
 	} //}}}
@@ -138,7 +135,7 @@ public class VFSManager
 		{
 			VFS vfs = (VFS)ServiceManager.getService(SERVICE,protocol);
 			if(vfs == null)
-				vfs = (VFS)protocolHash.get(protocol);
+				vfs = protocolHash.get(protocol);
 
 			if(vfs != null)
 				return vfs;
@@ -179,7 +176,7 @@ public class VFSManager
 	/**
 	 * @deprecated Use <code>getVFSs()</code> instead.
 	 */
-	public static Enumeration getFilesystems()
+	public static Enumeration<VFS> getFilesystems()
 	{
 		return vfsHash.elements();
 	} //}}}
@@ -193,7 +190,7 @@ public class VFSManager
 	{
 		// the sooner ppl move to the new api, the less we'll need
 		// crap like this
-		List returnValue = new LinkedList();
+		List<String> returnValue = new LinkedList<String>();
 		String[] newAPI = ServiceManager.getServiceNames(SERVICE);
 		if(newAPI != null)
 		{
@@ -202,11 +199,10 @@ public class VFSManager
 				returnValue.add(newAPI[i]);
 			}
 		}
-		Enumeration oldAPI = vfsHash.keys();
+		Enumeration<String> oldAPI = vfsHash.keys();
 		while(oldAPI.hasMoreElements())
 			returnValue.add(oldAPI.nextElement());
-		return (String[])returnValue.toArray(new String[
-			returnValue.size()]);
+		return returnValue.toArray(new String[returnValue.size()]);
 	} //}}}
 
 	//}}}
@@ -275,6 +271,17 @@ public class VFSManager
 
 	//{{{ error() method
 	/**
+	 * Handle an I/O error.
+	 * @since jEdit 4.3pre3
+	 */
+	public static void error(IOException e, String path, Component comp)
+	{
+		Log.log(Log.ERROR,VFSManager.class,e);
+		VFSManager.error(comp,path,"ioerror",new String[] { e.toString() });
+	} //}}}
+
+	//{{{ error() method
+	/**
 	 * @deprecated Call the other <code>error()</code> method instead.
 	 */
 	public static void error(final Component comp, final String error, final Object[] args)
@@ -329,7 +336,7 @@ public class VFSManager
 		{
 			error = true;
 
-			errors.addElement(new ErrorListDialog.ErrorEntry(
+			errors.add(new ErrorListDialog.ErrorEntry(
 				path,messageProp,args));
 
 			if(errors.size() == 1)
@@ -343,14 +350,14 @@ public class VFSManager
 						String caption = jEdit.getProperty(
 							"ioerror.caption" + (errors.size() == 1
 							? "-1" : ""),new Integer[] {
-							new Integer(errors.size()) });
+							Integer.valueOf(errors.size())});
 						new ErrorListDialog(
 							frame.isShowing()
 							? frame
 							: jEdit.getFirstView(),
 							jEdit.getProperty("ioerror.title"),
 							caption,errors,false);
-						errors.removeAllElements();
+						errors.clear();
 						error = false;
 					}
 				});
@@ -385,8 +392,7 @@ public class VFSManager
 			{
 				for(int i = 0; i < vfsUpdates.size(); i++)
 				{
-					VFSUpdate msg = (VFSUpdate)vfsUpdates
-						.get(i);
+					VFSUpdate msg = vfsUpdates.get(i);
 					if(msg.getPath().equals(path))
 					{
 						// don't send two updates
@@ -421,11 +427,11 @@ public class VFSManager
 				// before any updates for the children. sorting
 				// the list alphanumerically guarantees this.
 				Collections.sort(vfsUpdates,
-					new MiscUtilities.StringCompare()
+					new StandardUtilities.StringCompare<VFSUpdate>()
 				);
 				for(int i = 0; i < vfsUpdates.size(); i++)
 				{
-					EditBus.send((VFSUpdate)vfsUpdates.get(i));
+					EditBus.send(vfsUpdates.get(i));
 				}
 
 				vfsUpdates.clear();
@@ -439,26 +445,24 @@ public class VFSManager
 	private static WorkThreadPool ioThreadPool;
 	private static VFS fileVFS;
 	private static VFS urlVFS;
-	private static Hashtable vfsHash;
-	private static Hashtable protocolHash;
+	private static final Hashtable<String, VFS> vfsHash;
+	private static final Map<String, VFS> protocolHash;
 	private static boolean error;
-	private static Object errorLock;
-	private static Vector errors;
-	private static Object vfsUpdateLock;
-	private static List vfsUpdates;
+	private static final Object errorLock = new Object();
+	private static final Vector<ErrorListDialog.ErrorEntry> errors;
+	private static final Object vfsUpdateLock = new Object();
+	private static final List<VFSUpdate> vfsUpdates;
 	//}}}
 
 	//{{{ Class initializer
 	static
 	{
-		errorLock = new Object();
-		errors = new Vector();
+		errors = new Vector<ErrorListDialog.ErrorEntry>();
 		fileVFS = new FileVFS();
 		urlVFS = new UrlVFS();
-		vfsHash = new Hashtable();
-		protocolHash = new Hashtable();
-		vfsUpdateLock = new Object();
-		vfsUpdates = new ArrayList(10);
+		vfsHash = new Hashtable<String, VFS>();
+		protocolHash = new Hashtable<String, VFS>();
+		vfsUpdates = new ArrayList<VFSUpdate>(10);
 	} //}}}
 
 	private VFSManager() {}

@@ -23,14 +23,51 @@
 package org.gjt.sp.jedit.options;
 
 //{{{ Imports
+
+import org.gjt.sp.jedit.AbstractOptionPane;
+import org.gjt.sp.jedit.jEdit;
+import org.gjt.sp.jedit.buffer.JEditBuffer;
+import org.gjt.sp.util.Log;
+
 import javax.swing.*;
-import java.awt.event.*;
-import java.util.Arrays;
-import org.gjt.sp.jedit.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 //}}}
+
+/**
+ * jEdit's General Options Pane
+ */
 
 public class GeneralOptionPane extends AbstractOptionPane
 {
+	//{{{ checkFileStatus options
+	// Check the buffer status when the view got the focus
+	public static final int checkFileStatus_focus = 0;
+	// Check the file status when the view got the status
+	// or when saving or visiting the buffer
+	public static final int checkFileStatus_all = 1;
+	// Check the file status when visiting or saving <b>any</b> buffer
+	public static final int checkFileStatus_operations = 2;
+	// Check the file status when visiting or saving the buffer
+	public static final int checkFileStatus_focusBuffer = 3;
+	// Check the file status when saving the buffer
+	public static final int checkFileStatus_none = 4;
+	//}}}
+
+	//{{{ Private members
+	private JComboBox lineSeparator;
+	private JComboBox checkModStatus;
+	private JComboBox checkModStatusUpon;
+	private JTextField recentFiles;
+	private JTextField hypersearchResultsWarning;
+	private JCheckBox saveCaret;
+	private JCheckBox sortRecent;
+	private JCheckBox persistentMarkers;
+	private JCheckBox restore;
+	private JCheckBox restoreRemote;
+	private JCheckBox restoreCLI;
+	//}}}
+
 	//{{{ GeneralOptionPane constructor
 	public GeneralOptionPane()
 	{
@@ -38,14 +75,16 @@ public class GeneralOptionPane extends AbstractOptionPane
 	} //}}}
 
 	//{{{ _init() method
+	@Override
 	protected void _init()
 	{
+
 		/* Line separator */
 		String[] lineSeps = { jEdit.getProperty("lineSep.unix"),
 			jEdit.getProperty("lineSep.windows"),
 			jEdit.getProperty("lineSep.mac") };
 		lineSeparator = new JComboBox(lineSeps);
-		String lineSep = jEdit.getProperty("buffer.lineSeparator",
+		String lineSep = jEdit.getProperty("buffer."+ JEditBuffer.LINESEP,
 			System.getProperty("line.separator"));
 		if("\n".equals(lineSep))
 			lineSeparator.setSelectedIndex(0);
@@ -56,36 +95,46 @@ public class GeneralOptionPane extends AbstractOptionPane
 		addComponent(jEdit.getProperty("options.general.lineSeparator"),
 			lineSeparator);
 
-		/* Default file encoding */
-		String[] encodings = MiscUtilities.getEncodings();
-		Arrays.sort(encodings,new MiscUtilities.StringICaseCompare());
-		encoding = new JComboBox(encodings);
-		encoding.setEditable(true);
-		encoding.setSelectedItem(jEdit.getProperty("buffer.encoding",
-			System.getProperty("file.encoding")));
-		addComponent(jEdit.getProperty("options.general.encoding"),encoding);
 
-		/* Auto detect encoding */
-		encodingAutodetect = new JCheckBox(jEdit.getProperty(
-			"options.general.encodingAutodetect"));
-		encodingAutodetect.setSelected(jEdit.getBooleanProperty("buffer.encodingAutodetect"));
-		addComponent(encodingAutodetect);
-
-		/* Check mod status on focus */
+		/* Check mod status */
 		String[] modCheckOptions = {
 			jEdit.getProperty("options.general.checkModStatus.nothing"),
 			jEdit.getProperty("options.general.checkModStatus.prompt"),
-			jEdit.getProperty("options.general.checkModStatus.reload")
+			jEdit.getProperty("options.general.checkModStatus.reload"),
+			jEdit.getProperty("options.general.checkModStatus.silentReload")
 		};
 		checkModStatus = new JComboBox(modCheckOptions);
 		if(jEdit.getBooleanProperty("autoReload"))
-			checkModStatus.setSelectedIndex(2);
-		else if(jEdit.getBooleanProperty("autoReloadDialog"))
-			checkModStatus.setSelectedIndex(1);
+		{
+			if (jEdit.getBooleanProperty("autoReloadDialog"))
+				// reload and notify
+				checkModStatus.setSelectedIndex(2);
+			else	// reload silently
+				checkModStatus.setSelectedIndex(3);
+		}
 		else
-			checkModStatus.setSelectedIndex(0);
+		{
+			if (jEdit.getBooleanProperty("autoReloadDialog"))
+				// prompt
+				checkModStatus.setSelectedIndex(1);
+			else	// do nothing
+				checkModStatus.setSelectedIndex(0);
+		}
 		addComponent(jEdit.getProperty("options.general.checkModStatus"),
 			checkModStatus);
+
+		/* Check mod status upon */
+		String[] modCheckUponOptions = {
+			jEdit.getProperty("options.general.checkModStatusUpon.focus"),
+			jEdit.getProperty("options.general.checkModStatusUpon.all"),
+			jEdit.getProperty("options.general.checkModStatusUpon.operations"),
+			jEdit.getProperty("options.general.checkModStatusUpon.focusBuffer"),
+			jEdit.getProperty("options.general.checkModStatusUpon.none")
+		};
+		checkModStatusUpon = new JComboBox(modCheckUponOptions);
+		checkModStatusUpon.setSelectedIndex(jEdit.getIntegerProperty("checkFileStatus"));
+		addComponent(jEdit.getProperty("options.general.checkModStatusUpon"),
+			checkModStatusUpon);
 
 		/* Recent file list size */
 		recentFiles = new JTextField(jEdit.getProperty(
@@ -116,68 +165,45 @@ public class GeneralOptionPane extends AbstractOptionPane
 		/* Session management */
 		restore = new JCheckBox(jEdit.getProperty(
 			"options.general.restore"));
+
 		restore.setSelected(jEdit.getBooleanProperty("restore"));
 		restore.addActionListener(new ActionListener()
 		{
 			public void actionPerformed(ActionEvent evt)
 			{
 				restoreCLI.setEnabled(restore.isSelected());
+				restoreRemote.setEnabled(restore.isSelected());
 			}
 		});
 
 		addComponent(restore);
+
+		restoreRemote = new JCheckBox(jEdit.getProperty(
+			"options.general.restore.remote"));
+		restoreRemote.setSelected(jEdit.getBooleanProperty("restore.remote", false));
+		restoreRemote.setEnabled(restore.isSelected());
+		addComponent(restoreRemote);
+
 		restoreCLI = new JCheckBox(jEdit.getProperty(
 			"options.general.restore.cli"));
 		restoreCLI.setSelected(jEdit.getBooleanProperty("restore.cli"));
 		restoreCLI.setEnabled(restore.isSelected());
 		addComponent(restoreCLI);
 
-		/* Sort buffers */
-		sortBuffers = new JCheckBox(jEdit.getProperty(
-			"options.general.sortBuffers"));
-		sortBuffers.setSelected(jEdit.getBooleanProperty("sortBuffers"));
-		sortBuffers.addActionListener(new ActionListener()
-		{
-			public void actionPerformed(ActionEvent evt)
-			{
-				sortByName.setEnabled(sortBuffers.isSelected());
-			}
-		});
+		
+		hypersearchResultsWarning = new JTextField(jEdit.getProperty("hypersearch.maxWarningResults"));
+		addComponent(jEdit.getProperty("options.general.hypersearch.maxWarningResults"),
+			hypersearchResultsWarning);
 
-		addComponent(sortBuffers);
 
-		/* Sort buffers by names */
-		sortByName = new JCheckBox(jEdit.getProperty(
-			"options.general.sortByName"));
-		sortByName.setSelected(jEdit.getBooleanProperty("sortByName"));
-		sortByName.setEnabled(sortBuffers.isSelected());
-		addComponent(sortByName);
-
-		/* Two-stage save */
-		twoStageSave = new JCheckBox(jEdit.getProperty(
-			"options.general.twoStageSave"));
-		twoStageSave.setSelected(jEdit.getBooleanProperty(
-			"twoStageSave"));
-		addComponent(twoStageSave);
-
-		/* Confirm save all */
-		confirmSaveAll = new JCheckBox(jEdit.getProperty(
-			"options.general.confirmSaveAll"));
-		confirmSaveAll.setSelected(jEdit.getBooleanProperty(
-			"confirmSaveAll"));
-		addComponent(confirmSaveAll);
-
-		/* Strip trailing EOL */
-		stripTrailingEOL = new JCheckBox(jEdit.getProperty(
-			"options.general.stripTrailingEOL"));
-		stripTrailingEOL.setSelected(jEdit.getBooleanProperty("stripTrailingEOL"));
-		addComponent(stripTrailingEOL);
 
 	} //}}}
 
 	//{{{ _save() method
+	@Override
 	protected void _save()
 	{
+
 		String lineSep = null;
 		switch(lineSeparator.getSelectedIndex())
 		{
@@ -191,11 +217,7 @@ public class GeneralOptionPane extends AbstractOptionPane
 			lineSep = "\r";
 			break;
 		}
-		jEdit.setProperty("buffer.lineSeparator",lineSep);
-		jEdit.setProperty("buffer.encoding",(String)
-			encoding.getSelectedItem());
-		jEdit.setBooleanProperty("buffer.encodingAutodetect",
-			encodingAutodetect.isSelected());
+		jEdit.setProperty("buffer."+ JEditBuffer.LINESEP,lineSep);
 		switch(checkModStatus.getSelectedIndex())
 		{
 		case 0:
@@ -210,7 +232,12 @@ public class GeneralOptionPane extends AbstractOptionPane
 			jEdit.setBooleanProperty("autoReloadDialog",true);
 			jEdit.setBooleanProperty("autoReload",true);
 			break;
+		case 3:
+			jEdit.setBooleanProperty("autoReloadDialog",false);
+			jEdit.setBooleanProperty("autoReload",true);
+			break;
 		}
+		jEdit.setIntegerProperty("checkFileStatus",checkModStatusUpon.getSelectedIndex());
 		jEdit.setProperty("recentFiles",recentFiles.getText());
 		jEdit.setBooleanProperty("sortRecent",sortRecent.isSelected());
 		jEdit.setBooleanProperty("saveCaret",saveCaret.isSelected());
@@ -218,28 +245,16 @@ public class GeneralOptionPane extends AbstractOptionPane
 			persistentMarkers.isSelected());
 		jEdit.setBooleanProperty("restore",restore.isSelected());
 		jEdit.setBooleanProperty("restore.cli",restoreCLI.isSelected());
-		jEdit.setBooleanProperty("sortBuffers",sortBuffers.isSelected());
-		jEdit.setBooleanProperty("sortByName",sortByName.isSelected());
-		jEdit.setBooleanProperty("twoStageSave",twoStageSave.isSelected());
-		jEdit.setBooleanProperty("confirmSaveAll",confirmSaveAll.isSelected());
-		jEdit.setBooleanProperty("stripTrailingEOL", stripTrailingEOL.isSelected());
+		jEdit.setBooleanProperty("restore.remote", restoreRemote.isSelected());
+		try
+		{
+			jEdit.setIntegerProperty("hypersearch.maxWarningResults", Integer.parseInt(hypersearchResultsWarning.getText()));
+		}
+		catch (NumberFormatException e)
+		{
+			Log.log(Log.WARNING, this, "hypersearchResultsWarning: " + hypersearchResultsWarning.getText() + " is not a valid value for this option");
+		}
 	} //}}}
 
-	//{{{ Private members
-	private JComboBox lineSeparator;
-	private JComboBox encoding;
-	private JCheckBox encodingAutodetect;
-	private JComboBox checkModStatus;
-	private JTextField recentFiles;
-	private JCheckBox saveCaret;
-	private JCheckBox sortRecent;
-	private JCheckBox persistentMarkers;
-	private JCheckBox restore;
-	private JCheckBox restoreCLI;
-	private JCheckBox sortBuffers;
-	private JCheckBox sortByName;
-	private JCheckBox twoStageSave;
-	private JCheckBox confirmSaveAll;
-	private JCheckBox stripTrailingEOL;
-	//}}}
+
 }

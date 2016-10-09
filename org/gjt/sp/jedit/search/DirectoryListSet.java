@@ -29,12 +29,13 @@ import java.io.*;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
  * Recursive directory search.
  * @author Slava Pestov
- * @version $Id: DirectoryListSet.java,v 1.6 2003/03/22 22:52:09 spestov Exp $
+ * @version $Id: DirectoryListSet.java 16365 2009-10-20 05:13:52Z vanza $
  */
 public class DirectoryListSet extends BufferListSet
 {
@@ -44,7 +45,11 @@ public class DirectoryListSet extends BufferListSet
 		this.directory = directory;
 		this.glob = glob;
 		this.recurse = recurse;
+		this.skipBinary = jEdit.getBooleanProperty("search.skipBinary.toggle");
+		this.skipHidden = jEdit.getBooleanProperty("search.skipHidden.toggle");
 	} //}}}
+
+
 
 	//{{{ getDirectory() method
 	public String getDirectory()
@@ -95,16 +100,20 @@ public class DirectoryListSet extends BufferListSet
 	} //}}}
 
 	//{{{ getCode() method
+	@Override
 	public String getCode()
 	{
-		return "new DirectoryListSet(\"" + MiscUtilities.charsToEscapes(directory)
-			+ "\",\"" + MiscUtilities.charsToEscapes(glob) + "\","
-			+ recurse + ")";
+		return "new DirectoryListSet(\"" + StandardUtilities.charsToEscapes(directory)
+			+ "\",\"" + StandardUtilities.charsToEscapes(glob) + "\","
+			+ recurse + ')';
 	} //}}}
 
 	//{{{ _getFiles() method
+	@Override
 	protected String[] _getFiles(final Component comp)
 	{
+		skipBinary = jEdit.getBooleanProperty("search.skipBinary.toggle");
+		skipHidden = jEdit.getBooleanProperty("search.skipHidden.toggle");
 		final VFS vfs = VFSManager.getVFSForPath(directory);
 		Object session;
 		if(SwingUtilities.isEventDispatchThread())
@@ -138,7 +147,14 @@ public class DirectoryListSet extends BufferListSet
 
 		try
 		{
-			return vfs._listDirectory(session,directory,glob,recurse,comp);
+			try
+			{
+				return vfs._listDirectory(session,directory,glob,recurse,comp, skipBinary, skipHidden);
+			}
+			finally
+			{
+				vfs._endVFSSession(session, comp);
+			}
 		}
 		catch(IOException io)
 		{
@@ -152,5 +168,7 @@ public class DirectoryListSet extends BufferListSet
 	private String directory;
 	private String glob;
 	private boolean recurse;
+	private boolean skipHidden;
+	private boolean skipBinary;
 	//}}}
 }

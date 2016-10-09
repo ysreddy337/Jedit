@@ -23,12 +23,14 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import com.microstar.xml.*;
 import java.awt.datatransfer.*;
 import java.awt.Toolkit;
 import java.io.*;
-import org.gjt.sp.jedit.gui.*;
-import org.gjt.sp.jedit.textarea.*;
+
+import org.gjt.sp.jedit.buffer.JEditBuffer;
+import org.gjt.sp.jedit.gui.HistoryModel;
+import org.gjt.sp.jedit.textarea.TextArea;
+import org.gjt.sp.jedit.textarea.Selection;
 import org.gjt.sp.util.Log;
 //}}}
 
@@ -55,7 +57,7 @@ import org.gjt.sp.util.Log;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: Registers.java,v 1.21 2004/05/29 01:55:24 spestov Exp $
+ * @version $Id: Registers.java 14793 2009-03-17 22:43:27Z ezust $
  */
 public class Registers
 {
@@ -68,7 +70,7 @@ public class Registers
 	 * @param register The register
 	 * @since jEdit 2.7pre2
 	 */
-	public static void copy(JEditTextArea textArea, char register)
+	public static void copy(TextArea textArea, char register)
 	{
 		String selection = textArea.getSelectedText();
 		if(selection == null)
@@ -76,6 +78,7 @@ public class Registers
 
 		setRegister(register,selection);
 		HistoryModel.getModel("clipboard").addItem(selection);
+
 	} //}}}
 
 	//{{{ cut() method
@@ -87,7 +90,7 @@ public class Registers
 	 * @param register The register
 	 * @since jEdit 2.7pre2
 	 */
-	public static void cut(JEditTextArea textArea, char register)
+	public static void cut(TextArea textArea, char register)
 	{
 		if(textArea.isEditable())
 		{
@@ -111,7 +114,7 @@ public class Registers
 	 * @param textArea The text area
 	 * @param register The register
 	 */
-	public static void append(JEditTextArea textArea, char register)
+	public static void append(TextArea textArea, char register)
 	{
 		append(textArea,register,"\n",false);
 	} //}}}
@@ -123,7 +126,7 @@ public class Registers
 	 * @param register The register
 	 * @param separator The separator to insert between the old and new text
 	 */
-	public static void append(JEditTextArea textArea, char register,
+	public static void append(TextArea textArea, char register,
 		String separator)
 	{
 		append(textArea,register,separator,false);
@@ -138,7 +141,7 @@ public class Registers
 	 * @param cut Should the current selection be removed?
 	 * @since jEdit 3.2pre1
 	 */
-	public static void append(JEditTextArea textArea, char register,
+	public static void append(TextArea textArea, char register,
 		String separator, boolean cut)
 	{
 		if(cut && !textArea.isEditable())
@@ -172,19 +175,18 @@ public class Registers
 			textArea.setSelectedText("");
 	} //}}}
 
-	//{{{ paste() method
+	//{{{ paste() methods
 	/**
 	 * Insets the contents of the specified register into the text area.
 	 * @param textArea The text area
 	 * @param register The register
 	 * @since jEdit 2.7pre2
 	 */
-	public static void paste(JEditTextArea textArea, char register)
+	public static void paste(TextArea textArea, char register)
 	{
 		paste(textArea,register,false);
-	} //}}}
+	}
 
-	//{{{ paste() method
 	/**
 	 * Inserts the contents of the specified register into the text area.
 	 * @param textArea The text area
@@ -192,7 +194,7 @@ public class Registers
 	 * @param vertical Vertical (columnar) paste
 	 * @since jEdit 4.1pre1
 	 */
-	public static void paste(JEditTextArea textArea, char register,
+	public static void paste(TextArea textArea, char register,
 		boolean vertical)
 	{
 		if(!textArea.isEditable())
@@ -208,62 +210,60 @@ public class Registers
 			textArea.getToolkit().beep();
 			return;
 		}
-		else
-		{
-			String selection = reg.toString();
-			if(selection == null)
-			{
-				textArea.getToolkit().beep();
-				return;
-			}
 
+		String selection = reg.toString();
+		if(selection == null)
+		{
+			textArea.getToolkit().beep();
+			return;
+		}
+		JEditBuffer buffer = textArea.getBuffer();
+		try
+		{
+			buffer.beginCompoundEdit();
+
+			/* vertical paste */
 			if(vertical && textArea.getSelectionCount() == 0)
 			{
-				Buffer buffer = textArea.getBuffer();
+				int caret = textArea.getCaretPosition();
+				int caretLine = textArea.getCaretLine();
+				Selection.Rect rect = new Selection.Rect(
+					caretLine,caret,caretLine,caret);
+				textArea.setSelectedText(rect,selection);
+				caretLine = textArea.getCaretLine();
 
-				try
+				if(caretLine != textArea.getLineCount() - 1)
 				{
-					buffer.beginCompoundEdit();
 
-					int caret = textArea.getCaretPosition();
-					int caretLine = textArea.getCaretLine();
-					Selection.Rect rect = new Selection.Rect(
-						caretLine,caret,caretLine,caret);
-					textArea.setSelectedText(rect,selection);
-					caretLine = textArea.getCaretLine();
-
-					if(caretLine != textArea.getLineCount() - 1)
+					int startColumn = rect.getStartColumn(
+						buffer);
+					int offset = buffer
+						.getOffsetOfVirtualColumn(
+						caretLine + 1,startColumn,null);
+					if(offset == -1)
 					{
-						int startColumn = rect.getStartColumn(
-							buffer);
-						int offset = buffer
-							.getOffsetOfVirtualColumn(
-							caretLine + 1,startColumn,null);
-						if(offset == -1)
-						{
-							buffer.insertAtColumn(caretLine + 1,startColumn,"");
-							textArea.setCaretPosition(
-								buffer.getLineEndOffset(
-								caretLine + 1) - 1);
-						}
-						else
-						{
-							textArea.setCaretPosition(
-								buffer.getLineStartOffset(
-								caretLine + 1) + offset);
-						}
+						buffer.insertAtColumn(caretLine + 1,startColumn,"");
+						textArea.setCaretPosition(
+							buffer.getLineEndOffset(
+							caretLine + 1) - 1);
+					}
+					else
+					{
+						textArea.setCaretPosition(
+							buffer.getLineStartOffset(
+							caretLine + 1) + offset);
 					}
 				}
-				finally
-				{
-					buffer.endCompoundEdit();
-				}
 			}
-			else
-				textArea.setSelectedText(selection);
-
-			HistoryModel.getModel("clipboard").addItem(selection);
+			else /* Regular paste */
+			{
+				textArea.replaceSelection(selection);
+			}
 		}
+		finally {
+			buffer.endCompoundEdit();
+		}
+		HistoryModel.getModel("clipboard").addItem(selection);
 	} //}}}
 
 	//{{{ getRegister() method
@@ -293,25 +293,20 @@ public class Registers
 	 */
 	public static void setRegister(char name, Register newRegister)
 	{
-		if(name != '%' && name != '$')
-		{
-			if(!loaded)
-				loadRegisters();
-
-			if(!loading)
-				modified = true;
-		}
+		touchRegister(name);
 
 		if(name >= registers.length)
 		{
 			Register[] newRegisters = new Register[
-				Math.min(1<<16,name * 2)];
+				Math.min(1<<16, name<<1)];
 			System.arraycopy(registers,0,newRegisters,0,
 				registers.length);
 			registers = newRegisters;
 		}
 
 		registers[name] = newRegister;
+		if (listener != null)
+			listener.registerChanged(name);
 	} //}}}
 
 	//{{{ setRegister() method
@@ -322,9 +317,14 @@ public class Registers
 	 */
 	public static void setRegister(char name, String value)
 	{
+		touchRegister(name);
 		Register register = getRegister(name);
 		if(register != null)
+		{
 			register.setValue(value);
+			if (listener != null)
+				listener.registerChanged(name);
+		}
 		else
 			setRegister(name,new StringRegister(value));
 	} //}}}
@@ -343,7 +343,12 @@ public class Registers
 		if(name == '$' || name == '%')
 			register.setValue("");
 		else
+		{
 			registers[name] = null;
+			modified = true;
+			if (listener != null)
+				listener.registerChanged(name);
+		}
 	} //}}}
 
 	//{{{ getRegisters() method
@@ -358,18 +363,6 @@ public class Registers
 		return registers;
 	} //}}}
 
-	//{{{ getRegisterStatusPrompt() method
-	/**
-	 * Returns the status prompt for the given register action. Only
-	 * intended to be called from <code>actions.xml</code>.
-	 * @since jEdit 4.2pre2
-	 */
-	public static String getRegisterStatusPrompt(String action)
-	{
-		return jEdit.getProperty("view.status." + action,
-			new String[] { getRegisterNameString() });
-	} //}}}
-
 	//{{{ getRegisterNameString() method
 	/**
 	 * Returns a string of all defined registers, used by the status bar
@@ -381,7 +374,7 @@ public class Registers
 		if(!loaded)
 			loadRegisters();
 
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder(registers.length << 1);
 		for(int i = 0; i < registers.length; i++)
 		{
 			if(registers[i] != null)
@@ -393,7 +386,7 @@ public class Registers
 		}
 
 		if(buf.length() == 0)
-			return jEdit.getProperty("view.status.no-registers");
+			return null;
 		else
 			return buf.toString();
 	} //}}}
@@ -404,159 +397,81 @@ public class Registers
 		if(!loaded || !modified)
 			return;
 
-		Log.log(Log.MESSAGE,Registers.class,"Saving registers.xml");
-		File file1 = new File(MiscUtilities.constructPath(
-			jEdit.getSettingsDirectory(), "#registers.xml#save#"));
-		File file2 = new File(MiscUtilities.constructPath(
-			jEdit.getSettingsDirectory(), "registers.xml"));
-		if(file2.exists() && file2.lastModified() != registersModTime)
+		if (saver != null)
 		{
-			Log.log(Log.WARNING,Registers.class,file2 + " changed"
-				+ " on disk; will not save registers");
-			return;
+			saver.saveRegisters();
+			modified = false;
 		}
+	} //}}}
 
-		jEdit.backupSettingsFile(file2);
+	//{{{ setListener() method
+	public static void setListener(RegistersListener listener)
+	{
+		Registers.listener = listener;
+	} //}}}
 
-		String lineSep = System.getProperty("line.separator");
+	//{{{ setSaver() method
+	public static void setSaver(RegisterSaver saver)
+	{
+		Registers.saver = saver;
+	} //}}}
 
-		BufferedWriter out = null;
+	//{{{ isLoading() method
+	public static boolean isLoading()
+	{
+		return loading;
+	} //}}}
 
-		boolean ok = false;
-
-		try
-		{
-			out = new BufferedWriter(new FileWriter(file1));
-
-			out.write("<?xml version=\"1.0\"?>");
-			out.write(lineSep);
-			out.write("<!DOCTYPE REGISTERS SYSTEM \"registers.dtd\">");
-			out.write(lineSep);
-			out.write("<REGISTERS>");
-			out.write(lineSep);
-
-			Register[] registers = getRegisters();
-			for(int i = 0; i < registers.length; i++)
-			{
-				Register register = registers[i];
-				if(register == null || i == '$' || i == '%')
-					continue;
-
-				out.write("<REGISTER NAME=\"");
-				if(i == '"')
-					out.write("&quot;");
-				else
-					out.write((char)i);
-				out.write("\">");
-
-				out.write(MiscUtilities.charsToEntities(
-					register.toString()));
-
-				out.write("</REGISTER>");
-				out.write(lineSep);
-			}
-
-			out.write("</REGISTERS>");
-			out.write(lineSep);
-
-			ok = true;
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,Registers.class,e);
-		}
-		finally
-		{
-			try
-			{
-				if(out != null)
-					out.close();
-			}
-			catch(IOException e)
-			{
-			}
-		}
-
-		if(ok)
-		{
-			/* to avoid data loss, only do this if the above
-			 * completed successfully */
-			file2.delete();
-			file1.renameTo(file2);
-		}
-
-		registersModTime = file2.lastModified();
-		modified = false;
+	//{{{ setLoading() method
+	public static void setLoading(boolean loading)
+	{
+		Registers.loading = loading;
 	} //}}}
 
 	//{{{ Private members
 	private static Register[] registers;
-	private static long registersModTime;
-	private static boolean loaded, loading, modified;
+	private static boolean loaded, loading;
+	private static RegisterSaver saver;
+	private static RegistersListener listener;
+	/**
+	 * Flag that tell if a register has been modified (except for '%' and '$' registers that aren't
+	 * saved to the xml file).
+	 */
+	private static boolean modified;
 
 	private Registers() {}
 
 	static
 	{
 		registers = new Register[256];
-		registers['$'] = new ClipboardRegister(Toolkit
-			.getDefaultToolkit().getSystemClipboard());
+		Toolkit toolkit = Toolkit.getDefaultToolkit();
+		registers['$'] = new ClipboardRegister(
+			toolkit.getSystemClipboard());
+		Clipboard selection = toolkit.getSystemSelection();
+		if(selection != null)
+			registers['%'] = new ClipboardRegister(selection);
 	}
+
+	//{{{ touchRegister() method
+	private static void touchRegister(char name)
+	{
+		if(name == '%' || name == '$')
+			return;
+
+		if(!loaded)
+			loadRegisters();
+
+		if(!loading)
+			modified = true;
+	} //}}}
 
 	//{{{ loadRegisters() method
 	private static void loadRegisters()
 	{
-		String settingsDirectory = jEdit.getSettingsDirectory();
-		if(settingsDirectory == null)
-			return;
-
-		File registerFile = new File(MiscUtilities.constructPath(
-			jEdit.getSettingsDirectory(),"registers.xml"));
-		if(!registerFile.exists())
-			return;
-
-		registersModTime = registerFile.lastModified();
-		loaded = true;
-
-		Log.log(Log.MESSAGE,jEdit.class,"Loading registers.xml");
-
-		RegistersHandler handler = new RegistersHandler();
-		XmlParser parser = new XmlParser();
-		parser.setHandler(handler);
-		Reader in = null;
-		try
+		if (saver != null)
 		{
-			loading = true;
-			in = new BufferedReader(new FileReader(registerFile));
-			parser.parse(null, null, in);
-		}
-		catch(XmlException xe)
-		{
-			int line = xe.getLine();
-			String message = xe.getMessage();
-			Log.log(Log.ERROR,Registers.class,registerFile + ":"
-				+ line + ": " + message);
-		}
-		catch(FileNotFoundException fnf)
-		{
-			//Log.log(Log.DEBUG,Registers.class,fnf);
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,Registers.class,e);
-		}
-		finally
-		{
-			loading = false;
-			try
-			{
-				if(in != null)
-					in.close();
-			}
-			catch(IOException io)
-			{
-				Log.log(Log.ERROR,Registers.class,io);
-			}
+			loaded = true;
+			saver.loadRegisters();
 		}
 	} //}}}
 
@@ -607,24 +522,42 @@ public class Registers
 		/**
 		 * Returns the clipboard contents.
 		 */
+		@Override
 		public String toString()
 		{
 			try
 			{
-				String selection = (String)(clipboard
-					.getContents(this).getTransferData(
-					DataFlavor.stringFlavor));
 
-				boolean trailingEOL = (selection.endsWith("\n")
+				if (false)
+				{
+					/*
+						This is to debug clipboard problems.
+
+						Apparently, jEdit is unable to copy text from clipbard into the current
+						text buffer if the clipboard was filles using the command
+							echo test | xselection CLIPBOARD -
+						under Linux. However, it seems that Java does not offer any
+						data flavor for this clipboard content (under J2RE 1.5.0_06-b05)
+						Thus, copying from clipboard seems to be plainly impossible.
+					*/
+					Log.log(Log.DEBUG,this,"clipboard.getContents(this)="+clipboard.getContents(this)+'.');
+					debugListDataFlavors(clipboard.getContents(this));
+				}
+
+				String selection = (String)clipboard
+					.getContents(this).getTransferData(
+					DataFlavor.stringFlavor);
+
+				boolean trailingEOL = selection.endsWith("\n")
 					|| selection.endsWith(System.getProperty(
-					"line.separator")));
+					"line.separator"));
 
 				// Some Java versions return the clipboard
 				// contents using the native line separator,
 				// so have to convert it here
 				BufferedReader in = new BufferedReader(
 					new StringReader(selection));
-				StringBuffer buf = new StringBuffer();
+				StringBuilder buf = new StringBuilder();
 				String line;
 				while((line = in.readLine()) != null)
 				{
@@ -650,6 +583,27 @@ public class Registers
 			}
 		}
 	} //}}}
+
+	//{{{ debugListDataFlavors() method
+	protected static void debugListDataFlavors(Transferable transferable)
+	{
+		DataFlavor[] dataFlavors = transferable.getTransferDataFlavors();
+
+		for (int i = 0;i<dataFlavors.length;i++)
+		{
+			DataFlavor dataFlavor = dataFlavors[i];
+			Log.log(Log.DEBUG,Registers.class,
+				"debugListDataFlavors(): dataFlavor="+
+				dataFlavor+'.');
+		}
+
+		if (dataFlavors.length == 0)
+		{
+			Log.log(Log.DEBUG,Registers.class,
+				"debugListDataFlavors(): no dataFlavor supported.");
+		}
+	} //}}}
+
 
 	//{{{ StringRegister class
 	/**
@@ -679,6 +633,7 @@ public class Registers
 		/**
 		 * Converts to a string.
 		 */
+		@Override
 		public String toString()
 		{
 			return value;
@@ -689,76 +644,6 @@ public class Registers
 		 * implementation does nothing.
 		 */
 		public void dispose() {}
-	} //}}}
-
-	//{{{ RegistersHandler class
-	static class RegistersHandler extends HandlerBase
-	{
-		//{{{ resolveEntity() method
-		public Object resolveEntity(String publicId, String systemId)
-		{
-			if("registers.dtd".equals(systemId))
-			{
-				// this will result in a slight speed up, since we
-				// don't need to read the DTD anyway, as AElfred is
-				// non-validating
-				return new StringReader("<!-- -->");
-
-				/* try
-				{
-					return new BufferedReader(new InputStreamReader(
-						getClass().getResourceAsStream("registers.dtd")));
-				}
-				catch(Exception e)
-				{
-					Log.log(Log.ERROR,this,"Error while opening"
-						+ " recent.dtd:");
-					Log.log(Log.ERROR,this,e);
-				} */
-			}
-
-			return null;
-		} //}}}
-
-		//{{{ attribute() method
-		public void attribute(String aname, String value, boolean isSpecified)
-		{
-			if(aname.equals("NAME"))
-				registerName = value;
-		} //}}}
-
-		//{{{ doctypeDecl() method
-		public void doctypeDecl(String name, String publicId,
-			String systemId) throws Exception
-		{
-			if("REGISTERS".equals(name))
-				return;
-
-			Log.log(Log.ERROR,this,"registers.xml: DOCTYPE must be REGISTERS");
-		} //}}}
-
-		//{{{ endElement() method
-		public void endElement(String name)
-		{
-			if(name.equals("REGISTER"))
-			{
-				if(registerName == null || registerName.length() != 1)
-					Log.log(Log.ERROR,this,"Malformed NAME: " + registerName);
-				else
-					setRegister(registerName.charAt(0),charData);
-			}
-		} //}}}
-
-		//{{{ charData() method
-		public void charData(char[] ch, int start, int length)
-		{
-			charData = new String(ch,start,length);
-		} //}}}
-
-		//{{{ Private members
-		private String registerName;
-		private String charData;
-		//}}}
 	} //}}}
 
 	//}}}

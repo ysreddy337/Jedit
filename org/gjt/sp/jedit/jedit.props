@@ -2,6 +2,7 @@
 ### jEdit global properties
 ### :tabSize=8:indentSize=8:noTabs=false:
 ### :folding=explicit:collapseFolds=1:
+### :encoding=ISO-8859-1:
 ###
 ### Copyright (C) 1998, 2003 Slava Pestov
 ###
@@ -34,6 +35,10 @@ firstTime=true
 # Autosave interval in seconds, 0=off
 autosave=30
 
+# Autosave untitled buffers
+autosaveUntitled=true
+
+
 # Maximum number of elements in a history list
 history=20
 
@@ -54,6 +59,9 @@ twoStageSave=true
 
 # Strip trailing EOL
 stripTrailingEOL=true
+
+# Complete words from all open buffers
+completeFromAllBuffers=false
 
 # Need this so that new files have a trailing EOL
 buffer.trailingEOL=true
@@ -90,16 +98,28 @@ firewall.enabled=false
 # Keep dialog on by default
 search.keepDialog.toggle=true
 
+# When this limit is reached a dialog appears to cancel the search
+hypersearch.maxWarningResults=1000
+
+# Style for highlighting matches in hypersearch results
+hypersearch.results.highlight=bgColor:#ccccff
+
 # Confirm dialogs
 confirmSaveAll=true
 
 # Check modification status on focus?
 
-# If this is true, show a dialog; if false, do nothing
+# if false and autoReload == false, do nothing
+# if false and autoReload == true, autoreload silently
+# If true and autoReload == false, prompt for reloading
+# if true and autoReload == true, reload and notify user (message box)
 autoReloadDialog=true
 
-# If this is true, auto reload; if false, 'reload' button in dialog
+# If this is true, auto reload; if false, use 'reload' button in dialog
 autoReload=true
+
+# When to check file status on disk (0 = upon app focus; 1 = upon app focus, visiting the buffer or saving any buffer; 2 = upon visiting the buffer or saving any buffer; 3 = visiting the buffer; 4 = upon saving the buffer)
+checkFileStatus=0
 
 #}}}
 
@@ -147,6 +167,9 @@ buffer.wordBreakChars=
 # Non-alphanumeric word characters
 buffer.noWordSep=_
 
+# Whether to separate "CamelCased" words
+buffer.camelCasedWords=false
+
 # Fold mode (explicit, indent, or none)
 buffer.folding=none
 
@@ -190,7 +213,7 @@ view.structureHighlight=true
 view.structureHighlightColor=#000000
 
 # EOL markers
-view.eolMarkers=true
+view.eolMarkers=false
 view.eolMarkerColor=#ff6633
 
 # Wrap guide
@@ -213,14 +236,29 @@ view.blockCaret=false
 # Electric borders
 view.electricBorders=3
 
+# Drag and drop of text
+view.dragAndDrop=true
+
 # Treat consecutive non-alphanumeric characters as one word
 view.joinNonWordChars=true
 
 # Middle mouse button pastes % register
 view.middleMousePaste=false
 
-# Drag and drop of text
-view.dragAndDrop=true
+# Pressing Ctrl while mouse actions makes them
+# as if selection mode were rectangular mode
+view.ctrlForRectangularSelection=true
+
+# Minimal view size that is considered "valid" when loading perspective
+view.minStartupWidth=200
+view.minStartupHeight=200
+
+# The default bufferSet scope
+editpane.bufferset.default=global
+
+# Copy the current bufferSet content when creating a new bufferSet for an
+# EditPane
+editpane.bufferset.new=copy
 
 #{{{ Gutter
 
@@ -286,6 +324,18 @@ view.gutter.AfoldClick=narrow-fold
 view.gutter.structClick=match-struct
 view.gutter.CstructClick=select-struct
 view.gutter.AstructClick=narrow-struct
+
+# Show gutter?
+view.gutter.enabled=true
+
+# Gutter minimal number of digits to reserve for line numbers
+view.gutter.minDigitCount=2
+
+# Show selection area in gutter?
+view.gutter.selectionAreaEnabled=true
+# Gutter selection area background color
+# - leave out so by default it is the same as the gutter's
+#view.gutter.selectionAreaBgColor=#dbdbdb
 #}}}
 
 # Expand abbrevs when space bar pressed
@@ -328,17 +378,8 @@ view.toolbar.alternateLayout=false
 view.status.foreground=black
 view.status.background=white
 view.status.visible=true
+view.status.plainview.visible=false
 view.status.show-caret-status=true
-view.status.show-edit-mode=true
-view.status.show-fold-mode=true
-view.status.show-encoding=true
-view.status.show-wrap=true
-view.status.show-multi-select=true
-view.status.show-rect-select=true
-view.status.show-overwrite=true
-view.status.show-line-seperator=true
-view.status.show-memory=true
-view.status.show-clock=false
 view.status.memory.foreground=#cccccc
 view.status.memory.background=#666699a
 #}}}
@@ -383,6 +424,7 @@ vfs.browser.sortMixFilesAndDirs=false
 vfs.browser.sortIgnoreCase=true
 vfs.browser.doubleClickClose=false
 vfs.browser.currentBufferFilter=false
+vfs.browser.useDefaultIcons=true
 
 # Can be one of: buffer, home, favorites, last
 vfs.browser.defaultPath=buffer
@@ -415,9 +457,10 @@ vfs.browser.colors.8.color=#666666
 plugin-manager.downloadSource=false
 plugin-manager.installUser=true
 plugin-manager.showAll=true
-plugin-manager.mirror.id=NONE
+plugin-manager.mirror.id=switch
 plugin-manager.deleteDownloads=true
 plugin-manager.hide-libraries.toggle=true
+plugin-blacklist.MacOS.jar=true
 #}}}
 
 #{{{ Hidden settings
@@ -427,3 +470,6 @@ showTooltips=true
 ioThreadCount=4
 server.brokenToFront=false
 #}}}
+
+# restore remote VFS files by default (new option)
+options.general.restore.remote=true

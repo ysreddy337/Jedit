@@ -23,15 +23,25 @@
 package org.gjt.sp.jedit.io;
 
 //{{{ Imports
-import gnu.regexp.*;
 import java.awt.Color;
 import java.awt.Component;
 import java.io.*;
 import java.util.*;
-import org.gjt.sp.jedit.buffer.BufferIORequest;
+
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
 import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.bufferio.BufferLoadRequest;
+import org.gjt.sp.jedit.bufferio.BufferSaveRequest;
+import org.gjt.sp.jedit.bufferio.BufferInsertRequest;
+import org.gjt.sp.jedit.bufferio.BufferIORequest;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.ProgressObserver;
+import org.gjt.sp.util.IOUtilities;
+import org.gjt.sp.util.StandardUtilities;
+import org.gjt.sp.util.WorkThread;
 //}}}
 
 /**
@@ -91,7 +101,7 @@ import org.gjt.sp.util.Log;
  * @see VFSManager#getVFSForProtocol(String)
  *
  * @author Slava Pestov
- * @author $Id: VFS.java,v 1.39 2003/09/08 01:24:11 spestov Exp $
+ * @author $Id: VFS.java 15834 2009-08-01 05:35:05Z shlomy $
  */
 public abstract class VFS
 {
@@ -110,7 +120,8 @@ public abstract class VFS
 	public static final int WRITE_CAP = 1 << 1;
 
 	/**
-	 * @deprecated Do not define this capability.<p>
+	 * Browse capability
+	 * @since jEdit 4.3pre11
 	 *
 	 * This was the official API for adding items to a file
 	 * system browser's <b>Plugins</b> menu in jEdit 4.1 and earlier. In
@@ -181,31 +192,32 @@ public abstract class VFS
 	public static final String EA_MODIFIED = "modified";
 	//}}}
 
-	//{{{ VFS constructor
+	public static int IOBUFSIZE = 32678;
+
+	//{{{ VFS constructors
 	/**
 	 * @deprecated Use the form where the constructor takes a capability
 	 * list.
 	 */
-	public VFS(String name)
+	@Deprecated
+	protected VFS(String name)
 	{
 		this(name,0);
-	} //}}}
+	}
 
-	//{{{ VFS constructor
 	/**
 	 * Creates a new virtual filesystem.
 	 * @param name The name
 	 * @param caps The capabilities
 	 */
-	public VFS(String name, int caps)
+	protected VFS(String name, int caps)
 	{
 		this.name = name;
 		this.caps = caps;
 		// reasonable defaults (?)
 		this.extAttrs = new String[] { EA_SIZE, EA_TYPE };
-	} //}}}
+	}
 
-	//{{{ VFS constructor
 	/**
 	 * Creates a new virtual filesystem.
 	 * @param name The name
@@ -213,7 +225,7 @@ public abstract class VFS
 	 * @param extAttrs The extended attributes
 	 * @since jEdit 4.2pre1
 	 */
-	public VFS(String name, int caps, String[] extAttrs)
+	protected VFS(String name, int caps, String[] extAttrs)
 	{
 		this.name = name;
 		this.caps = caps;
@@ -241,6 +253,18 @@ public abstract class VFS
 		return caps;
 	} //}}}
 
+	//{{{ isMarkersFileSupported() method
+	/**
+	 * Returns if an additional markers file can be saved by this VFS.
+	 * Default is {@code true}.
+	 *
+	 * @since jEdit 4.3pre10
+	 */
+	public boolean isMarkersFileSupported()
+	{
+		return true;
+	} //}}}
+
 	//{{{ getExtendedAttributes() method
 	/**
 	 * Returns the extended attributes supported by this VFS.
@@ -259,7 +283,12 @@ public abstract class VFS
 	 * @param comp The component that will parent error dialog boxes
 	 * @return The URL
 	 * @since jEdit 2.7pre1
+	 * @deprecated This function is not used in the jEdit core anymore,
+	 *             so it doesn't have to be provided anymore. If you want
+	 *             to use it for another purpose like in the FTP plugin,
+	 *             feel free to do so.
 	 */
+	@Deprecated
 	public String showBrowseDialog(Object[] session, Component comp)
 	{
 		return null;
@@ -276,7 +305,7 @@ public abstract class VFS
 		if(path.equals("/"))
 			return path;
 
-		if(path.endsWith("/") || path.endsWith(File.separator))
+		while(path.endsWith("/") || path.endsWith(File.separator))
 			path = path.substring(0,path.length() - 1);
 
 		int index = Math.max(path.lastIndexOf('/'),
@@ -303,7 +332,15 @@ public abstract class VFS
 	{
 		// ignore last character of path to properly handle
 		// paths like /foo/bar/
-		int count = Math.max(0,path.length() - 2);
+		int lastIndex = path.length() - 1;
+		while(lastIndex > 0
+			&& (path.charAt(lastIndex) == File.separatorChar
+			|| path.charAt(lastIndex) == '/'))
+		{
+			lastIndex--;
+		}
+
+		int count = Math.max(0,lastIndex);
 		int index = path.lastIndexOf(File.separatorChar,count);
 		if(index == -1)
 			index = path.lastIndexOf('/',count);
@@ -357,6 +394,9 @@ public abstract class VFS
 	 * systems might not support the <code>#</code> character in filenames,
 	 * so this method permits the VFS to override this behavior.
 	 *
+	 * If this method returns <code>null</code>, two stage save will not
+	 * be used for that particular file (introduced in jEdit 4.3pre1).
+	 *
 	 * @param path The path name
 	 * @since jEdit 4.1pre7
 	 */
@@ -381,7 +421,7 @@ public abstract class VFS
 	 * a login name and password, for example.
 	 * @param path The path in question
 	 * @param comp The component that will parent any dialog boxes shown
-	 * @return The session
+	 * @return The session. The session can be null if there were errors
 	 * @since jEdit 2.6pre3
 	 */
 	public Object createVFSSession(String path, Component comp)
@@ -412,8 +452,8 @@ public abstract class VFS
 		if((getCapabilities() & WRITE_CAP) == 0)
 			buffer.setReadOnly(true);
 
-		BufferIORequest request = new BufferIORequest(
-			BufferIORequest.LOAD,view,buffer,session,this,path);
+		BufferIORequest request = new BufferLoadRequest(
+			view,buffer,session,this,path);
 		if(buffer.isTemporary())
 			// this makes HyperSearch much faster
 			request.run();
@@ -451,9 +491,98 @@ public abstract class VFS
 		if(!path.equals(buffer.getPath()))
 			buffer.unsetProperty(Buffer.BACKED_UP);
 
-		VFSManager.runInWorkThread(new BufferIORequest(
-			BufferIORequest.SAVE,view,buffer,session,this,path));
+		VFSManager.runInWorkThread(new BufferSaveRequest(
+			view,buffer,session,this,path));
 		return true;
+	} //}}}
+
+	//{{{ copy() methods
+	/**
+	 * Copy a file to another using VFS.
+	 *
+	 * @param progress the progress observer. It could be null if you don't want to monitor progress. If not null
+	 *                  you should probably launch this command in a WorkThread
+	 * @param sourceVFS the source VFS
+	 * @param sourceSession the VFS session
+	 * @param sourcePath the source path
+	 * @param targetVFS the target VFS
+	 * @param targetSession the target session
+	 * @param targetPath the target path
+	 * @param comp comp The component that will parent error dialog boxes
+	 * @param canStop could this copy be stopped ?
+	 * @return true if the copy was successful
+	 * @throws IOException  IOException If an I/O error occurs
+	 * @since jEdit 4.3pre3
+	 */
+	public static boolean copy(ProgressObserver progress, VFS sourceVFS, Object sourceSession,String sourcePath,
+		VFS targetVFS, Object targetSession,String targetPath, Component comp, boolean canStop)
+	throws IOException
+	{
+		if (progress != null)
+			progress.setStatus("Initializing");
+
+		InputStream in = null;
+		OutputStream out = null;
+		try
+		{
+			VFSFile sourceVFSFile = sourceVFS._getFile(sourceSession, sourcePath, comp);
+			if (sourceVFSFile == null)
+				throw new FileNotFoundException(sourcePath);
+			if (progress != null)
+			{
+				progress.setMaximum(sourceVFSFile.getLength());
+			}
+			VFSFile targetVFSFile = targetVFS._getFile(targetSession, targetPath, comp);
+			if (targetVFSFile.getType() == VFSFile.DIRECTORY)
+			{
+				if (targetVFSFile.getPath().equals(sourceVFSFile.getPath()))
+					return false;
+				targetPath = MiscUtilities.constructPath(targetPath, sourceVFSFile.getName());
+			}
+			in = new BufferedInputStream(sourceVFS._createInputStream(sourceSession, sourcePath, false, comp));
+			out = new BufferedOutputStream(targetVFS._createOutputStream(targetSession, targetPath, comp));
+			boolean copyResult = IOUtilities.copyStream(IOBUFSIZE, progress, in, out, canStop);
+			VFSManager.sendVFSUpdate(targetVFS, targetPath, true);
+			return copyResult;
+		}
+		finally
+		{
+			IOUtilities.closeQuietly(in);
+			IOUtilities.closeQuietly(out);
+		}
+	}
+
+	/**
+	 * Copy a file to another using VFS.
+	 *
+	 * @param progress the progress observer. It could be null if you don't want to monitor progress. If not null
+	 *                  you should probably launch this command in a WorkThread
+	 * @param sourcePath the source path
+	 * @param targetPath the target path
+	 * @param comp comp The component that will parent error dialog boxes
+	 * @param canStop if true the copy can be stopped
+	 * @return true if the copy was successful
+	 * @throws IOException IOException If an I/O error occurs
+	 * @since jEdit 4.3pre3
+	 */
+	public static boolean copy(ProgressObserver progress, String sourcePath,String targetPath, Component comp, boolean canStop)
+	throws IOException
+	{
+		VFS sourceVFS = VFSManager.getVFSForPath(sourcePath);
+		Object sourceSession = sourceVFS.createVFSSession(sourcePath, comp);
+		if (sourceSession == null)
+		{
+			Log.log(Log.WARNING, VFS.class, "Unable to get a valid session from " + sourceVFS + " for path " + sourcePath);
+			return false;
+		}
+		VFS targetVFS = VFSManager.getVFSForPath(targetPath);
+		Object targetSession = targetVFS.createVFSSession(targetPath, comp);
+		if (targetSession == null)
+		{
+			Log.log(Log.WARNING, VFS.class, "Unable to get a valid session from " + targetVFS + " for path " + targetPath);
+			return false;
+		}
+		return copy(progress, sourceVFS, sourceSession, sourcePath, targetVFS, targetSession, targetPath, comp,canStop);
 	} //}}}
 
 	//{{{ insert() method
@@ -476,8 +605,8 @@ public abstract class VFS
 		if(session == null)
 			return false;
 
-		VFSManager.runInWorkThread(new BufferIORequest(
-			BufferIORequest.INSERT,view,buffer,session,this,path));
+		VFSManager.runInWorkThread(new BufferInsertRequest(
+			view,buffer,session,this,path));
 		return true;
 	} //}}}
 
@@ -515,37 +644,89 @@ public abstract class VFS
 	 * @since jEdit 4.1pre1
 	 */
 	public String[] _listDirectory(Object session, String directory,
-		String glob, boolean recursive, Component comp)
+		String glob, boolean recursive, Component comp )
 		throws IOException
 	{
-		Log.log(Log.DEBUG,this,"Listing " + directory);
-		ArrayList files = new ArrayList(100);
+		String[] retval = _listDirectory(session, directory, glob, recursive, comp, true, false);
+		return retval;
+	} //}}}
 
-		RE filter;
-		try
-		{
-			filter = new RE(MiscUtilities.globToRE(glob),
-				RE.REG_ICASE);
-		}
-		catch(REException e)
-		{
-			Log.log(Log.ERROR,this,e);
-			return null;
-		}
 
-		_listDirectory(session,new ArrayList(),files,directory,filter,
-			recursive,comp);
-
-		String[] retVal = (String[])files.toArray(new String[files.size()]);
-
-		Arrays.sort(retVal,new MiscUtilities.StringICaseCompare());
-
-		return retVal;
+	//{{{ _listDirectory() method
+	/**
+	 * A convenience method that matches file names against globs, and can
+	 * optionally list the directory recursively.
+	 * @param session The session
+	 * @param directory The directory. Note that this must be a full
+	 * URL, including the host name, path name, and so on. The
+	 * username and password (if needed by the VFS) is obtained from the
+	 * session instance.
+	 * @param glob Only file names matching this glob will be returned
+	 * @param recursive If true, subdirectories will also be listed.
+	 * @param comp The component that will parent error dialog boxes
+	 * @exception IOException if an I/O error occurred
+	 * @param skipBinary ignore binary files (do not return them).
+	 *    This will slow down the process since it will open the files
+	 * @param skipHidden skips hidden files, directories, and
+	 *        backup files. Ignores any file beginning with . or #, or ending with ~
+	 *        or .bak
+	 *
+	 *
+	 * @since jEdit 4.3pre5
+	 */
+	public String[] _listDirectory(Object session, String directory,
+		String glob, boolean recursive, Component comp,
+		boolean skipBinary, boolean skipHidden)
+		throws IOException
+	{
+		VFSFileFilter filter = new GlobVFSFileFilter(glob);
+		return _listDirectory(session, directory, filter,
+				      recursive, comp, skipBinary,
+				      skipHidden);
 	} //}}}
 
 	//{{{ _listDirectory() method
 	/**
-	 * Lists the specified directory. 
+	 * A convenience method that filters the directory listing
+	 * according to a filter, and can optionally list the directory
+	 * recursively.
+	 * @param session The session
+	 * @param directory The directory. Note that this must be a full
+	 * URL, including the host name, path name, and so on. The
+	 * username and password (if needed by the VFS) is obtained from the
+	 * session instance.
+	 * @param filter The {@link VFSFileFilter} to use for filtering.
+	 * @param recursive If true, subdirectories will also be listed.
+	 * @param comp The component that will parent error dialog boxes
+	 * @exception IOException if an I/O error occurred
+	 * @param skipBinary ignore binary files (do not return them).
+	 *    This will slow down the process since it will open the files
+	 * @param skipHidden skips hidden files, directories, and
+	 *        backup files. Ignores any file beginning with . or #, or ending with ~
+	 *        or .bak
+	 *
+	 * @since jEdit 4.3pre7
+	 */
+	public String[] _listDirectory(Object session, String directory,
+		VFSFileFilter filter, boolean recursive, Component comp,
+		boolean skipBinary, boolean skipHidden)
+		throws IOException
+	{
+		List<String> files = new ArrayList<String>(100);
+
+		listFiles(session,new HashSet<String>(), files,directory,filter,
+			recursive, comp, skipBinary, skipHidden);
+
+		String[] retVal = files.toArray(new String[files.size()]);
+
+		Arrays.sort(retVal,new StandardUtilities.StringCompare<String>(true));
+
+		return retVal;
+	} //}}}
+
+	//{{{ _listFiles() method
+	/**
+	 * Lists the specified directory.
 	 * @param session The session
 	 * @param directory The directory. Note that this must be a full
 	 * URL, including the host name, path name, and so on. The
@@ -553,8 +734,20 @@ public abstract class VFS
 	 * session instance.
 	 * @param comp The component that will parent error dialog boxes
 	 * @exception IOException if an I/O error occurred
-	 * @since jEdit 2.7pre1
+	 * @since jEdit 4.3pre2
 	 */
+	public VFSFile[] _listFiles(Object session, String directory,
+		Component comp)
+		throws IOException
+	{
+		return _listDirectory(session,directory,comp);
+	} //}}}
+
+	//{{{ _listDirectory() method
+	/**
+	 * @deprecated Use <code>_listFiles()</code> instead.
+	 */
+	@Deprecated
 	public DirectoryEntry[] _listDirectory(Object session, String directory,
 		Component comp)
 		throws IOException
@@ -563,16 +756,35 @@ public abstract class VFS
 		return null;
 	} //}}}
 
+	//{{{ _getFile() method
+	/**
+	 * Returns the specified directory entry.
+	 * @param session The session get it with {@link VFS#createVFSSession(String, Component)}
+	 * @param path The path
+	 * @param comp The component that will parent error dialog boxes
+	 * @exception IOException if an I/O error occurred
+	 * @return The specified directory entry, or null if it doesn't exist.
+	 * @since jEdit 4.3pre2
+	 */
+	public VFSFile _getFile(Object session, String path,
+		Component comp)
+		throws IOException
+	{
+		return _getDirectoryEntry(session,path,comp);
+	} //}}}
+
 	//{{{ _getDirectoryEntry() method
 	/**
 	 * Returns the specified directory entry.
-	 * @param session The session
+	 * @param session The session get it with {@link VFS#createVFSSession(String, Component)}
 	 * @param path The path
 	 * @param comp The component that will parent error dialog boxes
 	 * @exception IOException if an I/O error occurred
 	 * @return The specified directory entry, or null if it doesn't exist.
 	 * @since jEdit 2.7pre1
+	 * @deprecated Use <code>_getFile()</code> instead.
 	 */
+	@Deprecated
 	public DirectoryEntry _getDirectoryEntry(Object session, String path,
 		Component comp)
 		throws IOException
@@ -582,34 +794,11 @@ public abstract class VFS
 
 	//{{{ DirectoryEntry class
 	/**
-	 * A directory entry.
-	 * @since jEdit 2.6pre2
+	 * @deprecated Use <code>VFSFile</code> instead.
 	 */
-	public static class DirectoryEntry implements Serializable
+	@Deprecated
+	public static class DirectoryEntry extends VFSFile
 	{
-		//{{{ File types
-		public static final int FILE = 0;
-		public static final int DIRECTORY = 1;
-		public static final int FILESYSTEM = 2;
-		//}}}
-
-		//{{{ Instance variables
-		public String name;
-		public String path;
-
-		/**
-		 * @since jEdit 4.2pre5
-		 */
-		public String symlinkPath;
-
-		public String deletePath;
-		public int type;
-		public long length;
-		public boolean hidden;
-		public boolean canRead;
-		public boolean canWrite;
-		//}}}
-
 		//{{{ DirectoryEntry constructor
 		/**
 		 * @since jEdit 4.2pre2
@@ -636,80 +825,6 @@ public abstract class VFS
 				canRead = ((vfs.getCapabilities() & READ_CAP) != 0);
 				canWrite = ((vfs.getCapabilities() & WRITE_CAP) != 0);
 			}
-		} //}}}
-
-		protected boolean colorCalculated;
-		protected Color color;
-
-		//{{{ getExtendedAttribute() method
-		/**
-		 * Returns the value of an extended attribute. Note that this
-		 * returns formatted strings (eg, "10 Mb" for a file size of
-		 * 1048576 bytes). If you need access to the raw data, access
-		 * fields and methods of this class.
-		 * @param name The extended attribute name
-		 * @since jEdit 4.2pre1
-		 */
-		public String getExtendedAttribute(String name)
-		{
-			if(name.equals(EA_TYPE))
-			{
-				switch(type)
-				{
-				case FILE:
-					return jEdit.getProperty("vfs.browser.type.file");
-				case DIRECTORY:
-					return jEdit.getProperty("vfs.browser.type.directory");
-				case FILESYSTEM:
-					return jEdit.getProperty("vfs.browser.type.filesystem");
-				default:
-					throw new IllegalArgumentException();
-				}
-			}
-			else if(name.equals(EA_STATUS))
-			{
-				if(canRead)
-				{
-					if(canWrite)
-						return jEdit.getProperty("vfs.browser.status.rw");
-					else
-						return jEdit.getProperty("vfs.browser.status.ro");
-				}
-				else
-				{
-					if(canWrite)
-						return jEdit.getProperty("vfs.browser.status.append");
-					else
-						return jEdit.getProperty("vfs.browser.status.no");
-				}
-			}
-			else if(name.equals(EA_SIZE))
-			{
-				if(type != FILE)
-					return null;
-				else
-					return MiscUtilities.formatFileSize(length);
-			}
-			else
-				return null;
-		} //}}}
-
-		//{{{ getColor() method
-		public Color getColor()
-		{
-			if(!colorCalculated)
-			{
-				colorCalculated = true;
-				color = getDefaultColorFor(name);
-			}
-
-			return color;
-		} //}}}
-
-		//{{{ toString() method
-		public String toString()
-		{
-			return name;
 		} //}}}
 	} //}}}
 
@@ -785,6 +900,7 @@ public abstract class VFS
 	 * @param ignoreErrors If true, file not found errors should be
 	 * ignored
 	 * @param comp The component that will parent error dialog boxes
+	 * @return an inputstream or <code>null</code> if there was a problem
 	 * @exception IOException If an I/O error occurs
 	 * @since jEdit 2.7pre1
 	 */
@@ -829,6 +945,25 @@ public abstract class VFS
 	public void _saveComplete(Object session, Buffer buffer, String path,
 		Component comp) throws IOException {} //}}}
 
+	//{{{ _finishTwoStageSave() method
+	/**
+	 * Called after a file has been saved and we use twoStageSave (first saving to
+	 * another file). This should re-apply permissions for example.
+
+	 * @param session The VFS session
+	 * @param buffer The buffer
+	 * @param path The path the buffer was saved to (can be different from
+	 * {@link org.gjt.sp.jedit.Buffer#getPath()} if the user invoked the
+	 * <b>Save a Copy As</b> command, for example).
+	 * @param comp The component that will parent error dialog boxes
+	 * @exception IOException If an I/O error occurs
+	 * @since jEdit 4.3pre4
+	 */
+	public void _finishTwoStageSave(Object session, Buffer buffer, String path,
+		Component comp) throws IOException
+	{
+	} //}}}
+
 	//{{{ _endVFSSession() method
 	/**
 	 * Finishes the specified VFS session. This must be called
@@ -859,8 +994,8 @@ public abstract class VFS
 
 			for(int i = 0; i < colors.size(); i++)
 			{
-				ColorEntry entry = (ColorEntry)colors.elementAt(i);
-				if(entry.re.isMatch(name))
+				ColorEntry entry = colors.get(i);
+				if(entry.re.matcher(name).matches())
 					return entry.color;
 			}
 
@@ -870,11 +1005,11 @@ public abstract class VFS
 
 	//{{{ DirectoryEntryCompare class
 	/**
-	 * Implementation of {@link org.gjt.sp.jedit.MiscUtilities.Compare}
+	 * Implementation of {@link Comparator}
 	 * interface that compares {@link VFS.DirectoryEntry} instances.
 	 * @since jEdit 4.2pre1
 	 */
-	public static class DirectoryEntryCompare implements MiscUtilities.Compare
+	public static class DirectoryEntryCompare implements Comparator<VFSFile>
 	{
 		private boolean sortIgnoreCase, sortMixFilesAndDirs;
 
@@ -892,19 +1027,16 @@ public abstract class VFS
 			this.sortIgnoreCase = sortIgnoreCase;
 		}
 
-		public int compare(Object obj1, Object obj2)
+		public int compare(VFSFile file1, VFSFile file2)
 		{
-			VFS.DirectoryEntry file1 = (VFS.DirectoryEntry)obj1;
-			VFS.DirectoryEntry file2 = (VFS.DirectoryEntry)obj2;
-
 			if(!sortMixFilesAndDirs)
 			{
-				if(file1.type != file2.type)
-					return file2.type - file1.type;
+				if(file1.getType() != file2.getType())
+					return file2.getType() - file1.getType();
 			}
 
-			return MiscUtilities.compareStrings(file1.name,
-				file2.name,sortIgnoreCase);
+			return StandardUtilities.compareStrings(file1.getName(),
+				file2.getName(),sortIgnoreCase);
 		}
 	} //}}}
 
@@ -912,8 +1044,8 @@ public abstract class VFS
 	private String name;
 	private int caps;
 	private String[] extAttrs;
-	private static Vector colors;
-	private static Object lock = new Object();
+	private static List<ColorEntry> colors;
+	private static final Object lock = new Object();
 
 	//{{{ Class initializer
 	static
@@ -933,53 +1065,84 @@ public abstract class VFS
 		});
 	} //}}}
 
-	//{{{ _listDirectory() method
-	private void _listDirectory(Object session, ArrayList stack,
-		ArrayList files, String directory, RE glob, boolean recursive,
-		Component comp) throws IOException
+	//{{{ recursive listFiles() method
+	private void listFiles(Object session, Collection<String> stack,
+		List<String> files, String directory, VFSFileFilter filter, boolean recursive,
+		Component comp, boolean skipBinary, boolean skipHidden) throws IOException
 	{
-		if(stack.contains(directory))
+		String resolvedPath = directory;
+		if (recursive && !MiscUtilities.isURL(directory))
 		{
-			Log.log(Log.ERROR,this,
-				"Recursion in _listDirectory(): "
-				+ directory);
-			return;
+			resolvedPath = MiscUtilities.resolveSymlinks(directory);
+			/*
+			 * If looking at a symlink, do not traverse the
+			 * resolved path more than once.
+			 */
+			if (!directory.equals(resolvedPath))
+			{
+				if (stack.contains(resolvedPath))
+				{
+					Log.log(Log.ERROR,this,
+						"Recursion in listFiles(): "
+						+ directory);
+					return;
+				}
+				stack.add(resolvedPath);
+			}
 		}
-		else
-			stack.add(directory);
 
-		VFS.DirectoryEntry[] _files = _listDirectory(session,directory,
+		Thread ct = Thread.currentThread();
+		WorkThread wt = null;
+		if (ct instanceof WorkThread) {
+			wt = (WorkThread) ct;
+		}
+
+
+		VFSFile[] _files = _listFiles(session,directory,
 			comp);
 		if(_files == null || _files.length == 0)
 			return;
 
 		for(int i = 0; i < _files.length; i++)
 		{
-			VFS.DirectoryEntry file = _files[i];
-
-			if(file.type == VFS.DirectoryEntry.DIRECTORY
-				|| file.type == VFS.DirectoryEntry.FILESYSTEM)
+			if (wt != null && wt.isAborted()) break;
+			VFSFile file = _files[i];
+			if (skipHidden && (file.isHidden() || MiscUtilities.isBackup(file.getName())))
+				continue;
+			if(!filter.accept(file))
+				continue;
+			if(file.getType() == VFSFile.DIRECTORY
+				|| file.getType() == VFSFile.FILESYSTEM)
 			{
 				if(recursive)
 				{
-					// resolve symlinks to avoid loops
-					String canonPath = _canonPath(session,file.path,comp);
-					if(!MiscUtilities.isURL(canonPath))
-						canonPath = MiscUtilities.resolveSymlinks(canonPath);
-
-					_listDirectory(session,stack,files,
-						canonPath,glob,recursive,
-						comp);
+					String canonPath = _canonPath(session,
+						file.getPath(),comp);
+					listFiles(session,stack,files,
+						canonPath,filter,recursive,
+						comp, skipBinary, skipHidden);
 				}
 			}
-			else
+			else // It's a regular file
 			{
-				if(!glob.isMatch(file.name))
-					continue;
-
-				Log.log(Log.DEBUG,this,file.path);
-
-				files.add(file.path);
+				if (skipBinary)
+				{
+					try
+					{
+						if (file.isBinary(session))
+						{
+							Log.log(Log.NOTICE,this
+								,file.getPath() + ": skipped as a binary file");
+							continue;
+						}
+					}
+					catch(IOException e)
+					{
+						Log.log(Log.ERROR,this,e);
+						// may be not binary...
+					}
+				}
+				files.add(file.getPath());
 			}
 		}
 	} //}}}
@@ -989,7 +1152,7 @@ public abstract class VFS
 	{
 		synchronized(lock)
 		{
-			colors = new Vector();
+			colors = new ArrayList<ColorEntry>();
 
 			if(!jEdit.getBooleanProperty("vfs.browser.colorize"))
 				return;
@@ -1000,13 +1163,13 @@ public abstract class VFS
 			{
 				try
 				{
-					colors.addElement(new ColorEntry(
-						new RE(MiscUtilities.globToRE(glob)),
+					colors.add(new ColorEntry(
+						Pattern.compile(StandardUtilities.globToRE(glob)),
 						jEdit.getColorProperty(
 						"vfs.browser.colors." + i + ".color",
 						Color.black)));
 				}
-				catch(REException e)
+				catch(PatternSyntaxException e)
 				{
 					Log.log(Log.ERROR,VFS.class,"Invalid regular expression: "
 						+ glob);
@@ -1019,12 +1182,12 @@ public abstract class VFS
 	} //}}}
 
 	//{{{ ColorEntry class
-	static class ColorEntry
+	private static class ColorEntry
 	{
-		RE re;
+		Pattern re;
 		Color color;
 
-		ColorEntry(RE re, Color color)
+		ColorEntry(Pattern re, Color color)
 		{
 			this.re = re;
 			this.color = color;

@@ -26,9 +26,8 @@ package org.gjt.sp.jedit.options;
 import java.awt.Dialog;
 import java.awt.Frame;
 import org.gjt.sp.jedit.gui.OptionsDialog;
-import org.gjt.sp.jedit.options.*;
+import org.gjt.sp.jedit.msg.PropertiesChanging;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
 //}}}
 
 public class GlobalOptions extends OptionsDialog
@@ -64,20 +63,21 @@ public class GlobalOptions extends OptionsDialog
 		OptionGroup rootGroup = (OptionGroup) paneTreeModel.getRoot();
 
 		// initialize the jEdit branch of the options tree
-		jEditGroup = new OptionGroup("jedit");
+		OptionGroup jEditGroup = new OptionGroup("jedit");
 
+		jEditGroup.addOptionPane("general");
 		jEditGroup.addOptionPane("abbrevs");
 		jEditGroup.addOptionPane("appearance");
-		jEditGroup.addOptionPane("auto-back");
 		jEditGroup.addOptionPane("context");
 		jEditGroup.addOptionPane("docking");
 		jEditGroup.addOptionPane("editing");
-		jEditGroup.addOptionPane("general");
+		jEditGroup.addOptionPane("encodings");
 		jEditGroup.addOptionPane("gutter");
 		jEditGroup.addOptionPane("mouse");
-		jEditGroup.addOptionPane("print");
 		jEditGroup.addOptionPane("plugin-manager");
+		jEditGroup.addOptionPane("print");
 		jEditGroup.addOptionPane("firewall");
+		jEditGroup.addOptionPane("save-back");
 		jEditGroup.addOptionPane("shortcuts");
 		jEditGroup.addOptionPane("status");
 		jEditGroup.addOptionPane("syntax");
@@ -86,7 +86,7 @@ public class GlobalOptions extends OptionsDialog
 		jEditGroup.addOptionPane("view");
 		rootGroup.addOptionGroup(jEditGroup);
 
-		browserGroup = new OptionGroup("browser");
+		OptionGroup browserGroup = new OptionGroup("browser");
 		browserGroup.addOptionPane("browser.general");
 		browserGroup.addOptionPane("browser.colors");
 		rootGroup.addOptionGroup(browserGroup);
@@ -94,14 +94,29 @@ public class GlobalOptions extends OptionsDialog
 		return paneTreeModel;
 	} //}}}
 
+	//{{{ cancel() method
+	@Override
+	public void cancel()
+	{
+		EditBus.send(
+			new PropertiesChanging(null,
+				PropertiesChanging.State.CANCELED));
+		super.cancel();
+	} //}}}
+
+	//{{{ init() method
+	@Override
+	protected void init(String name, String pane)
+	{
+		EditBus.send(
+			new PropertiesChanging(null,
+				PropertiesChanging.State.LOADING));
+		super.init(name, pane);
+	} //}}}
+
 	//{{{ getDefaultGroup() method
 	protected OptionGroup getDefaultGroup()
 	{
 		return null;
 	} //}}}
-
-	//{{{ Private members
-	private OptionGroup jEditGroup;
-	private OptionGroup browserGroup;
-	//}}}
 }

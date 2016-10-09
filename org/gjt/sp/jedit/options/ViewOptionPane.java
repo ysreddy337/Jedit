@@ -24,11 +24,12 @@ package org.gjt.sp.jedit.options;
 
 import javax.swing.border.*;
 import javax.swing.*;
+
 import java.awt.event.*;
 import java.awt.*;
-import java.io.*;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
+import org.gjt.sp.jedit.bufferset.BufferSet;
+import org.gjt.sp.jedit.bufferset.BufferSetManager;
 
 public class ViewOptionPane extends AbstractOptionPane
 {
@@ -39,6 +40,7 @@ public class ViewOptionPane extends AbstractOptionPane
 	} //}}}
 
 	//{{{ _init() method
+	@Override
 	protected void _init()
 	{
 		/* View dock layout */
@@ -69,10 +71,11 @@ public class ViewOptionPane extends AbstractOptionPane
 		buttons.setBorder(new EmptyBorder(0,12,12,12));
 		buttons.add(alternateDockingLayout = new JButton(jEdit.getProperty(
 			"options.view.alternateDockingLayout")));
-		alternateDockingLayout.addActionListener(new ActionHandler());
+		ActionHandler actionHandler = new ActionHandler();
+		alternateDockingLayout.addActionListener(actionHandler);
 		buttons.add(alternateToolBarLayout = new JButton(jEdit.getProperty(
 			"options.view.alternateToolBarLayout")));
-		alternateToolBarLayout.addActionListener(new ActionHandler());
+		alternateToolBarLayout.addActionListener(actionHandler);
 		layoutPanel.add(BorderLayout.SOUTH,buttons);
 
 		TitledBorder border = new TitledBorder(jEdit.getProperty(
@@ -106,12 +109,78 @@ public class ViewOptionPane extends AbstractOptionPane
 		/* Show buffer switcher */
 		showBufferSwitcher = new JCheckBox(jEdit.getProperty(
 			"options.view.showBufferSwitcher"));
+
 		showBufferSwitcher.setSelected(jEdit.getBooleanProperty(
 			"view.showBufferSwitcher"));
 		addComponent(showBufferSwitcher);
+		showBufferSwitcher.addActionListener(actionHandler);
+
+
+		/* Buffer switcher max row count */
+		bufferSwitcherMaxRowCount = new JTextField(jEdit.getProperty("bufferSwitcher.maxRowCount"));
+		addComponent(jEdit.getProperty("options.view.bufferSwitcherMaxRowsCount"),
+			bufferSwitcherMaxRowCount);
+		bufferSwitcherMaxRowCount.setEditable(showBufferSwitcher.isSelected());
+
+		defaultBufferSet = new JComboBox();
+		defaultBufferSet.addItem(BufferSet.Scope.global);
+		defaultBufferSet.addItem(BufferSet.Scope.view);
+		defaultBufferSet.addItem(BufferSet.Scope.editpane);
+		defaultBufferSet.setSelectedItem(BufferSet.Scope.fromString(jEdit.getProperty("editpane.bufferset.default")));
+		addComponent(jEdit.getProperty("options.editpane.bufferset.default"), defaultBufferSet);
+
+		newBufferSetBehavior = new JComboBox();
+		newBufferSetBehavior.addItem(BufferSetManager.NewBufferSetAction.copy);
+		newBufferSetBehavior.addItem(BufferSetManager.NewBufferSetAction.empty);
+		newBufferSetBehavior.addItem(BufferSetManager.NewBufferSetAction.currentbuffer);
+		newBufferSetBehavior.setSelectedItem(BufferSetManager.NewBufferSetAction.fromString(jEdit.getProperty("editpane.bufferset.new")));
+		addComponent(new JLabel(jEdit.getProperty("options.editpane.bufferset.contain")),
+					newBufferSetBehavior);
+
+
+		/* Sort buffers */
+		sortBuffers = new JCheckBox(jEdit.getProperty(
+			"options.view.sortBuffers"));
+		sortBuffers.setSelected(jEdit.getBooleanProperty("sortBuffers"));
+		sortBuffers.addActionListener(new ActionListener()
+		{
+			public void actionPerformed(ActionEvent evt)
+			{
+				sortByName.setEnabled(sortBuffers.isSelected());
+			}
+		});
+
+		addComponent(sortBuffers);
+
+		/* Sort buffers by names */
+		sortByName = new JCheckBox(jEdit.getProperty(
+			"options.view.sortByName"));
+		sortByName.setSelected(jEdit.getBooleanProperty("sortByName"));
+		sortByName.setEnabled(sortBuffers.isSelected());
+		addComponent(sortByName);
+
+		fullScreenIncludesMenu = new JCheckBox(jEdit.getProperty(
+			"options.view.fullScreenIncludesMenu"));
+		fullScreenIncludesMenu.setSelected(
+			jEdit.getBooleanProperty("fullScreenIncludesMenu"));
+		addComponent(fullScreenIncludesMenu);
+
+		fullScreenIncludesToolbar = new JCheckBox(jEdit.getProperty(
+			"options.view.fullScreenIncludesToolbar"));
+		fullScreenIncludesToolbar.setSelected(
+			jEdit.getBooleanProperty("fullScreenIncludesToolbar"));
+		addComponent(fullScreenIncludesToolbar);
+
+		fullScreenIncludesStatus = new JCheckBox(jEdit.getProperty(
+				"options.view.fullScreenIncludesStatus"));
+		fullScreenIncludesStatus.setSelected(
+				jEdit.getBooleanProperty("fullScreenIncludesStatus"));
+		addComponent(fullScreenIncludesStatus);
+
 	} //}}}
 
 	//{{{ _save() method
+	@Override
 	protected void _save()
 	{
 		jEdit.setBooleanProperty("view.docking.alternateLayout",
@@ -128,6 +197,17 @@ public class ViewOptionPane extends AbstractOptionPane
 			.isSelected());
 		jEdit.setBooleanProperty("view.showBufferSwitcher",
 			showBufferSwitcher.isSelected());
+		jEdit.setProperty("bufferSwitcher.maxRowCount",
+			bufferSwitcherMaxRowCount.getText());
+		jEdit.setProperty("editpane.bufferset.default", defaultBufferSet.getSelectedItem().toString());
+		jEdit.setProperty("editpane.bufferset.new",
+						  ((BufferSetManager.NewBufferSetAction)newBufferSetBehavior.getSelectedItem()).getName());
+		jEdit.setBooleanProperty("sortBuffers",sortBuffers.isSelected());
+		jEdit.setBooleanProperty("sortByName",sortByName.isSelected());
+		jEdit.setBooleanProperty("fullScreenIncludesMenu",fullScreenIncludesMenu.isSelected());
+		jEdit.setBooleanProperty("fullScreenIncludesToolbar",fullScreenIncludesToolbar.isSelected());
+		jEdit.setBooleanProperty("fullScreenIncludesStatus",fullScreenIncludesStatus.isSelected());
+
 	} //}}}
 
 	//{{{ Private members
@@ -138,10 +218,19 @@ public class ViewOptionPane extends AbstractOptionPane
 	private JCheckBox showSearchbar;
 	private JCheckBox beepOnSearchAutoWrap;
 	private JCheckBox showBufferSwitcher;
+	private JTextField bufferSwitcherMaxRowCount;
+	private JComboBox defaultBufferSet;
+	private JComboBox newBufferSetBehavior;
+	private JCheckBox sortBuffers;
+	private JCheckBox sortByName;
+	private JCheckBox fullScreenIncludesMenu;
+	private JCheckBox fullScreenIncludesToolbar;
+	private JCheckBox fullScreenIncludesStatus;
+
 	//}}}
 
 	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
+	private class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
 		{
@@ -166,6 +255,10 @@ public class ViewOptionPane extends AbstractOptionPane
 					layout.setIcon(layoutIcon4);
 				else if(layout.getIcon() == layoutIcon4)
 					layout.setIcon(layoutIcon2);
+			}
+			else if (evt.getSource() == showBufferSwitcher)
+			{
+				bufferSwitcherMaxRowCount.setEditable(showBufferSwitcher.isSelected());
 			}
 		}
 	} //}}}

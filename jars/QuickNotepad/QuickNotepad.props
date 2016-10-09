@@ -1,5 +1,5 @@
 # Properties file for QuickNotepad plugin
-# $Id: QuickNotepad.props,v 1.13 2004/08/28 08:12:46 spestov Exp $
+# $Id: QuickNotepad.props 6876 2006-09-02 20:39:49Z jchoyt $
 
 # jEdit only needs to load the plugin the first time the user accesses it
 # the presence of this property also tells jEdit the plugin is using the new API
@@ -10,14 +10,16 @@ plugin.QuickNotepadPlugin.name=QuickNotepad
 plugin.QuickNotepadPlugin.author=John Gellene
 
 # version number == jEdit version number
-plugin.QuickNotepadPlugin.version=4.2
+plugin.QuickNotepadPlugin.version=4.3
 
 # online help
 plugin.QuickNotepadPlugin.docs=index.html
 
 # we only have one dependency, jEdit 4.2, since we use the new plugin API
 plugin.QuickNotepadPlugin.depend.0=jedit 04.02.01.00
+plugin.QuickNotepadPlugin.depend.1=jdk 1.4
 
+plugin.QuickNotepadPlugin.description=This plugin provides a dockable "scratch pad" for writing and displaying notes, to do lists or similar items as unformatted text.
 # plugin menu
 plugin.QuickNotepadPlugin.menu=quicknotepad \
 	- \

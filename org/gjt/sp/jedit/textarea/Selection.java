@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2001, 2002 Slava Pestov
+ * Copyright (C) 2001, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,8 +24,10 @@ package org.gjt.sp.jedit.textarea;
 
 //{{{ Imports
 import java.util.ArrayList;
-import org.gjt.sp.jedit.Buffer;
-import org.gjt.sp.jedit.MiscUtilities;
+import java.util.List;
+
+import org.gjt.sp.jedit.buffer.JEditBuffer;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
@@ -40,7 +42,7 @@ import org.gjt.sp.jedit.MiscUtilities;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: Selection.java,v 1.22 2004/04/06 19:05:31 spestov Exp $
+ * @version $Id: Selection.java 15570 2009-06-25 00:43:57Z ezust $
  * @since jEdit 3.2pre1
  */
 public abstract class Selection implements Cloneable
@@ -67,24 +69,24 @@ public abstract class Selection implements Cloneable
 	/**
 	 * Returns the beginning of the portion of the selection
 	 * falling on the specified line. Used to manipulate
-         * selection text on a line-by-line basis.
+	 * selection text on a line-by-line basis.
 	 * @param buffer The buffer
 	 * @param line The line number
 	 * @since jEdit 4.1pre1
 	 */
-	public abstract int getStart(Buffer buffer, int line);
+	public abstract int getStart(JEditBuffer buffer, int line);
 	//}}}
 
 	//{{{ getEnd() method
 	/**
 	 * Returns the end of the portion of the selection
 	 * falling on the specified line. Used to manipulate
-         * selection text on a line-by-line basis.
+	 * selection text on a line-by-line basis.
 	 * @param buffer The buffer
 	 * @param line The line number
 	 * @since jEdit 4.1pre1
 	 */
-	public abstract int getEnd(Buffer buffer, int line);
+	public abstract int getEnd(JEditBuffer buffer, int line);
 	//}}}
 
 	//{{{ getStartLine() method
@@ -121,14 +123,16 @@ public abstract class Selection implements Cloneable
 	} //}}}
 
 	//{{{ toString() method
+	@Override
 	public String toString()
 	{
 		return getClass().getName() + "[start=" + start
 			+ ",end=" + end + ",startLine=" + startLine
-			+ ",endLine=" + endLine + "]";
+			+ ",endLine=" + endLine + ']';
 	} //}}}
 
 	//{{{ clone() method
+	@Override
 	public Object clone()
 	{
 		try
@@ -148,31 +152,57 @@ public abstract class Selection implements Cloneable
 	int startLine, endLine;
 
 	//{{{ Selection constructor
-	Selection()
+	protected Selection()
 	{
 	} //}}}
 
 	//{{{ Selection constructor
-	Selection(Selection sel)
+	protected Selection(Selection sel)
 	{
 		this.start = sel.start;
 		this.end = sel.end;
 	} //}}}
 
 	//{{{ Selection constructor
-	Selection(int start, int end)
+	protected Selection(int start, int end)
 	{
 		this.start = start;
 		this.end = end;
 	} //}}}
 
 	// should the next two be public, maybe?
-	abstract void getText(Buffer buffer, StringBuffer buf);
-	abstract int setText(Buffer buffer, String text);
+	abstract void getText(JEditBuffer buffer, StringBuilder buf);
 
-	abstract boolean contentInserted(Buffer buffer, int startLine, int start,
+	/**
+	 * Replace the selection with the given text
+	 * @param buffer the buffer
+	 * @param text the text
+	 * @return the offset at the end of the inserted text
+	 */
+	abstract int setText(JEditBuffer buffer, String text);
+
+	/**
+	 * Called when text is inserted into the buffer.
+	 * @param buffer The buffer in question
+	 * @param startLine The first line
+	 * @param start The start offset, from the beginning of the buffer
+	 * @param numLines The number of lines inserted
+	 * @param length The number of characters inserted
+	 * @return <code>true</code> if the selection was changed
+	 */
+	abstract boolean contentInserted(JEditBuffer buffer, int startLine, int start,
 		int numLines, int length);
-	abstract boolean contentRemoved(Buffer buffer, int startLine, int start,
+
+	/**
+	 * Called when text is removed from the buffer.
+	 * @param buffer The buffer in question
+	 * @param startLine The first line
+	 * @param start The start offset, from the beginning of the buffer
+	 * @param numLines The number of lines removed
+	 * @param length The number of characters removed
+	 * @return <code>true</code> if the selection was changed
+	 */
+	abstract boolean contentRemoved(JEditBuffer buffer, int startLine, int start,
 		int numLines, int length);
 	//}}}
 
@@ -201,7 +231,8 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ getStart() method
-		public int getStart(Buffer buffer, int line)
+		@Override
+		public int getStart(JEditBuffer buffer, int line)
 		{
 			if(line == startLine)
 				return start;
@@ -210,7 +241,8 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ getEnd() method
-		public int getEnd(Buffer buffer, int line)
+		@Override
+		public int getEnd(JEditBuffer buffer, int line)
 		{
 			if(line == endLine)
 				return end;
@@ -221,13 +253,21 @@ public abstract class Selection implements Cloneable
 		//{{{ Package-private members
 
 		//{{{ getText() method
-		void getText(Buffer buffer, StringBuffer buf)
+		@Override
+		void getText(JEditBuffer buffer, StringBuilder buf)
 		{
 			buf.append(buffer.getText(start,end - start));
 		} //}}}
 
 		//{{{ setText() method
-		int setText(Buffer buffer, String text)
+		/**
+		 * Replace the selection with the given text
+		 * @param buffer the buffer
+		 * @param text the text
+		 * @return the offset at the end of the inserted text
+		 */
+		@Override
+		int setText(JEditBuffer buffer, String text)
 		{
 			buffer.remove(start,end - start);
 			if(text != null && text.length() != 0)
@@ -240,7 +280,8 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ contentInserted() method
-		boolean contentInserted(Buffer buffer, int startLine, int start,
+		@Override
+		boolean contentInserted(JEditBuffer buffer, int startLine, int start,
 			int numLines, int length)
 		{
 			boolean changed = false;
@@ -265,7 +306,8 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ contentRemoved() method
-		boolean contentRemoved(Buffer buffer, int startLine, int start,
+		@Override
+		boolean contentRemoved(JEditBuffer buffer, int startLine, int start,
 			int numLines, int length)
 		{
 			int end = start + length;
@@ -316,7 +358,6 @@ public abstract class Selection implements Cloneable
 		//{{{ Rect constructor
 		public Rect()
 		{
-			super();
 		} //}}}
 
 		//{{{ Rect constructor
@@ -341,7 +382,7 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ Rect constructor
-		public Rect(Buffer buffer, int startLine, int startColumn,
+		public Rect(JEditBuffer buffer, int startLine, int startColumn,
 			int endLine, int endColumn)
 		{
 			this.startLine = startLine;
@@ -353,24 +394,24 @@ public abstract class Selection implements Cloneable
 			if(startOffset == -1)
 			{
 				extraStartVirt = startColumn - width[0];
-				startOffset = buffer.getLineEndOffset(startLine) - 1;
+				//startOffset = buffer.getLineEndOffset(startLine) - 1;
 			}
-			else
-				startOffset += buffer.getLineStartOffset(startLine);
+			/*else
+				startOffset += buffer.getLineStartOffset(startLine);*/
 
 			int endOffset = buffer.getOffsetOfVirtualColumn(endLine,
 				endColumn,width);
 			if(endOffset == -1)
 			{
 				extraEndVirt = endColumn - width[0];
-				endOffset = buffer.getLineEndOffset(endLine) - 1;
+				//endOffset = buffer.getLineEndOffset(endLine) - 1;
 			}
-			else
-				endOffset += buffer.getLineStartOffset(endLine);
+			/*else
+				endOffset += buffer.getLineStartOffset(endLine);*/
 		} //}}}
 
 		//{{{ getStartColumn() method
-		public int getStartColumn(Buffer buffer)
+		public int getStartColumn(JEditBuffer buffer)
 		{
 			int virtColStart = buffer.getVirtualWidth(startLine,
 				start - buffer.getLineStartOffset(startLine)) + extraStartVirt;
@@ -380,7 +421,7 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ getEndColumn() method
-		public int getEndColumn(Buffer buffer)
+		public int getEndColumn(JEditBuffer buffer)
 		{
 			int virtColStart = buffer.getVirtualWidth(startLine,
 				start - buffer.getLineStartOffset(startLine)) + extraStartVirt;
@@ -390,14 +431,16 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ getStart() method
-		public int getStart(Buffer buffer, int line)
+		@Override
+		public int getStart(JEditBuffer buffer, int line)
 		{
 			return getColumnOnOtherLine(buffer,line,
 				getStartColumn(buffer));
 		} //}}}
 
 		//{{{ getEnd() method
-		public int getEnd(Buffer buffer, int line)
+		@Override
+		public int getEnd(JEditBuffer buffer, int line)
 		{
 			return getColumnOnOtherLine(buffer,line,
 				getEndColumn(buffer));
@@ -408,7 +451,8 @@ public abstract class Selection implements Cloneable
 		int extraEndVirt;
 
 		//{{{ getText() method
-		void getText(Buffer buffer, StringBuffer buf)
+		@Override
+		void getText(JEditBuffer buffer, StringBuilder buf)
 		{
 			int start = getStartColumn(buffer);
 			int end = getEndColumn(buffer);
@@ -429,8 +473,8 @@ public abstract class Selection implements Cloneable
 					rectEnd = lineLen;
 
 				if(rectEnd < rectStart)
-					System.err.println(i + ":::" + start + ":" + end
-						+ " ==> " + rectStart + ":" + rectEnd);
+					System.err.println(i + ":::" + start + ':' + end
+						+ " ==> " + rectStart + ':' + rectEnd);
 				buf.append(buffer.getText(lineStart + rectStart,
 					rectEnd - rectStart));
 
@@ -440,18 +484,24 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ setText() method
-		int setText(Buffer buffer, String text)
+		/**
+		 * Replace the selection with the given text
+		 * @param buffer the buffer
+		 * @param text the text
+		 * @return the offset at the end of the inserted text
+		 */
+		@Override
+		int setText(JEditBuffer buffer, String text)
 		{
 			int startColumn = getStartColumn(buffer);
 			int endColumn = getEndColumn(buffer);
-
-			int[] total = new int[1];
 
 			int tabSize = buffer.getTabSize();
 
 			int maxWidth = 0;
 			int totalLines = 0;
-			ArrayList lines = new ArrayList();
+			/** This list will contains Strings and Integer. */
+			List<Object> lines = new ArrayList<Object>();
 
 			//{{{ Split the text into lines
 			if(text != null)
@@ -468,7 +518,7 @@ public abstract class Selection implements Cloneable
 							lastNewline,i));
 						lastNewline = i + 1;
 						maxWidth = Math.max(maxWidth,currentWidth);
-						lines.add(new Integer(currentWidth));
+						lines.add(currentWidth);
 						currentWidth = startColumn;
 					}
 					else if(ch == '\t')
@@ -481,13 +531,14 @@ public abstract class Selection implements Cloneable
 				{
 					totalLines++;
 					lines.add(text.substring(lastNewline));
-					lines.add(new Integer(currentWidth));
+					lines.add(currentWidth);
 					maxWidth = Math.max(maxWidth,currentWidth);
 				}
 			} //}}}
 
 			//{{{ Insert the lines into the buffer
 			int endOffset = 0;
+			int[] total = new int[1];
 			int lastLine = Math.max(startLine + totalLines - 1,endLine);
 			for(int i = startLine; i <= lastLine; i++)
 			{
@@ -502,7 +553,7 @@ public abstract class Selection implements Cloneable
 				int startWhitespace;
 				if(rectStart == -1)
 				{
-					startWhitespace = (startColumn - total[0]);
+					startWhitespace = startColumn - total[0];
 					rectStart = lineLen;
 				}
 				else
@@ -518,7 +569,7 @@ public abstract class Selection implements Cloneable
 				if(startWhitespace != 0)
 				{
 					buffer.insert(rectStart + lineStart,
-						MiscUtilities.createWhiteSpace(startWhitespace,0));
+						StandardUtilities.createWhiteSpace(startWhitespace,0));
 				}
 
 				int endWhitespace;
@@ -539,8 +590,7 @@ public abstract class Selection implements Cloneable
 					else
 					{
 						endWhitespace = maxWidth
-							- ((Integer)lines.get(index+1))
-							.intValue();
+							- (Integer) lines.get(index + 1);
 					}
 					startWhitespace += str.length();
 				}
@@ -549,7 +599,7 @@ public abstract class Selection implements Cloneable
 				{
 					buffer.insert(rectStart + lineStart
 						+ startWhitespace,
-						MiscUtilities.createWhiteSpace(endWhitespace,0));
+						StandardUtilities.createWhiteSpace(endWhitespace,0));
 				}
 
 				endOffset = rectStart + lineStart
@@ -566,7 +616,8 @@ public abstract class Selection implements Cloneable
 		} //}}}
 
 		//{{{ contentInserted() method
-		boolean contentInserted(Buffer buffer, int startLine, int start,
+		@Override
+		boolean contentInserted(JEditBuffer buffer, int startLine, int start,
 			int numLines, int length)
 		{
 			if(this.end < start)
@@ -643,21 +694,20 @@ public abstract class Selection implements Cloneable
 				end - buffer.getLineStartOffset(this.endLine));
 			if(startLine == this.endLine && extraEndVirt != 0)
 			{
-				extraEndVirt += (endVirtualColumn
-					- newEndVirtualColumn);
+				extraEndVirt += endVirtualColumn - newEndVirtualColumn;
 			}
 			else if(startLine == this.startLine
 				&& extraStartVirt != 0)
 			{
-				extraStartVirt += (endVirtualColumn
-					- newEndVirtualColumn);
+				extraStartVirt += endVirtualColumn - newEndVirtualColumn;
 			}
 
 			return true;
 		} //}}}
 
 		//{{{ contentRemoved() method
-		boolean contentRemoved(Buffer buffer, int startLine, int start,
+		@Override
+		boolean contentRemoved(JEditBuffer buffer, int startLine, int start,
 			int numLines, int length)
 		{
 			int end = start + length;
@@ -699,7 +749,7 @@ public abstract class Selection implements Cloneable
 		//{{{ Private members
 
 		//{{{ getColumnOnOtherLine() method
-		private int getColumnOnOtherLine(Buffer buffer, int line,
+		private static int getColumnOnOtherLine(JEditBuffer buffer, int line,
 			int col)
 		{
 			int returnValue = buffer.getOffsetOfVirtualColumn(

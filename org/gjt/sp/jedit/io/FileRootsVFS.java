@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2003 Slava Pestov
+ * Copyright (C) 2000, 2005 Slava Pestov
  * Portions copyright (C) 2002 Kris Kopicki
  * Portions copyright (C) 2002 Carmine Lucarelli
  *
@@ -27,18 +27,16 @@ package org.gjt.sp.jedit.io;
 //{{{ Imports
 import javax.swing.filechooser.FileSystemView;
 import java.awt.Component;
-import java.lang.reflect.*;
 import java.io.File;
 import java.util.LinkedList;
 import org.gjt.sp.jedit.MiscUtilities;
 import org.gjt.sp.jedit.OperatingSystem;
-import org.gjt.sp.util.Log;
 //}}}
 
 /**
  * A VFS that lists local root filesystems.
  * @author Slava Pestov
- * @version $Id: FileRootsVFS.java,v 1.18 2004/07/12 19:25:07 spestov Exp $
+ * @version $Id: FileRootsVFS.java 14617 2009-02-09 09:42:52Z kpouer $
  */
 public class FileRootsVFS extends VFS
 {
@@ -47,43 +45,18 @@ public class FileRootsVFS extends VFS
 	//{{{ FileRootsVFS constructor
 	public FileRootsVFS()
 	{
-		super("roots",LOW_LATENCY_CAP,new String[] {
+		super("roots",LOW_LATENCY_CAP | BROWSE_CAP, new String[] {
 			EA_TYPE });
-
-		// JDK 1.4 adds methods to obtain a drive letter label and
-		// list the desktop on Windows
-		if(OperatingSystem.hasJava14())
-		{
-			try
-			{
-				getSystemDisplayName = FileSystemView.class.getMethod("getSystemDisplayName",
-					new Class[] { java.io.File.class });
-				getRoots = FileSystemView.class.getMethod("getRoots",
-					new Class[0]);
-				isFileSystemRoot = FileSystemView.class.getMethod("isFileSystemRoot",
-					new Class[] { java.io.File.class });
-				isFloppyDrive = FileSystemView.class.getMethod("isFloppyDrive",
-					new Class[] { java.io.File.class });
-				isDrive = FileSystemView.class.getMethod("isDrive",
-					new Class[] { java.io.File.class });
-				fsView = FileSystemView.getFileSystemView();
-				Log.log(Log.DEBUG,this,"Java 1.4 FileSystemView detected");
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.DEBUG,this,"Java 1.4 FileSystemView not detected");
-			}
-		}
 	} //}}}
 
 	//{{{ getParentOfPath() method
 	public String getParentOfPath(String path)
 	{
-		return PROTOCOL + ":";
+		return PROTOCOL + ':';
 	} //}}}
 
-	//{{{ _listDirectory() method
-	public VFS.DirectoryEntry[] _listDirectory(Object session, String url,
+	//{{{ _listFiles() method
+	public VFSFile[] _listFiles(Object session, String url,
 		Component comp)
 	{
 		File[] roots = listRoots();
@@ -91,27 +64,22 @@ public class FileRootsVFS extends VFS
 		if(roots == null)
 			return null;
 
-		VFS.DirectoryEntry[] rootDE = new VFS.DirectoryEntry[roots.length];
+		VFSFile[] rootDE = new VFSFile[roots.length];
 		for(int i = 0; i < roots.length; i++)
-			rootDE[i] = new RootsEntry(roots[i]);
+			rootDE[i] = new Root(roots[i]);
 
 		return rootDE;
 	} //}}}
 
-	//{{{ _getDirectoryEntry() method
-	public DirectoryEntry _getDirectoryEntry(Object session, String path,
+	//{{{ _getFile() method
+	public VFSFile _getFile(Object session, String path,
 		Component comp)
 	{
-		return new RootsEntry(new File(path));
+		return new Root(new File(path));
 	} //}}}
 
 	//{{{ Private members
-	private static FileSystemView fsView;
-	private static Method getSystemDisplayName;
-	private static Method getRoots;
-	private static Method isFileSystemRoot;
-	private static Method isFloppyDrive;
-	private static Method isDrive;
+	private static FileSystemView fsView = FileSystemView.getFileSystemView();
 
 	//{{{ listRoots() method
 	private static File[] listRoots()
@@ -120,7 +88,7 @@ public class FileRootsVFS extends VFS
 		{
 			// Nasty hardcoded values
 			File[] volumes = new File("/Volumes").listFiles();
-			LinkedList roots = new LinkedList();
+			LinkedList<File> roots = new LinkedList<File>();
 
 			roots.add(new File("/"));
 
@@ -131,26 +99,12 @@ public class FileRootsVFS extends VFS
 					roots.add(volumes[i]);
 			}
 
-			return (File[])roots.toArray(new File[0]);
+			return roots.toArray(new File[roots.size()]);
 		}
 		else
 		{
 			File[] roots = File.listRoots();
-			File[] desktop = null;
-
-			if(getRoots != null)
-			{
-				try
-				{
-					desktop = (File[])getRoots.invoke(fsView,
-						new Object[0]);
-				}
-				catch(Exception e)
-				{
-					Log.log(Log.ERROR, FileRootsVFS.class, "Error getting Desktop: " + e.getMessage());
-					desktop = null;
-				}
-			}
+			File[] desktop = fsView.getRoots();
 
 			if(desktop == null)
 				return roots;
@@ -164,64 +118,44 @@ public class FileRootsVFS extends VFS
 
 	//}}}
 
-	//{{{ RootsEntry class
-	static class RootsEntry extends VFS.DirectoryEntry
+	//{{{ Root class
+	static class Root extends VFSFile
 	{
-		RootsEntry(File file)
+		Root(File file)
 		{
 			// REMIND: calling isDirectory() on a floppy drive
 			// displays stupid I/O error dialog box on Windows
 
-			this.path = this.deletePath = this.symlinkPath
-				= file.getPath();
+			String path = file.getPath();
+			setPath(path);
+			setDeletePath(path);
+			setSymlinkPath(path);
 
-			if(isFloppy(file))
+			if(fsView.isFloppyDrive(file))
 			{
-				type = VFS.DirectoryEntry.FILESYSTEM;
-				name = path;
+				setType(VFSFile.FILESYSTEM);
+				setName(path);
 			}
-			else if(isDrive(file))
+			else if(fsView.isDrive(file))
 			{
-				type = VFS.DirectoryEntry.FILESYSTEM;
-
-				if(getSystemDisplayName != null)
-				{
-					try
-					{
-						name = path + " " + (String)getSystemDisplayName
-							.invoke(fsView,new Object[] { file });
-					}
-					catch(Exception e)
-					{
-						Log.log(Log.ERROR,this,e);
-						name = path;
-					}
-				}
+				setType(VFSFile.FILESYSTEM);
+				setName(path + ' '
+					+ fsView.getSystemDisplayName(file));
 			}
 			else if(file.isDirectory())
 			{
-				type = VFS.DirectoryEntry.FILESYSTEM;
-
-				if(isFileSystemRoot != null)
-				{
-					try
-					{
-						if(Boolean.FALSE.equals(isFileSystemRoot
-							.invoke(fsView,new Object[] { file })))
-						{
-							type = VFS.DirectoryEntry.DIRECTORY;
-						}
-					}
-					catch(Exception e) {}
-				}
+				if(fsView.isFileSystemRoot(file))
+					setType(VFSFile.DIRECTORY);
+				else
+					setType(VFSFile.FILESYSTEM);
 
 				if(OperatingSystem.isMacOS())
-					name = MiscUtilities.getFileName(path);
+					setName(MiscUtilities.getFileName(path));
 				else
-					name = path;
+					setName(path);
 			}
 			else
-				type = VFS.DirectoryEntry.FILE;
+				setType(VFSFile.FILE);
 		}
 
 		public String getExtendedAttribute(String name)
@@ -234,46 +168,6 @@ public class FileRootsVFS extends VFS
 				// etc.
 				return null;
 			}
-		}
-
-		private boolean isFloppy(File file)
-		{
-			// to prevent windows looking for a disk in the floppy drive
-			if(isFloppyDrive != null)
-			{
-				try
-				{
-					return Boolean.TRUE.equals(isFloppyDrive.
-						invoke(fsView, new Object[] { file }));
-				}
-				catch(Exception e)
-				{
-					Log.log(Log.ERROR,this,e);
-					return false;
-				}
-			}
-			else
-				return path.startsWith("A:") || path.startsWith("B:");
-		}
-
-		private boolean isDrive(File file)
-		{
-			// so an empty cd drive is not reported as a file
-			if(isDrive != null)
-			{
-				try
-				{
-					return Boolean.TRUE.equals(isDrive.
-						invoke(fsView, new Object[] { file }));
-				}
-				catch(Exception e)
-				{
-					Log.log(Log.ERROR,this,e);
-					return false;
-				}
-			}
-			else
-				return true;
 		}
 	} //}}}
 }

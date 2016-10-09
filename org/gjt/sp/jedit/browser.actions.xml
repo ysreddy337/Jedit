@@ -6,7 +6,7 @@
 <!-- Copyright (C) 2003 Slava Pestov                                         -->
 
 <!-- :tabSize=8:indentSize=8:noTabs=false:                                   -->
-<!-- :folding=indent:collapseFolds=1:                                        -->
+<!-- :folding=indent:collapseFolds=1:mode=jedit-actions:		     -->
 
 <!-- Actions are the 'glue' that binds menu item selections and keystrokes   -->
 <!-- to jEdit's APIs. For simplicity and compactness, they are written in    -->
@@ -16,7 +16,20 @@
 
 <ACTION NAME="vfs.browser.browse">
 	<CODE>
-		browser.setDirectory(files[0].path);
+		if (files.length != 0)
+			browser.setDirectory(files[0].path);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="vfs.browser.previous">
+	<CODE>
+		browser.previousDirectory();
+	</CODE>
+</ACTION>
+
+<ACTION NAME="vfs.browser.next">
+	<CODE>
+		browser.nextDirectory();
 	</CODE>
 </ACTION>
 
@@ -43,7 +56,7 @@
 
 <ACTION NAME="vfs.browser.copy-path">
 	<CODE>
-		buf = new StringBuffer();
+		buf = new StringBuilder();
 		for(int i = 0; i &lt; files.length; i++)
 		{
 			if(i != 0)
@@ -54,9 +67,27 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="vfs.browser.paste">
+	<CODE>
+		buf = new StringBuilder();
+		for(int i = 0; i &lt; files.length; i++)
+		{
+			if(i != 0)
+				buf.append('\n');
+			buf.append(files[i].path);
+		}
+		String source = Registers.getRegister('$').toString();
+		String target = buf.toString();
+		if (source == null || target.length() == 0 || source.length() == 0)
+			return;
+		VFSManager.runInWorkThread(new CopyFileWorker(view, source, target));
+	</CODE>
+</ACTION>
+
 <ACTION NAME="vfs.browser.delete">
 	<CODE>
-		browser.delete(files);
+		if (files.length != 0)
+			browser.delete(files);
 	</CODE>
 </ACTION>
 
@@ -108,6 +139,12 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="vfs.browser.properties">
+	<CODE>
+	   	browser.fileProperties(files);
+	</CODE>
+</ACTION>
+
 <ACTION NAME="vfs.browser.reload">
 	<CODE>
 		browser.reloadDirectory();
@@ -116,7 +153,8 @@
 
 <ACTION NAME="vfs.browser.rename">
 	<CODE>
-		browser.rename(files[0].path);
+		if (files.length != 0)
+			browser.rename(files[0].path);
 	</CODE>
 </ACTION>
 

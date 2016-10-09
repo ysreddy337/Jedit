@@ -24,20 +24,27 @@
 package org.gjt.sp.jedit;
 
 import java.util.*;
-import org.gjt.sp.util.Log;
 
 /**
  * A set of option panes shown in one branch in the options dialog.<p>
  *
- * Plugins should not create instances of this class anymore. See
+ * Plugins should not create instances of this class directly. See
  * {@link EditPlugin} for information on how jEdit obtains and constructs
  * option pane instances.
  *
  * @author Mike Dillon
- * @version $Id: OptionGroup.java,v 1.10 2003/06/27 20:02:05 spestov Exp $
+ * @version $Id: OptionGroup.java 14444 2009-01-24 06:19:57Z shlomy $
  */
 public class OptionGroup
 {
+	
+	// {{{ data members
+	protected final String name;
+	protected final String label;
+	protected final Vector<Object> members;
+	private boolean sort;
+	// }}}
+	
 	//{{{ OptionGroup constructor
 	/**
 	 * Creates an option group.
@@ -50,7 +57,7 @@ public class OptionGroup
 	{
 		this.name = name;
 		label = jEdit.getProperty("options." + name + ".label");
-		members = new Vector();
+		members = new Vector<Object>();
 	} //}}}
 
 	//{{{ OptionGroup constructor
@@ -64,7 +71,7 @@ public class OptionGroup
 	{
 		this.name = name;
 		this.label = label;
-		members = new Vector();
+		members = new Vector<Object>();
 
 		StringTokenizer st = new StringTokenizer(options);
 		while(st.hasMoreTokens())
@@ -117,7 +124,7 @@ public class OptionGroup
 	} //}}}
 
 	//{{{ getMembers() method
-	public Enumeration getMembers()
+	public Enumeration<Object> getMembers()
 	{
 		return members.elements();
 	} //}}}
@@ -152,10 +159,7 @@ public class OptionGroup
 	} //}}}
 
 	//{{{ Private members
-	private String name;
-	private String label;
-	private Vector members;
-	private boolean sort;
+
 
 	//{{{ insertionSort() method
 	private void insertionSort(String newLabel, Object newObj)
@@ -184,7 +188,7 @@ public class OptionGroup
 				else
 					throw new InternalError();
 
-				if(newLabel.compareTo(label) < 0)
+				if(newLabel.compareToIgnoreCase(label) < 0)
 				{
 					members.insertElementAt(newObj,i);
 					return;

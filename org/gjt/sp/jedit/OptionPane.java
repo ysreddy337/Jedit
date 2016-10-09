@@ -31,7 +31,7 @@ import java.awt.Component;
  * {@link AbstractOptionPane} instead.
  *
  * @author Slava Pestov
- * @version $Id: OptionPane.java,v 1.6 2003/05/01 02:21:26 spestov Exp $
+ * @version $Id: OptionPane.java 12504 2008-04-22 23:12:43Z ezust $
  */
 public interface OptionPane
 {

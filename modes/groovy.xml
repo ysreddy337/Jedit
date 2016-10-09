@@ -15,10 +15,9 @@
 		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
 		<PROPERTY NAME="indentNextLine"
 			VALUE="\s*(((if|while)\s*\(|else\s*|else\s+if\s*\(|for\s*\(.*\))[^{;]*)" />
-		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 	</PROPS>
 
-	<RULES ESCAPE="\" HIGHLIGHT_DIGITS="TRUE" IGNORE_CASE="FALSE">
+	<RULES HIGHLIGHT_DIGITS="TRUE" IGNORE_CASE="FALSE">
 		<!-- Silly comment -->
 		<SEQ TYPE="COMMENT1">/**/</SEQ>
 
@@ -38,14 +37,14 @@
 			<BEGIN>"</BEGIN>
 			<END>"</END>
 		</SPAN>
-		<SPAN TYPE="LITERAL1">
+		<SPAN TYPE="LITERAL1" ESCAPE="\">
 			<BEGIN>'</BEGIN>
 			<END>'</END>
 		</SPAN>
 
 		<!-- heredoc -->
-		<SPAN_REGEXP HASH_CHAR="&lt;" TYPE="LITERAL1" DELEGATE="LITERAL">
-			<BEGIN><![CDATA[<<<([[:alpha:]_][[:alnum:]_]*)\s*]]></BEGIN>
+		<SPAN_REGEXP HASH_CHAR="&lt;&lt;&lt;" TYPE="LITERAL1" DELEGATE="LITERAL">
+			<BEGIN><![CDATA[<<<([\p{Alpha}_][\p{Alnum}_]*)\s*]]></BEGIN>
 			<END>$1</END>
 		</SPAN_REGEXP>
 
@@ -70,7 +69,8 @@
 		<EOL_SPAN TYPE="COMMENT1">//</EOL_SPAN>
 
 		<!-- Function calls -->
-		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
+		<MARK_PREVIOUS TYPE="FUNCTION" MATCH_TYPE="OPERATOR">(</MARK_PREVIOUS>
+		<SEQ TYPE="OPERATOR">)</SEQ>
 
 		<KEYWORDS>
 			<KEYWORD1>abstract</KEYWORD1>

@@ -24,16 +24,24 @@ package org.gjt.sp.jedit.options;
 
 //{{{ Imports
 import javax.swing.*;
+
 import java.awt.event.*;
-import java.awt.*;
 import java.io.*;
 import org.gjt.sp.jedit.gui.FontSelector;
+import org.gjt.sp.jedit.gui.NumericTextField;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.IOUtilities;
 //}}}
 
 public class AppearanceOptionPane extends AbstractOptionPane
 {
+	/**
+	 * List of icon themes that are supported in jEdit core.
+	 * Possible values of the jedit property 'icon-theme'
+	 */
+	public static final String[] builtInIconThemes = {"tango", "old"};
+	
 	//{{{ AppearanceOptionPane constructor
 	public AppearanceOptionPane()
 	{
@@ -41,6 +49,7 @@ public class AppearanceOptionPane extends AbstractOptionPane
 	} //}}}
 
 	//{{{ _init() method
+	@Override
 	protected void _init()
 	{
 		/* Look and feel */
@@ -67,9 +76,25 @@ public class AppearanceOptionPane extends AbstractOptionPane
 			}
 		});
 
+		
 		addComponent(jEdit.getProperty("options.appearance.lf"),
 			lookAndFeel);
+		addDockingFrameworkChooser();
 
+		/* Icon Theme */
+		String[] themes = IconTheme.builtInNames();
+		iconThemes = new JComboBox(themes);
+		addComponent(jEdit.getProperty("options.appearance.iconTheme"), iconThemes);
+		oldTheme = IconTheme.get();
+		for (int i=0; i<themes.length; ++i)
+		{
+			if (themes[i].equals(oldTheme))
+			{
+				iconThemes.setSelectedIndex(i);
+				break;
+			}
+		}
+		
 		/* Primary Metal L&F font */
 		primaryFont = new FontSelector(jEdit.getFontProperty(
 			"metal.primary.font"));
@@ -82,15 +107,26 @@ public class AppearanceOptionPane extends AbstractOptionPane
 		addComponent(jEdit.getProperty("options.appearance.secondaryFont"),
 			secondaryFont);
 
+		/*
+		antiAliasExtras = new JComboBox(AntiAlias.comboChoices);
+		antiAliasExtras.setSelectedIndex(AntiAlias.appearance().val());
+		antiAliasExtras.setToolTipText(jEdit.getProperty("options.textarea.antiAlias.tooltip"));
+		addComponent(jEdit.getProperty("options.appearance.fonts.antialias"), antiAliasExtras);
+		*/
 		updateEnabled();
 
 		/* History count */
-		history = new JTextField(jEdit.getProperty("history"));
+		history = new NumericTextField(jEdit.getProperty("history"), true);
 		addComponent(jEdit.getProperty("options.appearance.history"),history);
 
 		/* Menu spillover count */
-		menuSpillover = new JTextField(jEdit.getProperty("menu.spillover"));
+		menuSpillover = new NumericTextField(jEdit.getProperty("menu.spillover"), true);
 		addComponent(jEdit.getProperty("options.appearance.menuSpillover"),menuSpillover);
+
+		continuousLayout = new JCheckBox(jEdit.getProperty(
+			"options.appearance.continuousLayout.label"));
+		continuousLayout.setSelected(jEdit.getBooleanProperty("appearance.continuousLayout"));
+		addComponent(continuousLayout);
 
 		addSeparator("options.appearance.startup.label");
 
@@ -124,20 +160,17 @@ public class AppearanceOptionPane extends AbstractOptionPane
 		decorateFrames = new JCheckBox(jEdit.getProperty(
 			"options.appearance.decorateFrames"));
 		decorateFrames.setSelected(jEdit.getBooleanProperty("decorate.frames"));
+		addComponent(decorateFrames);
 
 		/* Decorate dialogs with look and feel (JDK 1.4 only) */
 		decorateDialogs = new JCheckBox(jEdit.getProperty(
 			"options.appearance.decorateDialogs"));
 		decorateDialogs.setSelected(jEdit.getBooleanProperty("decorate.dialogs"));
-
-		if(OperatingSystem.hasJava14())
-		{
-			addComponent(decorateFrames);
-			addComponent(decorateDialogs);
-		}
+		addComponent(decorateDialogs);
 	} //}}}
 
 	//{{{ _save() method
+	@Override
 	protected void _save()
 	{
 		String lf = lfs[lookAndFeel.getSelectedIndex()].getClassName();
@@ -147,6 +180,19 @@ public class AppearanceOptionPane extends AbstractOptionPane
 		jEdit.setProperty("history",history.getText());
 		jEdit.setProperty("menu.spillover",menuSpillover.getText());
 		jEdit.setBooleanProperty("tip.show",showTips.isSelected());
+		jEdit.setBooleanProperty("appearance.continuousLayout",continuousLayout.isSelected());
+		IconTheme.set(iconThemes.getSelectedItem().toString());
+
+		jEdit.setProperty(View.VIEW_DOCKING_FRAMEWORK_PROPERTY,
+			(String) dockingFramework.getSelectedItem());
+
+		/* AntiAlias nv = AntiAlias.appearance();
+		 int idx = antiAliasExtras.getSelectedIndex();
+		nv.set(idx);
+		primaryFont.setAntiAliasEnabled(idx > 0);
+		secondaryFont.setAntiAliasEnabled(idx > 0);
+		primaryFont.repaint();
+		secondaryFont.repaint(); */
 
 		// this is handled a little differently from other jEdit settings
 		// as the splash screen flag needs to be known very early in the
@@ -172,14 +218,7 @@ public class AppearanceOptionPane extends AbstractOptionPane
 				}
 				finally
 				{
-					try
-					{
-						if(out != null)
-							out.close();
-					}
-					catch(IOException e)
-					{
-					}
+					IOUtilities.closeQuietly(out);
 				}
 			}
 		}
@@ -191,17 +230,22 @@ public class AppearanceOptionPane extends AbstractOptionPane
 	//{{{ Private members
 
 	//{{{ Instance variables
+	private String oldTheme;
 	private UIManager.LookAndFeelInfo[] lfs;
 	private JComboBox lookAndFeel;
 	private FontSelector primaryFont;
 	private FontSelector secondaryFont;
+	private JComboBox dockingFramework;
 	private JTextField history;
 	private JTextField menuSpillover;
 	private JCheckBox showTips;
+	private JCheckBox continuousLayout;
 	private JCheckBox showSplash;
 	private JCheckBox textColors;
 	private JCheckBox decorateFrames;
 	private JCheckBox decorateDialogs;
+	private JComboBox antiAliasExtras;
+	private JComboBox iconThemes;
 	//}}}
 
 	//{{{ updateEnabled() method
@@ -222,6 +266,22 @@ public class AppearanceOptionPane extends AbstractOptionPane
 			secondaryFont.setEnabled(false);
 		}
 	} //}}}
+	private void addDockingFrameworkChooser()
+	{	
+		String [] frameworks =
+			ServiceManager.getServiceNames(View.DOCKING_FRAMEWORK_PROVIDER_SERVICE);
+		dockingFramework = new JComboBox(frameworks);
+		String framework = View.getDockingFrameworkName();
+		for (int i = 0; i < frameworks.length; i++)
+		{
+			if (frameworks[i].equals(framework))
+			{
+				dockingFramework.setSelectedIndex(i);
+				break;
+			}
+		}
+		addComponent(new JLabel(jEdit.getProperty("options.appearance.selectFramework.label")), dockingFramework);
+	}
 
 	//}}}
 }

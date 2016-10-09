@@ -12,10 +12,9 @@
 		<PROPERTY NAME="lineComment" VALUE="--" />
 		<PROPERTY NAME="wordBreakChars" VALUE=",+-=&lt;&gt;/?^&amp;*" />
 	</PROPS>
-	<RULES ESCAPE="\"
-		IGNORE_CASE="FALSE"
+	<RULES IGNORE_CASE="FALSE"
 		HIGHLIGHT_DIGITS="TRUE"
-		DIGIT_RE="(0x[[:xdigit:]]+[lL]?|[[:digit:]]+(e[[:digit:]]*)?[lLdDfF]?)">
+		DIGIT_RE="(0x[\p{XDigit}]+[lL]?|[\p{Digit}]+(e[\p{Digit}]*)?[lLdDfF]?)">
 
 		<!-- C style comment -->
 		<SPAN TYPE="COMMENT1">
@@ -23,11 +22,11 @@
 			<END>*/</END>
 		</SPAN>
 
-		<SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
+		<SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
 			<BEGIN>"</BEGIN>
 			<END>"</END>
 		</SPAN>
-		<SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
+		<SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
 			<BEGIN>'</BEGIN>
 			<END>'</END>
 		</SPAN>
@@ -54,15 +53,16 @@
 		<SEQ TYPE="OPERATOR">~</SEQ>
 		<SEQ TYPE="OPERATOR">}</SEQ>
 		<SEQ TYPE="OPERATOR">{</SEQ>
-		
+
 		<MARK_PREVIOUS TYPE="FUNCTION">::</MARK_PREVIOUS>
-		
+
 		<MARK_PREVIOUS AT_WHITESPACE_END="TRUE"
-			EXCLUDE_MATCH="TRUE"
+			MATCH_TYPE="OPERATOR"
 			TYPE="LABEL">:</MARK_PREVIOUS>
 
 		<!-- Function calls -->
-		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
+		<MARK_PREVIOUS TYPE="FUNCTION" MATCH_TYPE="OPERATOR">(</MARK_PREVIOUS>
+		<SEQ TYPE="OPERATOR">)</SEQ>
 
 		<KEYWORDS>
 			<KEYWORD1>Address</KEYWORD1>

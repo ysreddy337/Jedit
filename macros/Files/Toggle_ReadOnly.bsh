@@ -18,7 +18,7 @@
  * along with the jEdit program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: Toggle_ReadOnly.bsh,v 1.2 2003/12/22 04:14:54 spestov Exp $
+ * $Id: Toggle_ReadOnly.bsh 4937 2003-12-22 04:14:55Z spestov $
  */
 
 

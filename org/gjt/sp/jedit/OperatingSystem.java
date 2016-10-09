@@ -1,12 +1,9 @@
 /*
- * :tabSize=8:indentSize=8:noTabs=false:
- * :folding=explicit:collapseFolds=1:
- *
  * OperatingSystem.java - OS detection
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2002, 2003 Slava Pestov
+ * Copyright (C) 2002, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -32,14 +29,15 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import javax.swing.UIManager;
 import java.io.File;
-import java.util.Enumeration;
-import java.util.Vector;
+import java.util.Set;
+import java.util.HashSet;
+
 import org.gjt.sp.util.Log;
 
 /**
  * Operating system detection routines.
  * @author Slava Pestov
- * @version $Id: OperatingSystem.java,v 1.16 2003/12/25 00:09:42 spestov Exp $
+ * @version $Id: OperatingSystem.java 14467 2009-01-25 13:17:42Z kpouer $
  * @since jEdit 4.0pre4
  */
 public class OperatingSystem
@@ -48,7 +46,7 @@ public class OperatingSystem
 	/**
 	 * Returns the bounds of the default screen.
 	 */
-	public static final Rectangle getScreenBounds()
+	public static Rectangle getScreenBounds()
 	{
 		int screenX = (int)Toolkit.getDefaultToolkit().getScreenSize().getWidth();
 		int screenY = (int)Toolkit.getDefaultToolkit().getScreenSize().getHeight();
@@ -84,10 +82,10 @@ public class OperatingSystem
 	 * Returns the bounds of the (virtual) screen that the window should be in
 	 * @param window The bounds of the window to get the screen for
 	 */
-	public static final Rectangle getScreenBounds(Rectangle window)
+	public static Rectangle getScreenBounds(Rectangle window)
 	{
 		GraphicsDevice[] gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
-		Vector intersects = new Vector();
+		Set<GraphicsConfiguration> intersects = new HashSet<GraphicsConfiguration>();
 
 		// Get available screens
 		// O(n^3), this is nasty, but since we aren't dealling with
@@ -99,23 +97,17 @@ public class OperatingSystem
 			// Don't add duplicates
 			if (window.intersects(gc.getBounds()))
 			{
-				for (Enumeration e = intersects.elements(); e.hasMoreElements();)
-				{
-					GraphicsConfiguration gcc = (GraphicsConfiguration)e.nextElement();
-					if (gcc.getBounds().equals(gc.getBounds()))
-						break;
-				}
-				intersects.add(gc);
+				if (!intersects.contains(gc))
+					intersects.add(gc);
 			}
 		}
 		
 		GraphicsConfiguration choice = null;
-		if (intersects.size() > 0)
+		if (!intersects.isEmpty())
 		{
 			// Pick screen with largest intersection
-			for (Enumeration e = intersects.elements(); e.hasMoreElements();)
+			for (GraphicsConfiguration gcc : intersects)
 			{
-				GraphicsConfiguration gcc = (GraphicsConfiguration)e.nextElement();
 				if (choice == null)
 					choice = gcc;
 				else
@@ -133,10 +125,10 @@ public class OperatingSystem
 			choice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
 		
 		// Make adjustments for some OS's
-		int screenX = (int)choice.getBounds().x;
-		int screenY = (int)choice.getBounds().y;
-		int screenW = (int)choice.getBounds().width;
-		int screenH = (int)choice.getBounds().height;
+		int screenX = choice.getBounds().x;
+		int screenY = choice.getBounds().y;
+		int screenW = choice.getBounds().width;
+		int screenH = choice.getBounds().height;
 		int x, y, w, h;
 		
 		if (isMacOS())
@@ -145,13 +137,6 @@ public class OperatingSystem
 			y = screenY + 22;
 			w = screenW;
 			h = screenH - y - 4;//shadow size
-		}
-		else if (isWindows())
-		{
-			x = screenX - 4;
-			y = screenY - 4;
-			w = screenW - 2*x;
-			h = screenH - 2*y;
 		}
 		else
 		{
@@ -169,7 +154,7 @@ public class OperatingSystem
 	/**
 	 * Returns if we're running Windows 95/98/ME/NT/2000/XP, or OS/2.
 	 */
-	public static final boolean isDOSDerived()
+	public static boolean isDOSDerived()
 	{
 		return isWindows() || isOS2();
 	} //}}}
@@ -178,7 +163,7 @@ public class OperatingSystem
 	/**
 	 * Returns if we're running Windows 95/98/ME/NT/2000/XP.
 	 */
-	public static final boolean isWindows()
+	public static boolean isWindows()
 	{
 		return os == WINDOWS_9x || os == WINDOWS_NT;
 	} //}}}
@@ -187,7 +172,7 @@ public class OperatingSystem
 	/**
 	 * Returns if we're running Windows 95/98/ME.
 	 */
-	public static final boolean isWindows9x()
+	public static boolean isWindows9x()
 	{
 		return os == WINDOWS_9x;
 	} //}}}
@@ -196,7 +181,7 @@ public class OperatingSystem
 	/**
 	 * Returns if we're running Windows NT/2000/XP.
 	 */
-	public static final boolean isWindowsNT()
+	public static boolean isWindowsNT()
 	{
 		return os == WINDOWS_NT;
 	} //}}}
@@ -205,7 +190,7 @@ public class OperatingSystem
 	/**
 	 * Returns if we're running OS/2.
 	 */
-	public static final boolean isOS2()
+	public static boolean isOS2()
 	{
 		return os == OS2;
 	} //}}}
@@ -214,7 +199,7 @@ public class OperatingSystem
 	/**
 	 * Returns if we're running Unix (this includes MacOS X).
 	 */
-	public static final boolean isUnix()
+	public static boolean isUnix()
 	{
 		return os == UNIX || os == MAC_OS_X;
 	} //}}}
@@ -223,7 +208,7 @@ public class OperatingSystem
 	/**
 	 * Returns if we're running MacOS X.
 	 */
-	public static final boolean isMacOS()
+	public static boolean isMacOS()
 	{
 		return os == MAC_OS_X;
 	} //}}}
@@ -243,7 +228,7 @@ public class OperatingSystem
 	/**
 	 * Returns if we're running VMS.
 	 */
-	public static final boolean isVMS()
+	public static boolean isVMS()
 	{
 		return os == VMS;
 	} //}}}
@@ -252,17 +237,17 @@ public class OperatingSystem
 	/**
 	* Returns if we're running MacOS X and using the native look and feel.
 	*/
-	public static final boolean isMacOSLF()
+	public static boolean isMacOSLF()
 	{
-		return (isMacOS() && UIManager.getLookAndFeel().isNativeLookAndFeel());
+		return isMacOS() && UIManager.getLookAndFeel().isNativeLookAndFeel();
 	} //}}}
 
-	//{{{ hasScreenMenuBar
+	//{{{ hasScreenMenuBar() method
 	/**
 	 * Returns whether the screen menu bar on Mac OS X is in use.
 	 * @since jEdit 4.2pre1
 	*/
-	public static final boolean hasScreenMenuBar()
+	public static boolean hasScreenMenuBar()
 	{
 		if(!isMacOS())
 			return false;
@@ -271,30 +256,54 @@ public class OperatingSystem
 			String result = System.getProperty("apple.laf.useScreenMenuBar");
 			if (result == null)
 				result = System.getProperty("com.apple.macos.useScreenMenuBar");
-			hasScreenMenuBar = ("true".equals(result)) ? 1 : 0;
+			hasScreenMenuBar = "true".equals(result) ? 1 : 0;
 		}
 
-		return (hasScreenMenuBar == 1);
+		return hasScreenMenuBar == 1;
 	} //}}}
 
-	//{{{ isJava14() method
+	//{{{ hasJava14() method
 	/**
 	 * Returns if Java 2 version 1.4, or Java 2 version 1.5 is in use.
 	 */
-	public static final boolean hasJava14()
+	@Deprecated
+	public static boolean hasJava14()
 	{
+		// jEdit 4.3 requires Java 1.4 or later. However, this method exists
+		// for two reasons. Compatibility with plugins for jEdit 4.2, and
+		// in case somebody wants to borrow this class for their app.
 		return java14;
 	} //}}}
 
-	//{{{ isJava15() method
+	//{{{ hasJava15() method
 	/**
 	 * Returns if Java 2 version 1.5 is in use.
 	 */
-	public static final boolean hasJava15()
+	@Deprecated
+	public static boolean hasJava15()
 	{
 		return java15;
 	} //}}}
 
+	//{{{ hasJava16() method
+	/**
+	 * Returns if Java 2 version 1.6 is in use.
+	 * @since jEdit 4.3pre17
+	 */
+	public static boolean hasJava16()
+	{
+		return java16;
+	} //}}}
+
+	//{{{ isCaseInsensitiveFS() method
+	/**
+	 * @since jEdit 4.3pre2
+	 */
+	public static boolean isCaseInsensitiveFS()
+	{
+		return isDOSDerived() || isMacOS();
+	} //}}}
+	
 	//{{{ Private members
 	private static final int UNIX = 0x31337;
 	private static final int WINDOWS_9x = 0x640;
@@ -307,6 +316,7 @@ public class OperatingSystem
 	private static int os;
 	private static boolean java14;
 	private static boolean java15;
+	private static boolean java16;
 	private static int hasScreenMenuBar = -1;
 
 	//{{{ Class initializer
@@ -319,20 +329,20 @@ public class OperatingSystem
 		else
 		{
 			String osName = System.getProperty("os.name");
-			if(osName.indexOf("Windows 9") != -1
-				|| osName.indexOf("Windows M") != -1)
+			if(osName.contains("Windows 9")
+				|| osName.contains("Windows M"))
 			{
 				os = WINDOWS_9x;
 			}
-			else if(osName.indexOf("Windows") != -1)
+			else if(osName.contains("Windows"))
 			{
 				os = WINDOWS_NT;
 			}
-			else if(osName.indexOf("OS/2") != -1)
+			else if(osName.contains("OS/2"))
 			{
 				os = OS2;
 			}
-			else if(osName.indexOf("VMS") != -1)
+			else if(osName.contains("VMS"))
 			{
 				os = VMS;
 			}
@@ -351,10 +361,13 @@ public class OperatingSystem
 		// for debugging, make jEdit think its using a different
 		// version of Java than it really is.
 		String javaVersion = System.getProperty("jedit.force.java.version");
-		if(javaVersion == null || javaVersion.equals(""))
+		if(javaVersion == null || javaVersion.length() == 0)
 			javaVersion = System.getProperty("java.version");
-		java14 = (javaVersion.compareTo("1.4") >= 0);
-		java15 = (javaVersion.compareTo("1.5") >= 0);
+		if(javaVersion == null || javaVersion.length() == 0)
+			javaVersion = System.getProperty("java.runtime.version");
+		java14 = javaVersion.compareTo("1.4") >= 0;
+		java15 = javaVersion.compareTo("1.5") >= 0;
+		java16 = javaVersion.compareTo("1.6") >= 0;
 	} //}}}
 
 	//}}}

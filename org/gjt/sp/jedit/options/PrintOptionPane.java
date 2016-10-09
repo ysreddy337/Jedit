@@ -74,6 +74,13 @@ public class PrintOptionPane extends AbstractOptionPane
 		tabSize.setSelectedItem(jEdit.getProperty("print.tabSize"));
 		addComponent(jEdit.getProperty("options.print.tabSize"),tabSize);
 
+
+		/* Print Folds */
+		printFolds = new JCheckBox(jEdit.getProperty("options.print"
+			+ ".folds"));
+		printFolds.setSelected(jEdit.getBooleanProperty("print.folds",true));
+		addComponent(printFolds);
+		
 		addSeparator("options.print.workarounds");
 
 		/* Spacing workaround */
@@ -86,9 +93,7 @@ public class PrintOptionPane extends AbstractOptionPane
 		force13 = new JCheckBox(jEdit.getProperty(
 			"options.print.force13"));
 		force13.setSelected(jEdit.getBooleanProperty("print.force13"));
-
-		if(OperatingSystem.hasJava14())
-			addComponent(force13);
+		addComponent(force13);
 	} //}}}
 
 	//{{{ _save() method
@@ -102,6 +107,7 @@ public class PrintOptionPane extends AbstractOptionPane
 		jEdit.setProperty("print.tabSize",(String)tabSize.getSelectedItem());
 		jEdit.setBooleanProperty("print.glyphVector",glyphVector.isSelected());
 		jEdit.setBooleanProperty("print.force13",force13.isSelected());
+		jEdit.setBooleanProperty("print.folds",printFolds.isSelected());
 	} //}}}
 
 	//{{{ Private members
@@ -109,6 +115,7 @@ public class PrintOptionPane extends AbstractOptionPane
 	private JCheckBox printHeader;
 	private JCheckBox printFooter;
 	private JCheckBox printLineNumbers;
+	private JCheckBox printFolds;
 	private JCheckBox color;
 	private JComboBox tabSize;
 	private JCheckBox glyphVector;

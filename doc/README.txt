@@ -1,11 +1,11 @@
-JEDIT 4.2 README
+JEDIT 4.3 README
 
 * About jEdit
 
 jEdit is a cross platform programmer's text editor written in Java.
 
-jEdit requires either Java 2 version 1.3 or 1.4. It will not run with
-earlier versions.
+jEdit 4.3 requires Java 2 version 1.5 or later.
+It will not run with earlier versions.
 
 jEdit comes with full online help; to read it, select 'jEdit Help' from
 jEdit's 'Help' menu or point your web browser to the file named
@@ -74,24 +74,20 @@ to one of the BeanShell mailing lists by visiting
 <http://www.beanshell.org/contact.html>.
 
 Finally, if you want to chat about jEdit with other users and
-developers, come join the #jedit channel on irc.openprojects.net. You
+developers, come join the #jedit channel on irc.freenode.net. You
 can use the IRC plugin, available from <http://plugins.jedit.org>, for
 this purpose.
-
-You may also e-mail me directly by e-mailing <slava@jedit.org>.
 
 * Libraries
 
 jEdit bundles the following libraries:
 
-- gnu.regexp by the Free Software Foundation. jEdit bundles the
-  gnu.regexp 1.1.5 CVS snapshot.
+- AElfred XML parser by Microstar corporation.
+  This class is also DEPRECATED in favor of JDK 1.5's XmlReaderFactory class,
+  or the supplied XMLUtilities helper classes.
 
-  gnu.regexp is released under the 'GNU Lesser General Public License'.
-  The gnu.regexp homepage is <http://www.cacas.org/java/gnu/regexp/>.
-
-- AElfred XML parser by Microstar corporation. This class library is
-  released under its own, non-GPL license, which reads as follows:
+  This class library is released under its own, non-GPL license,
+  which reads as follows:
 
   "AElfred is free for both commercial and non-commercial use and
   redistribution, provided that Microstar's copyright and disclaimer are
@@ -102,7 +98,7 @@ jEdit bundles the following libraries:
   The AElfred web site is <http://www.microstar.com>.
 
 - BeanShell scripting language, by Pat Niemeyer. jEdit bundles BeanShell
-  version 2.0b1 with the bsh.util and bsh.classpath packages removed.
+  version 2.0b4 with the bsh.util and bsh.classpath packages removed.
 
   BeanShell is released under a dual Sun Public License/GNU LGPL
   license. See the BeanShell homepage for details.
@@ -110,8 +106,9 @@ jEdit bundles the following libraries:
   The BeanShell web site is <http://www.beanshell.org>.
 
 - ASM bytecode generation library from Objectweb. This class library is
-  released under a BSD-style license. The ASM homepage can be found at
-  <http://asm.objectweb.org/>.
+  released under the 'GNU Lesser General Public License'.
+  The ASM homepage can be found at <http://asm.objectweb.org/>.
+  The library is in org/gjt/sp/jedit/bsh/org/objectweb/asm/.
 
 The jEdit installer bundles the following libraries:
 

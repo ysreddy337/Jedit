@@ -5,6 +5,7 @@
  *
  * Copyright (C) 1999 Jason Ginchereau
  * Portions copyright (C) 2001, 2003 Slava Pestov
+ * Portions copyright (C) 2007 Matthieu Casanova
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,18 +30,22 @@ import java.awt.font.*;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
-import org.gjt.sp.jedit.io.VFS;
+import org.gjt.sp.jedit.io.VFSFile;
 import org.gjt.sp.jedit.*;
 //}}}
 
+/**
+ * Local filesystem VFS.
+ * @version $Id: FileCellRenderer.java 12504 2008-04-22 23:12:43Z ezust $
+ */
 public class FileCellRenderer extends DefaultTableCellRenderer
 {
-	public static Icon fileIcon = GUIUtilities.loadIcon("File.png");
-	public static Icon openFileIcon = GUIUtilities.loadIcon("OpenFile.png");
-	public static Icon dirIcon = GUIUtilities.loadIcon("Folder.png");
-	public static Icon openDirIcon = GUIUtilities.loadIcon("OpenFolder.png");
-	public static Icon filesystemIcon = GUIUtilities.loadIcon("DriveSmall.png");
-	public static Icon loadingIcon = GUIUtilities.loadIcon("ReloadSmall.png");
+	public static Icon fileIcon = GUIUtilities.loadIcon(jEdit.getProperty("vfs.browser.file.icon"));
+	public static Icon openFileIcon = GUIUtilities.loadIcon(jEdit.getProperty("vfs.browser.open-file.icon"));
+	public static Icon dirIcon = GUIUtilities.loadIcon(jEdit.getProperty("vfs.browser.dir.icon"));
+	public static Icon openDirIcon = GUIUtilities.loadIcon(jEdit.getProperty("vfs.browser.open-dir.icon"));
+	public static Icon filesystemIcon = GUIUtilities.loadIcon(jEdit.getProperty("vfs.browser.filesystem.icon"));
+	public static Icon loadingIcon = GUIUtilities.loadIcon(jEdit.getProperty("vfs.browser.loading.icon"));
 
 	//{{{ FileCellRenderer constructor
 	public FileCellRenderer()
@@ -63,9 +68,9 @@ public class FileCellRenderer extends DefaultTableCellRenderer
 		{
 			VFSDirectoryEntryTableModel.Entry entry =
 				(VFSDirectoryEntryTableModel.Entry)value;
-			VFS.DirectoryEntry file = entry.dirEntry;
+			VFSFile file = entry.dirEntry;
 
-			setFont(file.type == VFS.DirectoryEntry.FILE
+			setFont(file.getType() == VFSFile.FILE
 				? plainFont : boldFont);
 
 			this.isSelected = isSelected;
@@ -77,19 +82,19 @@ public class FileCellRenderer extends DefaultTableCellRenderer
 				// symlinkPath, some older plugins
 				// might...
 				String path;
-				if(file.symlinkPath == null)
-					path = file.path;
+				if(file.getSymlinkPath() == null)
+					path = file.getPath();
 				else
-					path = file.symlinkPath;
-				openBuffer = (jEdit._getBuffer(path) != null);
+					path = file.getSymlinkPath();
+				openBuffer = jEdit._getBuffer(path) != null;
 
 				setIcon(showIcons
 					? getIconForFile(file,entry.expanded,
 					openBuffer) : null);
-				setText(file.name);
+				setText(file.getName());
 
 				int state;
-				if(file.type == VFS.DirectoryEntry.FILE)
+				if(file.getType() == VFSFile.FILE)
 					state = ExpansionToggleBorder.STATE_NONE;
 				else if(entry.expanded)
 					state = ExpansionToggleBorder.STATE_EXPANDED;
@@ -102,7 +107,7 @@ public class FileCellRenderer extends DefaultTableCellRenderer
 			else
 			{
 				VFSDirectoryEntryTableModel model = (VFSDirectoryEntryTableModel)table.getModel();
-				String extAttr = model.getExtendedAttribute(column - 1);
+				String extAttr = model.getExtendedAttribute(column);
 
 				openBuffer = false;
 				setIcon(null);
@@ -155,45 +160,42 @@ public class FileCellRenderer extends DefaultTableCellRenderer
 
 	//{{{ getIconForFile() method
 	/**
-	 * @since jEdit 4.2pre7
+	 * @since jEdit 4.3pre2
 	 */
-	public static Icon getIconForFile(VFS.DirectoryEntry file,
+	public static Icon getIconForFile(VFSFile file,
 		boolean expanded)
 	{
 		return getIconForFile(file,expanded,
-			jEdit._getBuffer(file.symlinkPath) != null);
+			jEdit._getBuffer(file.getSymlinkPath()) != null);
 	} //}}}
 
 	//{{{ getIconForFile() method
-	public static Icon getIconForFile(VFS.DirectoryEntry file,
+	public static Icon getIconForFile(VFSFile file,
 		boolean expanded, boolean openBuffer)
 	{
-		if(file.type == VFS.DirectoryEntry.DIRECTORY)
-			return (expanded ? openDirIcon : dirIcon);
-		else if(file.type == VFS.DirectoryEntry.FILESYSTEM)
-			return filesystemIcon;
-		else if(openBuffer)
-			return openFileIcon;
-		else
-			return fileIcon;
+		if (defaultIcons)
+			return file.getDefaultIcon(expanded, openBuffer);
+		return file.getIcon(expanded, openBuffer);
 	} //}}}
 
 	//{{{ Package-private members
 	Font plainFont;
 	Font boldFont;
 	boolean showIcons;
+	private static boolean defaultIcons = true;
 
 	//{{{ propertiesChanged() method
 	void propertiesChanged()
 	{
 		showIcons = jEdit.getBooleanProperty("vfs.browser.showIcons");
+		defaultIcons = jEdit.getBooleanProperty("vfs.browser.useDefaultIcons");
 	} //}}}
 
 	//{{{ getEntryWidth() method
 	int getEntryWidth(VFSDirectoryEntryTableModel.Entry entry,
 		Font font, FontRenderContext fontRenderContext)
 	{
-		String name = entry.dirEntry.name;
+		String name = entry.dirEntry.getName();
 		int width = (int)font.getStringBounds(name,fontRenderContext)
 			.getWidth();
 		width += ExpansionToggleBorder.ICON_WIDTH
@@ -212,24 +214,24 @@ public class FileCellRenderer extends DefaultTableCellRenderer
 	//{{{ Private members
 	private boolean openBuffer;
 	private boolean isSelected;
-	private VFS.DirectoryEntry file;
+	private VFSFile file;
 	//}}}
 
 	//{{{ ExpansionToggleBorder class
 	static class ExpansionToggleBorder implements Border
 	{
-		static final Icon COLLAPSED_ICON;
-		static final Icon EXPANDED_ICON;
+		static final Icon COLLAPSE_ICON;
+		static final Icon EXPAND_ICON;
 		static final int ICON_WIDTH;
 
-		static final int LEVEL_WIDTH = 15;
+		static final int LEVEL_WIDTH = 10;
 
 		static final int STATE_NONE = 0;
 		static final int STATE_COLLAPSED = 1;
 		static final int STATE_EXPANDED = 2;
 
 		//{{{ ExpansionToggleBorder constructor
-		public ExpansionToggleBorder(int state, int level)
+		ExpansionToggleBorder(int state, int level)
 		{
 			this.state = state;
 			this.level = level;
@@ -239,17 +241,18 @@ public class FileCellRenderer extends DefaultTableCellRenderer
 		public void paintBorder(Component c, Graphics g,
 			int x, int y, int width, int height)
 		{
+			// paint the opposite icon of what the state is
 			switch(state)
 			{
 			case STATE_COLLAPSED:
-				COLLAPSED_ICON.paintIcon(c,g,
+				EXPAND_ICON.paintIcon(c,g,
 					x + level * LEVEL_WIDTH + 2,
-					y + (height - COLLAPSED_ICON.getIconHeight()) / 2);
+					y + (height - EXPAND_ICON.getIconHeight()) / 2);
 				break;
 			case STATE_EXPANDED:
-				EXPANDED_ICON.paintIcon(c,g,
+				COLLAPSE_ICON.paintIcon(c,g,
 					x + level * LEVEL_WIDTH + 2,
-					y + 2 + (height - EXPANDED_ICON.getIconHeight()) / 2);
+					y + (height - COLLAPSE_ICON.getIconHeight()) / 2);
 				break;
 			}
 		} //}}}
@@ -280,10 +283,9 @@ public class FileCellRenderer extends DefaultTableCellRenderer
 
 		static
 		{
-			COLLAPSED_ICON = GUIUtilities.loadIcon("arrow1.png");
-			EXPANDED_ICON = GUIUtilities.loadIcon("arrow2.png");
-			ICON_WIDTH = Math.max(COLLAPSED_ICON.getIconWidth(),
-				EXPANDED_ICON.getIconWidth());
+			COLLAPSE_ICON = GUIUtilities.loadIcon(jEdit.getProperty("vfs.browser.collapse.icon"));
+			EXPAND_ICON = GUIUtilities.loadIcon(jEdit.getProperty("vfs.browser.expand.icon"));
+			ICON_WIDTH = Math.max(COLLAPSE_ICON.getIconWidth(), EXPAND_ICON.getIconWidth());
 		} //}}}
 	} //}}}
 }

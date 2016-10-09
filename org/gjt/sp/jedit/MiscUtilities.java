@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2004 Slava Pestov
+ * Copyright (C) 1999, 2005 Slava Pestov
  * Portions copyright (C) 2000 Richard S. Hall
  * Portions copyright (C) 2001 Dirk Moebius
  *
@@ -27,14 +27,27 @@ package org.gjt.sp.jedit;
 //{{{ Imports
 import javax.swing.text.Segment;
 import javax.swing.JMenuItem;
-import java.lang.reflect.Method;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.MalformedInputException;
 import java.text.DecimalFormat;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.xml.sax.InputSource;
+import org.xml.sax.helpers.DefaultHandler;
+
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.ProgressObserver;
+import org.gjt.sp.util.StandardUtilities;
+import org.gjt.sp.util.IOUtilities;
+
+import org.gjt.sp.util.XMLUtilities;
+import org.gjt.sp.jedit.menu.MenuItemTextComparator;
+import org.gjt.sp.jedit.buffer.JEditBuffer;
 //}}}
 
 /**
@@ -49,7 +62,7 @@ import org.gjt.sp.util.Log;
  * <li>{@link #constructPath(String,String)}</li>
  * </ul>
  * <b>String comparison:</b><p>
- 
+
  * A {@link #compareStrings(String,String,boolean)} method that unlike
  * <function>String.compareTo()</function>, correctly recognizes and handles
  * embedded numbers.<p>
@@ -58,7 +71,6 @@ import org.gjt.sp.util.Log;
  * sorting features of the Java collections API:
  *
  * <ul>
- * <li>{@link MiscUtilities.StringCompare}</li>
  * <li>{@link MiscUtilities.StringICaseCompare}</li>
  * <li>{@link MiscUtilities.MenuItemCompare}</li>
  * </ul>
@@ -70,21 +82,24 @@ import org.gjt.sp.util.Log;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: MiscUtilities.java,v 1.77 2004/08/21 01:49:05 spestov Exp $
+ * @version $Id: MiscUtilities.java 16559 2009-11-28 18:40:50Z ezust $
  */
 public class MiscUtilities
 {
 	/**
 	 * This encoding is not supported by Java, yet it is useful.
 	 * A UTF-8 file that begins with 0xEFBBBF.
+	 * @deprecated
+	 *   Extended encodings are now supported as services.
+	 *   This value is no longer used.
 	 */
-	public static final String UTF_8_Y = "UTF-8Y";
+	@Deprecated public static final String UTF_8_Y = "UTF-8Y";
 
 	//{{{ Path name methods
 
 	//{{{ canonPath() method
 	/**
-	 * Returns the canonical form of the specified path name. Currently
+	 * @return the canonical form of the specified path name. Currently
 	 * only expands a leading <code>~</code>. <b>For local path names
 	 * only.</b>
 	 * @param path The path name
@@ -104,13 +119,19 @@ public class MiscUtilities
 
 		if(File.separatorChar == '\\')
 		{
-			// get rid of mixed paths on Windows
-			path = path.replace('/','\\');
-			// also get rid of trailing spaces on Windows
-			int trim = path.length();
-			while(path.charAt(trim - 1) == ' ')
-				trim--;
-			path = path.substring(0,trim);
+				// get rid of mixed paths on Windows
+				path = path.replace('/','\\');
+				// also get rid of trailing spaces on Windows
+				int trim = path.length();
+				while(path.charAt(trim - 1) == ' ')
+					trim--;
+
+				if (path.charAt(trim - 1) == '\\')
+					while (trim > 1 && path.charAt(trim - 2) == '\\')
+					{
+						trim--;
+					}
+				path = path.substring(0,trim);
 		}
 		else if(OperatingSystem.isMacOS())
 		{
@@ -118,7 +139,7 @@ public class MiscUtilities
 			path = path.replace(':','/');
 		}
 
-		if(path.startsWith("~" + File.separator))
+		if(path.startsWith('~' + File.separator))
 		{
 			path = path.substring(2);
 			String home = System.getProperty("user.home");
@@ -128,10 +149,68 @@ public class MiscUtilities
 			else
 				return home + File.separator + path;
 		}
-		else if(path.equals("~"))
+		else if("~".equals(path))
 			return System.getProperty("user.home");
+		else if ("-".equals(path))
+			return getParentOfPath(jEdit.getActiveView().getBuffer().getPath());
 		else
 			return path;
+	} //}}}
+
+	//{{{ expandVariables() method
+	static final String varPatternString = "(\\$([a-zA-Z0-9_]+))";
+	static final String varPatternString2 = "(\\$\\{([^}]+)\\})";
+	static final Pattern varPattern = Pattern.compile(varPatternString);
+	static final Pattern varPattern2 = Pattern.compile(varPatternString2);
+
+	/** Accepts a string from the user which may contain variables of various syntaxes.
+	 *  The goal is to support the following:
+	 *     $varname
+	 *     ${varname}
+	 *     And expand each of these by looking at the system environment variables for possible
+	 *     expansions.
+	 *     @return a string which is either the unchanged input string, or one with expanded variables.
+	 *     @since 4.3pre7
+	 *     @author ezust
+	 */
+	public static String expandVariables(String arg)
+	{
+		Pattern p = varPattern;
+		Matcher m = p.matcher(arg);
+		if (!m.find())
+		{
+			p = varPattern2;
+			m = p.matcher(arg);
+			if (!m.find()) // no variables to substitute
+				return arg;
+		}
+		String varName = m.group(2);
+		String expansion = System.getenv(varName);
+		if (expansion == null)
+		{ // try everything uppercase?
+			varName = varName.toUpperCase();
+			String uparg = arg.toUpperCase();
+			m = p.matcher(uparg);
+			expansion = System.getenv(varName);
+		}
+		if (expansion != null)
+		{
+			expansion = expansion.replace("\\", "\\\\");
+			return m.replaceFirst(expansion);
+		}
+		return arg;
+	} //}}}
+
+	//{{{ abbreviate() method
+	/** returns an abbreviated path, replacing
+	 *  values with variables, if a prefix exists.
+	 *  @since jEdit 4.3pre16
+	 */
+	public static String abbreviate(String path)
+	{
+		if (svc == null)
+			svc = new VarCompressor();
+		return svc.compress(path);
 	} //}}}
 
 	//{{{ resolveSymlinks() method
@@ -178,7 +257,9 @@ public class MiscUtilities
 	{
 		if(isURL(path))
 			return true;
-		else if(path.startsWith("~/") || path.startsWith("~" + File.separator) || path.equals("~"))
+		else if(path.startsWith("~/") || path.startsWith('~' + File.separator) || "~".equals(path))
+			return true;
+		else if ("-".equals(path))
 			return true;
 		else if(OperatingSystem.isDOSDerived())
 		{
@@ -186,7 +267,7 @@ public class MiscUtilities
 				return true;
 			if(path.length() > 2 && path.charAt(1) == ':'
 				&& (path.charAt(2) == '\\'
-				|| path.charAt(2) == '/'))
+					|| path.charAt(2) == '/'))
 				return true;
 			if(path.startsWith("\\\\")
 				|| path.startsWith("//"))
@@ -194,7 +275,7 @@ public class MiscUtilities
 		}
 		// not sure if this is correct for OpenVMS.
 		else if(OperatingSystem.isUnix()
-			|| OperatingSystem.isVMS())
+				|| OperatingSystem.isVMS())
 		{
 			// nice and simple
 			if(path.length() > 0 && path.charAt(0) == '/')
@@ -204,7 +285,7 @@ public class MiscUtilities
 		return false;
 	} //}}}
 
-	//{{{ constructPath() method
+	//{{{ constructPath() methods
 	/**
 	 * Constructs an absolute path name from a directory and another
 	 * path name. This method is VFS-aware.
@@ -216,6 +297,12 @@ public class MiscUtilities
 		if(isAbsolutePath(path))
 			return canonPath(path);
 
+		if (parent == null)
+			parent = System.getProperty("user.dir");
+
+		if (path == null || path.length() == 0)
+			return parent;
+
 		// have to handle this case specially on windows.
 		// insert \ between, eg A: and myfile.txt.
 		if(OperatingSystem.isDOSDerived())
@@ -223,7 +310,7 @@ public class MiscUtilities
 			if(path.length() == 2 && path.charAt(1) == ':')
 				return path;
 			else if(path.length() > 2 && path.charAt(1) == ':'
-				&& path.charAt(2) != '\\')
+					&& path.charAt(2) != '\\')
 			{
 				path = path.substring(0,2) + '\\'
 					+ path.substring(2);
@@ -232,16 +319,13 @@ public class MiscUtilities
 		}
 
 		String dd = ".." + File.separator;
-		String d = "." + File.separator;
-
-		if(parent == null)
-			parent = System.getProperty("user.dir");
+		String d = '.' + File.separator;
 
 		for(;;)
 		{
-			if(path.equals("."))
+			if(".".equals(path))
 				return parent;
-			else if(path.equals(".."))
+			else if("..".equals(path))
 				return getParentOfPath(parent);
 			else if(path.startsWith(dd) || path.startsWith("../"))
 			{
@@ -253,18 +337,19 @@ public class MiscUtilities
 			else
 				break;
 		}
+		if(path.length() == 0)
+			return parent;
 
 		if(OperatingSystem.isDOSDerived()
 			&& !isURL(parent)
-			&& path.startsWith("\\"))
+		&& path.charAt(0) == '\\')
 			parent = parent.substring(0,2);
 
 		VFS vfs = VFSManager.getVFSForPath(parent);
 
 		return canonPath(vfs.constructPath(parent,path));
-	} //}}}
+	}
 
-	//{{{ constructPath() method
 	/**
 	 * Constructs an absolute path name from three path components.
 	 * This method is VFS-aware.
@@ -273,7 +358,7 @@ public class MiscUtilities
 	 * @param path2 The second path
 	 */
 	public static String constructPath(String parent,
-		String path1, String path2)
+				    String path1, String path2)
 	{
 		return constructPath(constructPath(parent,path1),path2);
 	} //}}}
@@ -284,8 +369,8 @@ public class MiscUtilities
 	 * appended to <code>parent</code> even if it is absolute.
 	 * <b>For local path names only.</b>.
 	 *
-	 * @param path
-	 * @param parent
+	 * @param parent the parent path
+	 * @param path the path to append to the parent
 	 */
 	public static String concatPath(String parent, String path)
 	{
@@ -295,7 +380,7 @@ public class MiscUtilities
 		// Make all child paths relative.
 		if (path.startsWith(File.separator))
 			path = path.substring(1);
-		else if ((path.length() >= 3) && (path.charAt(1) == ':'))
+		else if (path.length() >= 3 && path.charAt(1) == ':')
 			path = path.replace(':', File.separatorChar);
 
 		if (parent == null)
@@ -307,21 +392,58 @@ public class MiscUtilities
 			return parent + File.separator + path;
 	} //}}}
 
+	//{{{ getFirstSeparatorIndex() method
+	/**
+	 * Return the first index of either / or the OS-specific file
+	 * separator.
+	 * @param path The path
+	 * @since jEdit 4.3pre3
+	 */
+	public static int getFirstSeparatorIndex(String path)
+	{
+		int start = getPathStart(path);
+		int index = path.indexOf('/',start);
+		if(index == -1)
+			index = path.indexOf(File.separatorChar,start);
+		return index;
+	} //}}}
+
+	//{{{ getLastSeparatorIndex() method
+	/**
+	 * Return the last index of either / or the OS-specific file
+	 * separator.
+	 * @param path The path
+	 * @since jEdit 4.3pre3
+	 */
+	public static int getLastSeparatorIndex(String path)
+	{
+		int start = getPathStart(path);
+		if(start != 0)
+			path = path.substring(start);
+		int index = Math.max(
+			path.lastIndexOf('/'), path.lastIndexOf(File.separatorChar));
+		if(index == -1)
+			return index;
+		else
+			return index + start;
+	} //}}}
+
+
 	//{{{ getFileExtension() method
 	/**
 	 * Returns the extension of the specified filename, or an empty
 	 * string if there is none.
-	 * @param name The file name or path
+	 * @param path The path
 	 */
-	public static String getFileExtension(String name)
+	public static String getFileExtension(String path)
 	{
-		int fsIndex = Math.max(name.indexOf('/'),
-			name.indexOf(File.separatorChar));
-		int index = name.indexOf('.',fsIndex);
-		if(index == -1)
+		int fsIndex = getLastSeparatorIndex(path);
+		int index = path.lastIndexOf('.');
+		// there could be a dot in the path and no file extension
+		if(index == -1 || index < fsIndex )
 			return "";
 		else
-			return name.substring(index);
+			return path.substring(index);
 	} //}}}
 
 	//{{{ getFileName() method
@@ -356,6 +478,7 @@ public class MiscUtilities
 	/**
 	 * @deprecated Call getParentOfPath() instead
 	 */
+	@Deprecated
 	public static String getFileParent(String path)
 	{
 		return getParentOfPath(path);
@@ -376,6 +499,7 @@ public class MiscUtilities
 	/**
 	 * @deprecated Call getProtocolOfURL() instead
 	 */
+	@Deprecated
 	public static String getFileProtocol(String url)
 	{
 		return getProtocolOfURL(url);
@@ -400,8 +524,7 @@ public class MiscUtilities
 	 */
 	public static boolean isURL(String str)
 	{
-		int fsIndex = Math.max(str.indexOf(File.separatorChar),
-			str.indexOf('/'));
+		int fsIndex = getLastSeparatorIndex(str);
 		if(fsIndex == 0) // /etc/passwd
 			return false;
 		else if(fsIndex == 2) // C:\AUTOEXEC.BAT
@@ -427,7 +550,7 @@ public class MiscUtilities
 		}
 	} //}}}
 
-	//{{{ saveBackup() method
+	//{{{ saveBackup() methods
 	/**
 	 * Saves a backup (optionally numbered) of a file.
 	 * @param file A local file
@@ -439,14 +562,13 @@ public class MiscUtilities
 	 * they will be saved in the same directory as the file itself.
 	 * @since jEdit 4.0pre1
 	 */
-	public static void saveBackup(File file, int backups,
-		String backupPrefix, String backupSuffix,
-		String backupDirectory)
+	 public static void saveBackup(File file, int backups,
+		 String backupPrefix, String backupSuffix,
+		 String backupDirectory)
 	{
 		saveBackup(file,backups,backupPrefix,backupSuffix,backupDirectory,0);
-	} //}}}
+	}
 
-	//{{{ saveBackup() method
 	/**
 	 * Saves a backup (optionally numbered) of a file.
 	 * @param file A local file
@@ -462,8 +584,8 @@ public class MiscUtilities
 	 * @since jEdit 4.2pre5
 	 */
 	public static void saveBackup(File file, int backups,
-		String backupPrefix, String backupSuffix,
-		String backupDirectory, int backupTimeDistance)
+			       String backupPrefix, String backupSuffix,
+			       String backupDirectory, int backupTimeDistance)
 	{
 		if(backupPrefix == null)
 			backupPrefix = "";
@@ -482,10 +604,15 @@ public class MiscUtilities
 			 * 'backupTimeDistance' ago, we do not
 			 * create the backup */
 			if(System.currentTimeMillis() - modTime
-				>= backupTimeDistance)
+			   >= backupTimeDistance)
 			{
+				Log.log(Log.DEBUG,MiscUtilities.class,
+					"Saving backup of file \"" +
+					file.getAbsolutePath() + "\" to \"" +
+					backupFile.getAbsolutePath() + '"');
 				backupFile.delete();
-				file.renameTo(backupFile);
+				if (!file.renameTo(backupFile))
+					IOUtilities.moveFile(file, backupFile);
 			}
 		}
 		// If backups > 1, move old ~n~ files, create ~1~ file
@@ -498,13 +625,13 @@ public class MiscUtilities
 
 			File firstBackup = new File(backupDirectory,
 				backupPrefix + name + backupSuffix
-				+ "1" + backupSuffix);
+				+ '1' + backupSuffix);
 			long modTime = firstBackup.lastModified();
 			/* if backup file was created less than
 			 * 'backupTimeDistance' ago, we do not
 			 * create the backup */
 			if(System.currentTimeMillis() - modTime
-				>= backupTimeDistance)
+			   >= backupTimeDistance)
 			{
 				for(int i = backups - 1; i > 0; i--)
 				{
@@ -513,18 +640,239 @@ public class MiscUtilities
 						+ backupSuffix + i
 						+ backupSuffix);
 
-					backup.renameTo(
-						new File(backupDirectory,
+					backup.renameTo(new File(backupDirectory,
 						backupPrefix + name
-						+ backupSuffix + (i+1)
+						+ backupSuffix + (i + 1)
 						+ backupSuffix));
 				}
 
-				file.renameTo(new File(backupDirectory,
+				File backupFile = new File(backupDirectory,
 					backupPrefix + name + backupSuffix
-					+ "1" + backupSuffix));
+					+ '1' + backupSuffix);
+				Log.log(Log.DEBUG,MiscUtilities.class,
+					"Saving backup of file \"" +
+					file.getAbsolutePath() + "\" to \"" +
+					backupFile.getAbsolutePath() + '"');
+				if (!file.renameTo(backupFile))
+					IOUtilities.moveFile(file, backupFile);
 			}
 		}
+	} //}}}
+
+	//{{{ moveFile() method
+	/**
+	 * Moves the source file to the destination.
+	 *
+	 * If the destination cannot be created or is a read-only file, the
+	 * method returns <code>false</code>. Otherwise, the contents of the
+	 * source are copied to the destination, the source is deleted,
+	 * and <code>true</code> is returned.
+	 *
+	 * @param source The source file to move.
+	 * @param dest   The destination where to move the file.
+	 * @return true on success, false otherwise.
+	 *
+	 * @since jEdit 4.3pre1
+	 * @deprecated use {@link org.gjt.sp.util.IOUtilities#moveFile(java.io.File, java.io.File)}
+	 */
+	@Deprecated
+	public static boolean moveFile(File source, File dest)
+	{
+		return IOUtilities.moveFile(source, dest);
+	} //}}}
+
+	//{{{ copyStream() methods
+	/**
+	 * Copy an input stream to an output stream.
+	 *
+	 * @param bufferSize the size of the buffer
+	 * @param progress the progress observer it could be null
+	 * @param in the input stream
+	 * @param out the output stream
+	 * @param canStop if true, the copy can be stopped by interrupting the thread
+	 * @return <code>true</code> if the copy was done, <code>false</code> if it was interrupted
+	 * @throws IOException  IOException If an I/O error occurs
+	 * @since jEdit 4.3pre3
+	 * @deprecated use {@link IOUtilities#copyStream(int, org.gjt.sp.util.ProgressObserver, java.io.InputStream, java.io.OutputStream, boolean)}
+	 */
+	@Deprecated
+	public static boolean copyStream(int bufferSize, ProgressObserver progress,
+		InputStream in, OutputStream out, boolean canStop)
+		throws IOException
+	{
+		return IOUtilities.copyStream(bufferSize, progress, in, out, canStop);
+	}
+
+	/**
+	 * Copy an input stream to an output stream with a buffer of 4096 bytes.
+	 *
+	 * @param progress the progress observer it could be null
+	 * @param in the input stream
+	 * @param out the output stream
+	 * @param canStop if true, the copy can be stopped by interrupting the thread
+	 * @return <code>true</code> if the copy was done, <code>false</code> if it was interrupted
+	 * @throws IOException  IOException If an I/O error occurs
+	 * @since jEdit 4.3pre3
+	 * @deprecated use {@link IOUtilities#copyStream(org.gjt.sp.util.ProgressObserver, java.io.InputStream, java.io.OutputStream, boolean)}
+	 */
+	@Deprecated
+	public static boolean copyStream(ProgressObserver progress, InputStream in, OutputStream out, boolean canStop)
+		throws IOException
+	{
+		return IOUtilities.copyStream(4096,progress, in, out, canStop);
+	} //}}}
+
+	//{{{ isBinary() methods
+	/**
+	 * Check if a Reader is binary.
+	 * @deprecated
+	 *   Use isBinary(InputStream) instead.
+	 */
+	@Deprecated
+	public static boolean isBinary(Reader reader) throws IOException
+	{
+		return containsNullCharacter(reader);
+	}
+
+	/**
+	 * Check if an InputStream is binary.
+	 * First this tries encoding auto detection. If an encoding is
+	 * detected, the stream should be a text stream. Otherwise, this
+	 * will check the first characters 100
+	 * (jEdit property vfs.binaryCheck.length) in the system default
+	 * encoding. If more than 1 (jEdit property vfs.binaryCheck.count)
+	 * NUL(\u0000) was found, the stream is declared binary.
+	 *
+	 * This is not 100% because sometimes the autodetection could fail.
+	 *
+	 * This method will not close the stream. You have to do it yourself
+	 *
+	 * @param in the stream
+	 * @return <code>true</code> if the stream was detected as binary
+	 * @throws IOException IOException If an I/O error occurs
+	 * @since jEdit 4.3pre10
+	 */
+	public static boolean isBinary(InputStream in) throws IOException
+	{
+		AutoDetection.Result detection = new AutoDetection.Result(in);
+		// If an encoding is detected, this is a text stream
+		if (detection.getDetectedEncoding() != null)
+		{
+			return false;
+		}
+		// Read the stream in system default encoding. The encoding
+		// might be wrong. But enough for binary detection.
+		try
+		{
+			return containsNullCharacter(
+				new InputStreamReader(detection.getRewindedStream()));
+		}
+		catch (MalformedInputException mie)
+		{
+			// This error probably means the input is binary.
+			return true;
+		}
+	} //}}}
+
+	//{{{ isBackup() method
+	/**
+	 * Check if the filename is a backup file.
+	 * @param filename the filename to check
+	 * @return true if this is a backup file.
+	 * @since jEdit 4.3pre5
+	 */
+	public static boolean isBackup(String filename)
+	{
+		if (filename.startsWith("#")) return true;
+		if (filename.endsWith("~")) return true;
+		if (filename.endsWith(".bak")) return true;
+		return false;
+	} //}}}
+
+
+	//{{{ autodetect() method
+	/**
+	 * Tries to detect if the stream is gzipped, and if it has an encoding
+	 * specified with an XML PI.
+	 *
+	 * @param in the input stream reader that must be autodetected
+	 * @param buffer a buffer. It can be null if you only want to autodetect the encoding of a file
+	 * @return a Reader using the detected encoding
+	 * @throws IOException io exception during read
+	 * @since jEdit 4.3pre5
+	 */
+	public static Reader autodetect(InputStream in, Buffer buffer) throws IOException
+	{
+		String encoding;
+		if (buffer == null)
+			encoding = System.getProperty("file.encoding");
+		else
+			encoding = buffer.getStringProperty(JEditBuffer.ENCODING);
+		boolean gzipped = false;
+
+		if (buffer == null || buffer.getBooleanProperty(Buffer.ENCODING_AUTODETECT))
+		{
+			AutoDetection.Result detection = new AutoDetection.Result(in);
+			gzipped = detection.streamIsGzipped();
+			if (gzipped)
+			{
+				Log.log(Log.DEBUG, MiscUtilities.class
+					, "Stream is Gzipped");
+			}
+			String detected = detection.getDetectedEncoding();
+			if (detected != null)
+			{
+				encoding = detected;
+				Log.log(Log.DEBUG, MiscUtilities.class
+					, "Stream encoding detected is " + detected);
+			}
+			in = detection.getRewindedStream();
+		}
+		else
+		{
+			// Make the stream buffered in the same way.
+			in = AutoDetection.getMarkedStream(in);
+		}
+
+		Reader result = EncodingServer.getTextReader(in, encoding);
+		if (buffer != null)
+		{
+			// Store the successful properties.
+			if (gzipped)
+			{
+				buffer.setBooleanProperty(Buffer.GZIPPED,true);
+			}
+			buffer.setProperty(JEditBuffer.ENCODING, encoding);
+		}
+		return result;
+	} //}}}
+
+	//{{{ closeQuietly() method
+	/**
+	 * Method that will close an {@link InputStream} ignoring it if it is null and ignoring exceptions.
+	 *
+	 * @param in the InputStream to close.
+	 * @since jEdit 4.3pre3
+	 * @deprecated use {@link IOUtilities#closeQuietly(java.io.InputStream)}
+	 */
+	@Deprecated
+	public static void closeQuietly(InputStream in)
+	{
+		IOUtilities.closeQuietly(in);
+	} //}}}
+
+	//{{{ copyStream() method
+	/**
+	 * Method that will close an {@link OutputStream} ignoring it if it is null and ignoring exceptions.
+	 *
+	 * @param out the OutputStream to close.
+	 * @since jEdit 4.3pre3
+	 * @deprecated use {@link IOUtilities#closeQuietly(java.io.OutputStream)}
+	 */
+	@Deprecated
+	public static void closeQuietly(OutputStream out)
+	{
+		IOUtilities.closeQuietly(out);
 	} //}}}
 
 	//{{{ fileToClass() method
@@ -553,6 +901,34 @@ public class MiscUtilities
 		return name.replace('.','/').concat(".class");
 	} //}}}
 
+	//{{{ pathsEqual() method
+	/**
+	 * @param p1 A path name
+	 * @param p2 A path name
+	 * @return True if both paths are equal, ignoring trailing slashes, as
+	 * well as case insensitivity on Windows.
+	 * @since jEdit 4.3pre2
+	 */
+	public static boolean pathsEqual(String p1, String p2)
+	{
+		VFS v1 = VFSManager.getVFSForPath(p1);
+		VFS v2 = VFSManager.getVFSForPath(p2);
+
+		if(v1 != v2)
+			return false;
+
+		if(p1.endsWith("/") || p1.endsWith(File.separator))
+			p1 = p1.substring(0,p1.length() - 1);
+
+		if(p2.endsWith("/") || p2.endsWith(File.separator))
+			p2 = p2.substring(0,p2.length() - 1);
+
+		if((v1.getCapabilities() & VFS.CASE_INSENSITIVE_CAP) != 0)
+			return p1.equalsIgnoreCase(p2);
+		else
+			return p1.equals(p2);
+	} //}}}
+
 	//}}}
 
 	//{{{ Text methods
@@ -562,22 +938,12 @@ public class MiscUtilities
 	 * Returns the number of leading white space characters in the
 	 * specified string.
 	 * @param str The string
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#getLeadingWhiteSpace(String)}
 	 */
+	@Deprecated
 	public static int getLeadingWhiteSpace(String str)
 	{
-		int whitespace = 0;
-loop:		for(;whitespace < str.length();)
-		{
-			switch(str.charAt(whitespace))
-			{
-			case ' ': case '\t':
-				whitespace++;
-				break;
-			default:
-				break loop;
-			}
-		}
-		return whitespace;
+		return StandardUtilities.getLeadingWhiteSpace(str);
 	} //}}}
 
 	//{{{ getTrailingWhiteSpace() method
@@ -586,22 +952,12 @@ loop:		for(;whitespace < str.length();)
 	 * specified string.
 	 * @param str The string
 	 * @since jEdit 2.5pre5
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#getTrailingWhiteSpace(String)}
 	 */
+	@Deprecated
 	public static int getTrailingWhiteSpace(String str)
 	{
-		int whitespace = 0;
-loop:		for(int i = str.length() - 1; i >= 0; i--)
-		{
-			switch(str.charAt(i))
-			{
-			case ' ': case '\t':
-				whitespace++;
-				break;
-			default:
-				break loop;
-			}
-		}
-		return whitespace;
+		return StandardUtilities.getTrailingWhiteSpace(str);
 	} //}}}
 
 	//{{{ getLeadingWhiteSpaceWidth() method
@@ -610,25 +966,12 @@ loop:		for(int i = str.length() - 1; i >= 0; i--)
 	 * string.
 	 * @param str The string
 	 * @param tabSize The tab size
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#getLeadingWhiteSpace(String)}
 	 */
+	@Deprecated
 	public static int getLeadingWhiteSpaceWidth(String str, int tabSize)
 	{
-		int whitespace = 0;
-loop:		for(int i = 0; i < str.length(); i++)
-		{
-			switch(str.charAt(i))
-			{
-			case ' ':
-				whitespace++;
-				break;
-			case '\t':
-				whitespace += (tabSize - whitespace % tabSize);
-				break;
-			default:
-				break loop;
-			}
-		}
-		return whitespace;
+		return StandardUtilities.getLeadingWhiteSpaceWidth(str, tabSize);
 	} //}}}
 
 	//{{{ getVirtualWidth() method
@@ -639,27 +982,12 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 * @param seg The segment
 	 * @param tabSize The tab size
 	 * @since jEdit 4.1pre1
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#getVirtualWidth(javax.swing.text.Segment, int)}
 	 */
+	@Deprecated
 	public static int getVirtualWidth(Segment seg, int tabSize)
 	{
-		int virtualPosition = 0;
-
-		for (int i = 0; i < seg.count; i++)
-		{
-			char ch = seg.array[seg.offset + i];
-
-			if (ch == '\t')
-			{
-				virtualPosition += tabSize
-					- (virtualPosition % tabSize);
-			}
-			else
-			{
-				++virtualPosition;
-			}
-		}
-
-		return virtualPosition;
+		return StandardUtilities.getVirtualWidth(seg, tabSize);
 	} //}}}
 
 	//{{{ getOffsetOfVirtualColumn() method
@@ -677,40 +1005,16 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 * @return -1 if the column is out of bounds
 	 *
 	 * @since jEdit 4.1pre1
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#getVirtualWidth(javax.swing.text.Segment, int)}
 	 */
+	@Deprecated
 	public static int getOffsetOfVirtualColumn(Segment seg, int tabSize,
-		int column, int[] totalVirtualWidth)
+					    int column, int[] totalVirtualWidth)
 	{
-		int virtualPosition = 0;
-
-		for (int i = 0; i < seg.count; i++)
-		{
-			char ch = seg.array[seg.offset + i];
-
-			if (ch == '\t')
-			{
-				int tabWidth = tabSize
-					- (virtualPosition % tabSize);
-				if(virtualPosition >= column)
-					return i;
-				else
-					virtualPosition += tabWidth;
-			}
-			else
-			{
-				if(virtualPosition >= column)
-					return i;
-				else
-					++virtualPosition;
-			}
-		}
-
-		if(totalVirtualWidth != null)
-			totalVirtualWidth[0] = virtualPosition;
-		return -1;
+		return StandardUtilities.getOffsetOfVirtualColumn(seg, tabSize, column, totalVirtualWidth);
 	} //}}}
 
-	//{{{ createWhiteSpace() method
+	//{{{ createWhiteSpace() methods
 	/**
 	 * Creates a string of white space with the specified length.<p>
 	 *
@@ -723,13 +1027,14 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 *
 	 * @param len The length
 	 * @param tabSize The tab size, or 0 if tabs are not to be used
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#createWhiteSpace(int, int)}
 	 */
+	@Deprecated
 	public static String createWhiteSpace(int len, int tabSize)
 	{
-		return createWhiteSpace(len,tabSize,0);
-	} //}}}
+		return StandardUtilities.createWhiteSpace(len,tabSize,0);
+	}
 
-	//{{{ createWhiteSpace() method
 	/**
 	 * Creates a string of white space with the specified length.<p>
 	 *
@@ -744,29 +1049,12 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 * @param tabSize The tab size, or 0 if tabs are not to be used
 	 * @param start The start offset, for tab alignment
 	 * @since jEdit 4.2pre1
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#createWhiteSpace(int, int, int)}
 	 */
+	@Deprecated
 	public static String createWhiteSpace(int len, int tabSize, int start)
 	{
-		StringBuffer buf = new StringBuffer();
-		if(tabSize == 0)
-		{
-			while(len-- > 0)
-				buf.append(' ');
-		}
-		else if(len == 1)
-			buf.append(' ');
-		else
-		{
-			int count = (len + start % tabSize) / tabSize;
-			if(count != 0)
-				len += start;
-			while(count-- > 0)
-				buf.append('\t');
-			count = len % tabSize;
-			while(count-- > 0)
-				buf.append(' ');
-		}
-		return buf.toString();
+		return StandardUtilities.createWhiteSpace(len, tabSize, start);
 	} //}}}
 
 	//{{{ globToRE() method
@@ -775,83 +1063,12 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 *
 	 * ? becomes ., * becomes .*, {aa,bb} becomes (aa|bb).
 	 * @param glob The glob pattern
+	 * @deprecated Use {@link org.gjt.sp.util.StandardUtilities#globToRE(String)}.
 	 */
+	@Deprecated
 	public static String globToRE(String glob)
 	{
-		final Object NEG = new Object();
-		final Object GROUP = new Object();
-		Stack state = new Stack();
-
-		StringBuffer buf = new StringBuffer();
-		boolean backslash = false;
-
-		for(int i = 0; i < glob.length(); i++)
-		{
-			char c = glob.charAt(i);
-			if(backslash)
-			{
-				buf.append('\\');
-				buf.append(c);
-				backslash = false;
-				continue;
-			}
-
-			switch(c)
-			{
-			case '\\':
-				backslash = true;
-				break;
-			case '?':
-				buf.append('.');
-				break;
-			case '.':
-			case '+':
-			case '(':
-			case ')':
-				buf.append('\\');
-				buf.append(c);
-				break;
-			case '*':
-				buf.append(".*");
-				break;
-			case '|':
-				if(backslash)
-					buf.append("\\|");
-				else
-					buf.append('|');
-				break;
-			case '{':
-				buf.append('(');
-				if(i + 1 != glob.length() && glob.charAt(i + 1) == '!')
-				{
-					buf.append('?');
-					state.push(NEG);
-				}
-				else
-					state.push(GROUP);
-				break;
-			case ',':
-				if(!state.isEmpty() && state.peek() == GROUP)
-					buf.append('|');
-				else
-					buf.append(',');
-				break;
-			case '}':
-				if(!state.isEmpty())
-				{
-					buf.append(")");
-					if(state.pop() == NEG)
-						buf.append(".*");
-				}
-				else
-					buf.append('}');
-				break;
-			default:
-				buf.append(c);
-			}
-		}
-
-		return buf.toString();
+		return StandardUtilities.globToRE(glob);
 	} //}}}
 
 	//{{{ escapesToChars() method
@@ -863,7 +1080,7 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 */
 	public static String escapesToChars(String str)
 	{
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 		for(int i = 0; i < str.length(); i++)
 		{
 			char c = str.charAt(i);
@@ -896,56 +1113,41 @@ loop:		for(int i = 0; i < str.length(); i++)
 		return buf.toString();
 	} //}}}
 
-	//{{{ charsToEscapes() method
+	//{{{ charsToEscapes() methods
 	/**
 	 * Escapes newlines, tabs, backslashes, and quotes in the specified
 	 * string.
 	 * @param str The string
 	 * @since jEdit 2.3pre1
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#charsToEscapes(String)}
 	 */
+	@Deprecated
 	public static String charsToEscapes(String str)
 	{
-		return charsToEscapes(str,"\n\t\\\"'");
-	} //}}}
+		return StandardUtilities.charsToEscapes(str);
+	}
 
-	//{{{ charsToEscapes() method
 	/**
 	 * Escapes the specified characters in the specified string.
 	 * @param str The string
 	 * @param toEscape Any characters that require escaping
 	 * @since jEdit 4.1pre3
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#charsToEscapes(String)}
 	 */
+	@Deprecated
 	public static String charsToEscapes(String str, String toEscape)
 	{
-		StringBuffer buf = new StringBuffer();
-		for(int i = 0; i < str.length(); i++)
-		{
-			char c = str.charAt(i);
-			if(toEscape.indexOf(c) != -1)
-			{
-				if(c == '\n')
-					buf.append("\\n");
-				else if(c == '\t')
-					buf.append("\\t");
-				else
-				{
-					buf.append('\\');
-					buf.append(c);
-				}
-			}
-			else
-				buf.append(c);
-		}
-		return buf.toString();
+		return StandardUtilities.charsToEscapes(str, toEscape);
 	} //}}}
 
 	//{{{ compareVersions() method
 	/**
-	 * @deprecated Call <code>compareStrings()</code> instead
+	 * @deprecated Call {@link StandardUtilities#compareStrings(String, String, boolean)} instead
 	 */
+	@Deprecated
 	public static int compareVersions(String v1, String v2)
 	{
-		return compareStrings(v1,v2,false);
+		return StandardUtilities.compareStrings(v1,v2,false);
 	} //}}}
 
 	//{{{ compareStrings() method
@@ -962,85 +1164,22 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 * @return negative If str1 &lt; str2, 0 if both are the same,
 	 * positive if str1 &gt; str2
 	 * @since jEdit 4.0pre1
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities#compareStrings(String, String, boolean)}
 	 */
+	@Deprecated
 	public static int compareStrings(String str1, String str2, boolean ignoreCase)
 	{
-		char[] char1 = str1.toCharArray();
-		char[] char2 = str2.toCharArray();
-
-		int len = Math.min(char1.length,char2.length);
-
-		for(int i = 0, j = 0; i < len && j < len; i++, j++)
-		{
-			char ch1 = char1[i];
-			char ch2 = char2[j];
-			if(Character.isDigit(ch1) && Character.isDigit(ch2)
-				&& ch1 != '0' && ch2 != '0')
-			{
-				int _i = i + 1;
-				int _j = j + 1;
-
-				for(; _i < char1.length; _i++)
-				{
-					if(!Character.isDigit(char1[_i]))
-					{
-						//_i--;
-						break;
-					}
-				}
-
-				for(; _j < char2.length; _j++)
-				{
-					if(!Character.isDigit(char2[_j]))
-					{
-						//_j--;
-						break;
-					}
-				}
-
-				int len1 = _i - i;
-				int len2 = _j - j;
-				if(len1 > len2)
-					return 1;
-				else if(len1 < len2)
-					return -1;
-				else
-				{
-					for(int k = 0; k < len1; k++)
-					{
-						ch1 = char1[i + k];
-						ch2 = char2[j + k];
-						if(ch1 != ch2)
-							return ch1 - ch2;
-					}
-				}
-
-				i = _i - 1;
-				j = _j - 1;
-			}
-			else
-			{
-				if(ignoreCase)
-				{
-					ch1 = Character.toLowerCase(ch1);
-					ch2 = Character.toLowerCase(ch2);
-				}
-
-				if(ch1 != ch2)
-					return ch1 - ch2;
-			}
-		}
-
-		return char1.length - char2.length;
+		return StandardUtilities.compareStrings(str1, str2, ignoreCase);
 	} //}}}
 
 	//{{{ stringsEqual() method
 	/**
-	 * @deprecated Call <code>objectsEqual()</code> instead.
+	 * @deprecated Call {@link StandardUtilities#objectsEqual(Object, Object)} instead.
 	 */
+	@Deprecated
 	public static boolean stringsEqual(String s1, String s2)
 	{
-		return objectsEqual(s1,s2);
+		return StandardUtilities.objectsEqual(s1,s2);
 	} //}}}
 
 	//{{{ objectsEqual() method
@@ -1048,20 +1187,12 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 * Returns if two strings are equal. This correctly handles null pointers,
 	 * as opposed to calling <code>o1.equals(o2)</code>.
 	 * @since jEdit 4.2pre1
+	 * @deprecated use {@link StandardUtilities#objectsEqual(Object, Object)}
 	 */
+	@Deprecated
 	public static boolean objectsEqual(Object o1, Object o2)
 	{
-		if(o1 == null)
-		{
-			if(o2 == null)
-				return true;
-			else
-				return false;
-		}
-		else if(o2 == null)
-			return false;
-		else
-			return o1.equals(o2);
+		return StandardUtilities.objectsEqual(o1, o2);
 	} //}}}
 
 	//{{{ charsToEntities() method
@@ -1070,38 +1201,20 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 * equivalents.
 	 * @param str The string
 	 * @since jEdit 4.2pre1
+	 * @deprecated	Use {@link org.gjt.sp.util.XMLUtilities#charsToEntities(String, boolean)}.
 	 */
+	@Deprecated
 	public static String charsToEntities(String str)
 	{
-		StringBuffer buf = new StringBuffer(str.length());
-		for(int i = 0; i < str.length(); i++)
-		{
-			char ch = str.charAt(i);
-			switch(ch)
-			{
-			case '<':
-				buf.append("&lt;");
-				break;
-			case '>':
-				buf.append("&gt;");
-				break;
-			case '&':
-				buf.append("&amp;");
-				break;
-			default:
-				buf.append(ch);
-				break;
-			}
-		}
-		return buf.toString();
+		return XMLUtilities.charsToEntities(str,false);
 	} //}}}
 
 	//{{{ formatFileSize() method
-	public static final DecimalFormat KB_FORMAT = new DecimalFormat("#.# KB");
+	public static final DecimalFormat KB_FORMAT = new DecimalFormat("#.# kB");
 	public static final DecimalFormat MB_FORMAT = new DecimalFormat("#.# MB");
 
 	/**
-	 * Formats the given file size into a nice string (123 bytes, 10.6 KB,
+	 * Formats the given file size into a nice string (123 Bytes, 10.6 kB,
 	 * 1.2 MB).
 	 * @param length The size
 	 * @since jEdit 4.2pre1
@@ -1109,36 +1222,42 @@ loop:		for(int i = 0; i < str.length(); i++)
 	public static String formatFileSize(long length)
 	{
 		if(length < 1024)
-			return length + " bytes";
-		else if(length < 1024*1024)
+		{
+			return length + " Bytes";
+		}
+		else if(length < 1024 << 10)
+		{
 			return KB_FORMAT.format((double)length / 1024);
+		}
 		else
+		{
 			return MB_FORMAT.format((double)length / 1024 / 1024);
+		}
 	} //}}}
 
-	//{{{ getLongestPrefix() method
+	//{{{ getLongestPrefix() methods
 	/**
 	 * Returns the longest common prefix in the given set of strings.
 	 * @param str The strings
 	 * @param ignoreCase If true, case insensitive
 	 * @since jEdit 4.2pre2
 	 */
-	public static String getLongestPrefix(List str, boolean ignoreCase)
+	public static String getLongestPrefix(List<String> str, boolean ignoreCase)
 	{
-		if(str.size() == 0)
+		if(str.isEmpty())
 			return "";
 
 		int prefixLength = 0;
 
 loop:		for(;;)
 		{
-			String s = str.get(0).toString();
+			String s = str.get(0);
 			if(prefixLength >= s.length())
 				break loop;
 			char ch = s.charAt(prefixLength);
 			for(int i = 1; i < str.size(); i++)
 			{
-				s = str.get(i).toString();
+				s = str.get(i);
 				if(prefixLength >= s.length())
 					break loop;
 				if(!compareChars(s.charAt(prefixLength),ch,ignoreCase))
@@ -1147,10 +1266,9 @@ loop:		for(;;)
 			prefixLength++;
 		}
 
-		return str.get(0).toString().substring(0,prefixLength);
-	} //}}}
+		return str.get(0).substring(0,prefixLength);
+	}
 
-	//{{{ getLongestPrefix() method
 	/**
 	 * Returns the longest common prefix in the given set of strings.
 	 * @param str The strings
@@ -1160,9 +1278,8 @@ loop:		for(;;)
 	public static String getLongestPrefix(String[] str, boolean ignoreCase)
 	{
 		return getLongestPrefix((Object[])str,ignoreCase);
-	} //}}}
+	}
 
-	//{{{ getLongestPrefix() method
 	/**
 	 * Returns the longest common prefix in the given set of strings.
 	 * @param str The strings (calls <code>toString()</code> on each object)
@@ -1199,120 +1316,131 @@ loop:		for(;;)
 
 	//}}}
 
-	//{{{ Sorting methods
-
-	//{{{ quicksort() method
+	//{{{ quicksort() deprecated methods
 	/**
 	 * Sorts the specified array. Equivalent to calling
 	 * <code>Arrays.sort()</code>.
 	 * @param obj The array
 	 * @param compare Compares the objects
 	 * @since jEdit 4.0pre4
+	 * @deprecated use <code>Arrays.sort()</code>
 	 */
+	@Deprecated
 	public static void quicksort(Object[] obj, Comparator compare)
 	{
 		Arrays.sort(obj,compare);
-	} //}}}
+	}
 
-	//{{{ quicksort() method
+
 	/**
 	 * Sorts the specified vector.
 	 * @param vector The vector
 	 * @param compare Compares the objects
 	 * @since jEdit 4.0pre4
+	 * @deprecated <code>Collections.sort()</code>
 	 */
+	@Deprecated
 	public static void quicksort(Vector vector, Comparator compare)
 	{
 		Collections.sort(vector,compare);
-	} //}}}
+	}
 
-	//{{{ quicksort() method
 	/**
 	 * Sorts the specified list.
 	 * @param list The list
 	 * @param compare Compares the objects
 	 * @since jEdit 4.0pre4
+	 * @deprecated <code>Collections.sort()</code>
 	 */
+	@Deprecated
 	public static void quicksort(List list, Comparator compare)
 	{
 		Collections.sort(list,compare);
-	} //}}}
+	}
 
-	//{{{ quicksort() method
 	/**
 	 * Sorts the specified array. Equivalent to calling
 	 * <code>Arrays.sort()</code>.
 	 * @param obj The array
 	 * @param compare Compares the objects
+	 * @deprecated use <code>Arrays.sort()</code>
 	 */
+	@Deprecated
 	public static void quicksort(Object[] obj, Compare compare)
 	{
 		Arrays.sort(obj,compare);
-	} //}}}
+	}
 
-	//{{{ quicksort() method
 	/**
 	 * Sorts the specified vector.
 	 * @param vector The vector
 	 * @param compare Compares the objects
+	 * @deprecated <code>Collections.sort()</code>
 	 */
+	@Deprecated
 	public static void quicksort(Vector vector, Compare compare)
 	{
 		Collections.sort(vector,compare);
 	} //}}}
 
-	//{{{ Compare interface
+	//{{{ Compare deprecated interface
 	/**
 	 * An interface for comparing objects. This is a hold-over from
 	 * they days when jEdit had its own sorting API due to JDK 1.1
-	 * compatibility requirements. Use <code>java.util.Comparable</code>
+	 * compatibility requirements. Use <code>java.util.Comparator</code>
 	 * instead.
+	 * @deprecated
 	 */
+	@Deprecated
 	public interface Compare extends Comparator
 	{
 		int compare(Object obj1, Object obj2);
 	} //}}}
 
-	//{{{ StringCompare class
+	//{{{ StringCompare deprecated class
 	/**
 	 * Compares strings.
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities.StringCompare}
 	 */
+	@Deprecated
 	public static class StringCompare implements Compare
 	{
 		public int compare(Object obj1, Object obj2)
 		{
-			return compareStrings(obj1.toString(),
+			return StandardUtilities.compareStrings(obj1.toString(),
 				obj2.toString(),false);
 		}
 	} //}}}
 
-	//{{{ StringICaseCompare class
+	//{{{ StringICaseCompare deprecated class
 	/**
 	 * Compares strings ignoring case.
+	 * @deprecated use {@link org.gjt.sp.util.StandardUtilities.StringCompare}
 	 */
-	public static class StringICaseCompare implements Compare
+	@Deprecated
+	public static class StringICaseCompare implements Comparator<Object>
 	{
 		public int compare(Object obj1, Object obj2)
 		{
-			return compareStrings(obj1.toString(),
-				obj2.toString(),true);
+			return StandardUtilities.compareStrings(obj1.toString(), obj2.toString(), true);
 		}
 	} //}}}
 
-	//{{{ MenuItemCompare class
+	//{{{ MenuItemCompare deprecated class
 	/**
 	 * Compares menu item labels.
+	 * @deprecated Replaced with {@link org.gjt.sp.jedit.menu.MenuItemTextComparator}
 	 */
+	@Deprecated
 	public static class MenuItemCompare implements Compare
 	{
+		private MenuItemTextComparator comparator = new MenuItemTextComparator();
+
 		public int compare(Object obj1, Object obj2)
 		{
-			return compareStrings(((JMenuItem)obj1).getText(),
-				((JMenuItem)obj2).getText(),true);
+			return comparator.compare((JMenuItem)obj1, (JMenuItem)obj2);
 		}
 	} //}}}
-
-	//}}}
 
 	//{{{ buildToVersion() method
 	/**
@@ -1323,7 +1451,7 @@ loop:		for(;;)
 	public static String buildToVersion(String build)
 	{
 		if(build.length() != 11)
-			return "<unknown version: " + build + ">";
+			return "<unknown version: " + build + '>';
 		// First 2 chars are the major version number
 		int major = Integer.parseInt(build.substring(0,2));
 		// Second 2 are the minor number
@@ -1334,8 +1462,8 @@ loop:		for(;;)
 		int bugfix = Integer.parseInt(build.substring(9,11));
 
 		return major + "." + minor
-			+ (beta != 99 ? "pre" + beta :
-			(bugfix != 0 ? "." + bugfix : "final"));
+			+ (beta != 99 ? "rc" + beta :
+			(bugfix != 0 ? "." + bugfix : ""));
 	} //}}}
 
 	//{{{ isToolsJarAvailable() method
@@ -1366,10 +1494,10 @@ loop:		for(;;)
 	{
 		Log.log(Log.DEBUG, MiscUtilities.class,"Searching for tools.jar...");
 
-		Vector paths = new Vector();
+		Collection<String> paths = new LinkedList<String>();
 
 		//{{{ 1. Check whether tools.jar is in the system classpath:
-		paths.addElement("System classpath: "
+		paths.add("System classpath: "
 			+ System.getProperty("java.class.path"));
 
 		try
@@ -1400,7 +1528,7 @@ loop:		for(;;)
 		{
 			String toolsPath = constructPath(settingsDir, "jars",
 				"tools.jar");
-			paths.addElement(toolsPath);
+			paths.add(toolsPath);
 			if(new File(toolsPath).exists())
 			{
 				Log.log(Log.DEBUG, MiscUtilities.class,
@@ -1415,7 +1543,7 @@ loop:		for(;;)
 		if(jEditDir != null)
 		{
 			String toolsPath = constructPath(jEditDir, "jars", "tools.jar");
-			paths.addElement(toolsPath);
+			paths.add(toolsPath);
 			if(new File(toolsPath).exists())
 			{
 				Log.log(Log.DEBUG, MiscUtilities.class,
@@ -1430,9 +1558,9 @@ loop:		for(;;)
 		if(toolsPath.toLowerCase().endsWith(File.separator + "jre"))
 			toolsPath = toolsPath.substring(0, toolsPath.length() - 4);
 		toolsPath = constructPath(toolsPath, "lib", "tools.jar");
-		paths.addElement(toolsPath);
+		paths.add(toolsPath);
 
-		if(!(new File(toolsPath).exists()))
+		if(!new File(toolsPath).exists())
 		{
 			Log.log(Log.WARNING, MiscUtilities.class,
 				"Could not find tools.jar.\n"
@@ -1504,85 +1632,35 @@ loop:		for(;;)
 		return permissions;
 	} //}}}
 
-	//{{{ getEncodings() method
+	//{{{ getEncodings() methods
 	/**
 	 * Returns a list of supported character encodings.
-	 * On Java 1.3, returns a fixed list.
-	 * On Java 1.4, uses reflection to call an NIO API.
 	 * @since jEdit 4.2pre5
+	 * @deprecated See #getEncodings(boolean)
 	 */
+	@Deprecated
 	public static String[] getEncodings()
 	{
-		List returnValue = new ArrayList();
+		return getEncodings(false);
+	}
 
-		if(OperatingSystem.hasJava14())
+	/**
+	 * Returns a list of supported character encodings.
+	 * @since jEdit 4.3pre5
+	 * @param getSelected Whether to return just the selected encodings or all.
+	 */
+	public static String[] getEncodings(boolean getSelected)
+	{
+		Set<String> set;
+		if (getSelected)
 		{
-			try
-			{
-				Class clazz = Class.forName(
-					"java.nio.charset.Charset");
-				Method method = clazz.getMethod(
-					"availableCharsets",
-					new Class[0]);
-				Map map = (Map)method.invoke(null,
-					new Object[0]);
-				Iterator iter = map.keySet().iterator();
-
-				returnValue.add(UTF_8_Y);
-
-				while(iter.hasNext())
-				{
-					returnValue.add(iter.next());
-				}
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.ERROR,MiscUtilities.class,e);
-			}
+			set = EncodingServer.getSelectedNames();
 		}
 		else
 		{
-			StringTokenizer st = new StringTokenizer(
-				jEdit.getProperty("encodings"));
-			while(st.hasMoreTokens())
-			{
-				returnValue.add(st.nextToken());
-			}
+			set = EncodingServer.getAvailableNames();
 		}
-
-		return (String[])returnValue.toArray(
-			new String[returnValue.size()]);
-	} //}}}
-
-	//{{{ isSupportedEncoding() method
-	/**
-	 * Returns if the given character encoding is supported.
-	 * Uses reflection to call a Java 1.4 API on Java 1.4, and always
-	 * returns true on Java 1.3.
-	 * @since jEdit 4.2pre7
-	 */
-	public static boolean isSupportedEncoding(String encoding)
-	{
-		if(OperatingSystem.hasJava14())
-		{
-			try
-			{
-				Class clazz = Class.forName(
-					"java.nio.charset.Charset");
-				Method method = clazz.getMethod(
-					"isSupported",
-					new Class[] { String.class });
-				return ((Boolean)method.invoke(null,
-					new Object[] { encoding }))
-					.booleanValue();
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.ERROR,MiscUtilities.class,e);
-			}
-		}
-
-		return true;
+		return set.toArray(new String[set.size()]);
 	} //}}}
 
 	//{{{ throwableToString() method
@@ -1597,11 +1675,45 @@ loop:		for(;;)
 		return s.toString();
 	} //}}}
 
+	//{{{ parseXML() method
+	/**
+	 * Convenience method for parsing an XML file.
+	 *
+	 * @return Whether any error occured during parsing.
+	 * @since jEdit 4.3pre5
+	 * @deprecated Use {@link XMLUtilities#parseXML(InputStream,DefaultHandler)}.
+	 */
+	@Deprecated
+	public static boolean parseXML(InputStream in, DefaultHandler handler)
+		throws IOException
+	{
+		return XMLUtilities.parseXML(in, handler);
+	} //}}}
+
+	//{{{ resolveEntity() method
+	/**
+	 * Tries to find the given systemId in the context of the given
+	 * class.
+	 *
+	 * @deprecated Use {@link XMLUtilities#findEntity(String,String,Class)}.
+	 */
+	@Deprecated
+	public static InputSource findEntity(String systemId, String test, Class where)
+	{
+		return XMLUtilities.findEntity(systemId, test, where);
+	} //}}}
+
 	//{{{ Private members
 	private MiscUtilities() {}
 
-	//{{{ compareChars()
-	/** should this be public? */
+	//{{{ compareChars() method
+	/**
+	 * Compares two chars.
+	 * should this be public?
+	 * @param ch1 the first char
+	 * @param ch2 the second char
+	 * @param ignoreCase true if you want to ignore case
+	 */
 	private static boolean compareChars(char ch1, char ch2, boolean ignoreCase)
 	{
 		if(ignoreCase)
@@ -1610,5 +1722,150 @@ loop:		for(;;)
 			return ch1 == ch2;
 	} //}}}
 
+	//{{{ getPathStart() method
+	private static int getPathStart(String path)
+	{
+		if(path.startsWith("/"))
+			return 0;
+		else if(OperatingSystem.isDOSDerived()
+			&& path.length() >= 3
+			&& path.charAt(1) == ':'
+			&& (path.charAt(2) == '/'
+			|| path.charAt(2) == '\\'))
+			return 3;
+		else
+			return 0;
+	} //}}}
+
+	//{{{ containsNullCharacter() method
+	private static boolean containsNullCharacter(Reader reader)
+		throws IOException
+	{
+		int nbChars = jEdit.getIntegerProperty("vfs.binaryCheck.length",100);
+		int authorized = jEdit.getIntegerProperty("vfs.binaryCheck.count",1);
+		for (long i = 0L;i < nbChars;i++)
+		{
+			int c = reader.read();
+			if (c == -1)
+				return false;
+			if (c == 0)
+			{
+				authorized--;
+				if (authorized == 0)
+					return true;
+			}
+		}
+		return false;
+	} //}}}
+
 	//}}}
+
+	static VarCompressor svc = null;
+
+	//{{{ VarCompressor class
+	/**
+	 * Singleton class for quickly "compressing" paths into variable-prefixed values.
+	 * @author alan ezust
+	 */
+	static class VarCompressor
+	{
+		/** a reverse mapping of values to environment variable names */
+		final Map<String, String> prefixMap = new HashMap<String, String>();
+		/** previously compressed strings saved for quick access later */
+		final Map<String, String> previous = new HashMap<String, String>();
+
+		//{{{ VarCompressor constructor
+		VarCompressor()
+		{
+			ProcessBuilder pb = new ProcessBuilder();
+			Map<String, String> env = pb.environment();
+			if (OperatingSystem.isUnix())
+				prefixMap.put(System.getProperty("user.home"), "~");
+			for (String k: env.keySet())
+			{
+				if (k.equalsIgnoreCase("pwd") || k.equalsIgnoreCase("oldpwd")) continue;
+				if (!Character.isLetter(k.charAt(0))) continue;
+				String v = env.get(k);
+				// only add possible candidates to the prefix map
+				if (!canBePathPrefix(v)) continue;
+				// no need for trailing file separator
+				if (v.endsWith(File.separator))
+					v = v.substring(0, v.length()-1);
+				// check if it is actually shorter
+				if (OperatingSystem.isWindows())
+					if (k.length()+2 > v.length()) continue; // gets replaced by %FOO%
+				else
+					if (k.length()+1 > v.length()) continue; // gets replaced by $FOO
+				if (OperatingSystem.isWindows())
+				{
+					// no case sensitivity, might as well convert to lower case
+					v = v.toLowerCase();
+					k = k.toLowerCase();
+				}
+				if (prefixMap.containsKey(v))
+				{
+					String otherKey = prefixMap.get(v);
+					if (otherKey.length() < k.length()) continue;
+				}
+				prefixMap.put(v, k);
+			}
+		} //}}}
+
+		//{{{ compress() method
+		String compress(String path)
+		{
+			String original = path;
+			if (previous.containsKey(path))
+			{
+				return previous.get(path);
+			}
+			String bestPrefix = "/";
+			String verifiedPrefix = bestPrefix;
+			for (String tryPrefix : prefixMap.keySet())
+			{
+				if (tryPrefix.length() < bestPrefix.length()) continue;
+				if (OperatingSystem.isWindows() &&
+				    path.toLowerCase().startsWith(tryPrefix))
+					bestPrefix = tryPrefix;
+				else if (path.startsWith(tryPrefix))
+				{
+					bestPrefix = tryPrefix;
+				}
+				// Only use prefix if it is a directory-prefix of the path
+				if (!bestPrefix.equals(verifiedPrefix))
+				{
+					String remainder = original.substring(bestPrefix.length());
+					if (remainder.length() < 1 || remainder.startsWith(File.separator))
+						verifiedPrefix = bestPrefix;
+					else bestPrefix = verifiedPrefix;
+				}
+			}
+			if (bestPrefix.length() > 1)
+			{
+				String remainder = original.substring(bestPrefix.length());
+				String envvar = prefixMap.get(bestPrefix);
+				if (envvar.equals("~"))
+					path = envvar + remainder;
+				else if (OperatingSystem.isWindows())
+					path = '%' + envvar.toUpperCase() + '%' + remainder;
+				else
+					path = '$' + envvar + remainder;
+			}
+			previous.put(original, path);
+			return path;
+		} //}}}
+
+		//{{{ canBePathPrefix() method
+		// Returns true if the argument may absolutely point a directory.
+		// For speed, no access to file system or network should happen.
+		private boolean canBePathPrefix(String s)
+		{
+			// Do not use File#isDirectory() since it causes
+			// access to file system or network to check if
+			// the directory is actually exists.
+			return !s.contains(File.pathSeparator)
+				&& new File(s).isAbsolute();
+		} //}}}
+	} //}}}
+
 }

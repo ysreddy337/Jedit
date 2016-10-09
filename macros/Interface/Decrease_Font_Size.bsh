@@ -4,7 +4,7 @@
 *
 * Copyright (C) 2003 Ollie Rutherfurd <oliver@rutherfurd.net>
 *
-* $Id: Decrease_Font_Size.bsh,v 1.3 2003/12/22 04:14:54 spestov Exp $
+* $Id: Decrease_Font_Size.bsh 4937 2003-12-22 04:14:55Z spestov $
 */
 
 decreaseFontSize()

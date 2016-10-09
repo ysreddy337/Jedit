@@ -27,7 +27,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Message sent when plugins are loaded and unloaded.
  * @author Slava Pestov
- * @version $Id: PluginUpdate.java,v 1.4 2004/03/28 00:07:26 spestov Exp $
+ * @version $Id: PluginUpdate.java 12504 2008-04-22 23:12:43Z ezust $
  *
  * @since jEdit 4.2pre1
  */
@@ -49,7 +49,7 @@ public class PluginUpdate extends EBMessage
 	public static final Object ACTIVATED = "ACTIVATED";
 
 	/**
-	 * Plugin activated. This is sent after the plugin core class
+	 * Plugin deactivated. This is sent after the plugin core class
 	 * <code>stop()</code> method is called.
 	 * @since jEdit 4.2pre2
 	 */

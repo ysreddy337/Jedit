@@ -24,13 +24,19 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import gnu.regexp.RE;
+
+import org.gjt.sp.jedit.msg.BufferUpdate;
+import org.gjt.sp.jedit.msg.DynamicMenuChanged;
+import org.gjt.sp.util.Log;
+import org.gjt.sp.util.StandardUtilities;
+
 import javax.swing.*;
 import java.awt.*;
-import java.io.*;
+import java.io.File;
+import java.io.Reader;
 import java.util.*;
-import org.gjt.sp.jedit.msg.*;
-import org.gjt.sp.util.Log;
+import java.util.List;
+import java.util.regex.Pattern;
 //}}}
 
 /**
@@ -52,7 +58,7 @@ import org.gjt.sp.util.Log;
  * the methods in the {@link GUIUtilities} class instead.
  *
  * @author Slava Pestov
- * @version $Id: Macros.java,v 1.40 2004/07/12 19:25:07 spestov Exp $
+ * @version $Id: Macros.java 14091 2008-11-22 20:31:20Z kpouer $
  */
 public class Macros
 {
@@ -298,7 +304,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	public static Handler[] getHandlers()
 	{
 		Handler[] handlers = new Handler[macroHandlers.size()];
-		return (Handler[])macroHandlers.toArray(handlers);
+		return macroHandlers.toArray(handlers);
 	} //}}}
 
 	//{{{ getHandlerForFileName() method
@@ -311,7 +317,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	{
 		for (int i = 0; i < macroHandlers.size(); i++)
 		{
-			Handler handler = (Handler)macroHandlers.get(i);
+			Handler handler = macroHandlers.get(i);
 			if (handler.accept(pathName))
 				return handler;
 		}
@@ -327,11 +333,11 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	 */
 	public static Handler getHandler(String name)
 	{
-		Handler handler = null;
 		for (int i = 0; i < macroHandlers.size(); i++)
 		{
-			handler = (Handler)macroHandlers.get(i);
-			if (handler.getName().equals(name)) return handler;
+			Handler handler = macroHandlers.get(i);
+			if (handler.getName().equals(name))
+				return handler;
 		}
 
 		return null;
@@ -370,7 +376,25 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	 */
 	public static Macro getMacro(String macro)
 	{
-		return (Macro)macroHash.get(macro);
+		return macroHash.get(macro);
+	} //}}}
+
+	//{{{ getLastMacro() method
+	/**
+	 * @since jEdit 4.3pre1
+	 */
+	public static Macro getLastMacro()
+	{
+		return lastMacro;
+	} //}}}
+
+	//{{{ setLastMacro() method
+	/**
+	 * @since jEdit 4.3pre1
+	 */
+	public static void setLastMacro(Macro macro)
+	{
+		lastMacro = macro;
 	} //}}}
 
 	//{{{ Macro class
@@ -403,27 +427,29 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		} //}}}
 
 		//{{{ invoke() method
+		@Override
 		public void invoke(View view)
 		{
+			setLastMacro(this);
+
 			if(view == null)
 				handler.runMacro(null,this);
 			else
 			{
-				Buffer buffer = view.getBuffer();
-
 				try
 				{
-					buffer.beginCompoundEdit();
+					view.getBuffer().beginCompoundEdit();
 					handler.runMacro(view,this);
 				}
 				finally
 				{
-					buffer.endCompoundEdit();
+					view.getBuffer().endCompoundEdit();
 				}
 			}
 		} //}}}
 
 		//{{{ getCode() method
+		@Override
 		public String getCode()
 		{
 			return "Macros.getMacro(\"" + getName() + "\").invoke(view);";
@@ -465,7 +491,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 			return;
 		}
 
-		Buffer buffer = jEdit.openFile(null,settings + File.separator
+		Buffer buffer = jEdit.openFile((View)null,settings + File.separator
 			+ "macros","Temporary_Macro.bsh",true,null);
 
 		if(buffer == null)
@@ -505,7 +531,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 
 		name = name.replace(' ','_');
 
-		Buffer buffer = jEdit.openFile(null,null,
+		Buffer buffer = jEdit.openFile((View) null,null,
 			MiscUtilities.constructPath(settings,"macros",
 			name + ".bsh"),true,null);
 
@@ -590,27 +616,31 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	private static String systemMacroPath;
 	private static String userMacroPath;
 
-	private static ArrayList macroHandlers;
+	private static List<Handler> macroHandlers;
 
 	private static ActionSet macroActionSet;
 	private static Vector macroHierarchy;
-	private static Hashtable macroHash;
+	private static Map<String, Macro> macroHash;
+
+	private static Macro lastMacro;
 	//}}}
 
 	//{{{ Class initializer
 	static
 	{
-		macroHandlers = new ArrayList();
+		macroHandlers = new ArrayList<Handler>();
 		registerHandler(new BeanShellHandler());
 		macroActionSet = new ActionSet(jEdit.getProperty("action-set.macros"));
 		jEdit.addActionSet(macroActionSet);
 		macroHierarchy = new Vector();
-		macroHash = new Hashtable();
+		macroHash = new Hashtable<String, Macro>();
 	} //}}}
 
 	//{{{ loadMacros() method
-	private static void loadMacros(Vector vector, String path, File directory)
+	private static void loadMacros(List vector, String path, File directory)
 	{
+		lastMacro = null;
+
 		File[] macroFiles = directory.listFiles();
 		if(macroFiles == null || macroFiles.length == 0)
 			return;
@@ -622,20 +652,19 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 			if(file.isHidden())
 			{
 				/* do nothing! */
-				continue;
 			}
 			else if(file.isDirectory())
 			{
 				String submenuName = fileName.replace('_',' ');
-				Vector submenu = null;
+				List submenu = null;
 				//{{{ try to merge with an existing menu first
 				for(int j = 0; j < vector.size(); j++)
 				{
 					Object obj = vector.get(j);
-					if(obj instanceof Vector)
+					if(obj instanceof List)
 					{
-						Vector vec = (Vector)obj;
-						if(((String)vec.get(0)).equals(submenuName))
+						List vec = (List)obj;
+						if(submenuName.equals(vec.get(0)))
 						{
 							submenu = vec;
 							break;
@@ -645,8 +674,8 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 				if(submenu == null)
 				{
 					submenu = new Vector();
-					submenu.addElement(submenuName);
-					vector.addElement(submenu);
+					submenu.add(submenuName);
+					vector.add(submenu);
 				}
 
 				loadMacros(submenu,path + fileName + '/',file);
@@ -659,7 +688,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	} //}}}
 
 	//{{{ addMacro() method
-	private static void addMacro(File file, String path, Vector vector)
+	private static void addMacro(File file, String path, List vector)
 	{
 		String fileName = file.getName();
 		Handler handler = getHandlerForPathName(file.getPath());
@@ -680,7 +709,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 			if(macroHash.get(newMacro.getName()) != null)
 				return;
 
-			vector.addElement(newMacro.getName());
+			vector.add(newMacro.getName());
 			jEdit.setTemporaryProperty(newMacro.getName()
 				+ ".label",
 				newMacro.label);
@@ -742,6 +771,8 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		//{{{ record() method
 		public void record(String code)
 		{
+			if (BeanShell.isScriptRunning())
+				return;
 			flushInput();
 
 			append("\n");
@@ -757,8 +788,8 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 			{
 				record("for(int i = 1; i <= " + repeat + "; i++)\n"
 					+ "{\n"
-					+ code + "\n"
-					+ "}");
+					+ code + '\n'
+					+ '}');
 			}
 		} //}}}
 
@@ -776,7 +807,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 				record(repeat,"textArea.userInput(\'\\t\');");
 			else
 			{
-				StringBuffer buf = new StringBuffer();
+				StringBuilder buf = new StringBuilder(repeat);
 				for(int i = 0; i < repeat; i++)
 					buf.append(ch);
 				recordInput(buf.toString(),overwrite);
@@ -789,7 +820,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		 */
 		public void recordInput(String str, boolean overwrite)
 		{
-			String charStr = MiscUtilities.charsToEscapes(str);
+			String charStr = StandardUtilities.charsToEscapes(str);
 
 			if(overwrite)
 			{
@@ -888,7 +919,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	 * Encapsulates creating and invoking macros in arbitrary scripting languages
 	 * @since jEdit 4.0pre6
 	 */
-	public static abstract class Handler
+	public abstract static class Handler
 	{
 		//{{{ getName() method
 		public String getName()
@@ -905,7 +936,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		//{{{ accept() method
 		public boolean accept(String path)
 		{
-			return filter.isMatch(MiscUtilities.getFileName(path));
+			return filter.matcher(MiscUtilities.getFileName(path)).matches();
 		} //}}}
 
 		//{{{ createMacro() method
@@ -948,7 +979,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 				+ name + ".label", name);
 			try
 			{
-				filter = new RE(MiscUtilities.globToRE(
+				filter = Pattern.compile(StandardUtilities.globToRE(
 					jEdit.getProperty(
 					"macro-handler." + name + ".glob")));
 			}
@@ -961,12 +992,12 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		//{{{ Private members
 		private String name;
 		private String label;
-		private RE filter;
+		private Pattern filter;
 		//}}}
 	} //}}}
 
 	//{{{ BeanShellHandler class
-	static class BeanShellHandler extends Handler
+	private static class BeanShellHandler extends Handler
 	{
 		//{{{ BeanShellHandler constructor
 		BeanShellHandler()
@@ -975,6 +1006,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		} //}}}
 
 		//{{{ createMacro() method
+		@Override
 		public Macro createMacro(String macroName, String path)
 		{
 			// Remove '.bsh'
@@ -985,12 +1017,14 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		} //}}}
 
 		//{{{ runMacro() method
+		@Override
 		public void runMacro(View view, Macro macro)
 		{
 			BeanShell.runScript(view,macro.getPath(),null,true);
 		} //}}}
 
 		//{{{ runMacro() method
+		@Override
 		public void runMacro(View view, Macro macro, boolean ownNamespace)
 		{
 			BeanShell.runScript(view,macro.getPath(),null,ownNamespace);

@@ -27,7 +27,7 @@ import org.gjt.sp.jedit.*;
 /**
  * A file set for searching the current buffer.
  * @author Slava Pestov
- * @version $Id: CurrentBufferSet.java,v 1.4 2002/05/28 01:50:19 spestov Exp $
+ * @version $Id: CurrentBufferSet.java 12504 2008-04-22 23:12:43Z ezust $
  */
 public class CurrentBufferSet implements SearchFileSet
 {

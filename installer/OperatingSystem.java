@@ -100,7 +100,9 @@ public abstract class OperatingSystem
 			return os;
 
 		if(System.getProperty("mrj.version") != null)
+		{
 			os = new MacOS();
+		}
 		else
 		{
 			String osName = System.getProperty("os.name");
@@ -123,9 +125,16 @@ public abstract class OperatingSystem
 		{
 			String dir = "/usr/local/share/";
 			if(!new File(dir).canWrite())
+			{
 				dir = System.getProperty("user.home");
+			}
 
 			return new File(dir,name.toLowerCase() + "/" + version).getPath();
+		}
+
+		public String getExtraClassPath()
+		{
+			return "";
 		}
 
 		public class ScriptOSTask extends OSTask
@@ -139,7 +148,9 @@ public abstract class OperatingSystem
 			{
 				String dir = "/usr/local/";
 				if(!new File(dir).canWrite())
+				{
 					dir = System.getProperty("user.home");
+				}
 
 				return new File(dir,"bin").getPath();
 			}
@@ -148,7 +159,9 @@ public abstract class OperatingSystem
 				Vector filesets) throws IOException
 			{
 				if(!enabled)
+				{
 					return;
+				}
 
 				mkdirs(directory);
 
@@ -164,24 +177,30 @@ public abstract class OperatingSystem
 				// Write simple script
 				FileWriter out = new FileWriter(script);
 				out.write("#!/bin/sh\n");
-				out.write("# Java heap size, in megabytes\n");
-				out.write("JAVA_HEAP_SIZE=32\n");
+				out.write("#\n");
+				out.write("# Runs jEdit - Programmer's Text Editor.\n");
+				out.write("#\n");
+				out.write("\n");
+				out.write("# Set jvm heap initial and maximum sizes (in megabytes).\n");
+				out.write("JAVA_HEAP_MAX_SIZE=192\n");
+				out.write("\n");
 				out.write("DEFAULT_JAVA_HOME=\""
 					+ System.getProperty("java.home")
 					+ "\"\n");
-				out.write("if [ \"$JAVA_HOME\" = \"\" ]; then\n");
-				out.write("JAVA_HOME=\"$DEFAULT_JAVA_HOME\"\n");
+				out.write("if [ -z \"$JAVA_HOME\" ]; then\n");
+				out.write("\tJAVA_HOME=\"$DEFAULT_JAVA_HOME\"\n");
 				out.write("fi\n");
+				out.write("\n");
+				out.write("# Launch application.\n");
+				out.write("\n");
+				
+				String jar = "\""+ installDir + File.separator
+					+ name.toLowerCase() + ".jar"+"\"";
 
-				out.write("exec \"$JAVA_HOME"
-					+ "/bin/java\" -mx${JAVA_HEAP_SIZE}m ${"
-					+ name.toUpperCase() + "} ");
-
-				String jar = installDir + File.separator
-					+ name.toLowerCase() + ".jar";
-
-				out.write("-jar \"" + jar + "\" $@\n");
-
+                
+ 				out.write("exec \"$JAVA_HOME/bin/java\"" +
+ 					  " -Xmx${JAVA_HEAP_MAX_SIZE}M -jar " +
+					  jar + " \"$@\"\n");
 				out.close();
 
 				// Make it executable
@@ -264,13 +283,28 @@ public abstract class OperatingSystem
 		{
 			return "/Applications/" + name + " " + version;
 		}
+
+		public String getExtraClassPath()
+		{
+			return "/System/Library/Java/:";
+		}
 	}
 
 	public static class Windows extends OperatingSystem
 	{
 		public String getInstallDirectory(String name, String version)
 		{
-			return "C:\\Program Files\\" + name + " " + version;
+			String programDir = System.getenv("ProgramFiles");
+			// Here is a workaround for the case that the environment
+			// variable is not defined. Windows 98 and ME are known as
+			// such environments. This makes sense while jEdit supports
+			// JRE 5. JRE 6 doesn't support Windows 98 and ME.
+			if(programDir == null)
+			{
+				// This is a hint for what is needed here.
+				programDir = "%ProgramFiles%";
+			}
+			return programDir + "\\" + name + " " + version;
 		}
 
 		public class JEditLauncherOSTask extends OSTask

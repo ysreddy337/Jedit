@@ -46,7 +46,7 @@ public class EnhancedMenuItem extends JMenuItem
 	public EnhancedMenuItem(String label, String action, ActionContext context)
 	{
 		this.action = action;
-		this.shortcut = getShortcut();
+		this.shortcut = GUIUtilities.getShortcutLabel(action);
 		if(OperatingSystem.hasScreenMenuBar() && shortcut != null)
 		{
 			setText(label + " (" + shortcut + ")");
@@ -112,60 +112,37 @@ public class EnhancedMenuItem extends JMenuItem
 	private String action;
 	//}}}
 
-	//{{{ getShortcut() method
-	private String getShortcut()
-	{
-		if(action == null)
-			return null;
-		else
-		{
-			String shortcut1 = jEdit.getProperty(action + ".shortcut");
-			String shortcut2 = jEdit.getProperty(action + ".shortcut2");
-
-			if(shortcut1 == null || shortcut1.length() == 0)
-			{
-				if(shortcut2 == null || shortcut2.length() == 0)
-					return null;
-				else
-					return shortcut2;
-			}
-			else
-			{
-				if(shortcut2 == null || shortcut2.length() == 0)
-					return shortcut1;
-				else
-					return shortcut1 + " or " + shortcut2;
-			}
-		}
-	} //}}}
-
 	//{{{ Class initializer
 	static
 	{
 		String shortcutFont;
 		if (OperatingSystem.isMacOSLF())
+		{
 			shortcutFont = "Lucida Grande";
+		}
 		else
+		{
 			shortcutFont = "Monospaced";
+		}
 		
 		acceleratorFont = UIManager.getFont("MenuItem.acceleratorFont");
 		if(acceleratorFont == null)
-			acceleratorFont = new Font(shortcutFont,Font.PLAIN,12);
-		else
 		{
-			acceleratorFont = new Font(shortcutFont,
-				acceleratorFont.getStyle(),
-				acceleratorFont.getSize());
+			acceleratorFont = new Font(shortcutFont,Font.PLAIN,12);
 		}
 		acceleratorForeground = UIManager
 			.getColor("MenuItem.acceleratorForeground");
 		if(acceleratorForeground == null)
+		{
 			acceleratorForeground = Color.black;
+		}
 
 		acceleratorSelectionForeground = UIManager
 			.getColor("MenuItem.acceleratorSelectionForeground");
 		if(acceleratorSelectionForeground == null)
+		{
 			acceleratorSelectionForeground = Color.black;
+		}
 	} //}}}
 
 	//}}}

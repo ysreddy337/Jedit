@@ -22,16 +22,17 @@
 
 package org.gjt.sp.jedit;
 
-import com.microstar.xml.*;
-import java.io.*;
+//{{{ imports
 import java.net.URL;
 import java.util.*;
-import org.gjt.sp.jedit.gui.InputHandler;
+
+import org.gjt.sp.jedit.input.AbstractInputHandler;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * A set of actions, either loaded from an XML file, or constructed at runtime
- * by a plugin.<p>
+ * by a plugin. <p>
  *
  * <h3>Action sets loaded from XML files</h3>
  *
@@ -137,10 +138,10 @@ import org.gjt.sp.util.Log;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: ActionSet.java,v 1.31 2004/07/12 19:25:07 spestov Exp $
+ * @version $Id: ActionSet.java 16333 2009-10-14 09:30:00Z kpouer $
  * @since jEdit 4.0pre1
  */
-public class ActionSet
+public class ActionSet extends JEditActionSet<EditAction> implements Comparable
 {
 	//{{{ ActionSet constructor
 	/**
@@ -149,11 +150,9 @@ public class ActionSet
 	 */
 	public ActionSet()
 	{
-		actions = new Hashtable();
-		loaded = true;
 		label = "<no label set; plugin bug>";
 	} //}}}
-
+	
 	//{{{ ActionSet constructor
 	/**
 	 * Creates a new action set.
@@ -180,6 +179,39 @@ public class ActionSet
 			}
 		}
 		loaded = false;
+	} //}}}
+	
+	//{{{ addAction() method
+	/**
+	 * Adds an action to the action set.
+	 * It exists for binary compatibility issues
+	 * @param action The action
+	 * @since jEdit 4.0pre1
+	 */
+	@Override
+	public void addAction(EditAction action)
+	{
+		super.addAction(action);
+	} //}}}
+	
+	//{{{ getArray() method
+	protected EditAction[] getArray(int size)
+	{
+		return new EditAction[size];
+	} //}}}
+	
+	//{{{ getActions() method
+	/**
+	 * Returns an array of all actions in this action set.<p>
+	 *
+	 * <b>Deferred loading:</b> this will load the action set if necessary.
+	 *
+	 * @since jEdit 4.0pre1
+	 */
+	@Override
+	public EditAction[] getActions()
+	{
+		return super.getActions();
 	} //}}}
 
 	//{{{ ActionSet constructor
@@ -227,119 +259,16 @@ public class ActionSet
 		return plugin;
 	} //}}}
 
-	//{{{ addAction() method
-	/**
-	 * Adds an action to the action set.
-	 * @param action The action
-	 * @since jEdit 4.0pre1
-	 */
-	public void addAction(EditAction action)
-	{
-		actions.put(action.getName(),action);
-		if(context != null)
-		{
-			context.actionNames = null;
-			context.actionHash.put(action.getName(),this);
-		}
-	} //}}}
-
-	//{{{ removeAction() method
-	/**
-	 * Removes an action from the action set.
-	 * @param name The action name
-	 * @since jEdit 4.0pre1
-	 */
-	public void removeAction(String name)
-	{
-		actions.remove(name);
-		if(context != null)
-		{
-			context.actionNames = null;
-			context.actionHash.remove(name);
-		}
-	} //}}}
-
-	//{{{ removeAllActions() method
-	/**
-	 * Removes all actions from the action set.
-	 * @since jEdit 4.0pre1
-	 */
-	public void removeAllActions()
-	{
-		if(context != null)
-		{
-			context.actionNames = null;
-			String[] actions = getActionNames();
-			for(int i = 0; i < actions.length; i++)
-			{
-				context.actionHash.remove(actions[i]);
-			}
-		}
-		this.actions.clear();
-	} //}}}
-
-	//{{{ getAction() method
-	/**
-	 * Returns an action with the specified name.<p>
-	 *
-	 * <b>Deferred loading:</b> this will load the action set if necessary.
-	 *
-	 * @param name The action name
-	 * @since jEdit 4.0pre1
-	 */
-	public EditAction getAction(String name)
-	{
-		Object obj = actions.get(name);
-		if(obj == placeholder)
-		{
-			load();
-			obj = actions.get(name);
-			if(obj == placeholder)
-			{
-				Log.log(Log.WARNING,this,"Outdated cache");
-				obj = null;
-			}
-		}
-
-		return (EditAction)obj;
-	} //}}}
-
-	//{{{ getActionCount() method
-	/**
-	 * Returns the number of actions in the set.
-	 * @since jEdit 4.0pre1
-	 */
-	public int getActionCount()
-	{
-		return actions.size();
-	} //}}}
-
-	//{{{ getActionNames() method
-	/**
-	 * Returns an array of all action names in this action set.
-	 * @since jEdit 4.2pre1
-	 */
-	public String[] getActionNames()
-	{
-		String[] retVal = new String[actions.size()];
-		Enumeration e = actions.keys();
-		int i = 0;
-		while(e.hasMoreElements())
-		{
-			retVal[i++] = (String)e.nextElement();
-		}
-		return retVal;
-	} //}}}
-
 	//{{{ getCacheableActionNames() method
 	/**
 	 * Returns an array of all action names in this action set that should
 	 * be cached; namely, <code>BeanShellAction</code>s.
 	 * @since jEdit 4.2pre1
 	 */
+	@Override
 	public String[] getCacheableActionNames()
 	{
-		LinkedList retVal = new LinkedList();
+		LinkedList<String> retVal = new LinkedList<String>();
 		Enumeration e = actions.elements();
 		while(e.hasMoreElements())
 		{
@@ -354,162 +283,53 @@ public class ActionSet
 			else if(obj instanceof BeanShellAction)
 				retVal.add(((BeanShellAction)obj).getName());
 		}
-		return (String[])retVal.toArray(new String[retVal.size()]);
+		return retVal.toArray(new String[retVal.size()]);
 	} //}}}
-
-	//{{{ getActions() method
-	/**
-	 * Returns an array of all actions in this action set.<p>
-	 *
-	 * <b>Deferred loading:</b> this will load the action set if necessary.
-	 *
-	 * @since jEdit 4.0pre1
-	 */
-	public EditAction[] getActions()
+	
+	//{{{ getProperty() method
+	protected String getProperty(String name)
 	{
-		load();
-
-		EditAction[] retVal = new EditAction[actions.size()];
-		Enumeration e = actions.elements();
-		int i = 0;
-		while(e.hasMoreElements())
-		{
-			retVal[i++] = (EditAction)e.nextElement();
-		}
-		return retVal;
+		return jEdit.getProperty(name);
 	} //}}}
-
-	//{{{ contains() method
-	/**
-	 * Returns if this action set contains the specified action.
-	 * @param action The action
-	 * @since jEdit 4.2pre1
-	 */
-	public boolean contains(String action)
+	
+	//{{{ getInputHandler() method
+	public AbstractInputHandler getInputHandler()
 	{
-		return actions.containsKey(action);
+		return jEdit.getInputHandler();
 	} //}}}
 
-	//{{{ size() method
-	/**
-	 * Returns the number of actions in this action set.
-	 * @since jEdit 4.2pre2
-	 */
-	public int size()
+	//{{{ compareTo() method
+	public int compareTo(Object o)
 	{
-		return actions.size();
-	} //}}}
+		return label.compareTo(((ActionSet)o).label);
+	}//}}}
 
 	//{{{ toString() method
+	@Override
 	public String toString()
 	{
 		return label;
 	} //}}}
-
-	//{{{ initKeyBindings() method
+	
+	//{{{ createBeanShellAction() method
 	/**
-	 * Initializes the action set's key bindings.
-	 * jEdit calls this method for all registered action sets when the
-	 * user changes key bindings in the <b>Global Options</b> dialog box.<p>
-	 *
-	 * Note if your plugin adds a custom action set to jEdit's collection,
-	 * it must also call this method on the action set after adding it.
-	 *
-	 * @since jEdit 4.2pre1
+	 * Creates a BeanShellAction.
+	 * @since 4.3pre13
 	 */
-	public void initKeyBindings()
+	 protected EditAction createBeanShellAction(String actionName,
+						    String code,
+						    String selected,
+						    boolean noRepeat,
+						    boolean noRecord,
+						    boolean noRememberLast)
 	{
-		InputHandler inputHandler = jEdit.getInputHandler();
-
-		Iterator iter = actions.entrySet().iterator();
-		while(iter.hasNext())
-		{
-			Map.Entry entry = (Map.Entry)iter.next();
-			String name = (String)entry.getKey();
-
-			String shortcut1 = jEdit.getProperty(name + ".shortcut");
-			if(shortcut1 != null)
-				inputHandler.addKeyBinding(shortcut1,name);
-
-			String shortcut2 = jEdit.getProperty(name + ".shortcut2");
-			if(shortcut2 != null)
-				inputHandler.addKeyBinding(shortcut2,name);
-		}
-	} //}}}
-
-	//{{{ load() method
-	/**
-	 * Forces the action set to be loaded. Plugins and macros should not
-	 * call this method.
-	 * @since jEdit 4.2pre1
-	 */
-	public void load()
-	{
-		if(loaded)
-			return;
-
-		loaded = true;
-		//actions.clear();
-
-		Reader stream = null;
-
-		try
-		{
-			Log.log(Log.DEBUG,this,"Loading actions from " + uri);
-
-			ActionListHandler ah = new ActionListHandler(uri.toString(),this);
-			stream = new BufferedReader(new InputStreamReader(
-				uri.openStream()));
-			XmlParser parser = new XmlParser();
-			parser.setHandler(ah);
-			parser.parse(null, null, stream);
-		}
-		catch(XmlException xe)
-		{
-			int line = xe.getLine();
-			String message = xe.getMessage();
-			Log.log(Log.ERROR,this,uri + ":" + line
-				+ ": " + message);
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,uri,e);
-		}
-		finally
-		{
-			try
-			{
-				if(stream != null)
-					stream.close();
-			}
-			catch(IOException io)
-			{
-				Log.log(Log.ERROR,this,io);
-			}
-		}
-	} //}}}
-
-	//{{{ Package-private members
-	ActionContext context;
-
-	//{{{ getActionNames() method
-	void getActionNames(List vec)
-	{
-		Enumeration e = actions.keys();
-		while(e.hasMoreElements())
-			vec.add(e.nextElement());
-	} //}}}
-
+		return new BeanShellAction(actionName,code,selected,noRepeat,noRecord,noRememberLast);
+	}
 	//}}}
 
 	//{{{ Private members
 	private String label;
-	private Hashtable actions;
 	private PluginJAR plugin;
-	private URL uri;
-	private boolean loaded;
-
-	private static final Object placeholder = new Object();
-
 	//}}}
+
 }

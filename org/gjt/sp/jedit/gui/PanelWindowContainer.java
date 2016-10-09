@@ -23,28 +23,62 @@
 package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
-import javax.swing.border.*;
-import javax.swing.plaf.metal.*;
-import javax.swing.*;
-import java.awt.event.*;
-import java.awt.font.*;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Insets;
+import java.awt.LayoutManager;
+import java.awt.RenderingHints;
+import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.font.FontRenderContext;
+import java.awt.font.GlyphVector;
+import java.awt.font.LineMetrics;
 import java.awt.geom.AffineTransform;
-import java.awt.*;
-import java.util.*;
-import org.gjt.sp.jedit.*;
-//}}}
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+import javax.swing.AbstractButton;
+import javax.swing.ButtonGroup;
+import javax.swing.Icon;
+import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.JToggleButton;
+import javax.swing.UIManager;
+import javax.swing.border.Border;
+import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.metal.MetalLookAndFeel;
+
+import org.gjt.sp.jedit.EditBus;
+import org.gjt.sp.jedit.GUIUtilities;
+import org.gjt.sp.jedit.OperatingSystem;
+import org.gjt.sp.jedit.jEdit;
+import org.gjt.sp.jedit.gui.DockableWindowManager.DockingArea;
+import org.gjt.sp.jedit.msg.DockableWindowUpdate;
+import org.gjt.sp.util.StandardUtilities;
 
 /**
  * A container for dockable windows. This class should never be used
  * directly.
  * @author Slava Pestov
- * @version $Id: PanelWindowContainer.java,v 1.76 2004/03/19 22:42:21 spestov Exp $
+ * @version $Id: PanelWindowContainer.java 16341 2009-10-14 10:05:51Z kpouer $
  * @since jEdit 4.0pre1
  */
-public class PanelWindowContainer implements DockableWindowContainer
+public class PanelWindowContainer implements DockableWindowContainer, DockingArea
 {
 	//{{{ PanelWindowContainer constructor
-	public PanelWindowContainer(DockableWindowManager wm, String position,
+	public PanelWindowContainer(DockableWindowManagerImpl wm, String position,
 		int dimension)
 	{
 		this.wm = wm;
@@ -64,7 +98,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 		closeBox.addActionListener(new ActionHandler());
 
-		menuBtn = new JButton(GUIUtilities.loadIcon("ToolbarMenu.gif"));
+		menuBtn = new JButton(GUIUtilities.loadIcon(jEdit.getProperty("dropdown-arrow.icon")));
 		menuBtn.setRequestFocusEnabled(false);
 		menuBtn.setToolTipText(jEdit.getProperty("view.docking.menu-tooltip"));
 		if(OperatingSystem.isMacOSLF())
@@ -79,26 +113,35 @@ public class PanelWindowContainer implements DockableWindowContainer
 		buttonGroup.add(nullButton = new JToggleButton());
 		//}}}
 
-		dockables = new ArrayList();
-		buttons = new ArrayList();
-		dockablePanel = new DockablePanel();
+		dockables = new ArrayList<DockableWindowManagerImpl.Entry>();
+		buttons = new ArrayList<AbstractButton>();
+		dockablePanel = new DockablePanel(this);
 
 		this.dimension = dimension;
 	} //}}}
 
+	//{{{ getDockableWindowManager() method
+	/**
+	 * @since jEdit 4.3pre2
+	 */
+	public DockableWindowManagerImpl getDockableWindowManager()
+	{
+		return wm;
+	} //}}}
+	
 	//{{{ register() method
-	public void register(final DockableWindowManager.Entry entry)
+	public void register(DockableWindowManagerImpl.Entry entry)
 	{
 		dockables.add(entry);
 
 		//{{{ Create button
 		int rotation;
-		if(position.equals(DockableWindowManager.TOP)
-			|| position.equals(DockableWindowManager.BOTTOM))
+		if(position.equals(DockableWindowManagerImpl.TOP)
+			|| position.equals(DockableWindowManagerImpl.BOTTOM))
 			rotation = RotatedTextIcon.NONE;
-		else if(position.equals(DockableWindowManager.LEFT))
+		else if(position.equals(DockableWindowManagerImpl.LEFT))
 			rotation = RotatedTextIcon.CCW;
-		else if(position.equals(DockableWindowManager.RIGHT))
+		else if(position.equals(DockableWindowManagerImpl.RIGHT))
 			rotation = RotatedTextIcon.CW;
 		else
 			throw new InternalError("Invalid position: " + position);
@@ -107,7 +150,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 		button.setMargin(new Insets(1,1,1,1));
 		button.setRequestFocusEnabled(false);
 		button.setIcon(new RotatedTextIcon(rotation,button.getFont(),
-			entry.title));
+			entry.shortTitle()));
 		button.setActionCommand(entry.factory.name);
 		button.addActionListener(new ActionHandler());
 		button.addMouseListener(new MenuMouseHandler());
@@ -123,14 +166,17 @@ public class PanelWindowContainer implements DockableWindowContainer
 	} //}}}
 
 	//{{{ unregister() method
-	public void unregister(DockableWindowManager.Entry entry)
+	public void unregister(DockableWindowManagerImpl.Entry entry)
 	{
 		if(entry.factory.name.equals(mostRecent))
 			mostRecent = null;
 
-		buttonPanel.remove(entry.btn);
-		buttons.remove(entry.btn);
-		entry.btn = null;
+		if(entry.btn != null)
+		{
+			buttonPanel.remove(entry.btn);
+			buttons.remove(entry.btn);
+			entry.btn = null;
+		}
 
 		dockables.remove(entry);
 		if(entry.win != null)
@@ -139,7 +185,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 		if(current == entry)
 		{
 			current = null;
-			show(null);
+			show(current);
 		}
 		else
 		{
@@ -150,7 +196,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 	} //}}}
 
 	//{{{ remove() method
-	public void remove(final DockableWindowManager.Entry entry)
+	public void remove(DockableWindowManagerImpl.Entry entry)
 	{
 		if(entry.factory.name.equals(mostRecent))
 			mostRecent = null;
@@ -164,7 +210,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 		if(current == entry)
 		{
 			current = null;
-			show(null);
+			show(current);
 		}
 		else
 		{
@@ -176,7 +222,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 	//{{{ showMostRecent() method
 	public void showMostRecent()
 	{
-		if(dockables.size() == 0)
+		if(dockables.isEmpty())
 		{
 			Toolkit.getDefaultToolkit().beep();
 			return;
@@ -184,15 +230,14 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 		if(mostRecent == null)
 		{
-			mostRecent = ((DockableWindowManager.Entry)
-				dockables.get(0)).factory.name;
+			mostRecent = dockables.get(0).factory.name;
 		}
 
 		wm.showDockableWindow(mostRecent);
 	} //}}}
 
 	//{{{ show() method
-	public void show(final DockableWindowManager.Entry entry)
+	public void show(DockableWindowManagerImpl.Entry entry)
 	{
 		if(current == entry)
 		{
@@ -242,6 +287,12 @@ public class PanelWindowContainer implements DockableWindowContainer
 		}
 		else
 		{
+			if (current != null)
+			{
+				
+				Object reason = DockableWindowUpdate.DEACTIVATED;
+				EditBus.send(new DockableWindowUpdate(wm, reason, current.factory.name));
+			}
 			current = null;
 			nullButton.setSelected(true);
 			// removing last component, so remove border
@@ -255,7 +306,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 	} //}}}
 
 	//{{{ isVisible() method
-	public boolean isVisible(DockableWindowManager.Entry entry)
+	public boolean isVisible(DockableWindowManagerImpl.Entry entry)
 	{
 		return current == entry;
 	} //}}}
@@ -284,14 +335,22 @@ public class PanelWindowContainer implements DockableWindowContainer
 		return dimension;
 	} //}}}
 
+	//{{{ getPosition() method
+	/**
+	 * @since jEdit 4.3pre2
+	 */
+	public String getPosition()
+	{
+		return position;
+	} //}}}
+
 	//{{{ getDockables() method
 	public String[] getDockables()
 	{
 		String[] retVal = new String[dockables.size()];
 		for(int i = 0; i < dockables.size(); i++)
 		{
-			DockableWindowManager.Entry entry =
-				(DockableWindowManager.Entry) dockables.get(i);
+			DockableWindowManagerImpl.Entry entry = dockables.get(i);
 			retVal[i] = entry.factory.name;
 		}
 		return retVal;
@@ -319,7 +378,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 	//{{{ setDimension() method
 	void setDimension(int dimension)
 	{
-		if(dimension != 0)
+		if(dimension > SPLITTER_WIDTH)
 			this.dimension = dimension - SPLITTER_WIDTH;
 	} //}}}
 
@@ -332,7 +391,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 		Collections.sort(buttons,new DockableWindowCompare());
 		for(int i = 0; i < buttons.size(); i++)
 		{
-			buttonPanel.add((AbstractButton)buttons.get(i));
+			buttonPanel.add(buttons.get(i));
 		}
 	} //}}}
 
@@ -349,16 +408,16 @@ public class PanelWindowContainer implements DockableWindowContainer
 	//}}}
 
 	//{{{ Private members
-	private DockableWindowManager wm;
-	private String position;
-	private JButton closeBox;
-	private JButton menuBtn;
-	private ButtonGroup buttonGroup;
-	private JToggleButton nullButton;
+	private final DockableWindowManagerImpl wm;
+	private final String position;
+	private final JButton closeBox;
+	private final JButton menuBtn;
+	private final ButtonGroup buttonGroup;
+	private final JToggleButton nullButton;
 	private int dimension;
-	private ArrayList dockables;
-	private ArrayList buttons;
-	private DockableWindowManager.Entry current;
+	private final List<DockableWindowManagerImpl.Entry> dockables;
+	private final List<AbstractButton> buttons;
+	private DockableWindowManagerImpl.Entry current;
 	private JPopupMenu popup;
 
 	// remember the most recent dockable
@@ -368,13 +427,13 @@ public class PanelWindowContainer implements DockableWindowContainer
 	//{{{ Inner classes
 
 	//{{{ DockableWindowCompare class
-	static class DockableWindowCompare implements Comparator
+	static class DockableWindowCompare implements Comparator<AbstractButton>
 	{
-		public int compare(Object o1, Object o2)
+		public int compare(AbstractButton o1, AbstractButton o2)
 		{
-			String name1 = ((AbstractButton)o1).getActionCommand();
-			String name2 = ((AbstractButton)o2).getActionCommand();
-			return MiscUtilities.compareStrings(
+			String name1 = o1.getActionCommand();
+			String name2 = o2.getActionCommand();
+			return StandardUtilities.compareStrings(
 				jEdit.getProperty(name1 + ".title",""),
 				jEdit.getProperty(name2 + ".title",""),
 				true);
@@ -390,11 +449,11 @@ public class PanelWindowContainer implements DockableWindowContainer
 				popup.setVisible(false);
 
 			if(evt.getSource() == closeBox)
-				show(null);
+				show((DockableWindowManagerImpl.Entry)null);
 			else
 			{
 				if(wm.isDockableWindowVisible(evt.getActionCommand()))
-					show(null);
+					show((DockableWindowManagerImpl.Entry)null);
 				else
 					wm.showDockableWindow(evt.getActionCommand());
 			}
@@ -464,13 +523,13 @@ public class PanelWindowContainer implements DockableWindowContainer
 		{
 			this.position = position;
 			insets = new Insets(
-				position.equals(DockableWindowManager.BOTTOM)
+				position.equals(DockableWindowManagerImpl.BOTTOM)
 					? SPLITTER_WIDTH : 0,
-				position.equals(DockableWindowManager.RIGHT)
+				position.equals(DockableWindowManagerImpl.RIGHT)
 					? SPLITTER_WIDTH : 0,
-				position.equals(DockableWindowManager.TOP)
+				position.equals(DockableWindowManagerImpl.TOP)
 					? SPLITTER_WIDTH : 0,
-				position.equals(DockableWindowManager.LEFT)
+				position.equals(DockableWindowManagerImpl.LEFT)
 					? SPLITTER_WIDTH : 0);
 		} //}}}
 
@@ -483,16 +542,16 @@ public class PanelWindowContainer implements DockableWindowContainer
 			if(color1 == null || color2 == null || color3 == null)
 				return;
 
-			if(position.equals(DockableWindowManager.BOTTOM))
+			if(position.equals(DockableWindowManagerImpl.BOTTOM))
 				paintHorizBorder(g,x,y,width);
-			else if(position.equals(DockableWindowManager.RIGHT))
+			else if(position.equals(DockableWindowManagerImpl.RIGHT))
 				paintVertBorder(g,x,y,height);
-			else if(position.equals(DockableWindowManager.TOP))
+			else if(position.equals(DockableWindowManagerImpl.TOP))
 			{
 				paintHorizBorder(g,x,y + height
 					- SPLITTER_WIDTH,width);
 			}
-			else if(position.equals(DockableWindowManager.LEFT))
+			else if(position.equals(DockableWindowManagerImpl.LEFT))
 			{
 				paintVertBorder(g,x + width
 					- SPLITTER_WIDTH,y,height);
@@ -520,17 +579,17 @@ public class PanelWindowContainer implements DockableWindowContainer
 			for(int i = 0; i < width / 4 - 1; i++)
 			{
 				g.setColor(color1);
-				g.drawLine(x + i * 4 + 2,y + 3,
-					x + i * 4 + 2,y + 3);
+				g.drawLine(x + (i << 2) + 2,y + 3,
+					x + (i << 2) + 2,y + 3);
 				g.setColor(color2);
-				g.drawLine(x + i * 4 + 3,y + 4,
-					x + i * 4 + 3,y + 4);
+				g.drawLine(x + (i << 2) + 3,y + 4,
+					x + (i << 2) + 3,y + 4);
 				g.setColor(color1);
-				g.drawLine(x + i * 4 + 4,y + 5,
-					x + i * 4 + 4,y + 5);
+				g.drawLine(x + (i << 2) + 4,y + 5,
+					x + (i << 2) + 4,y + 5);
 				g.setColor(color2);
-				g.drawLine(x + i * 4 + 5,y + 6,
-					x + i * 4 + 5,y + 6);
+				g.drawLine(x + (i << 2) + 5,y + 6,
+					x + (i << 2) + 5,y + 6);
 			}
 		} //}}}
 
@@ -543,17 +602,17 @@ public class PanelWindowContainer implements DockableWindowContainer
 			for(int i = 0; i < height / 4 - 1; i++)
 			{
 				g.setColor(color1);
-				g.drawLine(x + 3,y + i * 4 + 2,
-					x + 3,y + i * 4 + 2);
+				g.drawLine(x + 3,y + (i << 2) + 2,
+					x + 3,y + (i << 2) + 2);
 				g.setColor(color2);
-				g.drawLine(x + 4,y + i * 4 + 3,
-					x + 4,y + i * 4 + 3);
+				g.drawLine(x + 4,y + (i << 2) + 3,
+					x + 4,y + (i << 2) + 3);
 				g.setColor(color1);
-				g.drawLine(x + 5,y + i * 4 + 4,
-					x + 5,y + i * 4 + 4);
+				g.drawLine(x + 5,y + (i << 2) + 4,
+					x + 5,y + (i << 2) + 4);
 				g.setColor(color2);
-				g.drawLine(x + 6,y + i * 4 + 5,
-					x + 6,y + i * 4 + 5);
+				g.drawLine(x + 6,y + (i << 2) + 5,
+					x + 6,y + (i << 2) + 5);
 			}
 		} //}}}
 
@@ -588,7 +647,6 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 			FontRenderContext fontRenderContext
 				= new FontRenderContext(null,true,true);
-			this.text = text;
 			glyphs = font.createGlyphVector(fontRenderContext,text);
 			width = (int)glyphs.getLogicalBounds().getWidth() + 4;
 			//height = (int)glyphs.getLogicalBounds().getHeight();
@@ -670,14 +728,13 @@ public class PanelWindowContainer implements DockableWindowContainer
 		} //}}}
 
 		//{{{ Private members
-		private int rotate;
-		private Font font;
-		private String text;
-		private GlyphVector glyphs;
-		private float width;
-		private float height;
-		private float ascent;
-		private RenderingHints renderHints;
+		private final int rotate;
+		private final Font font;
+		private final GlyphVector glyphs;
+		private final float width;
+		private final float height;
+		private final float ascent;
+		private final RenderingHints renderHints;
 		//}}}
 	} //}}}
 
@@ -696,8 +753,8 @@ public class PanelWindowContainer implements DockableWindowContainer
 		 */
 		int getWrappedDimension(JComponent parent, int dimension)
 		{
-			Insets insets = ((JComponent)parent).getBorder()
-				.getBorderInsets((JComponent)parent);
+			Insets insets = parent.getBorder()
+				.getBorderInsets(parent);
 
 			Component[] comp = parent.getComponents();
 			if(comp.length <= 2)
@@ -705,47 +762,16 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 			Dimension dim = comp[2].getPreferredSize();
 
-			if(position.equals(DockableWindowManager.TOP)
-				|| position.equals(DockableWindowManager.BOTTOM))
+			if(position.equals(DockableWindowManagerImpl.TOP)
+				|| position.equals(DockableWindowManagerImpl.BOTTOM))
 			{
 				int width = dimension - insets.right;
-				int rowHeight = Math.max(dim.height,closeBox.getPreferredSize().width);
-				int x = rowHeight * 2 + insets.left;
-				Dimension returnValue = new Dimension(0,rowHeight
-					+ insets.top + insets.bottom);
-
-				for(int i = 2; i < comp.length; i++)
-				{
-					int btnWidth = comp[i].getPreferredSize().width;
-					if(btnWidth + x > width)
-					{
-						returnValue.height += rowHeight;
-						x = insets.left;
-					}
-
-					x += btnWidth;
-				}
+				Dimension returnValue = preferredLayoutSizeLR(insets, comp, dim, width);
 				return returnValue.height;
 			}
 			else
 			{
-				int height = dimension - insets.bottom;
-				int colWidth = Math.max(dim.width,closeBox.getPreferredSize().height);
-				int y = colWidth * 2 + insets.top;
-				Dimension returnValue = new Dimension(colWidth
-					+ insets.left + insets.right,0);
-
-				for(int i = 2; i < comp.length; i++)
-				{
-					int btnHeight = comp[i].getPreferredSize().height;
-					if(btnHeight + y > height)
-					{
-						returnValue.width += colWidth;
-						y = insets.top;
-					}
-
-					y += btnHeight;
-				}
+				Dimension returnValue = preferredLayoutSizeTB(dimension, insets, comp, dim);
 				return returnValue.width;
 			}
 		} //}}}
@@ -754,7 +780,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 		public Dimension preferredLayoutSize(Container parent)
 		{
 			Insets insets = ((JComponent)parent).getBorder()
-				.getBorderInsets((JComponent)parent);
+				.getBorderInsets(parent);
 
 			Component[] comp = parent.getComponents();
 			if(comp.length <= 2)
@@ -765,47 +791,16 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 			Dimension dim = comp[2].getPreferredSize();
 
-			if(position.equals(DockableWindowManager.TOP)
-				|| position.equals(DockableWindowManager.BOTTOM))
+			if(position.equals(DockableWindowManagerImpl.TOP)
+				|| position.equals(DockableWindowManagerImpl.BOTTOM))
 			{
 				int width = parent.getWidth() - insets.right;
-				int rowHeight = Math.max(dim.height,closeBox.getPreferredSize().width);
-				int x = rowHeight * 2 + insets.left;
-				Dimension returnValue = new Dimension(0,rowHeight
-					+ insets.top + insets.bottom);
-
-				for(int i = 2; i < comp.length; i++)
-				{
-					int btnWidth = comp[i].getPreferredSize().width;
-					if(btnWidth + x > width)
-					{
-						returnValue.height += rowHeight;
-						x = insets.left;
-					}
-
-					x += btnWidth;
-				}
+				Dimension returnValue = preferredLayoutSizeLR(insets, comp, dim, width);
 				return returnValue;
 			}
 			else
 			{
-				int height = parent.getHeight() - insets.bottom;
-				int colWidth = Math.max(dim.width,closeBox.getPreferredSize().height);
-				int y = colWidth * 2 + insets.top;
-				Dimension returnValue = new Dimension(colWidth
-					+ insets.left + insets.right,0);
-
-				for(int i = 2; i < comp.length; i++)
-				{
-					int btnHeight = comp[i].getPreferredSize().height;
-					if(btnHeight + y > height)
-					{
-						returnValue.width += colWidth;
-						y = insets.top;
-					}
-
-					y += btnHeight;
-				}
+				Dimension returnValue = preferredLayoutSizeTB(parent.getHeight(), insets, comp, dim);
 				return returnValue;
 			}
 		} //}}}
@@ -820,7 +815,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 		public void layoutContainer(Container parent)
 		{
 			Insets insets = ((JComponent)parent).getBorder()
-				.getBorderInsets((JComponent)parent);
+				.getBorderInsets(parent);
 
 			Component[] comp = parent.getComponents();
 			if(comp.length <= 2)
@@ -837,12 +832,12 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 			Dimension dim = comp[2].getPreferredSize();
 
-			if(position.equals(DockableWindowManager.TOP)
-				|| position.equals(DockableWindowManager.BOTTOM))
+			if(position.equals(DockableWindowManagerImpl.TOP)
+				|| position.equals(DockableWindowManagerImpl.BOTTOM))
 			{
 				int width = parent.getWidth() - insets.right;
 				int rowHeight = Math.max(dim.height,closeBox.getPreferredSize().width);
-				int x = rowHeight * 2 + insets.left;
+				int x = (rowHeight << 1) + insets.left;
 				int y = insets.top;
 				closeBox.setBounds(insets.left,insets.top,rowHeight,rowHeight);
 				menuBtn.setBounds(insets.left + rowHeight,insets.top,rowHeight,rowHeight);
@@ -872,7 +867,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 				int height = parent.getHeight() - insets.bottom;
 				int colWidth = Math.max(dim.width,closeBox.getPreferredSize().height);
 				int x = insets.left;
-				int y = colWidth * 2 + insets.top;
+				int y = (colWidth << 1) + insets.top;
 				closeBox.setBounds(insets.left,insets.top,colWidth,colWidth);
 				menuBtn.setBounds(insets.left,insets.top + colWidth,colWidth,colWidth);
 
@@ -896,235 +891,63 @@ public class PanelWindowContainer implements DockableWindowContainer
 				} */
 			}
 		} //}}}
+
+		//{{{ preferredLayoutSizeLR() method
+		private Dimension preferredLayoutSizeLR(Insets insets, Component[] comp, Dimension dim, int width)
+		{
+			int rowHeight = Math.max(dim.height,closeBox.getPreferredSize().width);
+			int x = (rowHeight << 1) + insets.left;
+			Dimension returnValue = new Dimension(0,rowHeight
+				+ insets.top + insets.bottom);
+
+			for(int i = 2; i < comp.length; i++)
+			{
+				int btnWidth = comp[i].getPreferredSize().width;
+				if(btnWidth + x > width)
+				{
+					returnValue.height += rowHeight;
+					x = insets.left;
+				}
+
+				x += btnWidth;
+			}
+			return returnValue;
+		} //}}}
+
+		//{{{ preferredLayoutSizeTB() method
+		private Dimension preferredLayoutSizeTB(int dimension, Insets insets, Component[] comp, Dimension dim)
+		{
+			int height = dimension - insets.bottom;
+			int colWidth = Math.max(dim.width,closeBox.getPreferredSize().height);
+			int y = (colWidth << 1) + insets.top;
+			Dimension returnValue = new Dimension(colWidth
+				+ insets.left + insets.right,0);
+
+			for(int i = 2; i < comp.length; i++)
+			{
+				int btnHeight = comp[i].getPreferredSize().height;
+				if(btnHeight + y > height)
+				{
+					returnValue.width += colWidth;
+					y = insets.top;
+				}
+
+				y += btnHeight;
+			}
+			return returnValue;
+		} //}}}
 	} //}}}
 
-	//{{{ DockablePanel class
-	class DockablePanel extends JPanel
+	public void show(String name)
 	{
-		//{{{ DockablePanel constructor
-		DockablePanel()
+		DockableWindowManagerImpl.Entry entry = null;
+		if (name != null)
 		{
-			super(new CardLayout());
-
-			ResizeMouseHandler resizeMouseHandler = new ResizeMouseHandler();
-			addMouseListener(resizeMouseHandler);
-			addMouseMotionListener(resizeMouseHandler);
-		} //}}}
-
-		//{{{ getWindowContainer() method
-		PanelWindowContainer getWindowContainer()
-		{
-			return PanelWindowContainer.this;
-		} //}}}
-
-		//{{{ showDockable() method
-		void showDockable(String name)
-		{
-			((CardLayout)getLayout()).show(this,name);
-		} //}}}
-
-		//{{{ getMinimumSize() method
-		public Dimension getMinimumSize()
-		{
-			return new Dimension(0,0);
-		} //}}}
-
-		//{{{ getPreferredSize() method
-		public Dimension getPreferredSize()
-		{
-			if(current == null)
-				return new Dimension(0,0);
-			else
-			{
-				if(position.equals(DockableWindowManager.TOP)
-					|| position.equals(DockableWindowManager.BOTTOM))
-				{
-					if(dimension <= 0)
-					{
-						int height = super.getPreferredSize().height;
-						dimension = height - SPLITTER_WIDTH;
-					}
-					return new Dimension(0,
-						dimension + SPLITTER_WIDTH);
-				}
-				else
-				{
-					if(dimension <= 0)
-					{
-						int width = super.getPreferredSize().width;
-						dimension = width - SPLITTER_WIDTH;
-					}
-					return new Dimension(dimension + SPLITTER_WIDTH,
-						0);
-				}
-			}
-		} //}}}
-
-		//{{{ setBounds() method
-		public void setBounds(int x, int y, int width, int height)
-		{
-			if(position.equals(DockableWindowManager.TOP) ||
-				position.equals(DockableWindowManager.BOTTOM))
-			{
-				if(dimension != 0 && height <= SPLITTER_WIDTH)
-					PanelWindowContainer.this.show(null);
-				else
-					dimension = height - SPLITTER_WIDTH;
-			}
-			else
-			{
-				if(dimension != 0 && width <= SPLITTER_WIDTH)
-					PanelWindowContainer.this.show(null);
-				else
-					dimension = width - SPLITTER_WIDTH;
-			}
-
-			super.setBounds(x,y,width,height);
-		} //}}}
-
-		//{{{ ResizeMouseHandler class
-		class ResizeMouseHandler extends MouseAdapter implements MouseMotionListener
-		{
-			boolean canDrag;
-			Point dragStart;
-
-			//{{{ mousePressed() method
-			public void mousePressed(MouseEvent evt)
-			{
-				if(canDrag)
-				{
-					wm.setResizePos(dimension,PanelWindowContainer.this);
-					dragStart = evt.getPoint();
-				}
-			} //}}}
-
-			//{{{ mouseReleased() method
-			public void mouseReleased(MouseEvent evt)
-			{
-				if(canDrag)
-				{
-					dimension = wm.resizePos;
-					wm.finishResizing();
-					dragStart = null;
-					wm.revalidate();
-				}
-			} //}}}
-
-			//{{{ mouseMoved() method
-			public void mouseMoved(MouseEvent evt)
-			{
-				Border border = getBorder();
-				if(border == null)
-				{
-					// collapsed
-					return;
-				}
-
-				Insets insets = border.getBorderInsets(DockablePanel.this);
-				canDrag = false;
-				//{{{ Top...
-				if(position.equals(DockableWindowManager.TOP))
-				{
-					if(evt.getY() >= getHeight() - insets.bottom)
-						canDrag = true;
-				} //}}}
-				//{{{ Left...
-				else if(position.equals(DockableWindowManager.LEFT))
-				{
-					if(evt.getX() >= getWidth() - insets.right)
-						canDrag = true;
-				} //}}}
-				//{{{ Bottom...
-				else if(position.equals(DockableWindowManager.BOTTOM))
-				{
-					if(evt.getY() <= insets.top)
-						canDrag = true;
-				} //}}}
-				//{{{ Right...
-				else if(position.equals(DockableWindowManager.RIGHT))
-				{
-					if(evt.getX() <= insets.left)
-						canDrag = true;
-				} //}}}
-
-				if(canDrag)
-				{
-					wm.setCursor(Cursor.getPredefinedCursor(
-						getAppropriateCursor()));
-				}
-				else
-				{
-					wm.setCursor(Cursor.getPredefinedCursor(
-						Cursor.DEFAULT_CURSOR));
-				}
-			} //}}}
-
-			//{{{ mouseDragged() method
-			public void mouseDragged(MouseEvent evt)
-			{
-				if(!canDrag)
-					return;
-
-				if(dragStart == null) // can't happen?
-					return;
-
-				wm.setCursor(Cursor.getPredefinedCursor(
-					getAppropriateCursor()));
-
-				//{{{ Top...
-				if(position.equals(DockableWindowManager.TOP))
-				{
-					wm.setResizePos(
-						evt.getY() - dragStart.y
-						+ dimension,
-						PanelWindowContainer.this);
-				} //}}}
-				//{{{ Left...
-				else if(position.equals(DockableWindowManager.LEFT))
-				{
-					wm.setResizePos(evt.getX() - dragStart.x
-						+ dimension,
-						PanelWindowContainer.this);
-				} //}}}
-				//{{{ Bottom...
-				else if(position.equals(DockableWindowManager.BOTTOM))
-				{
-					wm.setResizePos(dimension - evt.getY()
-						+ dragStart.y,
-						PanelWindowContainer.this);
-				} //}}}
-				//{{{ Right...
-				else if(position.equals(DockableWindowManager.RIGHT))
-				{
-					wm.setResizePos(dimension - evt.getX()
-						+ dragStart.x,
-						PanelWindowContainer.this);
-				} //}}}
-			} //}}}
-
-			//{{{ mouseExited() method
-			public void mouseExited(MouseEvent evt)
-			{
-				wm.setCursor(Cursor.getPredefinedCursor(
-					Cursor.DEFAULT_CURSOR));
-			} //}}}
-
-			//{{{ getCursor() method
-			private int getAppropriateCursor()
-			{
-				if(position.equals(DockableWindowManager.TOP))
-					return Cursor.N_RESIZE_CURSOR;
-				else if(position.equals(DockableWindowManager.LEFT))
-					return Cursor.W_RESIZE_CURSOR;
-				else if(position.equals(DockableWindowManager.BOTTOM))
-					return Cursor.S_RESIZE_CURSOR;
-				else if(position.equals(DockableWindowManager.RIGHT))
-					return Cursor.E_RESIZE_CURSOR;
-				else
-					throw new InternalError();
-			} //}}}
-		} //}}}
-	} //}}}
+			wm.showDockableWindow(name);
+			wm.hideDockableWindow(name);
+		}
+		show(entry);
+	}
 
 	//}}}
 }

@@ -33,8 +33,11 @@ import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.util.Log;
 //}}}
 
+/**
+ * @version $Id: LogViewer.java 13903 2008-10-18 05:19:28Z k_satoda $
+ */
 public class LogViewer extends JPanel implements DefaultFocusComponent,
-	EBComponent
+EBComponent
 {
 	//{{{ LogViewer constructor
 	public LogViewer()
@@ -49,9 +52,9 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 		if(settingsDirectory != null)
 		{
 			String[] args = { MiscUtilities.constructPath(
-				settingsDirectory, "activity.log") };
+								      settingsDirectory, "activity.log") };
 			JLabel label = new JLabel(jEdit.getProperty(
-				"log-viewer.caption",args));
+								    "log-viewer.caption",args));
 			caption.add(label);
 		}
 
@@ -59,8 +62,29 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 
 		tailIsOn = jEdit.getBooleanProperty("log-viewer.tail", false);
 		tail = new JCheckBox(
-			jEdit.getProperty("log-viewer.tail.label"),tailIsOn);
+				     jEdit.getProperty("log-viewer.tail.label"),tailIsOn);
 		tail.addActionListener(new ActionHandler());
+
+
+		filter = new JTextField();
+		filter.getDocument().addDocumentListener(new DocumentListener()
+		{
+			public void changedUpdate(DocumentEvent e)
+			{
+				setFilter();
+			}
+
+			public void insertUpdate(DocumentEvent e)
+			{
+				setFilter();
+			}
+
+			public void removeUpdate(DocumentEvent e)
+			{
+				setFilter();
+			}
+		});
+		caption.add(filter);
 		caption.add(tail);
 
 		caption.add(Box.createHorizontalStrut(12));
@@ -70,9 +94,14 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 		caption.add(copy);
 
 		ListModel model = Log.getLogListModel();
-		model.addListDataListener(new ListHandler());
-		list = new LogList(model);
+		listModel = new MyFilteredListModel(model);
+		// without this, listModel is held permanently in model.
+		// See addNotify() and removeNotify(), and constructor of
+		// FilteredListModel.
+		model.removeListDataListener(listModel);
 
+		list = new LogList(listModel);
+		listModel.setList(list);
 		add(BorderLayout.NORTH,caption);
 		JScrollPane scroller = new JScrollPane(list);
 		Dimension dim = scroller.getPreferredSize();
@@ -83,6 +112,15 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 		propertiesChanged();
 	} //}}}
 
+	//{{{ setBounds() method
+	@Override
+	public void setBounds(int x, int y, int width, int height)
+	{
+		list.setCellRenderer( new ColorizerCellRenderer() );
+		super.setBounds(x, y, width, height);
+		scrollLaterIfRequired();
+	} //}}}
+
 	//{{{ handleMessage() method
 	public void handleMessage(EBMessage msg)
 	{
@@ -91,23 +129,28 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 	} //}}}
 
 	//{{{ addNotify() method
+	@Override
 	public void addNotify()
 	{
 		super.addNotify();
+		ListModel model = Log.getLogListModel();
+		model.addListDataListener(listModel);
+		model.addListDataListener(listHandler = new ListHandler());
 		if(tailIsOn)
-		{
-			int index = list.getModel().getSize() - 1;
-			list.ensureIndexIsVisible(index);
-		}
+			scrollToTail();
 
 		EditBus.addToBus(this);
 	} //}}}
 
 	//{{{ removeNotify() method
+	@Override
 	public void removeNotify()
 	{
 		super.removeNotify();
-
+		ListModel model = Log.getLogListModel();
+		model.removeListDataListener(listModel);
+		model.removeListDataListener(listHandler);
+		listHandler = null;
 		EditBus.removeFromBus(this);
 	} //}}}
 
@@ -118,23 +161,55 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 	} //}}}
 
 	//{{{ Private members
-	private JList list;
-	private JButton copy;
-	private JCheckBox tail;
+	private ListHandler listHandler;
+	private final FilteredListModel listModel;
+	private final JList list;
+	private final JButton copy;
+	private final JCheckBox tail;
+	private final JTextField filter;
 	private boolean tailIsOn;
+
+	//{{{ setFilter() method
+	private void setFilter()
+	{
+		listModel.setFilter(filter.getText());
+		scrollLaterIfRequired();
+	} //}}}
 
 	//{{{ propertiesChanged() method
 	private void propertiesChanged()
 	{
 		list.setFont(jEdit.getFontProperty("view.font"));
 		list.setFixedCellHeight(list.getFontMetrics(list.getFont())
-			.getHeight());
+					.getHeight());
+	} //}}}
+
+	//{{{ scrollToTail() method
+	/** Scroll to the tail of the logs. */
+	private void scrollToTail()
+	{
+		int index = list.getModel().getSize();
+		if(index != 0)
+			list.ensureIndexIsVisible(index - 1);
+	} //}}}
+
+	//{{{ scrollLaterIfRequired() method
+	private void scrollLaterIfRequired()
+	{
+		if (tailIsOn)
+			SwingUtilities.invokeLater(new Runnable()
+			{
+				public void run()
+				{
+					scrollToTail();
+				}
+			});
 	} //}}}
 
 	//}}}
 
 	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
+	private class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent e)
 		{
@@ -145,16 +220,12 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 				jEdit.setBooleanProperty("log-viewer.tail",tailIsOn);
 				if(tailIsOn)
 				{
-					int index = list.getModel().getSize();
-					if(index != 0)
-					{
-						list.ensureIndexIsVisible(index - 1);
-					}
+					scrollToTail();
 				}
 			}
 			else if(src == copy)
 			{
-				StringBuffer buf = new StringBuffer();
+				StringBuilder buf = new StringBuilder();
 				Object[] selected = list.getSelectedValues();
 				if(selected != null && selected.length != 0)
 				{
@@ -179,7 +250,7 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 	} //}}}
 
 	//{{{ ListHandler class
-	class ListHandler implements ListDataListener
+	private class ListHandler implements ListDataListener
 	{
 		public void intervalAdded(ListDataEvent e)
 		{
@@ -193,42 +264,33 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 
 		public void contentsChanged(ListDataEvent e)
 		{
-			if(tailIsOn)
-			{
-				SwingUtilities.invokeLater(new Runnable()
-				{
-					public void run()
-					{
-						int index = list.getModel().getSize() - 1;
-						list.ensureIndexIsVisible(index);
-					}
-				});
-			}
+			scrollLaterIfRequired();
 		}
 	} //}}}
 
 	//{{{ LogList class
-	class LogList extends JList
+	private class LogList extends JList
 	{
 		LogList(ListModel model)
 		{
 			super(model);
 			setVisibleRowCount(24);
-			getSelectionModel().setSelectionMode(
-				ListSelectionModel.SINGLE_INTERVAL_SELECTION);
+			getSelectionModel().setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
 			setAutoscrolls(true);
 		}
 
+		@Override
 		public void processMouseEvent(MouseEvent evt)
 		{
 			if(evt.getID() == MouseEvent.MOUSE_PRESSED)
 			{
 				startIndex = list.locationToIndex(
-					evt.getPoint());
+								  evt.getPoint());
 			}
 			super.processMouseEvent(evt);
 		}
 
+		@Override
 		public void processMouseMotionEvent(MouseEvent evt)
 		{
 			if(evt.getID() == MouseEvent.MOUSE_DRAGGED)
@@ -253,4 +315,73 @@ public class LogViewer extends JPanel implements DefaultFocusComponent,
 
 		private int startIndex;
 	} //}}}
+
+	private static class ColorizerCellRenderer extends JLabel implements ListCellRenderer
+	{
+
+		// This is the only method defined by ListCellRenderer.
+		// We just reconfigure the JLabel each time we're called.
+		public Component getListCellRendererComponent(
+							      JList list,
+							      Object value,              // value to display
+							      int index,                 // cell index
+							      boolean isSelected,        // is the cell selected
+							      boolean cellHasFocus )     // the list and the cell have the focus
+		{
+			String s = value.toString();
+			setText(s);
+			if (isSelected)
+			{
+				setBackground(list.getSelectionBackground());
+				setForeground(list.getSelectionForeground());
+			}
+			else
+			{
+				setBackground(list.getBackground());
+				Color color = list.getForeground();
+				if (s.contains("[debug]"))
+				{
+					color = Color.BLUE;
+				}
+				else if (s.contains("[notice]"))
+				{
+					color = Color.GREEN;
+				}
+				else if (s.contains("[warning]"))
+				{
+					color = Color.ORANGE;
+				}
+				else if (s.contains("[error]"))
+				{
+					color = Color.RED;
+				}
+				setForeground( color );
+			}
+			setEnabled( list.isEnabled() );
+			setFont( list.getFont() );
+			setOpaque( true );
+			return this;
+		}
+	}
+
+	private static class MyFilteredListModel extends FilteredListModel
+	{
+		MyFilteredListModel(ListModel model)
+		{
+			super(model);
+		}
+
+		@Override
+		public String prepareFilter(String filter)
+		{
+			return filter.toLowerCase();
+		}
+
+		@Override
+		public boolean passFilter(int row, String filter)
+		{
+			return delegated.getElementAt(row).toString().toLowerCase().contains(filter);
+		}
+	}
 }
+

@@ -23,14 +23,13 @@
 package org.gjt.sp.jedit.buffer;
 
 import javax.swing.text.Segment;
-import org.gjt.sp.jedit.Buffer;
 
 /**
  * A fold handler that folds lines based on markers ("{{{" and "}}}")
  * embedded in the text.
  *
  * @author Slava Pestov
- * @version $Id: ExplicitFoldHandler.java,v 1.8 2003/11/18 20:51:57 spestov Exp $
+ * @version $Id: ExplicitFoldHandler.java 12504 2008-04-22 23:12:43Z ezust $
  * @since jEdit 4.0pre1
  */
 public class ExplicitFoldHandler extends FoldHandler
@@ -51,7 +50,7 @@ public class ExplicitFoldHandler extends FoldHandler
 	 * @return The fold level of the specified line
 	 * @since jEdit 4.0pre1
 	 */
-	public int getFoldLevel(Buffer buffer, int lineIndex, Segment seg)
+	public int getFoldLevel(JEditBuffer buffer, int lineIndex, Segment seg)
 	{
 		if(lineIndex == 0)
 			return 0;

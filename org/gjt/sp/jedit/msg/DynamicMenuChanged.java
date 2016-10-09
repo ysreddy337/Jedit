@@ -29,7 +29,7 @@ import org.gjt.sp.jedit.*;
  * Sending this message will cause the specified dynamic menu to be recreated.
  *
  * @author Slava Pestov
- * @version $Id: DynamicMenuChanged.java,v 1.3 2004/03/28 00:07:26 spestov Exp $
+ * @version $Id: DynamicMenuChanged.java 12504 2008-04-22 23:12:43Z ezust $
  *
  * @since jEdit 4.2pre2
  */

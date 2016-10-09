@@ -25,7 +25,7 @@ import org.gjt.sp.jedit.EBMessage;
 /**
  * Message sent just before jEdit exits.
  * @author Slava Pestov
- * @version $Id: EditorExiting.java,v 1.2 2002/05/14 07:55:48 spestov Exp $
+ * @version $Id: EditorExiting.java 12504 2008-04-22 23:12:43Z ezust $
  *
  * @since jEdit 2.3pre2
  */

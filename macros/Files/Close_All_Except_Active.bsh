@@ -19,7 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: Close_All_Except_Active.bsh,v 1.2 2001/11/06 17:15:01 jgellene Exp $
+ * $Id: Close_All_Except_Active.bsh 3871 2001-11-06 17:15:01Z jgellene $
  *
  * Checked for jEdit 4.0 API
  *

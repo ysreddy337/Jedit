@@ -19,91 +19,58 @@
 
 package org.gjt.sp.jedit;
 
-import com.microstar.xml.*;
-import java.io.*;
+//{{{ Imports
+import org.gjt.sp.jedit.syntax.ModeProvider;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.XMLUtilities;
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.helpers.DefaultHandler;
+//}}}
 
-class ModeCatalogHandler extends HandlerBase
+/**
+ * @author Slava Pestov
+ */
+class ModeCatalogHandler extends DefaultHandler
 {
+	//{{{ ModeCatalogHandler constructor
 	ModeCatalogHandler(String directory, boolean resource)
 	{
 		this.directory = directory;
 		this.resource = resource;
-	}
+	} //}}}
 
-	public Object resolveEntity(String publicId, String systemId)
+	//{{{ resolveEntity() method
+	public InputSource resolveEntity(String publicId, String systemId)
 	{
-		if("catalog.dtd".equals(systemId))
-		{
-			// this will result in a slight speed up, since we
-			// don't need to read the DTD anyway, as AElfred is
-			// non-validating
-			return new StringReader("<!-- -->");
+		return XMLUtilities.findEntity(systemId, "catalog.dtd", getClass());
+	} //}}}
 
-			/* try
-			{
-				return new BufferedReader(new InputStreamReader(
-					getClass().getResourceAsStream("catalog.dtd")));
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.ERROR,this,"Error while opening"
-					+ " catalog.dtd:");
-				Log.log(Log.ERROR,this,e);
-			} */
-		}
-
-		return null;
-	}
-
-	public void attribute(String aname, String value, boolean isSpecified)
+	//{{{ startElement() method
+	public void startElement(String uri, String localName,
+							 String qName, Attributes attrs)
 	{
-		aname = (aname == null) ? null : aname.intern();
-
-		if(aname == "NAME")
-			modeName = value;
-		else if(aname == "FILE")
+		if (qName.equals("MODE"))
 		{
-			if(value == null)
+			String modeName = attrs.getValue("NAME");
+
+			String file = attrs.getValue("FILE");
+			if(file == null)
 			{
 				Log.log(Log.ERROR,this,directory + "catalog:"
 					+ " mode " + modeName + " doesn't have"
 					+ " a FILE attribute");
 			}
-			else
-				file = value;
-		}
-		else if(aname == "FILE_NAME_GLOB")
-			filenameGlob = value;
-		else if(aname == "FIRST_LINE_GLOB")
-			firstlineGlob = value;
-	}
 
-	public void doctypeDecl(String name, String publicId,
-		String systemId) throws Exception
-	{
-		// older jEdit versions used a DOCTYPE of CATALOG, which
-		// is incorrect since the DOCTYPE must be the name of the
-		// root element, which is MODES.
+			String filenameGlob = attrs.getValue("FILE_NAME_GLOB");
+			String firstlineGlob = attrs.getValue("FIRST_LINE_GLOB");
 
-		// so you the avid code reader should use MODES as the
-		// DOCTYPE instead, but we still let old catalogs through
-		// to avoid annoying users.
-		if("CATALOG".equals(name) || "MODES".equals(name))
-			return;
 
-		Log.log(Log.ERROR,this,directory + "catalog: DOCTYPE must be CATALOG");
-	}
-
-	public void endElement(String name)
-	{
-		if(name.equals("MODE"))
-		{
-			Mode mode = jEdit.getMode(modeName);
+			Mode mode = ModeProvider.instance.getMode(modeName);
 			if(mode == null)
 			{
-				mode = new Mode(modeName);
-				jEdit.addMode(mode);
+				mode = instantiateMode(modeName);
+				ModeProvider.instance.addMode(mode);
 			}
 
 			Object path;
@@ -124,19 +91,16 @@ class ModeCatalogHandler extends HandlerBase
 				mode.unsetProperty("firstlineGlob");
 
 			mode.init();
-
-			modeName = file = filenameGlob = firstlineGlob = null;
 		}
+	} //}}}
+
+	protected Mode instantiateMode(String modeName)
+	{
+		return new Mode(modeName);
 	}
 
-	// end HandlerBase implementation
-
-	// private members
 	private String directory;
 	private boolean resource;
 
-	private String modeName;
-	private String file;
-	private String filenameGlob;
-	private String firstlineGlob;
 }
+

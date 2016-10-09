@@ -7,7 +7,7 @@
  *
  * Copyright (C) 2002-2004, Ollie Rutherfurd <oliver@rutherfurd.net>
  *
- * $Id: Emacs_Previous_Line.bsh,v 1.1 2004/03/19 15:57:59 spestov Exp $
+ * $Id: Emacs_Previous_Line.bsh 4995 2004-03-19 15:58:00Z spestov $
  */
 
 void emacsPreviousLine(View view){

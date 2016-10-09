@@ -23,7 +23,6 @@
 package org.gjt.sp.jedit.help;
 
 //{{{ Imports
-import com.microstar.xml.*;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.tree.*;
@@ -32,16 +31,24 @@ import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+
+import org.xml.sax.Attributes;
+import org.xml.sax.helpers.DefaultHandler;
+
 import org.gjt.sp.jedit.browser.FileCellRenderer; // for icons
 import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.StandardUtilities;
+import org.gjt.sp.util.XMLUtilities;
+
+import static javax.swing.tree.TreeSelectionModel.SINGLE_TREE_SELECTION;
 //}}}
 
-class HelpTOCPanel extends JPanel
+public class HelpTOCPanel extends JPanel
 {
 	//{{{ HelpTOCPanel constructor
-	HelpTOCPanel(HelpViewer helpViewer)
+	public HelpTOCPanel(HelpViewerInterface helpViewer)
 	{
 		super(new BorderLayout());
 
@@ -64,7 +71,7 @@ class HelpTOCPanel extends JPanel
 	} //}}}
 
 	//{{{ selectNode() method
-	void selectNode(String shortURL)
+	public void selectNode(String shortURL)
 	{
 		if(tocModel == null)
 			return;
@@ -81,7 +88,7 @@ class HelpTOCPanel extends JPanel
 	} //}}}
 
 	//{{{ load() method
-	void load()
+	public void load()
 	{
 		DefaultTreeModel empty = new DefaultTreeModel(
 			new DefaultMutableTreeNode(
@@ -112,7 +119,7 @@ class HelpTOCPanel extends JPanel
 	} //}}}
 
 	//{{{ Private members
-	private HelpViewer helpViewer;
+	private HelpViewerInterface helpViewer;
 	private DefaultTreeModel tocModel;
 	private DefaultMutableTreeNode tocRoot;
 	private JTree toc;
@@ -152,10 +159,10 @@ class HelpTOCPanel extends JPanel
 		tocRoot.add(createNode("COPYING.PLUGINS.txt",
 			jEdit.getProperty("helpviewer.toc.copying-plugins")));
 
-		loadTOC(tocRoot,"news42/toc.xml");
+		loadTOC(tocRoot,"news43/toc.xml");
 		loadTOC(tocRoot,"users-guide/toc.xml");
 		loadTOC(tocRoot,"FAQ/toc.xml");
-		loadTOC(tocRoot,"api/toc.xml");
+
 
 		DefaultMutableTreeNode pluginTree = new DefaultMutableTreeNode(
 			jEdit.getProperty("helpviewer.toc.plugins"),true);
@@ -188,7 +195,7 @@ class HelpTOCPanel extends JPanel
 			// so that HelpViewer constructor doesn't try to expand
 			pluginTree = null;
 		}
-
+		loadTOC(tocRoot,"api/toc.xml");
 		tocModel = new DefaultTreeModel(tocRoot);
 	} //}}}
 
@@ -196,39 +203,15 @@ class HelpTOCPanel extends JPanel
 	private void loadTOC(DefaultMutableTreeNode root, String path)
 	{
 		TOCHandler h = new TOCHandler(root,MiscUtilities.getParentOfPath(path));
-		XmlParser parser = new XmlParser();
-		Reader in = null;
-		parser.setHandler(h);
-
 		try
 		{
-			in = new InputStreamReader(
+			XMLUtilities.parseXML(
 				new URL(helpViewer.getBaseURL()
-				+ '/' + path).openStream());
-			parser.parse(null, null, in);
+					+ '/' + path).openStream(), h);
 		}
-		catch(XmlException xe)
-		{
-			int line = xe.getLine();
-			String message = xe.getMessage();
-			Log.log(Log.ERROR,this,path + ':' + line
-				+ ": " + message);
-		}
-		catch(Exception e)
+		catch(IOException e)
 		{
 			Log.log(Log.ERROR,this,e);
-		}
-		finally
-		{
-			try
-			{
-				if(in != null)
-					in.close();
-			}
-			catch(IOException io)
-			{
-				Log.log(Log.ERROR,this,io);
-			}
 		}
 	} //}}}
 
@@ -254,7 +237,7 @@ class HelpTOCPanel extends JPanel
 	} //}}}
 
 	//{{{ TOCHandler class
-	class TOCHandler extends HandlerBase
+	class TOCHandler extends DefaultHandler
 	{
 		String dir;
 
@@ -266,37 +249,35 @@ class HelpTOCPanel extends JPanel
 			this.dir = dir;
 		} //}}}
 
-		//{{{ attribute() method
-		public void attribute(String aname, String value, boolean isSpecified)
-		{
-			if(aname.equals("HREF"))
-				href = value;
-		} //}}}
-
-		//{{{ charData() method
-		public void charData(char[] c, int off, int len)
+		//{{{ characters() method
+		public void characters(char[] c, int off, int len)
 		{
 			if(tag.equals("TITLE"))
 			{
-				StringBuffer buf = new StringBuffer();
+				boolean firstNonWhitespace = false;
 				for(int i = 0; i < len; i++)
 				{
 					char ch = c[off + i];
-					if(ch == ' ' || !Character.isWhitespace(ch))
-						buf.append(ch);
+					if (!firstNonWhitespace && Character.isWhitespace(ch)) continue;
+					firstNonWhitespace = true;
+					title.append(ch);
 				}
-				title = buf.toString();
 			}
+
+
 		} //}}}
 
 		//{{{ startElement() method
-		public void startElement(String name)
+		public void startElement(String uri, String localName,
+					 String name, Attributes attrs)
 		{
 			tag = name;
+			if (name.equals("ENTRY"))
+				href = attrs.getValue("HREF");
 		} //}}}
 
 		//{{{ endElement() method
-		public void endElement(String name)
+		public void endElement(String uri, String localName, String name)
 		{
 			if(name == null)
 				return;
@@ -304,18 +285,22 @@ class HelpTOCPanel extends JPanel
 			if(name.equals("TITLE"))
 			{
 				DefaultMutableTreeNode newNode = createNode(
-					dir + href,title);
+					dir + href,title.toString());
 				node.add(newNode);
 				nodes.push(node);
 				node = newNode;
+				title.setLength(0);
 			}
 			else if(name.equals("ENTRY"))
+			{
 				node = (DefaultMutableTreeNode)nodes.pop();
+				href = null;
+			}
 		} //}}}
 
 		//{{{ Private members
 		private String tag;
-		private String title;
+		private StringBuilder title = new StringBuilder();
 		private String href;
 		private DefaultMutableTreeNode node;
 		private Stack nodes;
@@ -329,6 +314,7 @@ class HelpTOCPanel extends JPanel
 		TOCTree()
 		{
 			ToolTipManager.sharedInstance().registerComponent(this);
+			selectionModel.setSelectionMode(SINGLE_TREE_SELECTION);
 		} //}}}
 
 		//{{{ getToolTipText() method
@@ -358,6 +344,35 @@ class HelpTOCPanel extends JPanel
 			}
 			return null;
 		} */ //}}}
+
+		//{{{ processKeyEvent() method
+		public void processKeyEvent(KeyEvent evt)
+		{
+			if ((KeyEvent.KEY_PRESSED == evt.getID()) &&
+			    (KeyEvent.VK_ENTER == evt.getKeyCode()))
+			{
+				TreePath path = getSelectionPath();
+				if(path != null)
+				{
+					Object obj = ((DefaultMutableTreeNode)
+						path.getLastPathComponent())
+						.getUserObject();
+					if(!(obj instanceof HelpNode))
+					{
+						this.expandPath(path);
+						return;
+					}
+
+					HelpNode node = (HelpNode)obj;
+					helpViewer.gotoURL(node.href,true,0);
+				}
+				evt.consume();
+			}
+			else
+			{
+				super.processKeyEvent(evt);
+			}
+		} //}}}
 
 		//{{{ processMouseEvent() method
 		protected void processMouseEvent(MouseEvent evt)
@@ -396,7 +411,7 @@ class HelpTOCPanel extends JPanel
 
 					HelpNode node = (HelpNode)obj;
 
-					helpViewer.gotoURL(node.href,true);
+					helpViewer.gotoURL(node.href,true,0);
 				}
 
 				super.processMouseEvent(evt);
@@ -444,7 +459,7 @@ class HelpTOCPanel extends JPanel
 		{
 			EditPlugin p1 = (EditPlugin)o1;
 			EditPlugin p2 = (EditPlugin)o2;
-			return MiscUtilities.compareStrings(
+			return StandardUtilities.compareStrings(
 				jEdit.getProperty("plugin." + p1.getClassName() + ".name"),
 				jEdit.getProperty("plugin." + p2.getClassName() + ".name"),
 				true);

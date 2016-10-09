@@ -4,7 +4,7 @@
  *
  * Copyright 2004 Ollie Rutherfurd <oliver@jedit.org>
  *
- * $Id: Display_Character_Code.bsh,v 1.2 2004/05/24 19:24:56 orutherfurd Exp $
+ * $Id: Display_Character_Code.bsh 5050 2004-05-24 19:24:56Z orutherfurd $
  */
 
 void displayCharacterCode(View view)

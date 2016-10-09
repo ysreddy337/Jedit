@@ -1,9 +1,9 @@
 /*
- * HelpViewer.java - HTML Help viewer
+ * HelpViewerDialog.java - HTML Help viewer
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2002 Slava Pestov
+ * Copyright (C) 1999, 2005 Slava Pestov, Nicholas O'Leary
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,28 +23,66 @@
 package org.gjt.sp.jedit.help;
 
 //{{{ Imports
-import javax.swing.*;
-import javax.swing.border.*;
-import javax.swing.event.*;
-import javax.swing.text.html.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.beans.*;
-import java.io.*;
-import java.net.*;
-import org.gjt.sp.jedit.gui.RolloverButton;
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+
+import java.io.File;
+import java.io.IOException;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JEditorPane;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
+import javax.swing.SwingUtilities;
+
+import javax.swing.event.HyperlinkEvent;
+import javax.swing.event.HyperlinkListener;
+
+import javax.swing.text.html.HTMLDocument;
+import javax.swing.text.html.HTMLFrameHyperlinkEvent;
+
+import org.gjt.sp.jedit.EBComponent;
+import org.gjt.sp.jedit.EBMessage;
+import org.gjt.sp.jedit.EditBus;
+import org.gjt.sp.jedit.GUIUtilities;
+import org.gjt.sp.jedit.jEdit;
+import org.gjt.sp.jedit.MiscUtilities;
+
 import org.gjt.sp.jedit.msg.PluginUpdate;
-import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.msg.PropertiesChanged;
+
 import org.gjt.sp.util.Log;
+
+import static org.gjt.sp.jedit.help.HelpHistoryModel.HistoryEntry;
 //}}}
 
 /**
  * jEdit's searchable help viewer. It uses a Swing JEditorPane to display the HTML,
  * and implements a URL history.
  * @author Slava Pestov
- * @version $Id: HelpViewer.java,v 1.14 2004/06/28 06:45:27 spestov Exp $
+ * @version $Id: HelpViewer.java 15433 2009-06-12 15:19:27Z Kpouer $
  */
-public class HelpViewer extends JFrame implements EBComponent
+public class HelpViewer extends JFrame implements HelpViewerInterface, EBComponent, HelpHistoryModelListener
 {
 	//{{{ HelpViewer constructor
 	/**
@@ -88,8 +126,6 @@ public class HelpViewer extends JFrame implements EBComponent
 			// what to do?
 		}
 
-		history = new String[25];
-
 		ActionHandler actionListener = new ActionHandler();
 
 		JTabbedPane tabs = new JTabbedPane();
@@ -101,27 +137,19 @@ public class HelpViewer extends JFrame implements EBComponent
 
 		JPanel rightPanel = new JPanel(new BorderLayout());
 
-		JToolBar toolBar = new JToolBar();
-		toolBar.setFloatable(false);
+		Box toolBar = new Box(BoxLayout.X_AXIS);
+		//toolBar.setFloatable(false);
 
 		toolBar.add(title = new JLabel());
 		toolBar.add(Box.createGlue());
-
-		JPanel buttons = new JPanel();
-		buttons.setLayout(new BoxLayout(buttons,BoxLayout.X_AXIS));
-		buttons.setBorder(new EmptyBorder(0,12,0,0));
-		back = new RolloverButton(GUIUtilities.loadIcon(
-			jEdit.getProperty("helpviewer.back.icon")));
-		back.setToolTipText(jEdit.getProperty("helpviewer.back.label"));
+		historyModel = new HelpHistoryModel(25);
+		back = new HistoryButton(HistoryButton.BACK,historyModel);
 		back.addActionListener(actionListener);
 		toolBar.add(back);
-		forward = new RolloverButton(GUIUtilities.loadIcon(
-			jEdit.getProperty("helpviewer.forward.icon")));
+		forward = new HistoryButton(HistoryButton.FORWARD,historyModel);
 		forward.addActionListener(actionListener);
-		forward.setToolTipText(jEdit.getProperty("helpviewer.forward.label"));
 		toolBar.add(forward);
 		back.setPreferredSize(forward.getPreferredSize());
-
 		rightPanel.add(BorderLayout.NORTH,toolBar);
 
 		viewer = new JEditorPane();
@@ -129,16 +157,25 @@ public class HelpViewer extends JFrame implements EBComponent
 		viewer.addHyperlinkListener(new LinkHandler());
 		viewer.setFont(new Font("Monospaced",Font.PLAIN,12));
 		viewer.addPropertyChangeListener(new PropertyChangeHandler());
+		viewer.addKeyListener(new KeyHandler());
 
-		rightPanel.add(BorderLayout.CENTER,new JScrollPane(viewer));
+		viewerScrollPane = new JScrollPane(viewer);
+
+		rightPanel.add(BorderLayout.CENTER,viewerScrollPane);
 
 		splitter = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-			tabs,rightPanel);
+					  jEdit.getBooleanProperty("appearance.continuousLayout"),
+					  tabs,
+					  rightPanel);
 		splitter.setBorder(null);
+
 
 		getContentPane().add(BorderLayout.CENTER,splitter);
 
-		gotoURL(url,true);
+		historyModel.addHelpHistoryModelListener(this);
+		historyUpdated();
+
+		gotoURL(url,true,0);
 
 		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
@@ -146,6 +183,7 @@ public class HelpViewer extends JFrame implements EBComponent
 
 		pack();
 		GUIUtilities.loadGeometry(this,"helpviewer");
+		GUIUtilities.addSizeSaver(this,"helpviewer");
 
 		EditBus.addToBus(this);
 
@@ -165,22 +203,26 @@ public class HelpViewer extends JFrame implements EBComponent
 	//{{{ gotoURL() method
 	/**
 	 * Displays the specified URL in the HTML component.
-	 * @param url The URL
-	 * @param addToHistory Should the URL be added to the back/forward
-	 * history?
+	 * 
+	 * @param url 		 The URL
+	 * @param addToHistory   Should the URL be added to the back/forward
+	 * 			 history?
+	 * @param scrollPosition The vertical scrollPosition
 	 */
-	public void gotoURL(String url, boolean addToHistory)
+	public void gotoURL(String url, boolean addToHistory, final int scrollPosition)
 	{
 		// the TOC pane looks up user's guide URLs relative to the
 		// doc directory...
 		String shortURL;
-		if(MiscUtilities.isURL(url))
+		if (MiscUtilities.isURL(url))
 		{
-			if(url.startsWith(baseURL))
+			if (url.startsWith(baseURL))
 			{
 				shortURL = url.substring(baseURL.length());
 				if(shortURL.startsWith("/"))
+				{
 					shortURL = shortURL.substring(1);
+				}
 			}
 			else
 			{
@@ -191,40 +233,48 @@ public class HelpViewer extends JFrame implements EBComponent
 		{
 			shortURL = url;
 			if(baseURL.endsWith("/"))
+			{
 				url = baseURL + url;
+			}
 			else
+			{
 				url = baseURL + '/' + url;
+			}
 		}
 
 		// reset default cursor so that the hand cursor doesn't
 		// stick around
 		viewer.setCursor(Cursor.getDefaultCursor());
 
-		URL _url = null;
 		try
 		{
-			_url = new URL(url);
+			URL _url = new URL(url);
 
 			if(!_url.equals(viewer.getPage()))
+			{
 				title.setText(jEdit.getProperty("helpviewer.loading"));
+			}
 			else
 			{
 				/* don't show loading msg because we won't
 				   receive a propertyChanged */
 			}
 
+			historyModel.setCurrentScrollPosition(viewer.getPage(),getCurrentScrollPosition());
 			viewer.setPage(_url);
+			if (0 != scrollPosition)
+			{
+				SwingUtilities.invokeLater(new Runnable()
+				{
+					public void run()
+					{
+						viewerScrollPane.getVerticalScrollBar().setValue(scrollPosition);
+					}
+				});
+			}
 			if(addToHistory)
 			{
-				history[historyPos] = url;
-				if(historyPos + 1 == history.length)
-				{
-					System.arraycopy(history,1,history,
-						0,history.length - 1);
-					history[historyPos] = null;
-				}
-				else
-					historyPos++;
+				historyModel.addToHistory(url);
 			}
 		}
 		catch(MalformedURLException mf)
@@ -246,7 +296,21 @@ public class HelpViewer extends JFrame implements EBComponent
 
 		// select the appropriate tree node.
 		if(shortURL != null)
+		{
 			toc.selectNode(shortURL);
+		}
+		
+		viewer.requestFocus();
+	} //}}}
+
+	//{{{ getCurrentScrollPosition() method
+	int getCurrentScrollPosition() {
+		return viewerScrollPane.getVerticalScrollBar().getValue();
+	} //}}}
+
+	//{{{ getCurrentPage() method
+	URL getCurrentPage() {
+		return viewer.getPage();
 	} //}}}
 
 	//{{{ dispose() method
@@ -255,7 +319,6 @@ public class HelpViewer extends JFrame implements EBComponent
 		EditBus.removeFromBus(this);
 		jEdit.setIntegerProperty("helpviewer.splitter",
 			splitter.getDividerLocation());
-		GUIUtilities.saveGeometry(this,"helpviewer");
 		super.dispose();
 	} //}}}
 
@@ -276,6 +339,10 @@ public class HelpViewer extends JFrame implements EBComponent
 				}
 			}
 		}
+		else if (msg instanceof PropertiesChanged)
+		{
+			GUIUtilities.initContinuousLayout(splitter);
+		}
 	} //}}}
 
 	//{{{ getBaseURL() method
@@ -285,9 +352,22 @@ public class HelpViewer extends JFrame implements EBComponent
 	} //}}}
 
 	//{{{ getShortURL() method
-	String getShortURL()
+	public String getShortURL()
 	{
 		return shortURL;
+	} //}}}
+
+	//{{{ historyUpdated() method
+	public void historyUpdated()
+	{
+		back.setEnabled(historyModel.hasPrevious());
+		forward.setEnabled(historyModel.hasNext());
+	} //}}}
+
+	//{{{ getComponent method
+	public Component getComponent()
+	{
+		return getRootPane();
 	} //}}}
 
 	//{{{ Private members
@@ -295,13 +375,13 @@ public class HelpViewer extends JFrame implements EBComponent
 	//{{{ Instance members
 	private String baseURL;
 	private String shortURL;
-	private JButton back;
-	private JButton forward;
+	private HistoryButton back;
+	private HistoryButton forward;
 	private JEditorPane viewer;
+	private JScrollPane viewerScrollPane;
 	private JLabel title;
 	private JSplitPane splitter;
-	private String[] history;
-	private int historyPos;
+	private HelpHistoryModel historyModel;
 	private HelpTOCPanel toc;
 	private boolean queuedTOCReload;
 	//}}}
@@ -330,30 +410,48 @@ public class HelpViewer extends JFrame implements EBComponent
 		public void actionPerformed(ActionEvent evt)
 		{
 			Object source = evt.getSource();
+			String actionCommand = evt.getActionCommand();
+			int separatorPosition = actionCommand.lastIndexOf(':');
+			String url;
+			int scrollPosition;
+			if (-1 == separatorPosition)
+			{
+				url = actionCommand;
+				scrollPosition = 0;
+			}
+			else
+			{
+				url = actionCommand.substring(0,separatorPosition);
+				scrollPosition = Integer.parseInt(actionCommand.substring(separatorPosition+1));
+			}
+			if (url.length() != 0)
+			{
+				gotoURL(url,false,scrollPosition);
+				return;
+			}
+
 			if(source == back)
 			{
-				if(historyPos <= 1)
+				HistoryEntry entry = historyModel.back(HelpViewer.this);
+				if(entry == null)
+				{
 					getToolkit().beep();
+				}
 				else
 				{
-					String url = history[--historyPos - 1];
-					gotoURL(url,false);
+					gotoURL(entry.url,false,entry.scrollPosition);
 				}
 			}
 			else if(source == forward)
 			{
-				if(history.length - historyPos <= 1)
+				HistoryEntry entry = historyModel.forward(HelpViewer.this);
+				if(entry == null)
+				{
 					getToolkit().beep();
+				}
 				else
 				{
-					String url = history[historyPos];
-					if(url == null)
-						getToolkit().beep();
-					else
-					{
-						historyPos++;
-						gotoURL(url,false);
-					}
+					gotoURL(entry.url,false,entry.scrollPosition);
 				}
 			}
 		} //}}}
@@ -372,18 +470,23 @@ public class HelpViewer extends JFrame implements EBComponent
 					((HTMLDocument)viewer.getDocument())
 						.processHTMLFrameHyperlinkEvent(
 						(HTMLFrameHyperlinkEvent)evt);
+					historyUpdated();
 				}
 				else
 				{
 					URL url = evt.getURL();
 					if(url != null)
-						gotoURL(url.toString(),true);
+					{
+						gotoURL(url.toString(),true,0);
+					}
 				}
 			}
-			else if (evt.getEventType() == HyperlinkEvent.EventType.ENTERED) {
+			else if (evt.getEventType() == HyperlinkEvent.EventType.ENTERED)
+			{
 				viewer.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 			}
-			else if (evt.getEventType() == HyperlinkEvent.EventType.EXITED) {
+			else if (evt.getEventType() == HyperlinkEvent.EventType.EXITED)
+			{
 				viewer.setCursor(Cursor.getDefaultCursor());
 			}
 		} //}}}
@@ -404,6 +507,39 @@ public class HelpViewer extends JFrame implements EBComponent
 						viewer.getPage().toString());
 				}
 				title.setText(titleStr);
+				historyModel.updateTitle(viewer.getPage().toString(),
+					titleStr);
+			}
+		}
+	} //}}}
+
+	//{{{ KeyHandler class
+	private class KeyHandler extends KeyAdapter
+	{
+		public void keyPressed(KeyEvent ke)
+		{
+			switch (ke.getKeyCode())
+			{
+			case KeyEvent.VK_UP:
+				JScrollBar scrollBar = viewerScrollPane.getVerticalScrollBar();
+				scrollBar.setValue(scrollBar.getValue()-scrollBar.getUnitIncrement(-1));
+				ke.consume();
+				break;
+			case KeyEvent.VK_DOWN:
+				scrollBar = viewerScrollPane.getVerticalScrollBar();
+				scrollBar.setValue(scrollBar.getValue()+scrollBar.getUnitIncrement(1));
+				ke.consume();
+				break;
+			case KeyEvent.VK_LEFT:
+				scrollBar = viewerScrollPane.getHorizontalScrollBar();
+				scrollBar.setValue(scrollBar.getValue()-scrollBar.getUnitIncrement(-1));
+				ke.consume();
+				break;
+			case KeyEvent.VK_RIGHT:
+				scrollBar = viewerScrollPane.getHorizontalScrollBar();
+				scrollBar.setValue(scrollBar.getValue()+scrollBar.getUnitIncrement(1));
+				ke.consume();
+				break;
 			}
 		}
 	} //}}}

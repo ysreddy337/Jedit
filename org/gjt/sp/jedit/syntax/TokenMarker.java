@@ -24,12 +24,13 @@
 package org.gjt.sp.jedit.syntax;
 
 //{{{ Imports
-import gnu.regexp.*;
 import javax.swing.text.Segment;
 import java.util.*;
-import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.CharIndexedSegment;
-import org.gjt.sp.util.Log;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.gjt.sp.jedit.TextUtilities;
+import org.gjt.sp.util.SegmentCharSequence;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
@@ -38,7 +39,7 @@ import org.gjt.sp.util.Log;
  * or font style for painting that token.
  *
  * @author Slava Pestov, mike dillon
- * @version $Id: TokenMarker.java,v 1.62 2003/12/27 05:14:46 spestov Exp $
+ * @version $Id: TokenMarker.java 16344 2009-10-14 10:31:01Z kpouer $
  *
  * @see org.gjt.sp.jedit.syntax.Token
  * @see org.gjt.sp.jedit.syntax.TokenHandler
@@ -47,9 +48,7 @@ public class TokenMarker
 {
 	//{{{ TokenMarker constructor
 	public TokenMarker()
-	{
-		ruleSets = new Hashtable(64);
-	} //}}}
+	{} //}}}
 
 	//{{{ addRuleSet() method
 	public void addRuleSet(ParserRuleSet rules)
@@ -69,7 +68,7 @@ public class TokenMarker
 	//{{{ getRuleSet() method
 	public ParserRuleSet getRuleSet(String setName)
 	{
-		return (ParserRuleSet) ruleSets.get(setName);
+		return ruleSets.get(setName);
 	} //}}}
 
 	//{{{ getRuleSets() method
@@ -78,14 +77,18 @@ public class TokenMarker
 	 */
 	public ParserRuleSet[] getRuleSets()
 	{
-		return (ParserRuleSet[])ruleSets.values().toArray(new ParserRuleSet[ruleSets.size()]);
+		return ruleSets.values().toArray(new ParserRuleSet[ruleSets.size()]);
 	} //}}}
 
 	//{{{ markTokens() method
 	/**
 	 * Do not call this method directly; call Buffer.markTokens() instead.
+	 *
+	 * @param prevContext the context of the previous line, it can be null
+	 * @param tokenHandler the token handler
+	 * @param line a segment containing the content of the line
 	 */
-	public LineContext markTokens(LineContext prevContext,
+	public synchronized LineContext markTokens(LineContext prevContext,
 		TokenHandler tokenHandler, Segment line)
 	{
 		//{{{ Set up some instance variables
@@ -100,30 +103,30 @@ public class TokenMarker
 		context = new LineContext();
 
 		if(prevContext == null)
+		{
 			context.rules = getMainRuleSet();
+			context.escapeRule = context.rules.getEscapeRule();
+		}
 		else
 		{
 			context.parent = prevContext.parent;
-			context.inRule = prevContext.inRule;
+			context.setInRule(prevContext.inRule);
 			context.rules = prevContext.rules;
 			context.spanEndSubst = prevContext.spanEndSubst;
 		}
 
 		keywords = context.rules.getKeywords();
-		escaped = false;
 
 		seenWhitespaceEnd = false;
 		whitespaceEnd = line.offset;
 		//}}}
 
 		//{{{ Main parser loop
-		ParserRule rule;
 		int terminateChar = context.rules.getTerminateChar();
 		boolean terminated = false;
-
 main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 		{
-			//{{{ check if we have to stop parsing
+			//{{{ check if we have to stop parsing (happens if the terminateChar has been exceeded)
 			if(terminateChar >= 0 && pos - line.offset >= terminateChar
 				&& !terminated)
 			{
@@ -134,25 +137,26 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 				keywords = context.rules.getKeywords();
 			} //}}}
 
-			//{{{ check for end of delegate
-			if(context.parent != null)
+			//{{{ Check for the escape rule before anything else.
+			if (context.escapeRule != null &&
+				handleRule(context.escapeRule,false))
 			{
-				rule = context.parent.inRule;
-				if(rule != null)
-				{
-					if(checkDelegateEnd(rule))
-					{
-						seenWhitespaceEnd = true;
-						continue main_loop;
-					}
-				}
+				continue main_loop;
+			} //}}}
+
+			//{{{ check for end of delegate
+			if (context.parent != null
+			    && context.parent.inRule != null
+			    && checkDelegateEnd(context.parent.inRule))
+			{
+				seenWhitespaceEnd = true;
+				continue main_loop;
 			} //}}}
 
 			//{{{ check every rule
-			char ch = line.array[pos];
-
-			rule = context.rules.getRules(ch);
-			while(rule != null)
+			Character ch = Character.valueOf(line.array[pos]);
+			List<ParserRule> rules = context.rules.getRules(ch);
+			for (ParserRule rule : rules)
 			{
 				// stop checking rules if there was a match
 				if (handleRule(rule,false))
@@ -160,8 +164,6 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 					seenWhitespaceEnd = true;
 					continue main_loop;
 				}
-
-				rule = rule.next;
 			} //}}}
 
 			//{{{ check if current character is a word separator
@@ -190,8 +192,6 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 					context.rules.getDefault(),
 					pos - line.offset,1,context);
 				lastOffset = pos + 1;
-
-				escaped = false;
 			}
 			else
 			{
@@ -218,7 +218,6 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 				}
 
 				seenWhitespaceEnd = true;
-				escaped = false;
 			} //}}}
 		} //}}}
 
@@ -235,14 +234,14 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 		//{{{ Unwind any NO_LINE_BREAK parent delegates
 unwind:		while(context.parent != null)
 		{
-			rule = context.parent.inRule;
+			ParserRule rule = context.parent.inRule;
 			if((rule != null && (rule.action
 				& ParserRule.NO_LINE_BREAK) == ParserRule.NO_LINE_BREAK)
 				|| terminated)
 			{
 				context = context.parent;
 				keywords = context.rules.getKeywords();
-				context.inRule = null;
+				context.setInRule(null);
 			}
 			else
 				break unwind;
@@ -253,26 +252,32 @@ unwind:		while(context.parent != null)
 
 		context = context.intern();
 		tokenHandler.setLineContext(context);
+
+		/* for GC. */
+		this.tokenHandler = null;
+		this.line = null;
+
 		return context;
 	} //}}}
 
 	//{{{ Private members
 
 	//{{{ Instance variables
-	private Hashtable ruleSets;
+	private final Map<String, ParserRuleSet> ruleSets = new Hashtable<String, ParserRuleSet>(64);
 	private ParserRuleSet mainRuleSet;
 
 	// Instead of passing these around to each method, we just store them
 	// as instance variables. Note that this is not thread-safe.
 	private TokenHandler tokenHandler;
+	/** The line from which we will mark the tokens. */
 	private Segment line;
+	/** The context of the current line. */
 	private LineContext context;
 	private KeywordMap keywords;
-	private Segment pattern = new Segment();
+	private final Segment pattern = new Segment();
 	private int lastOffset;
 	private int lineLength;
 	private int pos;
-	private boolean escaped;
 
 	private int whitespaceEnd;
 	private boolean seenWhitespaceEnd;
@@ -287,12 +292,11 @@ unwind:		while(context.parent != null)
 		LineContext tempContext = context;
 		context = context.parent;
 		keywords = context.rules.getKeywords();
-		boolean tempEscaped = escaped;
-		boolean b = handleRule(rule,true);
+		boolean handled = handleRule(rule,true);
 		context = tempContext;
 		keywords = context.rules.getKeywords();
 
-		if(b && !tempEscaped)
+		if (handled)
 		{
 			if(context.inRule != null)
 				handleRule(context.inRule,true);
@@ -302,28 +306,17 @@ unwind:		while(context.parent != null)
 			context = (LineContext)context.parent.clone();
 
 			tokenHandler.handleToken(line,
-				(context.inRule.action & ParserRule.EXCLUDE_MATCH)
-				== ParserRule.EXCLUDE_MATCH
-				? context.rules.getDefault()
-				: context.inRule.token,
+				matchToken(context.inRule, context.inRule, context),
 				pos - line.offset,pattern.count,context);
 
 			keywords = context.rules.getKeywords();
-			context.inRule = null;
+			context.setInRule(null);
 			lastOffset = pos + pattern.count;
 
 			// move pos to last character of match sequence
-			pos += (pattern.count - 1);
+			pos += pattern.count - 1;
 
 			return true;
-		}
-
-		// check escape rule of parent
-		if((rule.action & ParserRule.NO_ESCAPE) == 0)
-		{
-			ParserRule escape = context.parent.rules.getEscapeRule();
-			if(escape != null && handleRule(escape,false))
-				return true;
 		}
 
 		return false;
@@ -339,39 +332,57 @@ unwind:		while(context.parent != null)
 		//{{{ Some rules can only match in certain locations
 		if(!end)
 		{
-			if(Character.toUpperCase(checkRule.hashChar)
-				!= Character.toUpperCase(line.array[pos]))
+			if (null == checkRule.upHashChars)
 			{
-				return false;
+				if (checkRule.upHashChar != null &&
+				    (pos + checkRule.upHashChar.length() < line.array.length) &&
+				    !checkHashString(checkRule))
+				{
+					return false;
+				}
+			}
+			else
+			{
+				if (-1 == Arrays.binarySearch(
+						checkRule.upHashChars,
+						Character.toUpperCase(line.array[pos])))
+				{
+					return false;
+				}
 			}
 		}
 
-		int offset = ((checkRule.action & ParserRule.MARK_PREVIOUS) != 0) ?
-			lastOffset : pos;
-		int posMatch = (end ? checkRule.endPosMatch : checkRule.startPosMatch);
+		int offset = (checkRule.action & ParserRule.MARK_PREVIOUS) != 0 ? lastOffset : pos;
+		int posMatch = end ? checkRule.endPosMatch : checkRule.startPosMatch;
 
 		if((posMatch & ParserRule.AT_LINE_START)
 			== ParserRule.AT_LINE_START)
 		{
 			if(offset != line.offset)
+			{
 				return false;
+			}
 		}
 		else if((posMatch & ParserRule.AT_WHITESPACE_END)
 			== ParserRule.AT_WHITESPACE_END)
 		{
 			if(offset != whitespaceEnd)
+			{
 				return false;
+			}
 		}
 		else if((posMatch & ParserRule.AT_WORD_START)
 			== ParserRule.AT_WORD_START)
 		{
 			if(offset != lastOffset)
+			{
 				return false;
+			}
 		} //}}}
 
 		int matchedChars = 1;
-		CharIndexedSegment charIndexed = null;
-		REMatch match = null;
+		CharSequence charSeq = null;
+		Matcher match = null;
 
 		//{{{ See if the rule's start or end sequence matches here
 		if(!end || (checkRule.action & ParserRule.MARK_FOLLOWING) == 0)
@@ -402,17 +413,21 @@ unwind:		while(context.parent != null)
 			{
 				// note that all regexps start with \A so they only
 				// match the start of the string
-				int matchStart = pos - line.offset;
-				charIndexed = new CharIndexedSegment(line,matchStart);
-				match = checkRule.startRegexp.getMatch(
-					charIndexed,0,RE.REG_ANCHORINDEX);
-				if(match == null)
+				//int matchStart = pos - line.offset;
+				charSeq = new SegmentCharSequence(line, pos - line.offset,
+								  line.count - (pos - line.offset));
+				match = checkRule.startRegexp.matcher(charSeq);
+				if(!match.lookingAt())
+				{
 					return false;
-				else if(match.getStartIndex() != 0)
+				}
+				else if(match.start() != 0)
+				{
 					throw new InternalError("Can't happen");
+				}
 				else
 				{
-					matchedChars = match.getEndIndex();
+					matchedChars = match.end();
 					/* workaround for hang if match was
 					 * zero-width. not sure if there is
 					 * a better way to handle this */
@@ -421,20 +436,10 @@ unwind:		while(context.parent != null)
 				}
 			}
 		} //}}}
-
 		//{{{ Check for an escape sequence
 		if((checkRule.action & ParserRule.IS_ESCAPE) == ParserRule.IS_ESCAPE)
 		{
-			if(context.inRule != null)
-				handleRule(context.inRule,true);
-
-			escaped = !escaped;
-			pos += pattern.count - 1;
-		}
-		else if(escaped)
-		{
-			escaped = false;
-			pos += pattern.count - 1;
+			pos += pattern.count;
 		} //}}}
 		//{{{ Handle start of rule
 		else if(!end)
@@ -481,11 +486,10 @@ unwind:		while(context.parent != null)
 			//{{{ SPAN, EOL_SPAN
 			case ParserRule.SPAN:
 			case ParserRule.EOL_SPAN:
-				context.inRule = checkRule;
+				context.setInRule(checkRule);
 
-				byte tokenType = ((checkRule.action & ParserRule.EXCLUDE_MATCH)
-					== ParserRule.EXCLUDE_MATCH
-					? context.rules.getDefault() : checkRule.token);
+				byte tokenType = matchToken(checkRule,
+							context.inRule, context);
 
 				if((checkRule.action & ParserRule.REGEXP) != 0)
 				{
@@ -512,7 +516,7 @@ unwind:		while(context.parent != null)
 				 * ...
 				 * EOF
 				 */
-				if(charIndexed != null && checkRule.end != null)
+				if(charSeq != null && checkRule.end != null)
 				{
 					spanEndSubst = substitute(match,
 						checkRule.end);
@@ -528,46 +532,32 @@ unwind:		while(context.parent != null)
 			//}}}
 			//{{{ MARK_FOLLOWING
 			case ParserRule.MARK_FOLLOWING:
-				tokenHandler.handleToken(line,(checkRule.action
-					& ParserRule.EXCLUDE_MATCH)
-					== ParserRule.EXCLUDE_MATCH ?
-					context.rules.getDefault()
-					: checkRule.token,pos - line.offset,
+				tokenHandler.handleToken(line,
+					matchToken(checkRule, checkRule, context),
+					pos - line.offset,
 					pattern.count,context);
 
 				context.spanEndSubst = null;
-				context.inRule = checkRule;
+				context.setInRule(checkRule);
 				break;
 			//}}}
 			//{{{ MARK_PREVIOUS
 			case ParserRule.MARK_PREVIOUS:
 				context.spanEndSubst = null;
 
-				if ((checkRule.action & ParserRule.EXCLUDE_MATCH)
-					== ParserRule.EXCLUDE_MATCH)
-				{
-					if(pos != lastOffset)
-					{
-						tokenHandler.handleToken(line,
-							checkRule.token,
-							lastOffset - line.offset,
-							pos - lastOffset,
-							context);
-					}
-
-					tokenHandler.handleToken(line,
-						context.rules.getDefault(),
-						pos - line.offset,pattern.count,
-						context);
-				}
-				else
+				if(pos != lastOffset)
 				{
 					tokenHandler.handleToken(line,
 						checkRule.token,
 						lastOffset - line.offset,
-						pos - lastOffset + pattern.count,
+						pos - lastOffset,
 						context);
 				}
+
+				tokenHandler.handleToken(line,
+					matchToken(checkRule, checkRule, context),
+					pos - line.offset,pattern.count,
+					context);
 
 				break;
 			//}}}
@@ -576,7 +566,7 @@ unwind:		while(context.parent != null)
 			}
 
 			// move pos to last character of match sequence
-			pos += (matchedChars - 1);
+			pos += matchedChars - 1;
 			lastOffset = pos + 1;
 
 			// break out of inner for loop to check next char
@@ -593,7 +583,7 @@ unwind:		while(context.parent != null)
 			}
 
 			lastOffset = pos;
-			context.inRule = null;
+			context.setInRule(null);
 		} //}}}
 
 		return true;
@@ -619,7 +609,7 @@ unwind:		while(context.parent != null)
 				lastOffset = pos;
 				context = context.parent;
 				keywords = context.rules.getKeywords();
-				context.inRule = null;
+				context.setInRule(null);
 			}
 		}
 	} //}}}
@@ -676,12 +666,12 @@ unwind:		while(context.parent != null)
 
 			if(mixed)
 			{
-				RE digitRE = context.rules.getDigitRegexp();
+				Pattern digitRE = context.rules.getDigitRegexp();
 
 				// only match against regexp if its not all
 				// digits; if all digits, no point matching
 				if(digit)
-				{ 
+				{
 					if(digitRE == null)
 					{
 						// mixed digit/alpha keyword,
@@ -691,14 +681,12 @@ unwind:		while(context.parent != null)
 					}
 					else
 					{
-						CharIndexedSegment seg = new CharIndexedSegment(
-							line,false);
 						int oldCount = line.count;
 						int oldOffset = line.offset;
 						line.offset = lastOffset;
 						line.count = len;
-						if(!digitRE.isMatch(seg))
-							digit = false;
+						CharSequence seq = new SegmentCharSequence(line);
+						digit = digitRE.matcher(seq).matches();
 						line.offset = oldOffset;
 						line.count = oldCount;
 					}
@@ -741,13 +729,13 @@ unwind:		while(context.parent != null)
 	} //}}}
 
 	//{{{ substitute() method
-	private char[] substitute(REMatch match, char[] end)
+	private static char[] substitute(Matcher match, char[] end)
 	{
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 		for(int i = 0; i < end.length; i++)
 		{
 			char ch = end[i];
-			if(ch == '$')
+			if(ch == '$' || ch == '~')
 			{
 				if(i == end.length - 1)
 					buf.append(ch);
@@ -756,10 +744,24 @@ unwind:		while(context.parent != null)
 					char digit = end[i + 1];
 					if(!Character.isDigit(digit))
 						buf.append(ch);
+					else if (ch == '$')
+					{
+						buf.append(match.group(
+							digit - '0'));
+						i++;
+					}
 					else
 					{
-						buf.append(match.toString(
-							digit - '0'));
+						String s = match.group(digit - '0');
+						if (s.length() == 1)
+						{
+							char b = TextUtilities.getComplementaryBracket(s.charAt(0), null);
+							if (b == '\0')
+								b = s.charAt(0);
+							buf.append(b);
+						}
+						else
+							buf.append(ch);
 						i++;
 					}
 				}
@@ -773,6 +775,35 @@ unwind:		while(context.parent != null)
 		return returnValue;
 	} //}}}
 
+	//{{{ matchToken() method
+	private byte matchToken(ParserRule rule, ParserRule base, LineContext ctx)
+	{
+		switch (rule.matchType)
+		{
+			case ParserRule.MATCH_TYPE_RULE:
+				return base.token;
+
+			case ParserRule.MATCH_TYPE_CONTEXT:
+				return context.rules.getDefault();
+
+			default:
+				return rule.matchType;
+		}
+	} //}}}
+
+	//{{{ checkHashString() method
+	private boolean checkHashString(ParserRule rule)
+	{
+		for (int i = 0; i < rule.upHashChar.length(); i++)
+		{
+			if (Character.toUpperCase(line.array[pos+i]) != rule.upHashChar.charAt(i))
+			{
+				return false;
+			}
+		}
+		return true;
+	} //}}}
+
 	//}}}
 
 	//{{{ LineContext class
@@ -781,19 +812,29 @@ unwind:		while(context.parent != null)
 	 */
 	public static class LineContext
 	{
-		private static Hashtable intern = new Hashtable();
+		private static final Map<LineContext, LineContext> intern = new HashMap<LineContext, LineContext>();
 
 		public LineContext parent;
 		public ParserRule inRule;
 		public ParserRuleSet rules;
 		// used for SPAN_REGEXP rules; otherwise null
 		public char[] spanEndSubst;
+		public ParserRule escapeRule;
 
 		//{{{ LineContext constructor
 		public LineContext(ParserRuleSet rs, LineContext lc)
 		{
 			rules = rs;
 			parent = (lc == null ? null : (LineContext)lc.clone());
+			/*
+			 * SPANs with no delegate need to propagate the
+			 * escape rule to the child context, so this is
+			 * needed.
+			 */
+			if (rs.getModeName() != null)
+				escapeRule = rules.getEscapeRule();
+			else
+				escapeRule = lc.escapeRule;
 		} //}}}
 
 		//{{{ LineContext constructor
@@ -804,14 +845,14 @@ unwind:		while(context.parent != null)
 		//{{{ intern() method
 		public LineContext intern()
 		{
-			Object obj = intern.get(this);
+			LineContext obj = intern.get(this);
 			if(obj == null)
 			{
 				intern.put(this,this);
 				return this;
 			}
 			else
-				return (LineContext)obj;
+				return obj;
 		} //}}}
 
 		//{{{ hashCode() method
@@ -832,7 +873,7 @@ unwind:		while(context.parent != null)
 			{
 				LineContext lc = (LineContext)obj;
 				return lc.inRule == inRule && lc.rules == rules
-					&& MiscUtilities.objectsEqual(parent,lc.parent)
+					&& StandardUtilities.objectsEqual(parent,lc.parent)
 					&& charArraysEqual(spanEndSubst,lc.spanEndSubst);
 			}
 			else
@@ -847,17 +888,20 @@ unwind:		while(context.parent != null)
 			lc.rules = rules;
 			lc.parent = (parent == null) ? null : (LineContext) parent.clone();
 			lc.spanEndSubst = spanEndSubst;
+			lc.escapeRule = escapeRule;
 
 			return lc;
 		} //}}}
 
 		//{{{ charArraysEqual() method
-		private boolean charArraysEqual(char[] c1, char[] c2)
+		private static boolean charArraysEqual(char[] c1, char[] c2)
 		{
 			if(c1 == null)
-				return (c2 == null);
-			else if(c2 == null)
-				return (c1 == null);
+				return c2 == null;
+
+			// c1 is not null
+			if(c2 == null)
+				return false;
 
 			if(c1.length != c2.length)
 				return false;
@@ -870,5 +914,24 @@ unwind:		while(context.parent != null)
 
 			return true;
 		} //}}}
+
+		//{{{ setInRule() method
+		/**
+		 * Sets the current rule being processed and adjusts the
+		 * escape rule for the context based on the rule.
+		 */
+		public void setInRule(ParserRule rule)
+		{
+			inRule = rule;
+			if (rule != null && rule.escapeRule != null)
+				escapeRule = rule.escapeRule;
+			else if (rules != null && rules.getModeName() != null)
+				escapeRule = rules.getEscapeRule();
+			else if (parent != null)
+				escapeRule = parent.escapeRule;
+			else
+				escapeRule = null;
+		} //}}}
+
 	} //}}}
 }

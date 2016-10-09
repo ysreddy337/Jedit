@@ -23,20 +23,31 @@
 package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
+import java.util.Collection;
+import java.util.Arrays;
 import javax.swing.border.*;
 import javax.swing.event.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
-import org.gjt.sp.jedit.buffer.BufferIORequest;
+import org.gjt.sp.jedit.bufferio.BufferIORequest;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.Log;
 //}}}
 
+/**
+ * @author Slava Pestov
+ */
 public class CloseDialog extends EnhancedDialog
 {
 	//{{{ CloseDialog constructor
 	public CloseDialog(View view)
+	{
+		this(view, Arrays.asList(jEdit.getBuffers()));
+	}
+
+	public CloseDialog(View view, Collection<Buffer> buffers)
 	{
 		super(view,jEdit.getProperty("close.title"),true);
 
@@ -61,14 +72,10 @@ public class CloseDialog extends EnhancedDialog
 		bufferList.setVisibleRowCount(10);
 		bufferList.addListSelectionListener(new ListHandler());
 
-		Buffer[] buffers = jEdit.getBuffers();
-		for(int i = 0; i < buffers.length; i++)
+		for(Buffer buffer: buffers)
 		{
-			Buffer buffer = buffers[i];
-			if(buffer.isDirty())
-			{
-				bufferModel.addElement(buffer.getPath());
-			}
+			if(buffer.isDirty()) 
+				bufferModel.addElement(buffer.getPath()); 
 		}
 
 		centerPanel.add(BorderLayout.CENTER,new JScrollPane(bufferList));
@@ -94,13 +101,10 @@ public class CloseDialog extends EnhancedDialog
 		buttons.add(cancel = new JButton(jEdit.getProperty("common.cancel")));
 		cancel.addActionListener(actionListener);
 		buttons.add(Box.createGlue());
-
 		bufferList.setSelectedIndex(0);
-
 		content.add(BorderLayout.SOUTH,buttons);
-
+		content.getRootPane().setDefaultButton(cancel);
 		GUIUtilities.requestFocus(this,bufferList);
-
 		pack();
 		setLocationRelativeTo(view);
 		setVisible(true);
@@ -113,25 +117,27 @@ public class CloseDialog extends EnhancedDialog
 	} //}}}
 
 	//{{{ ok() method
+	@Override
 	public void ok()
 	{
 		// do nothing
 	} //}}}
 
 	//{{{ cancel() method
+	@Override
 	public void cancel()
 	{
 		dispose();
 	} //}}}
 
 	//{{{ Private members
-	private View view;
-	private JList bufferList;
-	private DefaultListModel bufferModel;
-	private JButton selectAll;
-	private JButton save;
-	private JButton discard;
-	private JButton cancel;
+	private final View view;
+	private final JList bufferList;
+	private final DefaultListModel bufferModel;
+	private final JButton selectAll;
+	private final JButton save;
+	private final JButton discard;
+	private final JButton cancel;
 
 	private boolean ok; // only set if all buffers saved/closed
 
@@ -145,7 +151,7 @@ public class CloseDialog extends EnhancedDialog
 	} //}}}
 
 	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
+	private class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
 		{
@@ -175,7 +181,7 @@ public class CloseDialog extends EnhancedDialog
 				{
 					String path = (String)paths[i];
 					Buffer buffer = jEdit.getBuffer(path);
-					if(!buffer.save(view,null,true))
+					if(!buffer.save(view,null,true,true))
 						return;
 					VFSManager.waitForRequests();
 					if(buffer.getBooleanProperty(BufferIORequest
@@ -225,7 +231,7 @@ public class CloseDialog extends EnhancedDialog
 	} //}}}
 
 	//{{{ ListHandler class
-	class ListHandler implements ListSelectionListener
+	private class ListHandler implements ListSelectionListener
 	{
 		public void valueChanged(ListSelectionEvent evt)
 		{
@@ -234,8 +240,20 @@ public class CloseDialog extends EnhancedDialog
 
 			int index = bufferList.getSelectedIndex();
 			if(index != -1)
-				view.goToBuffer(jEdit.getBuffer((String)
-					bufferModel.getElementAt(index)));
+			{
+				String path = (String) bufferModel.getElementAt(index);
+				Buffer buffer = jEdit.getBuffer(path);
+				if (buffer == null)
+				{
+					// it seems this buffer was already closed
+					Log.log(Log.DEBUG, this, "Buffer " + path + " is already closed");
+					bufferModel.removeElementAt(index);
+				}
+				else
+				{
+					view.showBuffer(buffer);
+				}
+			}
 
 			updateButtons();
 		}

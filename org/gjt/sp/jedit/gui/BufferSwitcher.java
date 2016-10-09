@@ -1,6 +1,6 @@
 /*
  * BufferSwitcher.java - Status bar
- * Copyright (C) 2000 Slava Pestov
+ * Copyright (C) 2000, 2004 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,14 +19,24 @@
 
 package org.gjt.sp.jedit.gui;
 
+import javax.swing.event.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.bufferset.BufferSet;
 
+
+/** BufferSwitcher class
+   @version $Id: BufferSwitcher.java 16348 2009-10-14 10:40:15Z kpouer $
+*/
 public class BufferSwitcher extends JComboBox
 {
-	public BufferSwitcher(EditPane editPane)
+    // private members
+	private EditPane editPane;
+	private boolean updating;
+
+	public BufferSwitcher(final EditPane editPane)
 	{
 		this.editPane = editPane;
 
@@ -34,25 +44,39 @@ public class BufferSwitcher extends JComboBox
 		setRenderer(new BufferCellRenderer());
 		setMaximumRowCount(jEdit.getIntegerProperty("bufferSwitcher.maxRowCount",10));
 		addActionListener(new ActionHandler());
+		addPopupMenuListener(new PopupMenuListener()
+		{
+			public void popupMenuWillBecomeVisible(
+				PopupMenuEvent e) {}
+
+			public void popupMenuWillBecomeInvisible(
+				PopupMenuEvent e)
+			{
+				editPane.getTextArea().requestFocus();
+			}
+
+			public void popupMenuCanceled(PopupMenuEvent e)
+			{
+				editPane.getTextArea().requestFocus();
+			}
+		});
 	}
 
 	public void updateBufferList()
 	{
 		// if the buffer count becomes 0, then it is guaranteed to
 		// become 1 very soon, so don't do anything in that case.
-		if(jEdit.getBufferCount() == 0)
+		BufferSet bufferSet = editPane.getBufferSet();
+		if(bufferSet.size() == 0)
 			return;
 
 		updating = true;
 		setMaximumRowCount(jEdit.getIntegerProperty("bufferSwitcher.maxRowCount",10));
-		setModel(new DefaultComboBoxModel(jEdit.getBuffers()));
+		setModel(new DefaultComboBoxModel(bufferSet.getAllBuffers()));
 		setSelectedItem(editPane.getBuffer());
+		setToolTipText(editPane.getBuffer().getPath(true));
 		updating = false;
 	}
-
-	// private members
-	private EditPane editPane;
-	private boolean updating;
 
 	class ActionHandler implements ActionListener
 	{
@@ -61,7 +85,7 @@ public class BufferSwitcher extends JComboBox
 			if(!updating)
 			{
 				Buffer buffer = (Buffer)getSelectedItem();
-				if(buffer != null)
+				if(buffer != null) 
 					editPane.setBuffer(buffer);
 			}
 		}
@@ -76,10 +100,14 @@ public class BufferSwitcher extends JComboBox
 			super.getListCellRendererComponent(list,value,index,
 				isSelected,cellHasFocus);
 			Buffer buffer = (Buffer)value;
+			
 			if(buffer == null)
 				setIcon(null);
 			else
+			{
 				setIcon(buffer.getIcon());
+				setToolTipText(buffer.getPath());
+			}
 			return this;
 		}
 	}

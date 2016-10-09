@@ -1,6 +1,6 @@
 /*
  * TextUtilities.java - Various text functions
- * Copyright (C) 1998, 2003 Slava Pestov
+ * Copyright (C) 1998, 2005 Slava Pestov
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
@@ -24,7 +24,9 @@ package org.gjt.sp.jedit;
 //{{{ Imports
 import java.util.*;
 import javax.swing.text.Segment;
+import org.gjt.sp.jedit.buffer.JEditBuffer;
 import org.gjt.sp.jedit.syntax.*;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
@@ -40,7 +42,7 @@ import org.gjt.sp.jedit.syntax.*;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: TextUtilities.java,v 1.47 2004/03/28 00:07:26 spestov Exp $
+ * @version $Id: TextUtilities.java 16336 2009-10-14 09:56:25Z kpouer $
  */
 public class TextUtilities
 {
@@ -71,6 +73,30 @@ public class TextUtilities
 		}
 	} //}}}
 
+	//{{{ getComplementaryBracket() method
+	/**
+	 * Given an opening bracket, return the corresponding closing bracket
+	 * and store true in <code>direction[0]</code>. Given a closing bracket,
+	 * return the corresponding opening bracket and store false in
+	 * <code>direction[0]</code>. Otherwise, return <code>\0</code>.
+	 * @since jEdit 4.3pre2
+	 */
+	public static char getComplementaryBracket(char ch, boolean[] direction)
+	{
+		switch(ch)
+		{
+		case '(': if (direction != null) direction[0] = true;  return ')';
+		case ')': if (direction != null) direction[0] = false; return '(';
+		case '[': if (direction != null) direction[0] = true;  return ']';
+		case ']': if (direction != null) direction[0] = false; return '[';
+		case '{': if (direction != null) direction[0] = true;  return '}';
+		case '}': if (direction != null) direction[0] = false; return '{';
+		case '<': if (direction != null) direction[0] = true;  return '>';
+		case '>': if (direction != null) direction[0] = false; return '<';
+		default:  return '\0';
+		}
+	} //}}}
+
 	//{{{ findMatchingBracket() method
 	/**
 	 * Returns the offset of the bracket matching the one at the
@@ -81,7 +107,7 @@ public class TextUtilities
 	 * @param offset The offset within that line
 	 * @since jEdit 2.6pre1
 	 */
-	public static int findMatchingBracket(Buffer buffer, int line, int offset)
+	public static int findMatchingBracket(JEditBuffer buffer, int line, int offset)
 	{
 		if(offset < 0 || offset >= buffer.getLineLength(line))
 		{
@@ -93,18 +119,15 @@ public class TextUtilities
 		buffer.getLineText(line,lineText);
 
 		char c = lineText.array[lineText.offset + offset];
-		char cprime; // corresponding character
-		boolean direction; // false - backwards, true - forwards
+		// false - backwards, true - forwards
+		boolean[] direction = new boolean[1];
 
-		switch(c)
-		{
-		case '(': cprime = ')'; direction = true;  break;
-		case ')': cprime = '('; direction = false; break;
-		case '[': cprime = ']'; direction = true;  break;
-		case ']': cprime = '['; direction = false; break;
-		case '{': cprime = '}'; direction = true;  break;
-		case '}': cprime = '{'; direction = false; break;
-		default: return -1;
+		// corresponding character
+		char cprime = getComplementaryBracket(c,direction);
+
+		if( cprime == '\0' )
+		{ // c is no bracket
+			return -1;
 		}
 
 		// 1 because we've already 'seen' the first bracket
@@ -123,7 +146,7 @@ public class TextUtilities
 		int startLine = line;
 
 		//{{{ Forward search
-		if(direction)
+		if(direction[0])
 		{
 			offset++;
 
@@ -243,6 +266,48 @@ public class TextUtilities
 	 * @param pos The position
 	 * @param noWordSep Characters that are non-alphanumeric, but
 	 * should be treated as word characters anyway
+	 * @since jEdit 4.3pre15
+	 */
+	public static int findWordStart(CharSequence line,
+					int pos,
+					String noWordSep)
+	{
+		return findWordStart(line, pos, noWordSep, true, false, false);
+	} //}}}
+
+
+	/** Similar to perl's join() method on lists,
+	 *    but works with all collections.
+	 *
+	 * @param c An iterable collection of Objects
+	 * @param delim a string to put between each object
+	 * @return a joined toString() representation of the collection
+	 *
+	 * @since jedit 4.3pre3
+	 */
+	public static String join(Collection<String> c, String delim)
+	{
+		StringBuilder retval = new StringBuilder();
+		Iterator<String> itr = c.iterator();
+		if (itr.hasNext())
+			retval.append( itr.next() );
+		else 
+			return "";
+		while (itr.hasNext())
+		{
+			retval.append(delim);
+			retval.append(itr.next());
+		}
+		return retval.toString();
+	}
+
+	//{{{ findWordStart() method
+	/**
+	 * Locates the start of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
 	 * @param joinNonWordChars Treat consecutive non-alphanumeric
 	 * characters as one word
 	 * @since jEdit 4.2pre5
@@ -268,24 +333,63 @@ public class TextUtilities
 	public static int findWordStart(String line, int pos, String noWordSep,
 		boolean joinNonWordChars, boolean eatWhitespace)
 	{
+		return findWordStart(line, pos, noWordSep, joinNonWordChars, false, eatWhitespace);
+	} //}}}
+
+	//{{{ findWordStart() method
+	/**
+	 * Locates the start of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @param joinNonWordChars Treat consecutive non-alphanumeric
+	 * characters as one word
+	 * @param camelCasedWords Treat "camelCased" parts as words
+	 * @param eatWhitespace Include whitespace at start of word
+	 * @since jEdit 4.3pre10
+	 */
+	public static int findWordStart(String line, int pos, String noWordSep,
+		boolean joinNonWordChars, boolean camelCasedWords,
+		boolean eatWhitespace)
+	{
+		return findWordStart((CharSequence) line, pos, noWordSep,
+				     joinNonWordChars, camelCasedWords,
+				     eatWhitespace);
+	} //}}}
+
+	//{{{ findWordStart() method
+	/**
+	 * Locates the start of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @param joinNonWordChars Treat consecutive non-alphanumeric
+	 * characters as one word
+	 * @param camelCasedWords Treat "camelCased" parts as words
+	 * @param eatWhitespace Include whitespace at start of word
+	 * @since jEdit 4.3pre15
+	 */
+	public static int findWordStart(CharSequence line,
+					int pos,
+					String noWordSep,
+					boolean joinNonWordChars,
+					boolean camelCasedWords,
+					boolean eatWhitespace)
+	{
 		char ch = line.charAt(pos);
 
 		if(noWordSep == null)
 			noWordSep = "";
 
 		//{{{ the character under the cursor changes how we behave.
-		int type;
-		if(Character.isWhitespace(ch))
-			type = WHITESPACE;
-		else if(Character.isLetterOrDigit(ch)
-			|| noWordSep.indexOf(ch) != -1)
-			type = WORD_CHAR;
-		else
-			type = SYMBOL;
+		int type = getCharType(ch, noWordSep);
 		//}}}
 
-loop:		for(int i = pos; i >= 0; i--)
+		for(int i = pos; i >= 0; i--)
 		{
+			char lastCh = ch;
 			ch = line.charAt(i);
 			switch(type)
 			{
@@ -299,8 +403,21 @@ loop:		for(int i = pos; i >= 0; i--)
 					return i + 1; //}}}
 			//{{{ Word character...
 			case WORD_CHAR:
+				// stop at next last (in writing direction) upper case char if camel cased
+				// (don't stop at every upper case char, don't treat noWordSep as word chars)
+				if (camelCasedWords && Character.isUpperCase(ch) && !Character.isUpperCase(lastCh)
+						&& Character.isLetterOrDigit(lastCh))
+				{
+					return i;
+				}
+				// stop at next first (in writing direction) upper case char if camel cased
+				// (don't stop at every upper case char)
+				else if (camelCasedWords && !Character.isUpperCase(ch) && Character.isUpperCase(lastCh))
+				{
+					return i + 1;
+				}
 				// word char; keep going
-				if(Character.isLetterOrDigit(ch) ||
+				else if(Character.isLetterOrDigit(ch) ||
 					noWordSep.indexOf(ch) != -1)
 				{
 					break;
@@ -365,6 +482,22 @@ loop:		for(int i = pos; i >= 0; i--)
 	 * @param pos The position
 	 * @param noWordSep Characters that are non-alphanumeric, but
 	 * should be treated as word characters anyway
+	 * @since jEdit 4.3pre15
+	 */
+	public static int findWordEnd(CharSequence line,
+				      int pos,
+				      String noWordSep)
+	{
+		return findWordEnd(line, pos, noWordSep, true, false, false);
+	} //}}}
+
+	//{{{ findWordEnd() method
+	/**
+	 * Locates the end of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
 	 * @param joinNonWordChars Treat consecutive non-alphanumeric
 	 * characters as one word
 	 * @since jEdit 4.1pre2
@@ -390,6 +523,51 @@ loop:		for(int i = pos; i >= 0; i--)
 	public static int findWordEnd(String line, int pos, String noWordSep,
 		boolean joinNonWordChars, boolean eatWhitespace)
 	{
+		return findWordEnd(line, pos, noWordSep, joinNonWordChars, false, eatWhitespace);
+	} //}}}
+
+	//{{{ findWordEnd() method
+	/**
+	 * Locates the end of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @param joinNonWordChars Treat consecutive non-alphanumeric
+	 * characters as one word
+	 * @param camelCasedWords Treat "camelCased" parts as words
+	 * @param eatWhitespace Include whitespace at end of word
+	 * @since jEdit 4.3pre10
+	 */
+	public static int findWordEnd(String line, int pos, String noWordSep,
+		boolean joinNonWordChars, boolean camelCasedWords,
+		boolean eatWhitespace)
+	{
+		return findWordEnd((CharSequence)line, pos, noWordSep,
+				   joinNonWordChars, camelCasedWords,
+				   eatWhitespace);
+	} //}}}
+
+	//{{{ findWordEnd() method
+	/**
+	 * Locates the end of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @param joinNonWordChars Treat consecutive non-alphanumeric
+	 * characters as one word
+	 * @param camelCasedWords Treat "camelCased" parts as words
+	 * @param eatWhitespace Include whitespace at end of word
+	 * @since jEdit 4.3pre15
+	 */
+	public static int findWordEnd(CharSequence line,
+				      int pos,
+				      String noWordSep,
+				      boolean joinNonWordChars,
+				      boolean camelCasedWords,
+				      boolean eatWhitespace)
+	{
 		if(pos != 0)
 			pos--;
 
@@ -399,18 +577,12 @@ loop:		for(int i = pos; i >= 0; i--)
 			noWordSep = "";
 
 		//{{{ the character under the cursor changes how we behave.
-		int type;
-		if(Character.isWhitespace(ch))
-			type = WHITESPACE;
-		else if(Character.isLetterOrDigit(ch)
-			|| noWordSep.indexOf(ch) != -1)
-			type = WORD_CHAR;
-		else
-			type = SYMBOL;
+		int type = getCharType(ch, noWordSep);
 		//}}}
 
-loop:		for(int i = pos; i < line.length(); i++)
+		for(int i = pos; i < line.length(); i++)
 		{
+			char lastCh = ch;
 			ch = line.charAt(i);
 			switch(type)
 			{
@@ -423,7 +595,19 @@ loop:		for(int i = pos; i < line.length(); i++)
 					return i; //}}}
 			//{{{ Word character...
 			case WORD_CHAR:
-				if(Character.isLetterOrDigit(ch) ||
+				// stop at next last upper case char if camel cased
+				// (don't stop at every upper case char, don't treat noWordSep as word chars)
+				if (camelCasedWords && i > pos + 1 && !Character.isUpperCase(ch) && Character.isLetterOrDigit(ch)
+						&& Character.isUpperCase(lastCh))
+				{
+					return i - 1;
+				}
+				// stop at next first upper case char if camel caseg (don't stop at every upper case char)
+				else if (camelCasedWords && Character.isUpperCase(ch) && !Character.isUpperCase(lastCh))
+				{
+					return i;
+				}
+				else if(Character.isLetterOrDigit(ch) ||
 					noWordSep.indexOf(ch) != -1)
 				{
 					break;
@@ -468,6 +652,27 @@ loop:		for(int i = pos; i < line.length(); i++)
 		return line.length();
 	} //}}}
 
+	/**
+	 * Returns the type of the char.
+	 *
+	 * @param ch the character
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @return the type of the char : {@link #WHITESPACE}, {@link #WORD_CHAR}, {@link #SYMBOL}
+	 */
+	private static int getCharType(char ch, String noWordSep)
+	{
+		int type;
+		if(Character.isWhitespace(ch))
+			type = WHITESPACE;
+		else if(Character.isLetterOrDigit(ch)
+			|| noWordSep.indexOf(ch) != -1)
+			type = WORD_CHAR;
+		else
+			type = SYMBOL;
+		return type;
+	}
+
 	//{{{ spacesToTabs() method
 	/**
 	 * Converts consecutive spaces to tabs in the specified string.
@@ -476,7 +681,7 @@ loop:		for(int i = pos; i < line.length(); i++)
 	 */
 	public static String spacesToTabs(String in, int tabSize)
 	{
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 		int width = 0;
 		int whitespace = 0;
 		for(int i = 0; i < in.length(); i++)
@@ -495,7 +700,7 @@ loop:		for(int i = pos; i < line.length(); i++)
 			case '\n':
 				if(whitespace != 0)
 				{
-					buf.append(MiscUtilities
+					buf.append(StandardUtilities
 						.createWhiteSpace(whitespace,tabSize,
 						width - whitespace));
 				}
@@ -506,7 +711,7 @@ loop:		for(int i = pos; i < line.length(); i++)
 			default:
 				if(whitespace != 0)
 				{
-					buf.append(MiscUtilities
+					buf.append(StandardUtilities
 						.createWhiteSpace(whitespace,tabSize,
 						width - whitespace));
 					whitespace = 0;
@@ -519,11 +724,11 @@ loop:		for(int i = pos; i < line.length(); i++)
 
 		if(whitespace != 0)
 		{
-			buf.append(MiscUtilities.createWhiteSpace(whitespace,tabSize,
+			buf.append(StandardUtilities.createWhiteSpace(whitespace,tabSize,
 				width - whitespace));
 		}
 
-                return buf.toString();
+		return buf.toString();
 	} //}}}
 
 	//{{{ tabsToSpaces() method
@@ -534,7 +739,7 @@ loop:		for(int i = pos; i < line.length(); i++)
 	 */
 	public static String tabsToSpaces(String in, int tabSize)
 	{
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 		int width = 0;
 		for(int i = 0; i < in.length(); i++)
 		{
@@ -554,9 +759,9 @@ loop:		for(int i = pos; i < line.length(); i++)
 				width++;
 				buf.append(in.charAt(i));
 				break;
-                        }
-                }
-                return buf.toString();
+			}
+		}
+		return buf.toString();
 	} //}}}
 
 	//{{{ format() method
@@ -569,7 +774,7 @@ loop:		for(int i = pos; i < line.length(); i++)
 	 */
 	public static String format(String text, int maxLineLength, int tabSize)
 	{
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 
 		int index = 0;
 
@@ -592,6 +797,45 @@ loop:		for(int i = pos; i < line.length(); i++)
 		}
 
 		return buf.toString();
+	} //}}}
+
+	//{{{ indexIgnoringWhitespace() method
+	/**
+	 * Inverse of <code>ignoringWhitespaceIndex()</code>.
+	 * @param str a string (not an empty string)
+	 * @param index The index
+	 * @return The number of non-whitespace characters that precede the index.
+	 * @since jEdit 4.3pre2
+	 */
+	public static int indexIgnoringWhitespace(String str, int index)
+	{
+		int j = 0;
+		for(int i = 0; i < index; i++)
+			if(!Character.isWhitespace(str.charAt(i))) j++;
+		return j;
+	} //}}}
+
+	//{{{ ignoringWhitespaceIndex() method
+	/**
+	 * Inverse of <code>indexIgnoringWhitespace()</code>.
+	 * @param str a string (not an empty string)
+	 * @param index The index
+	 * @return The index into the string where the number of non-whitespace
+	 * characters that precede the index is count.
+	 * @since jEdit 4.3pre2
+	 */
+	public static int ignoringWhitespaceIndex(String str, int index)
+	{
+		int j = 0;
+		for(int i = 0;;i++)
+		{
+			if(!Character.isWhitespace(str.charAt(i))) j++;
+
+			if(j > index)
+				return i;
+			if(i == str.length() - 1)
+				return i + 1;
+		}
 	} //}}}
 
 	//{{{ getStringCase() method
@@ -675,12 +919,48 @@ loop:		for(int i = pos; i < line.length(); i++)
 
 	//{{{ formatParagraph() method
 	private static void formatParagraph(String text, int maxLineLength,
+		int tabSize, StringBuilder buf)
+	{
+		// align everything to paragraph's leading indent
+		int leadingWhitespaceCount = StandardUtilities.getLeadingWhiteSpace(text);
+		String leadingWhitespace = text.substring(0,leadingWhitespaceCount);
+		int leadingWhitespaceWidth = StandardUtilities.getLeadingWhiteSpaceWidth(text,tabSize);
+
+		buf.append(leadingWhitespace);
+
+		int lineLength = leadingWhitespaceWidth;
+		StringTokenizer st = new StringTokenizer(text);
+		while(st.hasMoreTokens())
+		{
+			String word = st.nextToken();
+			if(lineLength == leadingWhitespaceWidth)
+			{
+				// do nothing
+			}
+			else if(lineLength + word.length() + 1 > maxLineLength)
+			{
+				buf.append('\n');
+				buf.append(leadingWhitespace);
+				lineLength = leadingWhitespaceWidth;
+			}
+			else
+			{
+				buf.append(' ');
+				lineLength++;
+			}
+			buf.append(word);
+			lineLength += word.length();
+		}
+	} //}}}
+
+	//{{{ indexIgnoringWhitespace() method
+	public static void indexIgnoringWhitespace(String text, int maxLineLength,
 		int tabSize, StringBuffer buf)
 	{
 		// align everything to paragraph's leading indent
-		int leadingWhitespaceCount = MiscUtilities.getLeadingWhiteSpace(text);
+		int leadingWhitespaceCount = StandardUtilities.getLeadingWhiteSpace(text);
 		String leadingWhitespace = text.substring(0,leadingWhitespaceCount);
-		int leadingWhitespaceWidth = MiscUtilities.getLeadingWhiteSpaceWidth(text,tabSize);
+		int leadingWhitespaceWidth = StandardUtilities.getLeadingWhiteSpaceWidth(text,tabSize);
 
 		buf.append(leadingWhitespace);
 

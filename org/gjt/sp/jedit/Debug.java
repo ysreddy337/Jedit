@@ -27,7 +27,7 @@ package org.gjt.sp.jedit;
  * development.
  * @since jEdit 4.2pre1
  * @author Slava Pestov
- * @version $Id: Debug.java,v 1.28 2004/02/22 20:00:52 spestov Exp $
+ * @version $Id: Debug.java 13534 2008-09-06 08:08:16Z k_satoda $
  */
 public class Debug
 {
@@ -95,11 +95,6 @@ public class Debug
 	public static boolean EB_TIMER = false;
 
 	/**
-	 * Disable monospaced font optimization.
-	 */
-	public static boolean DISABLE_MONOSPACE_HACK = false;
-
-	/**
 	 * Paint strings instead of glyph vectors.
 	 */
 	public static boolean DISABLE_GLYPH_VECTOR = false;
@@ -147,4 +142,11 @@ public class Debug
 	 * Create new search dialogs instead of reusing instances.
 	 */
 	public static boolean DISABLE_SEARCH_DIALOG_POOL = false;
+
+	/**
+	 * Disable multihead support, since it can cause window positioning
+	 * problems with some Java versions.
+	 * @since jEdit 4.3pre1
+	 */
+	public static boolean DISABLE_MULTIHEAD = false;
 }

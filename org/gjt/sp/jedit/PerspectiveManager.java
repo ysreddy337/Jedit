@@ -22,18 +22,27 @@
 
 package org.gjt.sp.jedit;
 
-import com.microstar.xml.*;
-import java.io.*;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.LinkedList;
+
+import org.gjt.sp.util.IOUtilities;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.XMLUtilities;
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.helpers.DefaultHandler;
 
 /**
  * Manages persistence of open buffers and views across jEdit sessions.
  * @since jEdit 4.2pre1
  * @author Slava Pestov
- * @version $Id: PerspectiveManager.java,v 1.12 2004/08/17 06:37:36 spestov Exp $
+ * @version $Id: PerspectiveManager.java 15613 2009-06-30 07:07:43Z voituk $
  */
 public class PerspectiveManager
 {
+	private static final String PERSPECTIVE_FILENAME = "perspective";
+
 	//{{{ isPerspectiveDirty() method
 	/**
 	 * We only autosave the perspective if it has changed, to avoid spinning
@@ -56,102 +65,99 @@ public class PerspectiveManager
 		PerspectiveManager.dirty = dirty;
 	} //}}}
 
+	//{{{ isPerspectiveEnabled() method
+	/**
+	 * We disable saving of the perspective while the 'close all' dialog is
+	 * showing.
+	 * @since jEdit 4.3pre2
+	 */
+	public static boolean isPerspectiveEnabled()
+	{
+		return enabled;
+	} //}}}
+
+	//{{{ setPerspectiveEnabled() method
+	/**
+	 * We disable saving of the perspective while the 'close all' dialog is
+	 * showing.
+	 * @since jEdit 4.3pre2
+	 */
+	public static void setPerspectiveEnabled(boolean enabled)
+	{
+		PerspectiveManager.enabled = enabled;
+	} //}}}
+
 	//{{{ loadPerspective() method
 	public static View loadPerspective(boolean restoreFiles)
 	{
-		String settingsDirectory = jEdit.getSettingsDirectory();
-		if(settingsDirectory == null)
+		if(perspectiveXML == null)
 			return null;
 
-		File perspective = new File(MiscUtilities.constructPath(
-			settingsDirectory,"perspective.xml"));
-
-		if(!perspective.exists())
+		if(!perspectiveXML.fileExists())
 			return null;
 
-		Log.log(Log.MESSAGE,PerspectiveManager.class,"Loading " + perspective);
+		Log.log(Log.MESSAGE,PerspectiveManager.class,"Loading " + perspectiveXML);
 
 		PerspectiveHandler handler = new PerspectiveHandler(restoreFiles);
-		XmlParser parser = new XmlParser();
-		parser.setHandler(handler);
-		Reader in = null;
 		try
 		{
-			in = new BufferedReader(new FileReader(perspective));
-			parser.parse(null, null, in);
+			perspectiveXML.load(handler);
 		}
-		catch(XmlException xe)
-		{
-			int line = xe.getLine();
-			String message = xe.getMessage();
-			Log.log(Log.ERROR,PerspectiveManager.class,perspective
-				+ ":" + line + ": " + message);
-		}
-		catch(FileNotFoundException fnf)
-		{
-		}
-		catch(Exception e)
+		catch(IOException e)
 		{
 			Log.log(Log.ERROR,PerspectiveManager.class,e);
 		}
-		finally
-		{
-			try
-			{
-				if(in != null)
-					in.close();
-			}
-			catch(IOException io)
-			{
-				Log.log(Log.ERROR,PerspectiveManager.class,io);
-			}
-		}
-
 		return handler.view;
 	} //}}}
 
 	//{{{ savePerspective() method
 	public static void savePerspective(boolean autosave)
 	{
-		String settingsDirectory = jEdit.getSettingsDirectory();
-		if(settingsDirectory == null)
+		if(!isPerspectiveEnabled() || !jEdit.isStartupDone())
 			return;
 
+		if(perspectiveXML == null)
+			return;
+		
 		// backgrounded
 		if(jEdit.getBufferCount() == 0)
 			return;
 
-		if(!autosave)
-			Log.log(Log.MESSAGE,PerspectiveManager.class,"Saving perspective.xml");
+		Buffer[] buffers = jEdit.getBuffers();
+		Collection<Buffer> savedBuffers = new LinkedList<Buffer>();
+		for (Buffer buffer: buffers)
+		{
+			if (!buffer.isNewFile())
+			{
+				savedBuffers.add(buffer);
+			}
+		}
 
-		File file1 = new File(MiscUtilities.constructPath(
-			settingsDirectory,"#perspective.xml#save#"));
-		File file2 = new File(MiscUtilities.constructPath(
-			settingsDirectory,"perspective.xml"));
+		if(!autosave)
+			Log.log(Log.MESSAGE,PerspectiveManager.class,"Saving " + perspectiveXML);
 
 		String lineSep = System.getProperty("line.separator");
 
-		BufferedWriter out = null;
+		SettingsXML.Saver out = null;
 
 		try
 		{
-			out = new BufferedWriter(new FileWriter(file1));
+			out = perspectiveXML.openSaver();
+			out.writeXMLDeclaration();
 
-			out.write("<?xml version=\"1.0\"?>");
-			out.write(lineSep);
 			out.write("<!DOCTYPE PERSPECTIVE SYSTEM \"perspective.dtd\">");
 			out.write(lineSep);
 			out.write("<PERSPECTIVE>");
 			out.write(lineSep);
 
-			Buffer[] buffers = jEdit.getBuffers();
-			for(int i = 0; i < buffers.length; i++)
+			for (Buffer buffer: savedBuffers)
 			{
-				Buffer buffer = buffers[i];
-				if(buffer.isNewFile())
-					continue;
-				out.write("<BUFFER>");
-				out.write(MiscUtilities.charsToEntities(buffer.getPath()));
+				out.write("<BUFFER AUTORELOAD=\"");
+				out.write(buffer.getAutoReload() ? "TRUE" : "FALSE");
+				out.write("\" AUTORELOAD_DIALOG=\"");
+				out.write(buffer.getAutoReloadDialog() ? "TRUE" : "FALSE");
+				out.write("\">");
+				out.write(XMLUtilities.charsToEntities(buffer.getPath(), false));
 				out.write("</BUFFER>");
 				out.write(lineSep);
 			}
@@ -179,8 +185,8 @@ public class PerspectiveManager
 
 				out.write("<PANES>");
 				out.write(lineSep);
-				out.write(MiscUtilities.charsToEntities(
-					config.splitConfig));
+				out.write(XMLUtilities.charsToEntities(
+					config.splitConfig,false));
 				out.write(lineSep);
 				out.write("</PANES>");
 				out.write(lineSep);
@@ -198,108 +204,81 @@ public class PerspectiveManager
 				out.write("\" />");
 				out.write(lineSep);
 
-				out.write("<DOCKING LEFT=\"");
-				out.write(config.left == null ? "" : config.left);
-				out.write("\" TOP=\"");
-				out.write(config.top == null ? "" : config.top);
-				out.write("\" RIGHT=\"");
-				out.write(config.right == null ? "" : config.right);
-				out.write("\" BOTTOM=\"");
-				out.write(config.bottom == null ? "" : config.bottom);
-				out.write("\" LEFT_POS=\"");
-				out.write(String.valueOf(config.leftPos));
-				out.write("\" TOP_POS=\"");
-				out.write(String.valueOf(config.topPos));
-				out.write("\" RIGHT_POS=\"");
-				out.write(String.valueOf(config.rightPos));
-				out.write("\" BOTTOM_POS=\"");
-				out.write(String.valueOf(config.bottomPos));
-				out.write("\" />");
-				out.write(lineSep);
-
+				if (config.docking != null)
+					config.docking.saveLayout(PERSPECTIVE_FILENAME, i);
+				
 				out.write("</VIEW>");
 				out.write(lineSep);
 			}
 
 			out.write("</PERSPECTIVE>");
 			out.write(lineSep);
+
+			out.finish();
 		}
 		catch(IOException io)
 		{
-			Log.log(Log.ERROR,PerspectiveManager.class,"Error saving " + file1);
+			Log.log(Log.ERROR,PerspectiveManager.class,"Error saving " + perspectiveXML);
 			Log.log(Log.ERROR,PerspectiveManager.class,io);
 		}
 		finally
 		{
-			try
-			{
-				if(out != null)
-					out.close();
-			}
-			catch(IOException e)
-			{
-			}
+			IOUtilities.closeQuietly(out);
 		}
-
-		file2.delete();
-		file1.renameTo(file2);
 	} //}}}
 
-	private static boolean dirty;
+	//{{{ Private members
+	private static boolean dirty, enabled = true;
+	private static SettingsXML perspectiveXML;
+
+	//{{{ Class initializer
+	static
+	{
+		String settingsDirectory = jEdit.getSettingsDirectory();
+		if(settingsDirectory != null)
+		{
+			perspectiveXML = new SettingsXML(settingsDirectory, PERSPECTIVE_FILENAME);
+		}
+	} //}}}
 
 	//{{{ PerspectiveHandler class
-	static class PerspectiveHandler extends HandlerBase
+	private static class PerspectiveHandler extends DefaultHandler
 	{
 		View view;
-		String charData;
+		private StringBuilder charData;
 		View.ViewConfig config;
 		boolean restoreFiles;
-
+		String autoReload, autoReloadDialog;
+		
 		PerspectiveHandler(boolean restoreFiles)
 		{
 			this.restoreFiles = restoreFiles;
 			config = new View.ViewConfig();
+			charData = new StringBuilder();
+			config.docking = View.getDockingFrameworkProvider().createDockingLayout();
 		}
 
-		public Object resolveEntity(String publicId, String systemId)
+		@Override
+		public InputSource resolveEntity(String publicId, String systemId)
 		{
-			if("perspective.dtd".equals(systemId))
+			return XMLUtilities.findEntity(systemId, "perspective.dtd", getClass());
+		}
+
+		@Override
+		public void startElement(String uri, String localName,
+					 String qName, Attributes attrs)
+		{
+			charData.setLength(0);
+			for (int i = 0; i < attrs.getLength(); i++)
 			{
-				// this will result in a slight speed up, since we
-				// don't need to read the DTD anyway, as AElfred is
-				// non-validating
-				return new StringReader("<!-- -->");
-
-				/* try
-				{
-					return new BufferedReader(new InputStreamReader(
-						getClass().getResourceAsStream("recent.dtd")));
-				}
-				catch(Exception e)
-				{
-					Log.log(Log.ERROR,this,"Error while opening"
-						+ " recent.dtd:");
-					Log.log(Log.ERROR,this,e);
-				} */
+				String name = attrs.getQName(i);
+				String value = attrs.getValue(i);
+				attribute(name, value);
 			}
-
-			return null;
 		}
 
-		public void doctypeDecl(String name, String publicId,
-			String systemId) throws Exception
+		private void attribute(String aname, String value)
 		{
-			if("PERSPECTIVE".equals(name))
-				return;
-
-			Log.log(Log.ERROR,this,"perspective.xml: DOCTYPE must be PERSPECTIVE");
-		}
-
-		public void attribute(String aname, String value, boolean specified)
-		{
-			if(!specified)
-				return;
-
 			if(aname.equals("X"))
 				config.x = Integer.parseInt(value);
 			else if(aname.equals("Y"))
@@ -312,43 +291,65 @@ public class PerspectiveManager
 				config.extState = Integer.parseInt(value);
 			else if(aname.equals("PLAIN"))
 				config.plainView = ("TRUE".equals(value));
-			else if(aname.equals("TOP"))
-				config.top = value;
-			else if(aname.equals("LEFT"))
-				config.left = value;
-			else if(aname.equals("BOTTOM"))
-				config.bottom = value;
-			else if(aname.equals("RIGHT"))
-				config.right = value;
-			else if(aname.equals("TOP_POS"))
-				config.topPos = Integer.parseInt(value);
-			else if(aname.equals("LEFT_POS"))
-				config.leftPos = Integer.parseInt(value);
-			else if(aname.equals("BOTTOM_POS"))
-				config.bottomPos = Integer.parseInt(value);
-			else if(aname.equals("RIGHT_POS"))
-				config.rightPos = Integer.parseInt(value);
+			else if(aname.equals("AUTORELOAD"))
+				autoReload = value;
+			else if(aname.equals("AUTORELOAD_DIALOG"))
+				autoReloadDialog = value;
 		}
 
-		public void endElement(String name)
+		/**
+		 * @return true if the uri points to a remote file
+		 */
+		public static boolean skipRemote(String uri)
+		{
+			if (jEdit.getBooleanProperty("restore.remote"))
+				return false;
+			if(MiscUtilities.isURL(uri))
+			{
+				String protocol = MiscUtilities.getProtocolOfURL(uri);
+				if (!protocol.equals("file")) return true;
+			}
+			return false;
+		}
+
+		@Override
+		public void endElement(String uri, String localName, String name)
 		{
 			if(name.equals("BUFFER"))
 			{
-				if(restoreFiles)
-					jEdit.openFile(null,charData);
+				if (restoreFiles && !skipRemote(charData.toString()))
+				{
+					Buffer restored = jEdit.openTemporary(null,null, charData.toString(), false);
+					// if the autoReload attributes are not present, don't set anything
+					// it's sufficient to check whether they are present on the first BUFFER element
+					if (restored != null)
+					{
+						if(autoReload != null)
+							restored.setAutoReload("TRUE".equals(autoReload));
+						if(autoReloadDialog != null)
+							restored.setAutoReloadDialog("TRUE".equals(autoReloadDialog));
+						jEdit.commitTemporary(restored);
+					}
+				}
 			}
 			else if(name.equals("PANES"))
-				config.splitConfig = charData;
+				config.splitConfig = charData.toString();
 			else if(name.equals("VIEW"))
 			{
+				if (config.docking != null)
+					config.docking.loadLayout(PERSPECTIVE_FILENAME, jEdit.getViewCount());
 				view = jEdit.newView(view,null,config);
 				config = new View.ViewConfig();
+				config.docking = View.getDockingFrameworkProvider().createDockingLayout();
 			}
 		}
 
-		public void charData(char[] ch, int start, int length)
+		@Override
+		public void characters(char[] ch, int start, int length)
 		{
-			charData = new String(ch,start,length);
+			charData.append(ch,start,length);
 		}
 	} //}}}
+
+	//}}}
 }

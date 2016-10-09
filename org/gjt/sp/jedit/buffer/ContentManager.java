@@ -32,7 +32,7 @@ import javax.swing.text.Segment;
  * called through, implements such protection.
  *
  * @author Slava Pestov
- * @version $Id: ContentManager.java,v 1.11 2003/03/09 19:26:05 spestov Exp $
+ * @version $Id: ContentManager.java 16338 2009-10-14 09:59:08Z kpouer $
  * @since jEdit 4.0pre1
  */
 public class ContentManager
@@ -43,7 +43,7 @@ public class ContentManager
 		return length;
 	} //}}}
 
-	//{{{ getText() method
+	//{{{ getText() methods
 	public String getText(int start, int len)
 	{
 		if(start >= gapStart)
@@ -55,9 +55,21 @@ public class ContentManager
 			return new String(text,start,gapStart - start)
 				.concat(new String(text,gapEnd,start + len - gapStart));
 		}
-	} //}}}
+	}
 
-	//{{{ getText() method
+	/**
+	 * Returns the specified text range in a <code>Segment</code>.<p>
+	 *
+	 * Using a <classname>Segment</classname> is generally more
+	 * efficient than using a <classname>String</classname> because it
+	 * results in less memory allocation and array copying.<p>
+	 *
+	 *
+	 * @param start The start offset
+	 * @param len The number of characters to get
+	 * @param seg The segment to copy the text to
+	 * @see JEditBuffer#getText(int, int, Segment)
+	 */
 	public void getText(int start, int len, Segment seg)
 	{
 		if(start >= gapStart)
@@ -88,7 +100,26 @@ public class ContentManager
 		}
 	} //}}}
 
-	//{{{ insert() method
+	//{{{ getSegment() method
+	/**
+	 * Returns a read-only segment of the buffer.
+	 *
+	 * @since jEdit 4.3pre15
+	 */
+	public CharSequence getSegment(int start, int len)
+	{
+		if(start >= gapStart)
+			return new BufferSegment(text,start + gapEnd - gapStart,len);
+		else if(start + len <= gapStart)
+			return new BufferSegment(text,start,len);
+		else
+		{
+			return new BufferSegment(text,start,gapStart - start,
+				new BufferSegment(text,gapEnd,start + len - gapStart));
+		}
+	} //}}}
+
+	//{{{ insert() methods
 	public void insert(int start, String str)
 	{
 		int len = str.length();
@@ -102,9 +133,31 @@ public class ContentManager
 		str.getChars(0,len,text,start);
 		gapStart += len;
 		length += len;
-	} //}}}
+	}
 
-	//{{{ insert() method
+	/**
+	 * Inserts the given data into the buffer.
+	 *
+	 * @since jEdit 4.3pre15
+	 */
+	public void insert(int start, CharSequence str)
+	{
+		int len = str.length();
+		moveGapStart(start);
+		if(gapEnd - gapStart < len)
+		{
+			ensureCapacity(length + len + 1024);
+			moveGapEnd(start + len + 1024);
+		}
+
+		for (int i = 0; i < len; i++)
+		{
+			text[start+i] = str.charAt(i);
+		}
+		gapStart += len;
+		length += len;
+	}
+
 	public void insert(int start, Segment seg)
 	{
 		moveGapStart(start);

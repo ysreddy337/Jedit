@@ -22,20 +22,32 @@
 
 package org.gjt.sp.jedit.pluginmgr;
 
-import com.microstar.xml.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import org.gjt.sp.jedit.*;
 
+import org.xml.sax.XMLReader;
+import org.xml.sax.InputSource;
+import org.xml.sax.helpers.XMLReaderFactory;
+
+import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.IOUtilities;
+import org.gjt.sp.util.ProgressObserver;
+import org.gjt.sp.util.Log;
+
+/**
+ * @version $Id: MirrorList.java 12504 2008-04-22 23:12:43Z ezust $
+ */
 public class MirrorList
 {
-	public ArrayList mirrors;
+	public List<Mirror> mirrors;
+	/** The xml mirror list. */
+	public String xml;
 
 	//{{{ MirrorList constructor
-	public MirrorList() throws Exception
+	public MirrorList(boolean download, ProgressObserver observer) throws Exception
 	{
-		mirrors = new ArrayList();
+		mirrors = new ArrayList<Mirror>();
 
 		Mirror none = new Mirror();
 		none.id = Mirror.NONE;
@@ -44,22 +56,87 @@ public class MirrorList
 
 		String path = jEdit.getProperty("plugin-manager.mirror-url");
 		MirrorListHandler handler = new MirrorListHandler(this,path);
-		XmlParser parser = new XmlParser();
-		parser.setHandler(handler);
+		if (download)
+		{
+			Log.log(Log.NOTICE, this, "Loading mirror list from internet");
+			downloadXml(path);
+		}
+		else
+		{
+			Log.log(Log.NOTICE, this, "Loading mirror list from cache");
+			readXml();
+		}
+		observer.setValue(1);
+		Reader in = new BufferedReader(new StringReader(xml));
 
-		Reader in = new BufferedReader(new InputStreamReader(
-			new URL(path).openStream()));
-		try
-		{
-			parser.parse(null,null,in);
-		}
-		finally
-		{
-			in.close();
-		}
+		InputSource isrc = new InputSource(in);
+		isrc.setSystemId("jedit.jar");
+		XMLReader parser = XMLReaderFactory.createXMLReader();
+		parser.setContentHandler(handler);
+		parser.setDTDHandler(handler);
+		parser.setEntityResolver(handler);
+		parser.setErrorHandler(handler);
+		parser.parse(isrc);
+		observer.setValue(2);
 	} //}}}
 
 	//{{{ Private members
+
+	//{{{ readXml() method
+	/**
+	 * Read and store the mirror list xml.
+	 * @throws IOException exception if it was not possible to read the
+	 * xml or if the url was invalid
+	 */
+	private void readXml() throws IOException
+	{
+		String settingsDirectory = jEdit.getSettingsDirectory();
+		if(settingsDirectory == null)
+			return;
+
+		File mirrorList = new File(MiscUtilities.constructPath(
+			settingsDirectory,"mirrorList.xml"));
+		if(!mirrorList.exists())
+			return;
+		InputStream inputStream = null;
+		try
+		{
+			inputStream = new BufferedInputStream(new FileInputStream(mirrorList));
+
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			IOUtilities.copyStream(null,inputStream,out, false);
+			xml = out.toString();
+		}
+		finally
+		{
+			IOUtilities.closeQuietly(inputStream);
+		}
+	} //}}}
+
+	//{{{ downloadXml() method
+	/**
+	 * Read and store the mirror list xml.
+	 *
+	 * @param path the url
+	 * @throws IOException exception if it was not possible to read the
+	 * xml or if the url was invalid
+	 */
+	private void downloadXml(String path) throws IOException
+	{
+		InputStream inputStream = null;
+		try
+		{
+			inputStream = new URL(path).openStream();
+
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			IOUtilities.copyStream(null,inputStream,out, false);
+			xml = out.toString();
+		}
+		finally
+		{
+			IOUtilities.closeQuietly(inputStream);
+		}
+	} //}}}
 
 	//{{{ add() method
 	void add(Mirror mirror)
@@ -90,13 +167,10 @@ public class MirrorList
 	} //}}}
 
 	//{{{ MirrorCompare class
-	class MirrorCompare implements Comparator
+	private class MirrorCompare implements Comparator<Mirror>
 	{
-		public int compare(Object o1,Object o2)
+		public int compare(Mirror m1,Mirror m2)
 		{
-			Mirror m1 = (Mirror)o1;
-			Mirror m2 = (Mirror)o2;
-
 			int result;
 			if ((result = m1.continent.compareToIgnoreCase(m2.continent)) == 0)
 				if ((result = m1.country.compareToIgnoreCase(m2.country)) == 0)
@@ -107,7 +181,7 @@ public class MirrorList
 
 		public boolean equals(Object obj)
 		{
-			return (obj instanceof MirrorCompare);
+			return obj instanceof MirrorCompare;
 		}
 	} //}}}
 

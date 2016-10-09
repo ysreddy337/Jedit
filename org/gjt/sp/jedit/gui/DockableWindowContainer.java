@@ -23,14 +23,14 @@ package org.gjt.sp.jedit.gui;
  * A container for dockable windows. This class should never be used
  * directly.
  * @author Slava Pestov
- * @version $Id: DockableWindowContainer.java,v 1.8 2003/05/07 22:40:00 spestov Exp $
+ * @version $Id: DockableWindowContainer.java 13259 2008-08-10 20:54:46Z shlomy $
  * @since jEdit 2.6pre3
  */
-public interface DockableWindowContainer
+interface DockableWindowContainer
 {
-	void register(DockableWindowManager.Entry entry);
-	void remove(DockableWindowManager.Entry entry);
-	void unregister(DockableWindowManager.Entry entry);
-	void show(DockableWindowManager.Entry entry);
-	boolean isVisible(DockableWindowManager.Entry entry);
+	void register(DockableWindowManagerImpl.Entry entry);
+	void remove(DockableWindowManagerImpl.Entry entry);
+	void unregister(DockableWindowManagerImpl.Entry entry);
+	void show(DockableWindowManagerImpl.Entry entry);
+	boolean isVisible(DockableWindowManagerImpl.Entry entry);
 }

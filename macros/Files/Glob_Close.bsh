@@ -4,10 +4,10 @@
  *
  * Copyright (C) 2003-2004 Ollie Rutherfurd <oliver@rutherfurd.net>
  *
- * $Id: Glob_Close.bsh,v 1.1 2004/03/19 15:57:59 spestov Exp $
+ * $Id: Glob_Close.bsh 12063 2008-03-02 06:58:51Z k_satoda $
  */
 
-import gnu.regexp.*;
+import java.util.regex.Pattern;
 
 void globClose(View view)
 {
@@ -15,10 +15,10 @@ void globClose(View view)
 	if(glob == null || glob.length() == 0)
 		return;
 
-	RE re = null;
+	Pattern re = null;
 	try
 	{
-		re = new RE(MiscUtilities.globToRE(glob));
+		re = Pattern.compile(MiscUtilities.globToRE(glob));
 	}
 	catch(Exception e)
 	{
@@ -29,7 +29,7 @@ void globClose(View view)
 	Buffer[] buffers = jEdit.getBuffers();
 	for(int i=0; i < buffers.length; i++)
 	{
-		if(re.isMatch(buffers[i].getPath()))
+		if(re.matcher(buffers[i].getPath()).matches())
 			jEdit.closeBuffer(view,buffers[i]);
 	}
 }

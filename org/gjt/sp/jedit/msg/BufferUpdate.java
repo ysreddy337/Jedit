@@ -27,7 +27,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Message sent when a buffer-related change occurs.
  * @author Slava Pestov
- * @version $Id: BufferUpdate.java,v 1.8 2002/12/24 17:35:23 spestov Exp $
+ * @version $Id: BufferUpdate.java 12504 2008-04-22 23:12:43Z ezust $
  *
  * @since jEdit 2.2pre6
  */
@@ -38,7 +38,12 @@ public class BufferUpdate extends EBMessage
 	 * Buffer created.
 	 */
 	public static final Object CREATED = "CREATED";
-
+	
+	/**
+	 * About to be closed
+	 * @since jEdit 4.2pre3 
+	 */
+	public static final Object CLOSING = "CLOSING";
 	/**
 	 * Buffer load started.
 	 * @since jEdit 2.6pre1
@@ -81,11 +86,6 @@ public class BufferUpdate extends EBMessage
 	 * @since jEdit 4.1pre1
 	 */
 	public static final Object PROPERTIES_CHANGED = "PROPERTIES_CHANGED";
-
-	/**
-	 * @deprecated No longer sent. Listen for PROPERTIES_CHANGED instead.
-	 */
-	public static final Object MODE_CHANGED = "MODE_CHANGED";
 	//}}}
 
 	//{{{ BufferUpdate constructor

@@ -36,7 +36,7 @@ import org.gjt.sp.jedit.*;
  * favorite and clicking 'delete' in the browser just deletes the
  * favorite, and not the directory itself.
  * @author Slava Pestov
- * @version $Id: FavoritesVFS.java,v 1.11 2004/02/23 00:15:21 spestov Exp $
+ * @version $Id: FavoritesVFS.java 14466 2009-01-25 12:49:34Z kpouer $
  */
 public class FavoritesVFS extends VFS
 {
@@ -61,19 +61,19 @@ public class FavoritesVFS extends VFS
 		return PROTOCOL + ":";
 	} //}}}
 
-	//{{{ _listDirectory() method
-	public VFS.DirectoryEntry[] _listDirectory(Object session, String url,
+	//{{{ _listFiles() method
+	public VFSFile[] _listFiles(Object session, String url,
 		Component comp)
 	{
 		return getFavorites();
 	} //}}}
 
-	//{{{ _getDirectoryEntry() method
-	public DirectoryEntry _getDirectoryEntry(Object session, String path,
+	//{{{ _getFile() method
+	public VFSFile _getFile(Object session, String path,
 		Component comp)
 	{
 		// does it matter that this doesn't set the type correctly?
-		return new FavoritesEntry(path,VFS.DirectoryEntry.DIRECTORY);
+		return new Favorite(path,VFSFile.DIRECTORY);
 	} //}}}
 
 	//{{{ _delete() method
@@ -83,14 +83,14 @@ public class FavoritesVFS extends VFS
 		{
 			path = path.substring(PROTOCOL.length() + 1);
 
-			Iterator iter = favorites.iterator();
+			Iterator<Favorite> iter = favorites.iterator();
 			while(iter.hasNext())
 			{
-				if(((FavoritesEntry)iter.next()).path.equals(path))
+				if(iter.next().getPath().equals(path))
 				{
 					iter.remove();
 					VFSManager.sendVFSUpdate(this,PROTOCOL
-						+ ":",false);
+						+ ':',false);
 					EditBus.send(new DynamicMenuChanged(
 						"favorites"));
 					return true;
@@ -106,16 +106,16 @@ public class FavoritesVFS extends VFS
 	{
 		synchronized(lock)
 		{
-			favorites = new LinkedList();
+			favorites = new LinkedList<Favorite>();
 
 			String favorite;
 			int i = 0;
 			while((favorite = jEdit.getProperty("vfs.favorite." + i)) != null)
 			{
-				favorites.add(new FavoritesEntry(favorite,
+				favorites.add(new Favorite(favorite,
 					jEdit.getIntegerProperty("vfs.favorite."
 					+ i + ".type",
-					VFS.DirectoryEntry.DIRECTORY)));
+					VFSFile.DIRECTORY)));
 				i++;
 			}
 		}
@@ -129,16 +129,15 @@ public class FavoritesVFS extends VFS
 			if(favorites == null)
 				loadFavorites();
 
-			Iterator iter = favorites.iterator();
-			while(iter.hasNext())
+			for (Favorite favorite : favorites)
 			{
-				if(((FavoritesEntry)iter.next()).path.equals(path))
+				if (favorite.getPath().equals(path))
 					return;
 			}
 
-			favorites.add(new FavoritesEntry(path,type));
+			favorites.add(new Favorite(path,type));
 
-			VFSManager.sendVFSUpdate(instance,PROTOCOL + ":",false);
+			VFSManager.sendVFSUpdate(instance,PROTOCOL + ':',false);
 			EditBus.send(new DynamicMenuChanged("favorites"));
 		}
 	} //}}}
@@ -152,15 +151,12 @@ public class FavoritesVFS extends VFS
 				return;
 
 			int i = 0;
-			Iterator iter = favorites.iterator();
-			while(iter.hasNext())
+			for (Favorite favorite : favorites)
 			{
-				FavoritesEntry e = ((FavoritesEntry)
-					iter.next());
 				jEdit.setProperty("vfs.favorite." + i,
-					e.path);
+					favorite.getPath());
 				jEdit.setIntegerProperty("vfs.favorite." + i
-					+ ".type",e.type);
+					+ ".type", favorite.getType());
 
 				i++;
 			}
@@ -171,30 +167,30 @@ public class FavoritesVFS extends VFS
 	} //}}}
 
 	//{{{ getFavorites() method
-	public static VFS.DirectoryEntry[] getFavorites()
+	public static VFSFile[] getFavorites()
 	{
 		synchronized(lock)
 		{
 			if(favorites == null)
 				loadFavorites();
 
-			return (VFS.DirectoryEntry[])favorites.toArray(
-				new VFS.DirectoryEntry[favorites.size()]);
+			return favorites.toArray(
+				new VFSFile[favorites.size()]);
 		}
 	} //}}}
 
 	//{{{ Private members
 	private static FavoritesVFS instance;
-	private static Object lock = new Object();
-	private static List favorites;
+	private static final Object lock = new Object();
+	private static List<Favorite> favorites;
 	//}}}
 
-	//{{{ FavoritesEntry class
-	static class FavoritesEntry extends VFS.DirectoryEntry
+	//{{{ Favorite class
+	static class Favorite extends VFSFile
 	{
-		FavoritesEntry(String path, int type)
+		Favorite(String path, int type)
 		{
-			super(path,path,PROTOCOL + ":" + path,type,0,false);
+			super(path,path,PROTOCOL + ':' + path,type,0,false);
 		}
 
 		public String getExtendedAttribute(String name)

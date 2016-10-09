@@ -26,12 +26,12 @@ package org.gjt.sp.jedit.gui;
 //{{{ Imports
 import java.awt.*;
 import java.awt.event.*;
-import java.lang.reflect.Method;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.plaf.basic.BasicButtonUI;
+import javax.swing.plaf.basic.BasicBorders.ButtonBorder;
 import org.gjt.sp.jedit.OperatingSystem;
-import org.gjt.sp.util.Log;
+
 //}}}
 
 /**
@@ -43,6 +43,7 @@ import org.gjt.sp.util.Log;
  *
  * Note: You should not call <code>setBorder()</code> on your buttons,
  * as they probably won't work properly.
+ * @version $Id: RolloverButton.java 12504 2008-04-22 23:12:43Z ezust $
  */
 public class RolloverButton extends JButton
 {
@@ -52,29 +53,15 @@ public class RolloverButton extends JButton
 	 */
 	public RolloverButton()
 	{
-		if(OperatingSystem.hasJava15())
-			setContentAreaFilled(false);
-
-		if(method != null)
-		{
-			try
-			{
-				method.invoke(this,new Boolean[] { Boolean.TRUE });
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.ERROR,this,e);
-			}
-		}
-		else
-		{
-			addMouseListener(new MouseOverHandler());
-		}
+		//setContentAreaFilled(true);
+		addMouseListener(new MouseOverHandler());
 	} //}}}
 
 	//{{{ RolloverButton constructor
 	/**
 	 * Setup the border (invisible initially)
+	 *
+	 * @param icon the icon of this button
 	 */
 	public RolloverButton(Icon icon)
 	{
@@ -86,36 +73,19 @@ public class RolloverButton extends JButton
 	//{{{ updateUI() method
 	public void updateUI()
 	{
-		if(OperatingSystem.isWindows())
-		{
-			/* Workaround for uncooperative Windows L&F */
-			setUI(new BasicButtonUI());
-		}
-		else
-			super.updateUI();
-
-		setBorder(new EtchedBorder());
+		super.updateUI();
+		//setBorder(originalBorder);
 		setBorderPainted(false);
-		setMargin(new Insets(1,1,1,1));
-
 		setRequestFocusEnabled(false);
-	} //}}}
-
-	//{{{ isOpaque() method
-	public boolean isOpaque()
-	{
-		return false;
+		setMargin(new Insets(1,1,1,1));
 	} //}}}
 
 	//{{{ setEnabled() method
 	public void setEnabled(boolean b)
 	{
 		super.setEnabled(b);
-		if(method == null)
-		{
-			setBorderPainted(false);
-			repaint();
-		}
+		setBorderPainted(false);
+		repaint();
 	} //}}}
 
 	//{{{ setBorderPainted() method
@@ -125,6 +95,7 @@ public class RolloverButton extends JButton
 		{
 			revalidateBlocked = true;
 			super.setBorderPainted(b);
+			setContentAreaFilled(b);
 		}
 		finally
 		{
@@ -146,7 +117,7 @@ public class RolloverButton extends JButton
 	//{{{ paint() method
 	public void paint(Graphics g)
 	{
-		if(method != null || isEnabled())
+		if(isEnabled())
 			super.paint(g);
 		else
 		{
@@ -157,31 +128,10 @@ public class RolloverButton extends JButton
 	} //}}}
 
 	//{{{ Private members
-	private static AlphaComposite c = AlphaComposite.getInstance(
+	private static final AlphaComposite c = AlphaComposite.getInstance(
 		AlphaComposite.SRC_OVER, 0.5f);
 
-	private static Method method;
-
 	private boolean revalidateBlocked;
-
-	static
-	{
-		/* if(OperatingSystem.hasJava14())
-		{
-			try
-			{
-				method = RolloverButton.class
-					.getMethod("setRolloverEnabled",new Class[]
-					{ boolean.class });
-				Log.log(Log.DEBUG,RolloverButton.class,
-					"Java 1.4 setRolloverEnabled() method enabled");
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.ERROR,RolloverButton.class,e);
-			}
-		} */
-	} //}}}
 
 	//{{{ MouseHandler class
 	/**
@@ -191,13 +141,15 @@ public class RolloverButton extends JButton
 	{
 		public void mouseEntered(MouseEvent e)
 		{
-			if (isEnabled())
-				setBorderPainted(true);
+			setContentAreaFilled(true);
+			setBorderPainted(isEnabled());
 		}
 
 		public void mouseExited(MouseEvent e)
 		{
+			setContentAreaFilled(false);
 			setBorderPainted(false);
 		}
 	} //}}}
+	//}}}
 }

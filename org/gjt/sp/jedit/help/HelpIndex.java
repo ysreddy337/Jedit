@@ -37,8 +37,8 @@ class HelpIndex
 	//{{{ HelpIndex constructor
 	public HelpIndex()
 	{
-		words = new HashMap();
-		files = new ArrayList();
+		words = new HashMap<String, Object>();
+		files = new ArrayList<HelpFile>();
 
 		ignoreWord("a");
 		ignoreWord("an");
@@ -91,7 +91,7 @@ class HelpIndex
 			{
 				indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","users-guide"));
 				indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","FAQ"));
-				indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","news42"));
+				indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","news43"));
 			}
 		}
 		catch(Throwable e)
@@ -194,14 +194,14 @@ class HelpIndex
 	//{{{ getFile() method
 	public HelpFile getFile(int index)
 	{
-		return (HelpFile)files.get(index);
+		return files.get(index);
 	} //}}}
 
 	//{{{ Private members
 	// used to mark words to ignore (see constructor for the list)
 	private static Object IGNORE = new Object();
-	private HashMap words;
-	private ArrayList files;
+	private Map<String, Object> words;
+	private List<HelpFile> files;
 
 	//{{{ ignoreWord() method
 	private void ignoreWord(String word)
@@ -214,7 +214,7 @@ class HelpIndex
 	 * Reads the specified HTML file and adds all words defined therein to the
 	 * index.
 	 * @param _in The input stream
-	 * @param file The file
+	 * @param fileName The file
 	 */
 	private void indexStream(InputStream _in, String fileName)
 		throws Exception
@@ -223,14 +223,14 @@ class HelpIndex
 		files.add(file);
 		int index = files.size() - 1;
 
-		StringBuffer titleText = new StringBuffer();
+		StringBuilder titleText = new StringBuilder();
 
 		BufferedReader in = new BufferedReader(
 			new InputStreamReader(_in));
 
 		try
 		{
-			StringBuffer word = new StringBuffer();
+			StringBuilder word = new StringBuilder();
 			boolean insideTag = false;
 			boolean insideEntity = false;
 

@@ -25,10 +25,16 @@ package org.gjt.sp.jedit.options;
 
 //{{{ Imports
 import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+
 import java.awt.*;
+
 import org.gjt.sp.jedit.gui.*;
+import org.gjt.sp.jedit.textarea.JEditTextArea;
 import org.gjt.sp.jedit.*;
 //}}}
+import org.gjt.sp.util.SyntaxUtilities;
 
 public class GutterOptionPane extends AbstractOptionPane
 {
@@ -41,12 +47,92 @@ public class GutterOptionPane extends AbstractOptionPane
 	//{{{ _init() method
 	public void _init()
 	{
+		/* Gutter enable */
+		gutterEnabled = new JCheckBox(jEdit.getProperty(
+			"options.gutter.enabled"));
+		gutterEnabled.setSelected(isGutterEnabled());
+		addComponent(gutterEnabled);
+
+		/* Gutter components frame */
+		GridBagConstraints cons = new GridBagConstraints();
+		cons.gridheight = 1;
+		cons.gridwidth = GridBagConstraints.REMAINDER;
+		cons.fill = GridBagConstraints.HORIZONTAL;
+		cons.anchor = GridBagConstraints.WEST;
+		cons.weightx = 1.0f;
+		cons.ipadx = 0;
+		cons.ipady = 0;
+		cons.insets = new Insets(0,0,0,0);
+		gutterComponents = new JPanel(new GridBagLayout());
+		gutterComponents.setBorder(BorderFactory.createTitledBorder(
+			jEdit.getProperty("options.gutter.optionalComponents")));
+
 		/* Line numbering */
 		lineNumbersEnabled = new JCheckBox(jEdit.getProperty(
 			"options.gutter.lineNumbers"));
 		lineNumbersEnabled.setSelected(jEdit.getBooleanProperty(
 			"view.gutter.lineNumbers"));
-		addComponent(lineNumbersEnabled);
+		gutterComponents.add(lineNumbersEnabled, cons);
+
+		InputVerifier integerInputVerifier = new InputVerifier()
+		{
+			@Override
+			public boolean verify(JComponent input)
+			{
+				if (! (input instanceof JTextField))
+					return true;
+				JTextField tf = (JTextField) input;
+				int i;
+				try
+				{
+					i = Integer.valueOf(tf.getText()).intValue();
+				}
+				catch (Exception e)
+				{
+					return false;
+				}
+				return (i >= 0);
+			}
+		};
+		minLineNumberDigits = new JTextField(String.valueOf(
+				getMinLineNumberDigits()),1);
+		minLineNumberDigits.setInputVerifier(integerInputVerifier);
+		JPanel minLineNumberDigitsPanel = new JPanel();
+		minLineNumberDigitsPanel.add(new JLabel(
+			jEdit.getProperty("options.gutter.minLineNumberDigits")));
+		minLineNumberDigitsPanel.add(minLineNumberDigits);
+		cons.gridy = 1;
+		gutterComponents.add(minLineNumberDigitsPanel, cons);
+
+		/* Selection area enable */
+		selectionAreaEnabled = new JCheckBox(jEdit.getProperty(
+			"options.gutter.selectionAreaEnabled"));
+		selectionAreaEnabled.setSelected(isSelectionAreaEnabled());
+		cons.gridy = 2;
+		gutterComponents.add(selectionAreaEnabled, cons);
+
+		addComponent(gutterComponents);
+		// Disable gutter components when 'show gutter' is unchecked
+		setGutterComponentsEnabledState();
+		gutterEnabled.addChangeListener(new ChangeListener()
+		{
+			public void stateChanged(ChangeEvent e)
+			{
+				setGutterComponentsEnabledState();
+			}
+		});
+
+		/* Selection area background color */
+		addComponent(jEdit.getProperty("options.gutter.selectionAreaBgColor"),
+			selectionAreaBgColor = new ColorWellButton(
+				getSelectionAreaBackground()), GridBagConstraints.VERTICAL);
+
+		/* Selection area width */
+		selectionAreaWidth = new JTextField(String.valueOf(
+			getSelectionAreaWidth()),DEFAULT_SELECTION_GUTTER_WIDTH);
+		selectionAreaWidth.setInputVerifier(integerInputVerifier);
+		addComponent(jEdit.getProperty("options.gutter.selectionAreaWidth"),
+			selectionAreaWidth);
 
 		/* Text font */
 		gutterFont = new FontSelector(
@@ -154,6 +240,8 @@ public class GutterOptionPane extends AbstractOptionPane
 			gutterNoFocusBorder = new ColorWellButton(
 			jEdit.getColorProperty("view.gutter.noFocusBorderColor")),
 			GridBagConstraints.VERTICAL);
+		
+		addFoldStyleChooser();
 	} //}}}
 
 	//{{{ _save() method
@@ -161,6 +249,8 @@ public class GutterOptionPane extends AbstractOptionPane
 	{
 		jEdit.setBooleanProperty("view.gutter.lineNumbers", lineNumbersEnabled
 			.isSelected());
+		jEdit.setIntegerProperty("view.gutter.minDigitCount",
+			Integer.valueOf(minLineNumberDigits.getText()));
 
 		jEdit.setFontProperty("view.gutter.font",gutterFont.getFont());
 		jEdit.setColorProperty("view.gutter.fgColor",gutterForeground
@@ -204,13 +294,97 @@ public class GutterOptionPane extends AbstractOptionPane
 			gutterMarkerHighlight.getSelectedColor());
 		jEdit.setColorProperty("view.gutter.foldColor",
 			gutterFoldMarkers.getSelectedColor());
+		jEdit.setProperty(JEditTextArea.FOLD_PAINTER_PROPERTY,
+			painters[foldPainter.getSelectedIndex()]);
 		jEdit.setColorProperty("view.gutter.focusBorderColor",
 			gutterFocusBorder.getSelectedColor());
 		jEdit.setColorProperty("view.gutter.noFocusBorderColor",
 			gutterNoFocusBorder.getSelectedColor());
+		jEdit.setBooleanProperty(GUTTER_ENABLED_PROPERTY,
+			gutterEnabled.isSelected());
+		jEdit.setBooleanProperty(SELECTION_AREA_ENABLED_PROPERTY,
+			selectionAreaEnabled.isSelected());
+		jEdit.setColorProperty(SELECTION_AREA_BGCOLOR_PROPERTY,
+			selectionAreaBgColor.getSelectedColor());
+		jEdit.setIntegerProperty("view.gutter.selectionAreaWidth",
+			Integer.valueOf(selectionAreaWidth.getText()));
+	} //}}}
+
+	//{{{ setGutterComponentsEnabledState
+	private void setGutterComponentsEnabledState()
+	{
+		GUIUtilities.setEnabledRecursively(gutterComponents,
+			gutterEnabled.isSelected());
+	} //}}}
+
+	//{{{ addFoldStyleChooser() method
+	private void addFoldStyleChooser()
+	{
+		painters = ServiceManager.getServiceNames(JEditTextArea.FOLD_PAINTER_SERVICE);
+		foldPainter = new JComboBox();
+		String current = JEditTextArea.getFoldPainterName();
+		int selected = 0;
+		for (int i = 0; i < painters.length; i++)
+		{
+			String painter = painters[i];
+			foldPainter.addItem(jEdit.getProperty(
+				"options.gutter.foldStyleNames." + painter, painter));
+			if (painter.equals(current))
+				selected = i;
+		}
+		foldPainter.setSelectedIndex(selected);
+		addComponent(new JLabel(jEdit.getProperty("options.gutter.foldStyle.label")), foldPainter);
+	} //}}}
+
+	//{{{ isGutterEnabled() method
+	public static boolean isGutterEnabled()
+	{
+		return jEdit.getBooleanProperty(GUTTER_ENABLED_PROPERTY);
+	} //}}}
+
+	//{{{ getMinLineNumberDigits() method
+	public static int getMinLineNumberDigits()
+	{
+		int n = jEdit.getIntegerProperty("view.gutter.minDigitCount", 2);
+		if (n < 0)
+			n = 2;
+		return n;
+	} //}}}
+
+	//{{{ isSelectionAreaEnabled() method
+	public static boolean isSelectionAreaEnabled()
+	{
+		return jEdit.getBooleanProperty(SELECTION_AREA_ENABLED_PROPERTY);
+	} //}}}
+
+	//{{{ getSelectionAreaBgColor() method
+	public static Color getSelectionAreaBackground()
+	{
+		String color = jEdit.getProperty(SELECTION_AREA_BGCOLOR_PROPERTY);
+		if (color == null)
+			return jEdit.getColorProperty("view.gutter.bgColor");
+		return SyntaxUtilities.parseColor(color, Color.black);
+	} //}}}
+
+	//{{{ getSelectionAreaWidth() method
+	public static int getSelectionAreaWidth()
+	{
+		int n = jEdit.getIntegerProperty("view.gutter.selectionAreaWidth",
+			DEFAULT_SELECTION_GUTTER_WIDTH);
+		if (n < 0)
+			n = DEFAULT_SELECTION_GUTTER_WIDTH;
+		return n;
 	} //}}}
 
 	//{{{ Private members
+	private static final String GUTTER_ENABLED_PROPERTY =
+		"view.gutter.enabled";
+	private static final String SELECTION_AREA_ENABLED_PROPERTY =
+		"view.gutter.selectionAreaEnabled";
+	private static final String SELECTION_AREA_BGCOLOR_PROPERTY =
+		"view.gutter.selectionAreaBgColor";
+	private static final int DEFAULT_SELECTION_GUTTER_WIDTH = 12;
+
 	private FontSelector gutterFont;
 	private ColorWellButton gutterForeground;
 	private ColorWellButton gutterBackground;
@@ -224,7 +398,15 @@ public class GutterOptionPane extends AbstractOptionPane
 	private JCheckBox gutterMarkerHighlightEnabled;
 	private ColorWellButton gutterMarkerHighlight;
 	private ColorWellButton gutterFoldMarkers;
+	private JComboBox foldPainter;
 	private ColorWellButton gutterFocusBorder;
 	private ColorWellButton gutterNoFocusBorder;
+	private String [] painters;
+	private JCheckBox gutterEnabled;
+	private JPanel gutterComponents;
+	private JTextField minLineNumberDigits;
+	private JCheckBox selectionAreaEnabled;
+	private ColorWellButton selectionAreaBgColor;
+	private JTextField selectionAreaWidth;
 	//}}}
 }

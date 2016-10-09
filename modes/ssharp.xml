@@ -12,29 +12,28 @@
 		<PROPERTY NAME="commentEnd" VALUE="&quot;" />
 		<PROPERTY NAME="indentOpenBrackets" VALUE="[" />
 		<PROPERTY NAME="indentCloseBrackets" VALUE="]" />
-		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 
 	</PROPS>
-	<RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
+	<RULES IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
 		<!-- Standard literals -->
-		<SPAN TYPE="LITERAL1" NO_LINE_BREAK="FALSE">
+		<SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="FALSE">
 			<BEGIN>'</BEGIN>
 			<END>'</END>
 		</SPAN>
-        
+
         <EOL_SPAN TYPE="COMMENT3">#</EOL_SPAN>
         <EOL_SPAN TYPE="COMMENT2">""</EOL_SPAN>
-        
+
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>"</BEGIN>
 			<END>"</END>
 		</SPAN>
 
-        <SPAN TYPE="LITERAL2" >
-            <BEGIN>«</BEGIN>
-            <END>»</END>
+        <SPAN TYPE="LITERAL2" ESCAPE="\">
+            <BEGIN>Â«</BEGIN>
+            <END>Â»</END>
         </SPAN>
-        
+
         <SEQ TYPE="OPERATOR">(</SEQ>
         <SEQ TYPE="OPERATOR">)</SEQ>
         <SEQ TYPE="OPERATOR">{</SEQ>
@@ -67,10 +66,10 @@
         <SEQ TYPE="OPERATOR">~=</SEQ>
         <SEQ TYPE="OPERATOR">!==</SEQ>
         <SEQ TYPE="OPERATOR">~~</SEQ>
-        
-		<MARK_PREVIOUS TYPE="KEYWORD3" EXCLUDE_MATCH="TRUE">:</MARK_PREVIOUS>
-		<MARK_FOLLOWING TYPE="LABEL" EXCLUDE_MATCH="TRUE">#</MARK_FOLLOWING>
-		<MARK_FOLLOWING TYPE="LITERAL1" EXCLUDE_MATCH="TRUE">$</MARK_FOLLOWING>
+
+		<MARK_PREVIOUS TYPE="KEYWORD3" MATCH_TYPE="OPERATOR">:</MARK_PREVIOUS>
+		<MARK_FOLLOWING TYPE="LABEL" MATCH_TYPE="OPERATOR">#</MARK_FOLLOWING>
+		<MARK_FOLLOWING TYPE="LITERAL1" MATCH_TYPE="OPERATOR">$</MARK_FOLLOWING>
 
 		<KEYWORDS>
 			<!-- Constants -->
@@ -92,16 +91,16 @@
             <KEYWORD2>senderMethod</KEYWORD2>
             <KEYWORD2>blockSelf</KEYWORD2>
             <KEYWORD2>scheduler</KEYWORD2>
-            <KEYWORD2>¼</KEYWORD2>
-            
+            <KEYWORD2>Â¼</KEYWORD2>
+
 			<!-- not really keywords, but a different color works well-->
 			<KEYWORD4>isNil</KEYWORD4>
 			<KEYWORD4>not</KEYWORD4>
-            			
+
 			<!-- not really -->
 			<LITERAL2>Smalltalk</LITERAL2>
 			<LITERAL2>Transcript</LITERAL2>
-			
+
 			<!-- base classes -->
 			<LITERAL2>Date</LITERAL2>
 			<LITERAL2>Time</LITERAL2>
@@ -114,7 +113,7 @@
 			<LITERAL2>Symbol</LITERAL2>
 			<LITERAL2>Integer</LITERAL2>
 			<LITERAL2>Object</LITERAL2>
-            
+
             <LITERAL3>Application</LITERAL3>
             <LITERAL3>Category</LITERAL3>
             <LITERAL3>Class</LITERAL3>

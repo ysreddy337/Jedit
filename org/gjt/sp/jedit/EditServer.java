@@ -23,7 +23,7 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import bsh.NameSpace;
+import org.gjt.sp.jedit.bsh.NameSpace;
 import javax.swing.SwingUtilities;
 import java.io.*;
 import java.net.*;
@@ -54,7 +54,7 @@ import org.gjt.sp.util.Log;
  * complicated stuff can be done too.
  *
  * @author Slava Pestov
- * @version $Id: EditServer.java,v 1.23 2004/08/08 03:41:34 spestov Exp $
+ * @version $Id: EditServer.java 16264 2009-10-03 06:29:29Z shlomy $
  */
 public class EditServer extends Thread
 {
@@ -82,7 +82,7 @@ public class EditServer extends Thread
 			// connection attempts before rejecting connections
 			socket = new ServerSocket(0, 2,
 				InetAddress.getByName("127.0.0.1"));
-			authKey = Math.abs(new Random().nextInt());
+			authKey = new Random().nextInt(Integer.MAX_VALUE);
 			int port = socket.getLocalPort();
 
 			FileWriter out = new FileWriter(portFile);
@@ -205,7 +205,7 @@ public class EditServer extends Thread
 			Buffer buffer = jEdit.openFiles(null,parent,args);
 
 			if(jEdit.getBufferCount() == 0)
-				jEdit.newFile(null);
+				jEdit.newFile((EditPane) null);
 
 			boolean restoreFiles = restore
 				&& jEdit.getBooleanProperty("restore")
@@ -222,7 +222,7 @@ public class EditServer extends Thread
 				view = jEdit.newView(null,buffer);
 			}
 			else if(buffer != null)
-				view.setBuffer(buffer);
+				view.setBuffer(buffer,false);
 
 			return buffer;
 		}
@@ -342,7 +342,7 @@ public class EditServer extends Thread
 						ns.setVariable("socket",client);
 						BeanShell.eval(null,ns,script);
 					}
-					catch(bsh.UtilEvalError e)
+					catch(org.gjt.sp.jedit.bsh.UtilEvalError e)
 					{
 						Log.log(Log.ERROR,this,e);
 					}
@@ -352,7 +352,7 @@ public class EditServer extends Thread
 						{
 							BeanShell.getNameSpace().setVariable("socket",null);
 						}
-						catch(bsh.UtilEvalError e)
+						catch(org.gjt.sp.jedit.bsh.UtilEvalError e)
 						{
 							Log.log(Log.ERROR,this,e);
 						}

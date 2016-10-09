@@ -28,7 +28,7 @@ import javax.swing.text.*;
 import java.awt.font.*;
 import java.awt.geom.*;
 import java.awt.*;
-import org.gjt.sp.jedit.syntax.*;
+
 import org.gjt.sp.jedit.Debug;
 //}}}
 
@@ -46,6 +46,8 @@ public class Chunk extends Token
 	 * @param gfx The graphics context
 	 * @param x The x co-ordinate
 	 * @param y The y co-ordinate
+	 * @param glyphVector true if we want to use glyphVector, false if we
+	 * want to use drawString
 	 * @return The width of the painted text
 	 * @since jEdit 4.2pre1
 	 */
@@ -202,9 +204,6 @@ public class Chunk extends Token
 	public boolean visible;
 	public boolean initialized;
 
-	public boolean monospaced;
-	public int charWidth;
-
 	// set up after init()
 	public SyntaxStyle style;
 	// this is either style.getBackgroundColor() or
@@ -251,8 +250,6 @@ public class Chunk extends Token
 	{
 		if(!visible)
 			return 0.0f;
-		else if(monospaced)
-			return offset * charWidth;
 		else
 			return getPositions()[offset * 2];
 	} //}}}
@@ -260,40 +257,28 @@ public class Chunk extends Token
 	//{{{ xToOffset() method
 	public final int xToOffset(float x, boolean round)
 	{
-		if(!visible)
+		if (!visible)
 		{
-			if(round && width - x < x)
+			if (round && width - x < x)
 				return offset + length;
 			else
 				return offset;
 		}
-		else if(monospaced)
-		{
-			x = Math.max(0,x);
-			float remainder = x % charWidth;
-			int i = (int)(x / charWidth);
-			if(round && remainder > charWidth / 2)
-				return offset + i + 1;
-			else
-				return offset + i;
-		}
-		else
-		{
-			float[] pos = getPositions();
+		
+		float[] pos = getPositions();
 
-			for(int i = 0; i < length; i++)
+		for(int i = 0; i < length; i++)
+		{
+			float glyphX = pos[i*2];
+			float nextX = (i == length - 1
+				? width : pos[i*2+2]);
+
+			if(nextX > x)
 			{
-				float glyphX = pos[i*2];
-				float nextX = (i == length - 1
-					? width : pos[i*2+2]);
-
-				if(nextX > x)
-				{
-					if(!round || nextX - x > x - glyphX)
-						return offset + i;
-					else
-						return offset + i + 1;
-				}
+				if(!round || nextX - x > x - glyphX)
+					return offset + i;
+				else
+					return offset + i + 1;
 			}
 		}
 
@@ -306,8 +291,6 @@ public class Chunk extends Token
 		FontRenderContext fontRenderContext)
 	{
 		initialized = true;
-		if(style != null)
-			charWidth = style.getCharWidth();
 
 		if(!accessable)
 		{
@@ -319,23 +302,62 @@ public class Chunk extends Token
 			float newX = expander.nextTabStop(x,offset + length);
 			width = newX - x;
 		}
-		else if(charWidth != 0 && !Debug.DISABLE_MONOSPACE_HACK)
-		{
-			visible = monospaced = true;
-			str = new String(seg.array,seg.offset + offset,length);
-			width = charWidth * length;
-		}
 		else
 		{
 			visible = true;
+
 			str = new String(seg.array,seg.offset + offset,length);
-			gv = style.getFont().createGlyphVector(
-				fontRenderContext,str);
-			width = (float)gv.getLogicalBounds().getWidth();
+
+			char[] textArray = seg.array;
+			int textStart = seg.offset + offset;
+			// {{{ Workaround for a bug in Sun Java 5
+			// http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6266084
+			if (SUN_JAVA_5)
+			{
+				// textLimit is used as a text count in
+				// layoutGlyphVector(). So it works only the
+				// case textStart is 0.
+				char[] copy = new char[length];
+				System.arraycopy(textArray, textStart,
+					copy, 0, length);
+				textArray = copy;
+				textStart = 0;
+			} //}}}
+			int textLimit = textStart + length;
+			// FIXME: Need BiDi support.
+			int layoutFlags = Font.LAYOUT_LEFT_TO_RIGHT
+				| Font.LAYOUT_NO_START_CONTEXT
+				| Font.LAYOUT_NO_LIMIT_CONTEXT;
+			gv = style.getFont().layoutGlyphVector(
+				fontRenderContext,
+				textArray, textStart, textLimit, layoutFlags);
+			Rectangle2D logicalBounds = gv.getLogicalBounds();
+
+			width = (float)logicalBounds.getWidth();
 		}
 	} //}}}
 
 	//{{{ Private members
 	private float[] positions;
+
+	// Flag to enable a workaround for a bug in Sun Java 5.
+	private static final boolean SUN_JAVA_5;
+	static
+	{
+		boolean sun_java_5 = false;
+		String vendor = System.getProperty("java.vendor");
+		// Enable the workaround on Apple JVM, too, because the
+		// same problem was reported on Mac OS X.
+		if (vendor != null && (vendor.startsWith("Sun") ||
+					vendor.startsWith("Apple")))
+		{
+			String version = System.getProperty("java.version");
+			if (version != null && version.startsWith("1.5"))
+			{
+				sun_java_5 = true;
+			}
+		}
+		SUN_JAVA_5 = sun_java_5;
+	}
 	//}}}
 }

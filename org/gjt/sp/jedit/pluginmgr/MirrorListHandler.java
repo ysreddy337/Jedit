@@ -22,97 +22,80 @@
 
 package org.gjt.sp.jedit.pluginmgr;
 
-import com.microstar.xml.*;
-import java.io.*;
 import java.util.*;
-import org.gjt.sp.util.Log;
 
-class MirrorListHandler extends HandlerBase
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.helpers.DefaultHandler;
+
+import org.gjt.sp.util.XMLUtilities;
+import org.gjt.sp.util.Log;
+import org.gjt.sp.jedit.options.PluginOptions;
+
+/**
+ * @version $Id: MirrorListHandler.java 12504 2008-04-22 23:12:43Z ezust $
+ */
+class MirrorListHandler extends DefaultHandler
 {
 	//{{{ Constructor
 	MirrorListHandler(MirrorList mirrors, String path)
 	{
 		this.mirrors = mirrors;
 		this.path = path;
-		stateStack = new Stack();
 	} //}}}
 
 	//{{{ resolveEntity() method
-	public Object resolveEntity(String publicId, String systemId)
+	public InputSource resolveEntity(String publicId, String systemId)
 	{
-		if("mirrors.dtd".equals(systemId))
-		{
-			// this will result in a slight speed up, since we
-			// don't need to read the DTD anyway, as AElfred is
-			// non-validating
-			return new StringReader("<!-- -->");
-		}
-
-		return null;
+		return XMLUtilities.findEntity(systemId, "mirrors.dtd",
+					PluginOptions.class);
 	} //}}}
 
-	//{{{ attribute() method
-	public void attribute(String aname, String value, boolean isSpecified)
-	{
-		aname = (aname == null) ? null : aname.intern();
-		value = (value == null) ? null : value.intern();
-		if(aname == "ID")
-			id = value;
-	} //}}}
-
-	//{{{ doctypeDecl() method
-	public void doctypeDecl(String name, String publicId,
-		String systemId) throws Exception
-	{
-		if("MIRRORS".equals(name))
-			return;
-
-		Log.log(Log.ERROR,this,path + ": DOCTYPE must be MIRRORS");
-	} //}}}
-
-	//{{{ charData() method
-	public void charData(char[] c, int off, int len)
+	//{{{ characters() method
+	public void characters(char[] c, int off, int len)
 	{
 		String tag = peekElement();
-		String text = new String(c, off, len);
-		
+
 		if(tag == "DESCRIPTION")
-			description = text;
+			description.append(c, off, len);
 		else if(tag == "LOCATION")
-			location = text;
+			location.append(c, off, len);
 		else if(tag == "COUNTRY")
-			country = text;
+			country.append(c, off, len);
 		else if(tag == "CONTINENT")
-			continent = text;
+			continent.append(c, off, len);
 	} //}}}
 
 	//{{{ startElement() method
-	public void startElement(String tag)
+	public void startElement(String uri, String localName,
+				 String tag, Attributes attrs)
 	{
 		tag = pushElement(tag);
 
-		if(tag == "MIRROR")
+		if (tag.equals("MIRROR"))
+		{
 			mirror = new MirrorList.Mirror();
+			id = attrs.getValue("ID");
+		}
 	} //}}}
 
 	//{{{ endElement() method
-	public void endElement(String tag)
+	public void endElement(String uri, String localName, String tag)
 	{
-		if(tag == null)
-			return;
-		else
-			tag = tag.intern();
-
 		popElement();
 
-		if(tag == "MIRROR")
+		if(tag.equals("MIRROR"))
 		{
 			mirror.id = id;
-			mirror.description = description;
-			mirror.location = location;
-			mirror.country = country;
-			mirror.continent = continent;
+			mirror.description = description.toString();
+			mirror.location = location.toString();
+			mirror.country = country.toString();
+			mirror.continent = continent.toString();
 			mirrors.add(mirror);
+			description.setLength(0);
+			location.setLength(0);
+			country.setLength(0);
+			continent.setLength(0);
 		}
 	} //}}}
 
@@ -125,7 +108,7 @@ class MirrorListHandler extends HandlerBase
 		}
 		catch (Exception e)
 		{
-			e.printStackTrace();
+			Log.log(Log.ERROR, this, e);
 		}
 	} //}}}
 
@@ -136,39 +119,37 @@ class MirrorListHandler extends HandlerBase
 	} //}}}
 
 	//{{{ Private members
-	
+
 	//{{{ Variables
 	private String id;
-	private String description;
-	private String location;
-	private String country;
-	private String continent;
-	
-	private MirrorList mirrors;
+	private final StringBuilder description = new StringBuilder();
+	private final StringBuilder location = new StringBuilder();
+	private final StringBuilder country = new StringBuilder();
+	private final StringBuilder continent = new StringBuilder();
+
+	private final MirrorList mirrors;
 	private MirrorList.Mirror mirror;
-	
-	private Stack stateStack;
-	private String path;
+
+	private final Stack<String> stateStack = new Stack<String>();
+	private final String path;
 	//}}}
-	
+
 	private String pushElement(String name)
 	{
-		name = (name == null) ? null : name.intern();
-
+		name = name == null ? null : name.intern();
 		stateStack.push(name);
-
 		return name;
 	}
 
 	private String peekElement()
 	{
-		return (String) stateStack.peek();
+		return stateStack.peek();
 	}
 
-	private String popElement()
+	private void popElement()
 	{
-		return (String) stateStack.pop();
+		stateStack.pop();
 	}
-	
+
 	//}}}
 }

@@ -19,51 +19,44 @@
 
 package org.gjt.sp.jedit.pluginmgr;
 
-import com.microstar.xml.*;
-import java.io.*;
+//{{{ Imports
 import java.util.Stack;
-import org.gjt.sp.util.Log;
 
-class PluginListHandler extends HandlerBase
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.helpers.DefaultHandler;
+
+import org.gjt.sp.util.Log;
+import org.gjt.sp.util.XMLUtilities;
+//}}}
+
+/**
+ * @version $Id: PluginListHandler.java 12504 2008-04-22 23:12:43Z ezust $
+ */
+class PluginListHandler extends DefaultHandler
 {
+	//{{{ PluginListHandler constructor
 	PluginListHandler(PluginList pluginList, String path)
 	{
 		this.pluginList = pluginList;
 		this.path = path;
-		stateStack = new Stack();
-	}
 
-	public Object resolveEntity(String publicId, String systemId)
+		author = new StringBuilder();
+		description = new StringBuilder();
+		pluginSetEntry = new StringBuilder();
+		download = new StringBuilder();
+		downloadSource = new StringBuilder();
+	} //}}}
+
+	//{{{ resolveEntity() method
+	public InputSource resolveEntity(String publicId, String systemId)
 	{
-		if("plugins.dtd".equals(systemId))
-		{
-			// this will result in a slight speed up, since we
-			// don't need to read the DTD anyway, as AElfred is
-			// non-validating
-			return new StringReader("<!-- -->");
+		return XMLUtilities.findEntity(systemId, "plugins.dtd", getClass());
+	} //}}}
 
-			/* try
-			{
-				return new BufferedReader(new InputStreamReader(
-					getClass().getResourceAsStream(
-					"/org/gjt/sp/jedit/pluginmgr/plugins.dtd")));
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.ERROR,this,"Error while opening"
-					+ " plugins.dtd:");
-				Log.log(Log.ERROR,this,e);
-			} */
-		}
-
-		return null;
-	}
-
+	//{{{ attribute() method
 	public void attribute(String aname, String value, boolean isSpecified)
 	{
-		aname = (aname == null) ? null : aname.intern();
-		value = (value == null) ? null : value.intern();
-
 		if(aname == "NAME")
 			name = value;
 		else if(aname == "JAR")
@@ -88,126 +81,125 @@ class PluginListHandler extends HandlerBase
 			if(size == 0)
 				Log.log(Log.WARNING,this,"SIZE = 0");
 		}
-	}
+	} //}}}
 
-	public void doctypeDecl(String name, String publicId,
-		String systemId) throws Exception
-	{
-		if("PLUGINS".equals(name))
-			return;
-
-		Log.log(Log.ERROR,this,path + ": DOCTYPE must be PLUGINS");
-	}
-
-	public void charData(char[] c, int off, int len)
+	//{{{ characters() method
+	public void characters(char[] c, int off, int len)
 	{
 		String tag = peekElement();
-		String text = new String(c, off, len);
 
-		if(tag == "DESCRIPTION")
+		if(tag.equals("DESCRIPTION"))
 		{
-			description = text;
+			description.append(c, off, len);
 		}
-		else if(tag == "PLUGIN_SET_ENTRY")
-			pluginSetEntry = text;
-		else if(tag == "AUTHOR")
+		else if(tag.equals("PLUGIN_SET_ENTRY"))
+			pluginSetEntry.append(c, off, len);
+		else if(tag.equals("AUTHOR"))
 		{
-			if(author != null && author.length() != 0)
-				author = author + ", " + text;
-			else
-				author = text;
+			if(author.length() != 0)
+				author.append(", ");
+			author.append(c, off, len);
 		}
-		else if(tag == "DOWNLOAD")
-			download = text;
-		else if(tag == "DOWNLOAD_SOURCE")
-			downloadSource = text;
-	}
+		else if(tag.equals("DOWNLOAD"))
+			download.append(c, off, len);
+		else if(tag.equals("DOWNLOAD_SOURCE"))
+			downloadSource.append(c, off, len);
+	} //}}}
 
-	public void startElement(String tag)
+	//{{{ startElement() method
+	public void startElement(String uri, String localName,
+				 String tag, Attributes attrs)
 	{
+		for (int i = 0; i < attrs.getLength(); i++)
+		{
+			String aName = attrs.getQName(i);
+			String aValue = attrs.getValue(i);
+			attribute(aName, aValue, true);
+		}
+
+
 		tag = pushElement(tag);
 
-		if(tag == "PLUGIN_SET")
+		if(tag.equals("PLUGIN_SET"))
 		{
-			description = null;
+			description.setLength(0);
 			pluginSet = new PluginList.PluginSet();
 			pluginSet.name = name;
 		}
-		else if(tag == "PLUGIN")
+		else if(tag.equals("PLUGIN"))
 		{
-			description = null;
-			author = null;
+			description.setLength(0);
+			author.setLength(0);
 			branch = null;
 			plugin = new PluginList.Plugin();
 		}
-		else if(tag == "BRANCH")
+		else if(tag.equals("BRANCH"))
 		{
-			download = null;
+			download.setLength(0);
 			branch = new PluginList.Branch();
 		}
-		else if(tag == "DOWNLOAD")
+		else if(tag.equals("DOWNLOAD"))
 			downloadSize = size;
-		else if(tag == "DOWNLOAD_SOURCE")
+		else if(tag.equals("DOWNLOAD_SOURCE"))
 			downloadSourceSize = size;
-	}
+	} //}}}
 
-	public void endElement(String tag)
+	//{{{ endElement() method
+	public void endElement(String uri, String localName, String tag)
 	{
-		if(tag == null)
-			return;
-		else
-			tag = tag.intern();
-
 		popElement();
 
-		if(tag == "PLUGIN_SET")
+		if(tag.equals("PLUGIN_SET"))
 		{
 			pluginList.addPluginSet(pluginSet);
 			pluginSet = null;
-			pluginSetEntry = null;
+			pluginSetEntry.setLength(0);
 		}
-		else if(tag == "PLUGIN_SET_ENTRY")
+		else if(tag.equals("PLUGIN_SET_ENTRY"))
 		{
-			pluginSet.plugins.addElement(pluginSetEntry);
-			pluginSetEntry = null;
+			pluginSet.plugins.add(pluginSetEntry.toString());
+			pluginSetEntry.setLength(0);
 		}
-		else if(tag == "PLUGIN")
+		else if(tag.equals("PLUGIN"))
 		{
 			plugin.jar = jar;
 			plugin.name = name;
-			plugin.author = author;
-			plugin.description = description;
+			plugin.author = author.toString();
+			plugin.description = description.toString();
 			pluginList.addPlugin(plugin);
 			jar = null;
 			name = null;
-			author = null;
+			author.setLength(0);
+			description.setLength(0);
 		}
-		else if(tag == "BRANCH")
+		else if(tag.equals("BRANCH"))
 		{
 			branch.version = version;
 			branch.date = date;
-			branch.download = download;
+			branch.download = download.toString();
 			branch.downloadSize = downloadSize;
-			branch.downloadSource = downloadSource;
+			branch.downloadSource = downloadSource.toString();
 			branch.downloadSourceSize = downloadSourceSize;
 			branch.obsolete = obsolete;
-			plugin.branches.addElement(branch);
+			plugin.branches.add(branch);
 			version = null;
-			download = null;
+			download.setLength(0);
+			downloadSource.setLength(0);
 			obsolete = false;
 		}
-		else if(tag == "DEPEND")
+		else if(tag.equals("DEPEND"))
 		{
 			PluginList.Dependency dep = new PluginList.Dependency(
 				depWhat,depFrom,depTo,depPlugin);
-			branch.deps.addElement(dep);
+			branch.deps.add(dep);
 			depWhat = null;
 			depFrom = null;
 			depTo = null;
 			depPlugin = null;
 		}
-	}
+	} //}}}
 
+	//{{{ startDocument() method
 	public void startDocument()
 	{
 		try
@@ -216,35 +208,39 @@ class PluginListHandler extends HandlerBase
 		}
 		catch (Exception e)
 		{
-			e.printStackTrace();
+			Log.log(Log.ERROR, this, e);
 		}
-	}
+	} //}}}
 
+	//{{{ endDocument() method
 	public void endDocument()
 	{
 		pluginList.finished();
-	}
+	} //}}}
+
 	// end HandlerBase implementation
 
-	// private members
-	private String path;
+	//{{{ private members
+	
+	//{{{ Instance variables
+	private final String path;
 
-	private PluginList pluginList;
+	private final PluginList pluginList;
 
 	private PluginList.PluginSet pluginSet;
-	private String pluginSetEntry;
+	private final StringBuilder pluginSetEntry;
 
 	private PluginList.Plugin plugin;
 	private String jar;
-	private String author;
+	private StringBuilder author;
 
 	private PluginList.Branch branch;
 	private boolean obsolete;
 	private String version;
 	private String date;
-	private String download;
+	private StringBuilder download;
 	private int downloadSize;
-	private String downloadSource;
+	private StringBuilder downloadSource;
 	private int downloadSourceSize;
 	private int size;
 	private String depWhat;
@@ -253,26 +249,29 @@ class PluginListHandler extends HandlerBase
 	private String depPlugin;
 
 	private String name;
-	private String description;
+	private StringBuilder description;
 
-	private Stack stateStack;
+	private final Stack<String> stateStack = new Stack<String>();
+	//}}}
 
+	//{{{ pushElement() method
 	private String pushElement(String name)
 	{
-		name = (name == null) ? null : name.intern();
-
 		stateStack.push(name);
-
 		return name;
-	}
+	} //}}}
 
+	//{{{ peekElement() method
 	private String peekElement()
 	{
-		return (String) stateStack.peek();
-	}
+		return stateStack.peek();
+	} //}}}
 
+	//{{{ popElement() method
 	private String popElement()
 	{
-		return (String) stateStack.pop();
-	}
+		return stateStack.pop();
+	} //}}}
+
+	//}}}
 }

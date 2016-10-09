@@ -1,6 +1,6 @@
 // XmlException.java: Simple base class for AElfred processors.
 // NO WARRANTY! See README, and copyright below.
-// $Id: XmlException.java,v 1.1.1.1 2001/09/02 05:39:36 spestov Exp $
+// $Id: XmlException.java 12845 2008-06-13 19:42:59Z ezust $
 
 package com.microstar.xml;
 
@@ -18,6 +18,7 @@ package com.microstar.xml;
   * @version 1.1
   * @see XmlHandler#error
   * @see HandlerBase
+  * @deprecated use import org.xml.sax.SAXParseException
   */
 public class XmlException extends Exception
 {

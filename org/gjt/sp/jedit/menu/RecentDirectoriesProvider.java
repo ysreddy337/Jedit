@@ -23,10 +23,11 @@
 package org.gjt.sp.jedit.menu;
 
 //{{{ Imports
-import javax.swing.event.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.util.Vector;
+import java.util.Collections;
+
 import org.gjt.sp.jedit.browser.*;
 import org.gjt.sp.jedit.gui.HistoryModel;
 import org.gjt.sp.jedit.*;
@@ -86,7 +87,7 @@ public class RecentDirectoriesProvider implements DynamicMenuProvider
 
 		int maxItems = jEdit.getIntegerProperty("menu.spillover",20);
 
-		Vector menuItems = new Vector();
+		Vector<JMenuItem> menuItems = new Vector<JMenuItem>();
 
 		for(int i = 0; i < model.getSize(); i++)
 		{
@@ -116,8 +117,8 @@ public class RecentDirectoriesProvider implements DynamicMenuProvider
 
 		if(sort)
 		{
-			MiscUtilities.quicksort(menuItems,
-				new MiscUtilities.MenuItemCompare());
+			Collections.sort(menuItems,
+					new MenuItemTextComparator());
 			for(int i = 0; i < menuItems.size(); i++)
 			{
 				if(menu.getMenuComponentCount() >= maxItems
@@ -129,7 +130,7 @@ public class RecentDirectoriesProvider implements DynamicMenuProvider
 					menu = newMenu;
 				}
 
-				menu.add((JMenuItem)menuItems.elementAt(i));
+				menu.add(menuItems.elementAt(i));
 			}
 		}
 	} //}}}

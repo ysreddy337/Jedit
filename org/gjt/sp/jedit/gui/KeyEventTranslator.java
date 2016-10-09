@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2003 Slava Pestov
+ * Copyright (C) 2003, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,18 +24,20 @@ package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
 import java.awt.event.*;
-import java.awt.Toolkit;
-import java.util.*;
-import org.gjt.sp.jedit.*;
+import java.util.HashMap;
+import java.util.Map;
+import org.gjt.sp.jedit.Debug;
+import org.gjt.sp.jedit.OperatingSystem;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 /**
- * In conjunction with the <code>KeyEventWorkaround</code>, hides some 
+ * In conjunction with the <code>KeyEventWorkaround</code>, hides some
  * warts in the AWT key event API.
  *
  * @author Slava Pestov
- * @version $Id: KeyEventTranslator.java,v 1.23 2004/07/12 19:25:07 spestov Exp $
+ * @version $Id: KeyEventTranslator.java 16341 2009-10-14 10:05:51Z kpouer $
  */
 public class KeyEventTranslator
 {
@@ -52,15 +54,42 @@ public class KeyEventTranslator
 	} //}}}
 
 	//{{{ translateKeyEvent() method
+
+	protected static KeyEvent lastKeyPressEvent;
+
+	protected static boolean lastKeyPressAccepted;
+
 	/**
 	 * Pass this an event from {@link
 	 * KeyEventWorkaround#processKeyEvent(java.awt.event.KeyEvent)}.
+	 * @param evt the KeyEvent to translate
 	 * @since jEdit 4.2pre3
 	 */
 	public static Key translateKeyEvent(KeyEvent evt)
 	{
+		Key key = translateKeyEvent2(evt);
+
+		if (key!=null)
+		{
+			if (key.isPhantom())
+			{
+				key = null;
+			}
+		}
+
+		return key;
+	}
+
+	/**
+	 * Pass this an event from {@link
+	 * KeyEventWorkaround#processKeyEvent(java.awt.event.KeyEvent)}.
+	 * @param evt the KeyEvent to translate
+	 * @since jEdit 4.2pre3
+	 */
+	public static Key translateKeyEvent2(KeyEvent evt)
+	{
 		int modifiers = evt.getModifiers();
-		Key returnValue = null;
+		Key returnValue;
 
 		switch(evt.getID())
 		{
@@ -118,6 +147,9 @@ public class KeyEventTranslator
 		case KeyEvent.KEY_TYPED:
 			char ch = evt.getKeyChar();
 
+			if(KeyEventWorkaround.isMacControl(evt))
+				ch |= 0x60;
+
 			switch(ch)
 			{
 			case '\n':
@@ -133,22 +165,19 @@ public class KeyEventTranslator
 			if(Debug.ALT_KEY_PRESSED_DISABLED)
 			{
 				/* on MacOS, A+ can be user input */
-				ignoreMods = (InputEvent.SHIFT_MASK
+				ignoreMods = InputEvent.SHIFT_MASK
 					| InputEvent.ALT_GRAPH_MASK
-					| InputEvent.ALT_MASK);
+					| InputEvent.ALT_MASK;
 			}
 			else
 			{
 				/* on MacOS, A+ can be user input */
-				ignoreMods = (InputEvent.SHIFT_MASK
-					| InputEvent.ALT_GRAPH_MASK);
+				ignoreMods = InputEvent.SHIFT_MASK
+					| InputEvent.ALT_GRAPH_MASK;
 			}
 
 			if((modifiers & InputEvent.ALT_GRAPH_MASK) == 0
-				&& evt.getWhen()
-				-  KeyEventWorkaround.lastKeyTime < 750
-				&& (KeyEventWorkaround.modifiers & ~ignoreMods)
-				!= 0)
+				&& (modifiers & ~ignoreMods) != 0)
 			{
 				if(Debug.ALTERNATIVE_DISPATCHER)
 				{
@@ -178,7 +207,7 @@ public class KeyEventTranslator
 		/* I guess translated events do not have the 'evt' field set
 		so consuming won't work. I don't think this is a problem as
 		nothing uses translation anyway */
-		Key trans = (Key)transMap.get(returnValue);
+		Key trans = transMap.get(returnValue);
 		if(trans == null)
 			return returnValue;
 		else
@@ -200,11 +229,16 @@ public class KeyEventTranslator
 	{
 		if(keyStroke == null)
 			return null;
-		int index = keyStroke.indexOf('+');
 		int modifiers = 0;
-		if(index != -1)
+		String key;
+		int endOfModifiers = keyStroke.indexOf('+');
+		if(endOfModifiers <= 0)	// not found or found at first
 		{
-			for(int i = 0; i < index; i++)
+			key = keyStroke;
+		}
+		else
+		{
+			for(int i = 0; i < endOfModifiers; i++)
 			{
 				switch(Character.toUpperCase(keyStroke
 					.charAt(i)))
@@ -223,15 +257,15 @@ public class KeyEventTranslator
 					break;
 				}
 			}
+			key = keyStroke.substring(endOfModifiers + 1);
 		}
-		String key = keyStroke.substring(index + 1);
 		if(key.length() == 1)
 		{
 			return new Key(modifiersToString(modifiers),0,key.charAt(0));
 		}
 		else if(key.length() == 0)
 		{
-			Log.log(Log.ERROR,DefaultInputHandler.class,
+			Log.log(Log.ERROR,KeyEventTranslator.class,
 				"Invalid key stroke: " + keyStroke);
 			return null;
 		}
@@ -250,7 +284,7 @@ public class KeyEventTranslator
 			}
 			catch(Exception e)
 			{
-				Log.log(Log.ERROR,DefaultInputHandler.class,
+				Log.log(Log.ERROR,KeyEventTranslator.class,
 					"Invalid key stroke: "
 					+ keyStroke);
 				return null;
@@ -266,7 +300,7 @@ public class KeyEventTranslator
 	 * (<code>C</code>, <code>A</code>, <code>M</code>, <code>S</code>) and
 	 * Java modifier flags.
 	 *
-	 * You can map more than one Java modifier to a symobolic modifier, for 
+	 * You can map more than one Java modifier to a symobolic modifier, for
 	 * example :
 	 * <p><code><pre>
 	 *	setModifierMapping(
@@ -287,27 +321,31 @@ public class KeyEventTranslator
 	 */
 	public static void setModifierMapping(int c, int a, int m, int s)
 	{
-	
-		int duplicateMapping = 
-			((c & a) | (c & m) | (c & s) | (a & m) | (a & s) | (m & s)); 
-		
-		if((duplicateMapping & InputEvent.CTRL_MASK) != 0) {
+
+		int duplicateMapping =
+			(c & a) | (c & m) | (c & s) | (a & m) | (a & s) | (m & s);
+
+		if((duplicateMapping & InputEvent.CTRL_MASK) != 0)
+		{
 			throw new IllegalArgumentException(
 				"CTRL is mapped to more than one modifier");
 		}
-		if((duplicateMapping & InputEvent.ALT_MASK) != 0) {
+		if((duplicateMapping & InputEvent.ALT_MASK) != 0)
+		{
 			throw new IllegalArgumentException(
 				"ALT is mapped to more than one modifier");
 		}
-		if((duplicateMapping & InputEvent.META_MASK) != 0) {
+		if((duplicateMapping & InputEvent.META_MASK) != 0)
+		{
 			throw new IllegalArgumentException(
 				"META is mapped to more than one modifier");
 		}
-		if((duplicateMapping & InputEvent.SHIFT_MASK) != 0) {
+		if((duplicateMapping & InputEvent.SHIFT_MASK) != 0)
+		{
 			throw new IllegalArgumentException(
 				"SHIFT is mapped to more than one modifier");
 		}
-			
+
 		KeyEventTranslator.c = c;
 		KeyEventTranslator.a = a;
 		KeyEventTranslator.m = m;
@@ -338,33 +376,21 @@ public class KeyEventTranslator
 	} //}}}
 
 	//{{{ modifiersToString() method
+	private static final int[] MODS = {
+		InputEvent.CTRL_MASK,
+		InputEvent.ALT_MASK,
+		InputEvent.META_MASK,
+		InputEvent.SHIFT_MASK
+	};
+
 	public static String modifiersToString(int mods)
 	{
-		StringBuffer buf = null;
+		StringBuilder buf = null;
 
-		if((mods & InputEvent.CTRL_MASK) != 0)
+		for(int i = 0; i < MODS.length; i++)
 		{
-			if(buf == null)
-				buf = new StringBuffer();
-			buf.append(getSymbolicModifierName(InputEvent.CTRL_MASK));
-		}
-		if((mods & InputEvent.ALT_MASK) != 0)
-		{
-			if(buf == null)
-				buf = new StringBuffer();
-			buf.append(getSymbolicModifierName(InputEvent.ALT_MASK));
-		}
-		if((mods & InputEvent.META_MASK) != 0)
-		{
-			if(buf == null)
-				buf = new StringBuffer();
-			buf.append(getSymbolicModifierName(InputEvent.META_MASK));
-		}
-		if((mods & InputEvent.SHIFT_MASK) != 0)
-		{
-			if(buf == null)
-				buf = new StringBuffer();
-			buf.append(getSymbolicModifierName(InputEvent.SHIFT_MASK));
+			if((mods & MODS[i]) != 0)
+				buf = lazyAppend(buf,getSymbolicModifierName(MODS[i]));
 		}
 
 		if(buf == null)
@@ -384,7 +410,7 @@ public class KeyEventTranslator
 	 */
 	public static String getModifierString(InputEvent evt)
 	{
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 		if(evt.isControlDown())
 			buf.append(getSymbolicModifierName(InputEvent.CTRL_MASK));
 		if(evt.isAltDown())
@@ -393,13 +419,23 @@ public class KeyEventTranslator
 			buf.append(getSymbolicModifierName(InputEvent.META_MASK));
 		if(evt.isShiftDown())
 			buf.append(getSymbolicModifierName(InputEvent.SHIFT_MASK));
-		return (buf.length() == 0 ? null : buf.toString());
+		return buf.length() == 0 ? null : buf.toString();
 	} //}}}
 
 	static int c, a, m, s;
 
 	//{{{ Private members
-	private static Map transMap = new HashMap();
+	/** This map is a pool of Key. */
+	private static final Map<Key, Key> transMap = new HashMap<Key, Key>();
+
+	private static StringBuilder lazyAppend(StringBuilder buf, char ch)
+	{
+		if(buf == null)
+			buf = new StringBuilder();
+		if(buf.indexOf(String.valueOf(ch)) == -1)
+			buf.append(ch);
+		return buf;
+	} //}}}
 
 	static
 	{
@@ -425,28 +461,45 @@ public class KeyEventTranslator
 	//{{{ Key class
 	public static class Key
 	{
-		public String modifiers;
-		public int key;
-		public char input;
+		public final String modifiers;
+		public final int key;
+		public final char input;
+
+		private final int hashCode;
+		/**
+			Wether this Key event applies to all jEdit windows (and not only a specific jEdit GUI component).
+		*/
+		protected boolean isFromGlobalContext;
+
+		/**
+			Wether this Key event is a phantom key event. A phantom key event is a kind of duplicate key event which
+			should not - due to its nature of being a duplicate - generate any action on data.
+			However, phantom key events may be necessary to notify the rest of the GUI that the key event, if it was not a phantom key event but a real key event,
+			would generate any action and thus would be consumed.
+		*/
+		protected boolean isPhantom;
 
 		public Key(String modifiers, int key, char input)
 		{
 			this.modifiers = modifiers;
 			this.key = key;
 			this.input = input;
+			hashCode = key + input;
 		}
 
+		@Override
 		public int hashCode()
 		{
-			return key + input;
+			return hashCode;
 		}
 
+		@Override
 		public boolean equals(Object o)
 		{
 			if(o instanceof Key)
 			{
 				Key k = (Key)o;
-				if(MiscUtilities.objectsEqual(modifiers,
+				if(StandardUtilities.objectsEqual(modifiers,
 					k.modifiers) && key == k.key
 					&& input == k.input)
 				{
@@ -457,14 +510,35 @@ public class KeyEventTranslator
 			return false;
 		}
 
+		@Override
 		public String toString()
 		{
 			return (modifiers == null ? "" : modifiers)
-				+ "<"
+				+ '<'
 				+ Integer.toString(key,16)
-				+ ","
+				+ ','
 				+ Integer.toString(input,16)
-				+ ">";
+				+ '>';
+		}
+
+		public void setIsFromGlobalContext(boolean to)
+		{
+			isFromGlobalContext = to;
+		}
+
+		public boolean isFromGlobalContext()
+		{
+			return isFromGlobalContext;
+		}
+
+		public void setIsPhantom(boolean to)
+		{
+			isPhantom = to;
+		}
+
+		public boolean isPhantom()
+		{
+			return isPhantom;
 		}
 	} //}}}
 }

@@ -34,7 +34,7 @@ package org.gjt.sp.jedit;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: EBMessage.java,v 1.7 2003/05/02 21:12:43 spestov Exp $
+ * @version $Id: EBMessage.java 12625 2008-05-11 12:07:29Z kpouer $
  *
  * @since jEdit 2.2pre6
  */
@@ -46,7 +46,7 @@ public abstract class EBMessage
 	 * @param source The message source
 	 * @since jEdit 4.2pre1
 	 */
-	public EBMessage(Object source)
+	protected EBMessage(Object source)
 	{
 		this.source = source;
 	} //}}}
@@ -56,7 +56,7 @@ public abstract class EBMessage
 	 * Creates a new message.
 	 * @param source The message source
 	 */
-	public EBMessage(EBComponent source)
+	protected EBMessage(EBComponent source)
 	{
 		this.source = source;
 	} //}}}
@@ -75,12 +75,13 @@ public abstract class EBMessage
 	/**
 	 * Returns a string representation of this message.
 	 */
+	@Override
 	public String toString()
 	{
 		String className = getClass().getName();
 		int index = className.lastIndexOf('.');
 		return className.substring(index + 1)
-			+ "[" + paramString() + "]";
+			+ '[' + paramString() + ']';
 	} //}}}
 
 	//{{{ paramString() method
@@ -95,43 +96,4 @@ public abstract class EBMessage
 	//{{{ Private members
 	private Object source;
 	//}}}
-
-	//{{{ Deprecated methods
-	/**
-	 * @deprecated Does nothing.
-	 */
-	public void veto()
-	{
-	}
-
-	/**
-	 * @deprecated Returns false.
-	 */
-	public boolean isVetoed()
-	{
-		return false;
-	}
-
-	/**
-	 * @deprecated Subclass <code>EBMessage</code> instead.
-	 */
-	public static abstract class NonVetoable extends EBMessage
-	{
-		/**
-		 * Creates a new non-vetoable message.
-		 * @param source The message source
-		 */
-		public NonVetoable(EBComponent source)
-		{
-			super(source);
-		}
-
-		/**
-		 * Disallows this message from being vetoed.
-		 */
-		public void veto()
-		{
-			throw new InternalError("Can't veto this message");
-		}
-	} //}}}
 }

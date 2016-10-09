@@ -4,7 +4,7 @@
  * 
  * Copyright (C) 2004 Ollie Rutherfurd <oliver@jedit.org>
  *
- * $Id: Copy_Lines_Containing.bsh,v 1.1 2004/08/03 21:31:47 orutherfurd Exp $
+ * $Id: Copy_Lines_Containing.bsh 5098 2004-08-03 21:31:48Z orutherfurd $
  */
 
 copyLinesContaining(){

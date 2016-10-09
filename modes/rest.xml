@@ -4,9 +4,9 @@
 
 <MODE>
 	<PROPS>
-		<PROPERTY NAME="lineComment" VALUE=".."/>
+		<PROPERTY NAME="lineComment" VALUE=".. "/>
 		<!-- indent after literal blocks and directives -->
-		<PROPERTY NAME="indentNextLines" VALUE=".+::$"/>
+		<PROPERTY NAME="indentNextLines" VALUE=".*::$"/>
 	</PROPS>
 
 	<RULES IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="FALSE">
@@ -16,19 +16,18 @@
 		<EOL_SPAN AT_LINE_START="TRUE" TYPE="KEYWORD3">.. _</EOL_SPAN>
 
 		<!-- section titles -->
-		<SEQ_REGEXP HASH_CHAR="=" TYPE="LABEL">={3,}</SEQ_REGEXP>
-		<SEQ_REGEXP HASH_CHAR="-" TYPE="LABEL">-{3,}</SEQ_REGEXP>
-		<SEQ_REGEXP HASH_CHAR="~" TYPE="LABEL">~{3,}</SEQ_REGEXP>
-		<SEQ_REGEXP HASH_CHAR="`" TYPE="LABEL">`{3,}</SEQ_REGEXP>
-		<SEQ_REGEXP HASH_CHAR="#" TYPE="LABEL">#{3,}</SEQ_REGEXP>
-		<SEQ_REGEXP HASH_CHAR='"' TYPE="LABEL">"{3,}</SEQ_REGEXP>
-		<SEQ_REGEXP HASH_CHAR='^' TYPE="LABEL">\^{3,}</SEQ_REGEXP>
-		<SEQ_REGEXP HASH_CHAR='+' TYPE="LABEL">\+{3,}</SEQ_REGEXP>
-		<SEQ_REGEXP HASH_CHAR='*' TYPE="LABEL">\*{3,}</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="===" TYPE="LABEL">={3,}</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="---" TYPE="LABEL">-{3,}</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="~~~" TYPE="LABEL">~{3,}</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="###" TYPE="LABEL">#{3,}</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR='"""' TYPE="LABEL">"{3,}</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="^^^" TYPE="LABEL">\^{3,}</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="+++" TYPE="LABEL">\+{3,}</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="***" TYPE="LABEL">\*{3,}</SEQ_REGEXP>
 
 		<!-- replacement -->
 		<SEQ_REGEXP
-			HASH_CHAR="."
+			HASH_CHAR=".."
 			AT_LINE_START="TRUE"
 			TYPE="LITERAL3"
 		>\.\.\s\|[^|]+\|</SEQ_REGEXP>
@@ -42,14 +41,14 @@
 
 		<!-- directives: .. name:: -->
 		<SEQ_REGEXP
-			HASH_CHAR="."
+			HASH_CHAR=".."
 			AT_LINE_START="TRUE"
 			TYPE="LITERAL2"
 		>\.\.\s[A-z][A-z0-9-_]+::</SEQ_REGEXP>
 
 		<!-- strong emphasis: **...** -->
 		<SEQ_REGEXP
-			HASH_CHAR="*"
+			HASH_CHAR="**"
 			AT_LINE_START="FALSE"
 			TYPE="KEYWORD2"
 		>\*\*[^*]+\*\*</SEQ_REGEXP>
@@ -62,7 +61,7 @@
 		>\*[^\s*][^*]*\*</SEQ_REGEXP>
 
 		<!-- comments -->
-		<EOL_SPAN AT_LINE_START="TRUE" TYPE="COMMENT1">..</EOL_SPAN>
+		<EOL_SPAN AT_LINE_START="TRUE" TYPE="COMMENT1">.. </EOL_SPAN>
 
 		<!-- links: `...`_ or `...`__ -->
 		<SEQ_REGEXP
@@ -78,15 +77,12 @@
 
 		<!-- footnote reference: [#]_ or [#foo]_ -->
 		<SEQ_REGEXP
-			HASH_CHAR="["
+			HASH_CHAR="[#"
 			TYPE="LABEL"
 		>\[#[A-z0-9_]*\]_</SEQ_REGEXP>
 
 		<!-- footnote reference: [*]_ -->
-		<SEQ_REGEXP
-			HASH_CHAR="["
-			TYPE="LABEL"
-		>\[*\]_</SEQ_REGEXP>
+		<SEQ TYPE="LABEL">[*]_</SEQ>
 
 		<!-- citation reference: [foo]_ -->
 		<SEQ_REGEXP
@@ -96,19 +92,27 @@
 
 		<!-- inline literal: ``...``-->
 		<!--<SEQ_REGEXP
-			HASH_CHAR="`"
+			HASH_CHAR="``"
 			TYPE="LITERAL1"
 		>``[^`]+``</SEQ_REGEXP>-->
-		<SPAN TYPE="LITERAL1">
+		<SPAN TYPE="LITERAL1" ESCAPE="\">
 			<BEGIN>``</BEGIN>
 			<END>``</END>
 		</SPAN>
 
 		<!-- interpreted text: `...` -->
+		<!--
 		<SEQ_REGEXP
 			HASH_CHAR="`"
 			TYPE="KEYWORD1"
 		>`[^`]+`</SEQ_REGEXP>
+		-->
+		<SPAN TYPE="KEYWORD1">
+			<BEGIN>`</BEGIN>
+			<END>`</END>
+		</SPAN>
+
+		<SEQ_REGEXP HASH_CHAR="```" TYPE="LABEL">`{3,}</SEQ_REGEXP>
 
 		<!-- :field list: -->
 		<SEQ_REGEXP
@@ -118,11 +122,11 @@
 
 		<!-- table -->
 		<SEQ_REGEXP
-			HASH_CHAR="+"
+			HASH_CHAR="+-"
 			TYPE="LABEL"
 		>\+-[+-]+</SEQ_REGEXP>
 		<SEQ_REGEXP
-			HASH_CHAR="+"
+			HASH_CHAR="+?"
 			TYPE="LABEL"
 		>\+=[+=]+</SEQ_REGEXP>
 

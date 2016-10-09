@@ -28,7 +28,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Message sent when dockable window state changes.
  * @author Slava Pestov
- * @version $Id: DockableWindowUpdate.java,v 1.2 2004/03/28 00:07:26 spestov Exp $
+ * @version $Id: DockableWindowUpdate.java 12504 2008-04-22 23:12:43Z ezust $
  *
  * @since jEdit 4.2pre1
  */

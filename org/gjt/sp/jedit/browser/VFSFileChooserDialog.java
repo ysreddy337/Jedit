@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2003 Slava Pestov
+ * Copyright (C) 2000, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,31 +26,248 @@ package org.gjt.sp.jedit.browser;
 import javax.swing.border.EmptyBorder;
 import javax.swing.*;
 import java.awt.event.*;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Dialog;
+import java.awt.Frame;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import org.gjt.sp.jedit.gui.EnhancedDialog;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.buffer.JEditBuffer;
 import org.gjt.sp.util.*;
 //}}}
 
 /**
  * Wraps the VFS browser in a modal dialog.
+ * Shows up when "File-Open" is used. 
  * @author Slava Pestov
- * @version $Id: VFSFileChooserDialog.java,v 1.44 2004/06/28 06:45:26 spestov Exp $
+ * @version $Id: VFSFileChooserDialog.java 16560 2009-11-29 19:06:17Z kerik-sf $
  */
 public class VFSFileChooserDialog extends EnhancedDialog
 {
+
 	//{{{ VFSFileChooserDialog constructor
 	public VFSFileChooserDialog(View view, String path,
 		int mode, boolean multipleSelection)
 	{
-		super(view,jEdit.getProperty("vfs.browser.title"),true);
+		this(view,path,mode,multipleSelection,true);
+	} //}}}
 
+	//{{{ VFSFileChooserDialog constructor
+	/**
+	 * Constructs a new VFSFileChooserDialog. If <code>authoshow</code>
+	 * is true, the dialog will be show automatically and the call
+	 * will only return after the user disposes of the dialog.
+	 *
+	 * @since jEdit 4.3pre7
+	 */
+	public VFSFileChooserDialog(View view, String path,
+		int mode, boolean multipleSelection, boolean autoshow)
+	{
+		super(view,getDefaultTitle(),true);
+		setFocusTraversalPolicy(new LayoutFocusTraversalPolicy());
+		_init(view,path,mode,multipleSelection,autoshow);
+	} //}}}
+
+	//{{{ VFSFileChooserDialog constructor
+	/**
+	 * Constructs a new VFSFileChooserDialog.
+	 * This version can specify a dialog as the parent instead
+	 * of the view.
+	 * @since jEdit 4.3pre10
+	 */
+	public VFSFileChooserDialog(Dialog parent, View view, String path,
+		int mode, boolean multipleSelection, boolean autoshow)
+	{
+		super(parent,getDefaultTitle(),true);
+		setFocusTraversalPolicy(new LayoutFocusTraversalPolicy());		
+		_init(view,path,mode,multipleSelection,autoshow);
+	} //}}}
+
+	/**
+	 * Constructs a new VFSFileChooserDialog.
+	 * This version can specify a Frame as the parent instead
+	 * of the view.
+	 * @since jEdit 4.3pre10
+	 */
+	public VFSFileChooserDialog(Frame parent, View view, String path,
+		int mode, boolean multipleSelection, boolean autoshow)
+	{
+		super(parent, getDefaultTitle(),true);
+		setFocusTraversalPolicy(new LayoutFocusTraversalPolicy());		
+		_init(view,path,mode,multipleSelection,autoshow);
+	} //}}}
+
+
+	//{{{ getBrowser() method
+	/**
+	 * Returns the VFSBrowser instance used internally.
+	 * @return the VFS browser used in the dialog
+	 * @since jEdit 4.3pre7
+	 */
+	public VFSBrowser getBrowser()
+	{
+		return browser;
+	} //}}}
+
+	//{{{ dispose() method
+	@Override
+	public void dispose()
+	{
+		GUIUtilities.saveGeometry(this,"vfs.browser.dialog");
+		VFSManager.getIOThreadPool().removeProgressListener(workThreadHandler);
+		super.dispose();
+	} //}}}
+
+	//{{{ ok() method
+	@Override
+	public void ok()
+	{
+		VFSFile[] files = browser.getSelectedFiles();
+		filename = filenameField.getText();
+		boolean choosingDir = (browser.getMode() ==
+			VFSBrowser.CHOOSE_DIRECTORY_DIALOG);
+
+		if(files.length != 0)
+		{
+			if(choosingDir)
+			{
+				isOK = true;
+				dispose();
+			}
+			else
+				browser.filesActivated(VFSBrowser.M_OPEN,false);
+			return;
+		}
+		else if(choosingDir && (filename == null || filename.length() == 0))
+		{
+			isOK = true;
+			dispose();
+			return;
+		}
+		else if(filename == null || filename.length() == 0)
+		{
+			getToolkit().beep();
+			return;
+		}
+
+		String bufferDir = browser.getView().getBuffer()
+			.getDirectory();
+		if(filename.equals("-"))
+			filename = bufferDir;
+		else if(filename.startsWith("-/")
+			|| filename.startsWith('-' + File.separator))
+		{
+			filename = MiscUtilities.constructPath(
+				bufferDir,filename.substring(2));
+		}
+
+		final int[] type = { -1 };
+		filename = MiscUtilities.expandVariables(filename);
+		final String path = MiscUtilities.constructPath(
+			browser.getDirectory(),filename);
+		final VFS vfs = VFSManager.getVFSForPath(path);
+		Object session = vfs.createVFSSession(path,this);
+		if(session == null)
+			return;
+
+		VFSManager.runInWorkThread(new GetFileTypeRequest(
+			vfs,session,path,type));
+		VFSManager.runInAWTThread(new Runnable()
+		{
+			public void run()
+			{
+				switch(type[0])
+				{
+				case VFSFile.FILE:
+					if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+						break;
+
+					if(vfs instanceof FileVFS)
+					{
+						if(doFileExistsWarning(path))
+							break;
+					}
+					isOK = true;
+					if(browser.getMode() == VFSBrowser.BROWSER_DIALOG)
+					{
+						Hashtable props = new Hashtable();
+						props.put(JEditBuffer.ENCODING,browser.currentEncoding);
+						jEdit.openFile(browser.getView(),
+							browser.getDirectory(),
+							path,false,props);
+					}
+					dispose();
+					break;
+				case VFSFile.DIRECTORY:
+				case VFSFile.FILESYSTEM:
+					browser.setDirectory(path);
+					break;
+				}
+			}
+		});
+	} //}}}
+
+	//{{{ cancel() method
+	@Override
+	public void cancel()
+	{
+		dispose();
+	} //}}}
+
+	//{{{ getSelectedFiles() method
+	public String[] getSelectedFiles()
+	{
+		if(!isOK)
+			return null;
+
+		if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+		{
+			if(browser.getSelectedFiles().length > 0)
+			{
+				return getSelectedFiles(VFSFile.DIRECTORY,
+					VFSFile.FILESYSTEM);
+			}
+			else
+				return new String[] { browser.getDirectory() };
+		}
+		else if(filename != null && filename.length() != 0)
+		{
+			String path = browser.getDirectory();
+			return new String[] { MiscUtilities.constructPath(
+				path,filename) };
+		}
+		else
+			return getSelectedFiles(VFSFile.FILE,VFSFile.FILE);
+	} //}}}
+
+	//{{{ Private members
+
+	//{{{ Instance variables
+	private VFSBrowser browser;
+	private VFSFileNameField filenameField;
+	private String filename;
+	private JButton ok;
+	private JButton cancel;
+	private boolean isOK;
+	private WorkThreadHandler workThreadHandler;
+	//}}}
+
+	//{{{ getDefaultTitle() method
+	private static String getDefaultTitle()
+	{
+		return jEdit.getProperty("vfs.browser.title");
+	}// }}}
+
+	//{{{ _init method
+	private void _init(View view, String path,
+		int mode, boolean multipleSelection, boolean autoshow)
+	{
 		JPanel content = new JPanel(new BorderLayout());
-		content.setBorder(new EmptyBorder(12,12,12,12));
 		setContentPane(content);
 
 		String name;
@@ -66,23 +283,26 @@ public class VFSFileChooserDialog extends EnhancedDialog
 			VFS vfs = VFSManager.getVFSForPath(path);
 			name = vfs.getFileName(path);
 			path = vfs.getParentOfPath(path);
+			if ((vfs.getCapabilities() & VFS.BROWSE_CAP) == 0)
+			{
+				path = null;
+			}
 		}
 
-		browser = new VFSBrowser(view,path,mode,multipleSelection,null);
-		browser.getBrowserView().getTable().setRequestFocusEnabled(false);
-		browser.getBrowserView().getParentDirectoryList()
-			.setRequestFocusEnabled(false);
-		/* browser.getBrowserView().getTable().addKeyListener(new KeyHandler()); */
+		browser = new VFSBrowser(view, path, mode, multipleSelection, null);
+		
 		browser.addBrowserListener(new BrowserHandler());
 		content.add(BorderLayout.CENTER,browser);
 
 		JPanel panel = new JPanel();
 		panel.setLayout(new BoxLayout(panel,BoxLayout.X_AXIS));
-		panel.setBorder(new EmptyBorder(12,0,0,0));
-
+		panel.setBorder(new EmptyBorder(12,12,12,12));
+		
 		filenameField = new VFSFileNameField(browser,null);
 		filenameField.setText(name);
 		filenameField.selectAll();
+		filenameField.setName("filename");
+		browser.setDefaultFocusComponent(filenameField);
 		Box box = new Box(BoxLayout.Y_AXIS);
 		box.add(Box.createGlue());
 		box.add(filenameField);
@@ -99,9 +319,8 @@ public class VFSFileChooserDialog extends EnhancedDialog
 
 		panel.add(Box.createHorizontalStrut(12));
 
-		GUIUtilities.requestFocus(this,filenameField);
-
 		ok = new JButton();
+		ok.setName("ok");
 		getRootPane().setDefaultButton(ok);
 
 		switch(mode)
@@ -125,6 +344,7 @@ public class VFSFileChooserDialog extends EnhancedDialog
 		panel.add(ok);
 		panel.add(Box.createHorizontalStrut(6));
 		cancel = new JButton(jEdit.getProperty("common.cancel"));
+		cancel.setName("cancel");
 		cancel.addActionListener(new ActionHandler());
 		panel.add(cancel);
 
@@ -135,149 +355,13 @@ public class VFSFileChooserDialog extends EnhancedDialog
 
 		pack();
 		GUIUtilities.loadGeometry(this,"vfs.browser.dialog");
-		setVisible(true);
+		GUIUtilities.requestFocus(this,filenameField);
+		if (autoshow)
+			setVisible(true);
 	} //}}}
 
-	//{{{ dispose() method
-	public void dispose()
-	{
-		GUIUtilities.saveGeometry(this,"vfs.browser.dialog");
-		VFSManager.getIOThreadPool().removeProgressListener(workThreadHandler);
-		super.dispose();
-	} //}}}
-
-	//{{{ ok() method
-	public void ok()
-	{
-		VFS.DirectoryEntry[] files = browser.getSelectedFiles();
-		filename = filenameField.getText();
-
-		if(files.length != 0)
-		{
-			browser.filesActivated(VFSBrowser.M_OPEN,false);
-			return;
-		}
-		else if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG
-			&& (filename == null || filename.length() == 0))
-		{
-			isOK = true;
-			dispose();
-			return;
-		}
-		else if(filename == null || filename.length() == 0)
-		{
-			getToolkit().beep();
-			return;
-		}
-
-		String bufferDir = browser.getView().getBuffer()
-			.getDirectory();
-		if(filename.equals("-"))
-			filename = bufferDir;
-		else if(filename.startsWith("-/")
-			|| filename.startsWith("-" + File.separator))
-		{
-			filename = MiscUtilities.constructPath(
-				bufferDir,filename.substring(2));
-		}
-
-		final int[] type = { -1 };
-		final String path = MiscUtilities.constructPath(
-			browser.getDirectory(),filename);
-		final VFS vfs = VFSManager.getVFSForPath(path);
-		Object session = vfs.createVFSSession(path,this);
-		if(session == null)
-			return;
-
-		VFSManager.runInWorkThread(new GetFileTypeRequest(
-			vfs,session,path,type));
-		VFSManager.runInAWTThread(new Runnable()
-		{
-			public void run()
-			{
-				switch(type[0])
-				{
-				case VFS.DirectoryEntry.FILE:
-					if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
-						break;
-
-					if(vfs instanceof FileVFS)
-					{
-						if(doFileExistsWarning(path))
-							break;
-					}
-					isOK = true;
-					if(browser.getMode() == VFSBrowser.BROWSER_DIALOG)
-					{
-						Hashtable props = new Hashtable();
-						props.put(Buffer.ENCODING,browser.currentEncoding);
-						jEdit.openFile(browser.getView(),
-							browser.getDirectory(),
-							path,false,props);
-					}
-					dispose();
-					break;
-				case VFS.DirectoryEntry.DIRECTORY:
-				case VFS.DirectoryEntry.FILESYSTEM:
-					browser.setDirectory(path);
-					break;
-				}
-			}
-		});
-	} //}}}
-
-	//{{{ cancel() method
-	public void cancel()
-	{
-		dispose();
-	} //}}}
-
-	//{{{ getSelectedFiles() method
-	public String[] getSelectedFiles()
-	{
-		if(!isOK)
-			return null;
-
-		//String filename = filenameField.getText();
-
-		if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
-		{
-			return new String[] { browser.getDirectory() };
-		}
-		else if(filename != null && filename.length() != 0)
-		{
-			String path = browser.getDirectory();
-			return new String[] { MiscUtilities.constructPath(
-				path,filename) };
-		}
-		else
-		{
-			Vector vector = new Vector();
-			VFS.DirectoryEntry[] selectedFiles = browser.getSelectedFiles();
-			for(int i = 0; i < selectedFiles.length; i++)
-			{
-				VFS.DirectoryEntry file = selectedFiles[i];
-				if(file.type == VFS.DirectoryEntry.FILE)
-					vector.addElement(file.path);
-			}
-			String[] retVal = new String[vector.size()];
-			vector.copyInto(retVal);
-			return retVal;
-		}
-	} //}}}
-
-	//{{{ Private members
-
-	//{{{ Instance variables
-	private VFSBrowser browser;
-	private VFSFileNameField filenameField;
-	private String filename;
-	private JButton ok;
-	private JButton cancel;
-	private boolean isOK;
-	private WorkThreadHandler workThreadHandler;
-	//}}}
-
+	
+	
 	//{{{ doFileExistsWarning() method
 	private boolean doFileExistsWarning(String filename)
 	{
@@ -296,62 +380,70 @@ public class VFSFileChooserDialog extends EnhancedDialog
 		return false;
 	} //}}}
 
+	//{{{ getSelectedFiles() method
+	private String[] getSelectedFiles(int type1, int type2)
+	{
+		List<String> l = new ArrayList<String>();
+		VFSFile[] selectedFiles = browser.getSelectedFiles();
+		for(int i = 0; i < selectedFiles.length; i++)
+		{
+			VFSFile file = selectedFiles[i];
+			if(file.getType() == type1 || file.getType() == type2)
+				l.add(file.getPath());
+		}
+		return l.toArray(new String[l.size()]);
+	} //}}}
+
 	//}}}
 
 	//{{{ Inner classes
 
 	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
+	private class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
 		{
 			if(evt.getSource() == ok)
-			{
-				if(!browser.getDirectory().equals(
-					browser.getDirectoryField().getText()))
-				{
-					browser.setDirectory(browser.getDirectoryField().getText());
-				}
-				else
-					ok();
-			}
+				ok();
 			else if(evt.getSource() == cancel)
 				cancel();
 		}
 	} //}}}
 
 	//{{{ BrowserHandler class
-	class BrowserHandler implements BrowserListener
+	private class BrowserHandler implements BrowserListener
 	{
 		//{{{ filesSelected() method
-		public void filesSelected(VFSBrowser browser, VFS.DirectoryEntry[] files)
+		public void filesSelected(VFSBrowser browser, VFSFile[] files)
 		{
+			boolean choosingDir = (browser.getMode()
+				== VFSBrowser.CHOOSE_DIRECTORY_DIALOG);
+
 			if(files.length == 0)
 			{
-				if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+				if(choosingDir)
 				{
 					ok.setText(jEdit.getProperty(
 						"vfs.browser.dialog.choose-dir"));
 				}
-				return;
 			}
 			else if(files.length == 1)
 			{
-				if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+				if(choosingDir)
 				{
 					ok.setText(jEdit.getProperty(
-						"vfs.browser.dialog.open"));
+						"vfs.browser.dialog.choose-dir"));
 				}
 
-				VFS.DirectoryEntry file = files[0];
-				if(file.type == VFS.DirectoryEntry.FILE)
+				VFSFile file = files[0];
+				if(file.getType() == VFSFile.FILE)
 				{
-					String path = file.path;
+					String path = file.getPath();
 					String directory = browser.getDirectory();
 					String parent = MiscUtilities
 						.getParentOfPath(path);
-					if(VFSBrowser.pathsEqual(parent,directory))
-						path = file.name;
+					if(MiscUtilities.pathsEqual(parent,directory))
+						path = file.getName();
 
 					filenameField.setText(path);
 					filenameField.selectAll();
@@ -359,10 +451,10 @@ public class VFSFileChooserDialog extends EnhancedDialog
 			}
 			else
 			{
-				if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+				if(choosingDir)
 				{
 					ok.setText(jEdit.getProperty(
-						"vfs.browser.dialog.open"));
+						"vfs.browser.dialog.choose-dir"));
 				}
 
 				filenameField.setText(null);
@@ -370,7 +462,7 @@ public class VFSFileChooserDialog extends EnhancedDialog
 		} //}}}
 
 		//{{{ filesActivated() method
-		public void filesActivated(VFSBrowser browser, VFS.DirectoryEntry[] files)
+		public void filesActivated(VFSBrowser browser, VFSFile[] files)
 		{
 			filenameField.selectAll();
 
@@ -385,9 +477,9 @@ public class VFSFileChooserDialog extends EnhancedDialog
 
 			for(int i = 0; i < files.length; i++)
 			{
-				if(files[i].type == VFS.DirectoryEntry.FILE)
+				if(files[i].getType() == VFSFile.FILE)
 				{
-					String path = files[i].path;
+					String path = files[i].getPath();
 					VFS vfs = VFSManager.getVFSForPath(path);
 					if(browser.getMode() == VFSBrowser.SAVE_DIALOG
 						&& vfs instanceof FileVFS)
@@ -410,29 +502,12 @@ public class VFSFileChooserDialog extends EnhancedDialog
 		} //}}}
 	} //}}}
 
-	//{{{ KeyHandler class
-	class KeyHandler extends KeyAdapter
-	{
-		public void keyTyped(KeyEvent evt)
-		{
-			switch(evt.getKeyChar())
-			{
-			case '/':
-			case '-':
-			case '~':
-				filenameField.processKeyEvent(evt);
-				filenameField.requestFocus();
-				break;
-			}
-		}
-	} //}}}
-
 	//{{{ WorkThreadListener class
-	class WorkThreadHandler implements WorkThreadProgressListener
+	private class WorkThreadHandler implements WorkThreadProgressListener
 	{
 		//{{{ statusUpdate() method
 		public void statusUpdate(final WorkThreadPool threadPool,
-			final int threadIndex)
+			int threadIndex)
 		{
 			SwingUtilities.invokeLater(new Runnable()
 			{
@@ -461,7 +536,7 @@ public class VFSFileChooserDialog extends EnhancedDialog
 	} //}}}
 
 	//{{{ GetFileTypeRequest class
-	class GetFileTypeRequest implements Runnable
+	private class GetFileTypeRequest implements Runnable
 	{
 		VFS    vfs;
 		Object session;
@@ -481,27 +556,21 @@ public class VFSFileChooserDialog extends EnhancedDialog
 		{
 			try
 			{
-				VFS.DirectoryEntry entry
-					= vfs._getDirectoryEntry(
+				VFSFile entry = vfs._getFile(
 						session,
 						path,
 						browser);
 				if(entry == null)
 				{
 					// non-existent file
-					type[0] = VFS.DirectoryEntry.FILE;
+					type[0] = VFSFile.FILE;
 				}
 				else
-					type[0] = entry.type;
+					type[0] = entry.getType();
 			}
 			catch(IOException e)
 			{
-				Log.log(Log.ERROR,this,e);
-				VFSManager.error(browser,path,
-					"ioerror",
-					new String[]
-					{ e.toString() });
-				return;
+				VFSManager.error(e,path,browser);
 			}
 			finally
 			{
@@ -513,12 +582,7 @@ public class VFSFileChooserDialog extends EnhancedDialog
 				}
 				catch(IOException e)
 				{
-					Log.log(Log.ERROR,this,e);
-					VFSManager.error(browser,path,
-						"ioerror",
-						new String[]
-						{ e.toString() });
-					return;
+					VFSManager.error(e,path,browser);
 				}
 			}
 		}

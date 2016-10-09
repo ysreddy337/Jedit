@@ -34,13 +34,14 @@ import org.gjt.sp.jedit.browser.VFSBrowser;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
 //{{{ ToolBarOptionPane class
 /**
  * Tool bar editor.
  * @author Slava Pestov
- * @version $Id: ToolBarOptionPane.java,v 1.14 2004/06/28 06:45:27 spestov Exp $
+ * @version $Id: ToolBarOptionPane.java 14665 2009-02-17 20:21:54Z scarlac $
  */
 public class ToolBarOptionPane extends AbstractOptionPane
 {
@@ -68,12 +69,120 @@ public class ToolBarOptionPane extends AbstractOptionPane
 
 		add(BorderLayout.NORTH,panel);
 
-		String toolbar = jEdit.getProperty("view.toolbar");
-		StringTokenizer st = new StringTokenizer(toolbar);
 		listModel = new DefaultListModel();
+		reloadButtonList(jEdit.getProperty("view.toolbar"));
+		
+		list = new JList(listModel);
+		list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		list.addListSelectionListener(new ListHandler());
+		list.setCellRenderer(new ButtonCellRenderer());
+
+		add(BorderLayout.CENTER,new JScrollPane(list));
+
+		//{{{ Create buttons
+		JPanel buttons = new JPanel();
+		buttons.setBorder(new EmptyBorder(3,0,0,0));
+		buttons.setLayout(new BoxLayout(buttons,BoxLayout.X_AXIS));
+		ActionHandler actionHandler = new ActionHandler();
+		add = new RolloverButton(GUIUtilities.loadIcon(jEdit.getProperty("options.toolbar.add.icon")));
+		add.setToolTipText(jEdit.getProperty("options.toolbar.add"));
+		add.addActionListener(actionHandler);
+		buttons.add(add);
+		buttons.add(Box.createHorizontalStrut(6));
+		remove = new RolloverButton(GUIUtilities.loadIcon(jEdit.getProperty("options.toolbar.remove.icon")));
+		remove.setToolTipText(jEdit.getProperty("options.toolbar.remove"));
+		remove.addActionListener(actionHandler);
+		buttons.add(remove);
+		buttons.add(Box.createHorizontalStrut(6));
+		moveUp = new RolloverButton(GUIUtilities.loadIcon(jEdit.getProperty("options.toolbar.moveUp.icon")));
+		moveUp.setToolTipText(jEdit.getProperty("options.toolbar.moveUp"));
+		moveUp.addActionListener(actionHandler);
+		buttons.add(moveUp);
+		buttons.add(Box.createHorizontalStrut(6));
+		moveDown = new RolloverButton(GUIUtilities.loadIcon(jEdit.getProperty("options.toolbar.moveDown.icon")));
+		moveDown.setToolTipText(jEdit.getProperty("options.toolbar.moveDown"));
+		moveDown.addActionListener(actionHandler);
+		buttons.add(moveDown);
+		buttons.add(Box.createHorizontalStrut(6));
+		edit = new RolloverButton(GUIUtilities.loadIcon(jEdit.getProperty("options.toolbar.edit.icon")));
+		edit.setToolTipText(jEdit.getProperty("options.toolbar.edit"));
+		edit.addActionListener(actionHandler);
+		buttons.add(edit);
+		buttons.add(Box.createGlue());
+		
+		// add "reset to defaults" button
+		reset = new RolloverButton(GUIUtilities.loadIcon(jEdit.getProperty("options.toolbar.reset.icon")));
+		reset.setToolTipText(jEdit.getProperty("options.toolbar.reset"));
+		reset.addActionListener(actionHandler);
+		buttons.add(reset);
+		//}}}
+
+		updateButtons();
+		add(BorderLayout.SOUTH,buttons);
+
+		//{{{ Ceate icons list
+		iconList = new DefaultComboBoxModel();
+		StringTokenizer st = new StringTokenizer(jEdit.getProperty("icons"));
+		while(st.hasMoreElements())
+		{
+			String icon = st.nextToken();
+			iconList.addElement(new IconListEntry(
+				GUIUtilities.loadIcon(icon),icon));
+		} //}}}
+	} ///}}}
+
+	//{{{ _save() method
+	protected void _save()
+	{
+		jEdit.setBooleanProperty("view.showToolbar",showToolbar
+			.isSelected());
+
+		StringBuilder buf = new StringBuilder();
+		for(int i = 0; i < listModel.getSize(); i++)
+		{
+			if(i != 0)
+				buf.append(' ');
+			Button button = (Button)listModel.elementAt(i);
+			buf.append(button.actionName);
+			jEdit.setProperty(button.actionName + ".icon",button.iconName);
+		}
+		jEdit.setProperty("view.toolbar",buf.toString());
+	} //}}}
+
+	//{{{ Private members
+
+	//{{{ Instance variables
+	private JCheckBox showToolbar;
+	private DefaultListModel listModel;
+	private JList list;
+	private RolloverButton add;
+	private RolloverButton remove;
+	private RolloverButton moveUp, moveDown;
+	private RolloverButton edit;
+	private RolloverButton reset;
+
+	private DefaultComboBoxModel iconList;
+	//}}}
+
+	//{{{ updateButtons() method
+	private void updateButtons()
+	{
+		int index = list.getSelectedIndex();
+		remove.setEnabled(index != -1 && listModel.getSize() != 0);
+		moveUp.setEnabled(index > 0);
+		moveDown.setEnabled(index != -1 && index != listModel.getSize() - 1);
+		edit.setEnabled(index != -1);
+	} //}}}
+	
+	//{{{ reloadButtonList() method
+	private void reloadButtonList(String toolbar)
+	{
+		StringTokenizer st = new StringTokenizer(toolbar);
+		listModel.clear();
+		
 		while(st.hasMoreTokens())
 		{
-			String actionName = (String)st.nextToken();
+			String actionName = st.nextToken();
 			if(actionName.equals("-"))
 				listModel.addElement(new ToolBarOptionPane.Button("-",null,null,"-"));
 			else
@@ -96,125 +205,32 @@ public class ToolBarOptionPane extends AbstractOptionPane
 				{
 					iconName = jEdit.getProperty(actionName + ".icon");
 					if(iconName == null)
-						icon = GUIUtilities.loadIcon("BrokenImage.png");
+						icon = GUIUtilities.loadIcon(jEdit.getProperty("broken-image.icon"));
 					else
 					{
 						icon = GUIUtilities.loadIcon(iconName);
 						if(icon == null)
-							icon = GUIUtilities.loadIcon("BrokenImage.png");
+							icon = GUIUtilities.loadIcon(jEdit.getProperty("broken-image.icon"));
 					}
 				}
 				listModel.addElement(new Button(actionName,iconName,icon,label));
 			}
 		}
-
-		list = new JList(listModel);
-		list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-		list.addListSelectionListener(new ListHandler());
-		list.setCellRenderer(new ButtonCellRenderer());
-
-		add(BorderLayout.CENTER,new JScrollPane(list));
-
-		//{{{ Create buttons
-		JPanel buttons = new JPanel();
-		buttons.setBorder(new EmptyBorder(3,0,0,0));
-		buttons.setLayout(new BoxLayout(buttons,BoxLayout.X_AXIS));
-		ActionHandler actionHandler = new ActionHandler();
-		add = new RolloverButton(GUIUtilities.loadIcon("Plus.png"));
-		add.setToolTipText(jEdit.getProperty("options.toolbar.add"));
-		add.addActionListener(actionHandler);
-		buttons.add(add);
-		buttons.add(Box.createHorizontalStrut(6));
-		remove = new RolloverButton(GUIUtilities.loadIcon("Minus.png"));
-		remove.setToolTipText(jEdit.getProperty("options.toolbar.remove"));
-		remove.addActionListener(actionHandler);
-		buttons.add(remove);
-		buttons.add(Box.createHorizontalStrut(6));
-		moveUp = new RolloverButton(GUIUtilities.loadIcon("ArrowU.png"));
-		moveUp.setToolTipText(jEdit.getProperty("options.toolbar.moveUp"));
-		moveUp.addActionListener(actionHandler);
-		buttons.add(moveUp);
-		buttons.add(Box.createHorizontalStrut(6));
-		moveDown = new RolloverButton(GUIUtilities.loadIcon("ArrowD.png"));
-		moveDown.setToolTipText(jEdit.getProperty("options.toolbar.moveDown"));
-		moveDown.addActionListener(actionHandler);
-		buttons.add(moveDown);
-		buttons.add(Box.createHorizontalStrut(6));
-		edit = new RolloverButton(GUIUtilities.loadIcon("ButtonProperties.png"));
-		edit.setToolTipText(jEdit.getProperty("options.toolbar.edit"));
-		edit.addActionListener(actionHandler);
-		buttons.add(edit);
-		buttons.add(Box.createGlue());
-		//}}}
-
-		updateButtons();
-		add(BorderLayout.SOUTH,buttons);
-
-		//{{{ Ceate icons list
-		iconList = new DefaultComboBoxModel();
-		st = new StringTokenizer(jEdit.getProperty("icons"));
-		while(st.hasMoreElements())
-		{
-			String icon = st.nextToken();
-			iconList.addElement(new IconListEntry(
-				GUIUtilities.loadIcon(icon),icon));
-		} //}}}
-	} ///}}}
-
-	//{{{ _save() method
-	protected void _save()
-	{
-		jEdit.setBooleanProperty("view.showToolbar",showToolbar
-			.isSelected());
-
-		StringBuffer buf = new StringBuffer();
-		for(int i = 0; i < listModel.getSize(); i++)
-		{
-			if(i != 0)
-				buf.append(' ');
-			Button button = (Button)listModel.elementAt(i);
-			buf.append(button.actionName);
-			jEdit.setProperty(button.actionName + ".icon",button.iconName);
-		}
-		jEdit.setProperty("view.toolbar",buf.toString());
-	} //}}}
-
-	//{{{ Private members
-
-	//{{{ Instance variables
-	private JCheckBox showToolbar;
-	private DefaultListModel listModel;
-	private JList list;
-	private RolloverButton add;
-	private RolloverButton remove;
-	private RolloverButton moveUp, moveDown;
-	private RolloverButton edit;
-
-	private DefaultComboBoxModel iconList;
+	}
 	//}}}
-
-	//{{{ updateButtons() method
-	private void updateButtons()
-	{
-		int index = list.getSelectedIndex();
-		remove.setEnabled(index != -1 && listModel.getSize() != 0);
-		moveUp.setEnabled(index > 0);
-		moveDown.setEnabled(index != -1 && index != listModel.getSize() - 1);
-		edit.setEnabled(index != -1);
-	} //}}}
-
+	
 	//}}}
 
 	//{{{ Inner classes
 
 	//{{{ ButtonCompare class
-	static class ButtonCompare implements MiscUtilities.Compare
+	static class ButtonCompare implements Comparator<Button>
 	{
-		public int compare(Object obj1, Object obj2)
+		public int compare(Button button1, Button button2)
 		{
-			return MiscUtilities.compareStrings(
-				((Button)obj1).label,
-				((Button)obj2).label,
+			return StandardUtilities.compareStrings(
+				button1.label,
+				button2.label,
 				true);
 		}
 	} //}}}
@@ -372,6 +388,31 @@ public class ToolBarOptionPane extends AbstractOptionPane
 				list.setSelectedIndex(index);
 				list.ensureIndexIsVisible(index);
 			}
+			else if(source == reset)
+			{
+				String dialogType = "options.toolbar.reset.dialog";
+				int result = GUIUtilities.confirm(list,dialogType,null,
+					JOptionPane.YES_NO_OPTION,
+					JOptionPane.WARNING_MESSAGE);
+				
+				if(result == JOptionPane.YES_OPTION)
+				{
+					// the user should be able to cancel the options dialog 
+					// so we need to modify the list, not the actual property
+					// since the default value is not available, 
+					// we reset, fetch default value and re-set to original
+					String orgToolbar = jEdit.getProperty("view.toolbar");
+					jEdit.resetProperty("view.toolbar");
+					String defaultToolbar = jEdit.getProperty("view.toolbar");
+					jEdit.setProperty("view.toolbar", orgToolbar);
+					reloadButtonList(defaultToolbar);
+					
+					// reset selection if user had more buttons than default
+					list.setSelectedIndex(0);
+					list.ensureIndexIsVisible(0);
+					updateButtons();
+				}
+			}
 		}
 	} //}}}
 
@@ -428,15 +469,28 @@ class ToolBarEditDialog extends EnhancedDialog
 		JPanel actionPanel = new JPanel(new BorderLayout(6,6));
 
 		ActionSet[] actionsList = jEdit.getActionSets();
-		Vector vec = new Vector(actionsList.length);
+		String selectedActionSet = jEdit.getProperty("options.toolbar.selectedActionSet");
+		ActionSet selectedItem = null;
+		Vector<ActionSet> vec = new Vector<ActionSet>(actionsList.length);
 		for(int i = 0; i < actionsList.length; i++)
 		{
 			ActionSet actionSet = actionsList[i];
 			if(actionSet.getActionCount() != 0)
-				vec.addElement(actionSet);
+			{
+				vec.add(actionSet);
+				if (actionSet.getLabel().equals(selectedActionSet))
+				{
+					selectedItem = actionSet;
+				}
+			}
 		}
 		combo = new JComboBox(vec);
+		if (selectedItem != null)
+			combo.setSelectedItem(selectedItem);
+		else
+			jEdit.unsetProperty("options.toolbar.selectedActionSet");
 		combo.addActionListener(actionHandler);
+
 		actionPanel.add(BorderLayout.NORTH,combo);
 
 		list = new JList();
@@ -529,7 +583,6 @@ class ToolBarEditDialog extends EnhancedDialog
 				}
 				else
 				{
-					String iconName = MiscUtilities.getFileName(current.iconName);
 					builtin.setSelected(true);
 					ListModel model = builtinCombo.getModel();
 					for(int i = 0; i < model.getSize(); i++)
@@ -537,7 +590,7 @@ class ToolBarEditDialog extends EnhancedDialog
 						ToolBarOptionPane.IconListEntry entry
 							= (ToolBarOptionPane.IconListEntry)
 							model.getElementAt(i);
-						if(entry.name.equals(iconName))
+						if(entry.name.equals(current.iconName))
 						{
 							builtinCombo.setSelectedIndex(i);
 							break;
@@ -645,8 +698,10 @@ class ToolBarEditDialog extends EnhancedDialog
 	private void updateList()
 	{
 		ActionSet actionSet = (ActionSet)combo.getSelectedItem();
+		String actionSetLabel = actionSet.getLabel();
+		jEdit.setProperty("options.toolbar.selectedActionSet", actionSetLabel);
 		EditAction[] actions = actionSet.getActions();
-		Vector listModel = new Vector(actions.length);
+		Vector<ToolBarOptionPane.Button> listModel = new Vector<ToolBarOptionPane.Button>(actions.length);
 
 		for(int i = 0; i < actions.length; i++)
 		{
@@ -655,11 +710,11 @@ class ToolBarEditDialog extends EnhancedDialog
 			if(label == null)
 				continue;
 
-			listModel.addElement(new ToolBarOptionPane.Button(
+			listModel.add(new ToolBarOptionPane.Button(
 				action.getName(),null,null,label));
 		}
 
-		MiscUtilities.quicksort(listModel,new ToolBarOptionPane.ButtonCompare());
+		Collections.sort(listModel,new ToolBarOptionPane.ButtonCompare());
 		list.setListData(listModel);
 	} //}}}
 
@@ -686,7 +741,7 @@ class ToolBarEditDialog extends EnhancedDialog
 					directory = null;
 				else
 					directory = MiscUtilities.getParentOfPath(fileIcon);
-				String paths[] = GUIUtilities.showVFSFileDialog(null,directory,
+				String[] paths = GUIUtilities.showVFSFileDialog(null,directory,
 					VFSBrowser.OPEN_DIALOG,false);
 				if(paths == null)
 					return;

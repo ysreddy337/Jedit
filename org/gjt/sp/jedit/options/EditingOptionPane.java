@@ -24,11 +24,19 @@ package org.gjt.sp.jedit.options;
 
 //{{{ Imports
 import javax.swing.*;
+
 import java.awt.event.*;
+import java.util.Arrays;
+
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.jedit.buffer.FoldHandler;
+import org.gjt.sp.util.StandardUtilities;
 //}}}
 
+/**
+ * @author Slava Pestov
+ * @version $Id: EditingOptionPane.java 14125 2008-12-01 10:06:24Z kpouer $
+ */
 public class EditingOptionPane extends AbstractOptionPane
 {
 	//{{{ EditingOptionPane constructor
@@ -38,10 +46,11 @@ public class EditingOptionPane extends AbstractOptionPane
 	} //}}}
 
 	//{{{ _init() method
+	@Override
 	protected void _init()
 	{
 		Mode[] modes = jEdit.getModes();
-		MiscUtilities.quicksort(modes,new MiscUtilities.StringICaseCompare());
+		Arrays.sort(modes,new StandardUtilities.StringCompare<Mode>(true));
 
 		global = new ModeProperties();
 		modeProps = new ModeProperties[modes.length];
@@ -70,6 +79,9 @@ public class EditingOptionPane extends AbstractOptionPane
 		addComponent(jEdit.getProperty("options.editing.noWordSep"),
 			noWordSep = new JTextField());
 
+		addComponent(camelCasedWords = new JCheckBox(jEdit.getProperty(
+			"options.editing.camelCasedWords")));
+
 		String[] foldModes = FoldHandler.getFoldModes();
 		addComponent(jEdit.getProperty("options.editing.folding"),
 			folding = new JComboBox(foldModes));
@@ -84,13 +96,12 @@ public class EditingOptionPane extends AbstractOptionPane
 		};
 		addComponent(jEdit.getProperty("options.editing.wrap"),
 			wrap = new JComboBox(wrapModes));
-		wrap.addActionListener(new ActionHandler());
 
 		String[] lineLens = { "0", "72", "76", "80" };
-		addComponent(jEdit.getProperty("options.editing.maxLineLen"),
-			maxLineLen = new JComboBox(lineLens));
+		maxLineLen = new JComboBox(lineLens);
+		maxLineLen.setToolTipText(jEdit.getProperty("options.editing.maxLineLen.tooltip"));
+		addComponent(jEdit.getProperty("options.editing.maxLineLen"), maxLineLen);
 		maxLineLen.setEditable(true);
-		maxLineLen.addActionListener(new ActionHandler());
 
 		String[] tabSizes = { "2", "4", "8" };
 		addComponent(jEdit.getProperty("options.editing.tabSize"),
@@ -107,8 +118,10 @@ public class EditingOptionPane extends AbstractOptionPane
 		addComponent(deepIndent = new JCheckBox(jEdit.getProperty(
 			"options.editing.deepIndent")));
 
+		filenameGlob = new JTextField();
+		filenameGlob.setToolTipText(jEdit.getProperty("glob.tooltip"));
 		addComponent(jEdit.getProperty("options.editing.filenameGlob"),
-			filenameGlob = new JTextField());
+			filenameGlob);
 
 		addComponent(jEdit.getProperty("options.editing.firstlineGlob"),
 			firstlineGlob = new JTextField());
@@ -125,14 +138,23 @@ public class EditingOptionPane extends AbstractOptionPane
 
 		undoCount = new JTextField(jEdit.getProperty("buffer.undoCount"));
 		addComponent(jEdit.getProperty("options.editing.undoCount"),undoCount);
+
+		//{{{ Reset Undo Manager On Save
+		resetUndoOnSave = new JCheckBox(jEdit.getProperty("options.general.resetUndo"));
+		resetUndoOnSave.setSelected(jEdit.getBooleanProperty("resetUndoOnSave"));
+		addComponent(resetUndoOnSave);
+		//}}}
+
 	} //}}}
 
 	//{{{ _save() method
+	@Override
 	protected void _save()
 	{
 		jEdit.setProperty("buffer.defaultMode",
 			((Mode)defaultMode.getSelectedItem()).getName());
 		jEdit.setProperty("buffer.undoCount",undoCount.getText());
+		jEdit.setBooleanProperty("resetUndoOnSave", resetUndoOnSave.isSelected());
 
 		saveMode();
 
@@ -149,6 +171,7 @@ public class EditingOptionPane extends AbstractOptionPane
 	//{{{ Instance variables
 	private JComboBox defaultMode;
 	private JTextField undoCount;
+	private JCheckBox resetUndoOnSave;
 	private ModeProperties global;
 	private ModeProperties[] modeProps;
 	private ModeProperties current;
@@ -158,6 +181,7 @@ public class EditingOptionPane extends AbstractOptionPane
 	private JTextField filenameGlob;
 	private JTextField firstlineGlob;
 	private JTextField noWordSep;
+	private JCheckBox camelCasedWords;
 	private JComboBox folding;
 	private JTextField collapseFolds;
 	private JComboBox wrap;
@@ -175,6 +199,7 @@ public class EditingOptionPane extends AbstractOptionPane
 		current.filenameGlob = filenameGlob.getText();
 		current.firstlineGlob = firstlineGlob.getText();
 		current.noWordSep = noWordSep.getText();
+		current.camelCasedWords = camelCasedWords.isSelected();
 		current.folding = (String)folding.getSelectedItem();
 		current.collapseFolds = collapseFolds.getText();
 		current.wrap = (String)wrap.getSelectedItem();
@@ -189,7 +214,7 @@ public class EditingOptionPane extends AbstractOptionPane
 	private void selectMode()
 	{
 		int index = mode.getSelectedIndex();
-		current = (index == 0 ? global : modeProps[index - 1]);
+		current = index == 0 ? global : modeProps[index - 1];
 		current.edited = true;
 		current.load();
 
@@ -202,6 +227,7 @@ public class EditingOptionPane extends AbstractOptionPane
 		filenameGlob.setText(current.filenameGlob);
 		firstlineGlob.setText(current.firstlineGlob);
 		noWordSep.setText(current.noWordSep);
+		camelCasedWords.setSelected(current.camelCasedWords);
 		folding.setSelectedItem(current.folding);
 		collapseFolds.setText(current.collapseFolds);
 		wrap.setSelectedItem(current.wrap);
@@ -236,6 +262,7 @@ public class EditingOptionPane extends AbstractOptionPane
 		}
 
 		noWordSep.setEnabled(enabled);
+		camelCasedWords.setEnabled(enabled);
 		folding.setEnabled(enabled);
 		collapseFolds.setEnabled(enabled);
 		wrap.setEnabled(enabled);
@@ -249,7 +276,7 @@ public class EditingOptionPane extends AbstractOptionPane
 	//}}}
 
 	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
+	private class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
 		{
@@ -265,33 +292,11 @@ public class EditingOptionPane extends AbstractOptionPane
 					useDefaults.isSelected();
 				updateEnabled();
 			}
-			else if(source == wrap)
-			{
-				if(!wrap.getSelectedItem().equals("none"))
-				{
-					if(maxLineLen.getSelectedItem()
-						.equals("0"))
-					{
-						maxLineLen.setSelectedItem("80");
-					}
-				}
-			}
-			else if(source == maxLineLen)
-			{
-				if(!wrap.getSelectedItem().equals("none"))
-				{
-					if(maxLineLen.getSelectedItem()
-						.equals("0"))
-					{
-						wrap.setSelectedItem("none");
-					}
-				}
-			}
 		}
 	} //}}}
 
 	//{{{ ModeProperties class
-	class ModeProperties
+	private static class ModeProperties
 	{
 		//{{{ Instance variables
 		Mode mode;
@@ -302,6 +307,7 @@ public class EditingOptionPane extends AbstractOptionPane
 		String filenameGlob;
 		String firstlineGlob;
 		String noWordSep;
+		boolean camelCasedWords;
 		String folding;
 		String collapseFolds;
 		String wrap;
@@ -340,6 +346,7 @@ public class EditingOptionPane extends AbstractOptionPane
 				filenameGlob = (String)mode.getProperty("filenameGlob");
 				firstlineGlob = (String)mode.getProperty("firstlineGlob");
 				noWordSep = (String)mode.getProperty("noWordSep");
+				camelCasedWords = mode.getBooleanProperty("camelCasedWords");
 				folding = mode.getProperty("folding").toString();
 				collapseFolds = mode.getProperty("collapseFolds").toString();
 				wrap = mode.getProperty("wrap").toString();
@@ -352,6 +359,7 @@ public class EditingOptionPane extends AbstractOptionPane
 			else
 			{
 				noWordSep = jEdit.getProperty("buffer.noWordSep");
+				camelCasedWords = jEdit.getBooleanProperty("buffer.camelCasedWords");
 				folding = jEdit.getProperty("buffer.folding");
 				collapseFolds = jEdit.getProperty("buffer.collapseFolds");
 				wrap = jEdit.getProperty("buffer.wrap");
@@ -374,7 +382,7 @@ public class EditingOptionPane extends AbstractOptionPane
 			String prefix;
 			if(mode != null)
 			{
-				prefix = "mode." + mode.getName() + ".";
+				prefix = "mode." + mode.getName() + '.';
 				jEdit.setBooleanProperty(prefix + "customSettings",!useDefaults);
 
 				// need to call Mode.init() if the file name or first line
@@ -386,6 +394,7 @@ public class EditingOptionPane extends AbstractOptionPane
 					jEdit.resetProperty(prefix + "filenameGlob");
 					jEdit.resetProperty(prefix + "firstlineGlob");
 					jEdit.resetProperty(prefix + "noWordSep");
+					jEdit.resetProperty(prefix + "camelCasedWords");
 					jEdit.resetProperty(prefix + "folding");
 					jEdit.resetProperty(prefix + "collapseFolds");
 					jEdit.resetProperty(prefix + "wrap");
@@ -394,11 +403,11 @@ public class EditingOptionPane extends AbstractOptionPane
 					jEdit.resetProperty(prefix + "indentSize");
 					jEdit.resetProperty(prefix + "noTabs");
 					jEdit.resetProperty(prefix + "deepIndent");
-	
-					if(!(MiscUtilities.objectsEqual(oldFilenameGlob,
-						(String)mode.getProperty("filenameGlob"))
-						&& MiscUtilities.objectsEqual(oldFirstlineGlob,
-						(String)mode.getProperty("firstlineGlob"))))
+
+					if(!(StandardUtilities.objectsEqual(oldFilenameGlob,
+						mode.getProperty("filenameGlob"))
+						&& StandardUtilities.objectsEqual(oldFirstlineGlob,
+						mode.getProperty("firstlineGlob"))))
 					{
 						mode.init();
 					}
@@ -410,9 +419,9 @@ public class EditingOptionPane extends AbstractOptionPane
 					jEdit.setProperty(prefix + "filenameGlob",filenameGlob);
 					jEdit.setProperty(prefix + "firstlineGlob",firstlineGlob);
 
-					if(!(MiscUtilities.objectsEqual(oldFilenameGlob,
+					if(!(StandardUtilities.objectsEqual(oldFilenameGlob,
 						filenameGlob)
-						&& MiscUtilities.objectsEqual(oldFirstlineGlob,
+						&& StandardUtilities.objectsEqual(oldFirstlineGlob,
 						firstlineGlob)))
 					{
 						mode.init();
@@ -425,6 +434,7 @@ public class EditingOptionPane extends AbstractOptionPane
 			}
 
 			jEdit.setProperty(prefix + "noWordSep",noWordSep);
+			jEdit.setBooleanProperty(prefix + "camelCasedWords",camelCasedWords);
 			jEdit.setProperty(prefix + "folding",folding);
 			jEdit.setProperty(prefix + "collapseFolds",collapseFolds);
 			jEdit.setProperty(prefix + "wrap",wrap);

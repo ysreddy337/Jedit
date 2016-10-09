@@ -22,7 +22,7 @@
  *
  * Based on code contributed by Richard Wan
  *
- * $Id: Get_Package_Name.bsh,v 1.4 2004/03/19 15:58:00 spestov Exp $
+ * $Id: Get_Package_Name.bsh 4995 2004-03-19 15:58:00Z spestov $
  *
  * Checked for jEdit 4.0 API
  *

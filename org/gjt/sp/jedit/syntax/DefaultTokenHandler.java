@@ -28,7 +28,7 @@ import javax.swing.text.Segment;
  * Builds a linked list of tokens without any additional processing.
  *
  * @author Slava Pestov
- * @version $Id: DefaultTokenHandler.java,v 1.17 2003/10/26 19:43:57 spestov Exp $
+ * @version $Id: DefaultTokenHandler.java 12504 2008-04-22 23:12:43Z ezust $
  * @since jEdit 4.1pre1
  */
 public class DefaultTokenHandler implements TokenHandler

@@ -28,7 +28,13 @@ import java.awt.event.*;
 import java.util.Vector;
 import javax.swing.*;
 import javax.swing.border.*;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.SimpleAttributeSet;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyledDocument;
+
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.pluginmgr.PluginManager;
 import org.gjt.sp.util.Log;
 //}}}
 
@@ -51,7 +57,7 @@ public class ErrorListDialog extends EnhancedDialog
 			Log.log(Log.ERROR,this,path + ":");
 			Log.log(Log.ERROR,this,message);
 
-			Vector tokenizedMessage = new Vector();
+			Vector<String> tokenizedMessage = new Vector<String>();
 			int lastIndex = -1;
 			for(int i = 0; i < message.length(); i++)
 			{
@@ -83,11 +89,20 @@ public class ErrorListDialog extends EnhancedDialog
 			else
 				return false;
 		}
+
+		// This enables users to copy the error messages to
+		// clipboard with Ctrl+C on Windows. But it works only
+		// if the entry is selected by a mouse click.
+		public String toString()
+		{
+			return path + ":\n" +
+				TextUtilities.join(java.util.Arrays.asList(messages), "\n");
+		}
 	} //}}}
 
 	//{{{ ErrorListDialog constructor
 	public ErrorListDialog(Frame frame, String title, String caption,
-		Vector messages, boolean pluginError)
+		Vector<ErrorEntry> messages, boolean pluginError)
 	{
 		super(frame,title,!pluginError);
 
@@ -106,9 +121,30 @@ public class ErrorListDialog extends EnhancedDialog
 		label.setBorder(new EmptyBorder(0,0,6,0));
 		centerPanel.add(BorderLayout.NORTH,label);
 
-		JList errors = new JList(messages);
-		errors.setCellRenderer(new ErrorListCellRenderer());
-		errors.setVisibleRowCount(Math.min(messages.size(),4));
+		JTextPane errors = new JTextPane();
+		errors.setEditable(false);
+		errors.setForeground( jEdit.getColorProperty("view.fgColor") );
+		errors.setBackground( jEdit.getColorProperty("view.bgColor") );
+		errors.setCaretColor( jEdit.getActiveView().getEditPane().getTextArea().getPainter().getCaretColor() );
+		errors.setSelectionColor( jEdit.getActiveView().getEditPane().getTextArea().getPainter().getSelectionColor() );
+		StyledDocument doc = errors.getStyledDocument();
+		Font plainFont = new JLabel().getFont();
+		SimpleAttributeSet plainFontAttrSet = new SimpleAttributeSet();
+		StyleConstants.setFontFamily(plainFontAttrSet, plainFont.getFamily());
+		SimpleAttributeSet boldFontAttrSet = (SimpleAttributeSet) plainFontAttrSet.clone();
+		StyleConstants.setBold(boldFontAttrSet, true);
+		for (ErrorEntry entry : messages)
+		{
+			try
+			{
+				doc.insertString(doc.getLength(), entry.path + ":\n", boldFontAttrSet);
+				for (String s: entry.messages)
+					doc.insertString(doc.getLength(), s + "\n", plainFontAttrSet);
+			}
+			catch (BadLocationException e)
+			{
+			}
+		}
 
 		// need this bullshit scroll bar policy for the preferred size
 		// hack to work
@@ -175,9 +211,7 @@ public class ErrorListDialog extends EnhancedDialog
 				dispose();
 			else if(evt.getSource() == pluginMgr)
 			{
-				org.gjt.sp.jedit.pluginmgr.PluginManager
-					.showPluginManager(JOptionPane
-					.getFrameForComponent(
+				PluginManager.showPluginManager(JOptionPane.getFrameForComponent(
 					ErrorListDialog.this));
 			}
 		} //}}}

@@ -7,7 +7,7 @@
  *
  * Copyright (C) 2004 Ollie Rutherfurd <oliver@jedit.org>
  *
- * $Id: Insert_Selection.bsh,v 1.1 2004/05/06 22:35:11 spestov Exp $
+ * $Id: Insert_Selection.bsh 5037 2004-05-06 22:35:11Z spestov $
  */
 
 insertSelected(View view, String path){

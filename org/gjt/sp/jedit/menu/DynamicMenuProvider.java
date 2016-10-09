@@ -25,14 +25,14 @@ package org.gjt.sp.jedit.menu;
 import javax.swing.JMenu;
 
 /**
- * Interface for a menu whose contents are determined at runtime.<p>
+ * Interface for a pull-down menu whose contents are determined at runtime.<p>
  *
  * See {@link org.gjt.sp.jedit.EditPlugin} for properties you need to define to
  * have your plugin provide a dynamic menu.
  *
  * @since jEdit 4.2pre2
  * @author Slava Pestov
- * @version $Id: DynamicMenuProvider.java,v 1.2 2003/05/02 23:14:17 spestov Exp $
+ * @version $Id: DynamicMenuProvider.java 13060 2008-07-17 18:22:42Z ezust $
  */
 public interface DynamicMenuProvider
 {

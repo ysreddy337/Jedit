@@ -23,10 +23,11 @@
 package org.gjt.sp.jedit.search;
 
 //{{{ Imports
-import javax.swing.text.Segment;
 import javax.swing.tree.*;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
+
 import org.gjt.sp.jedit.textarea.Selection;
+import org.gjt.sp.jedit.textarea.JEditTextArea;
 import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.Buffer;
 import org.gjt.sp.jedit.GUIUtilities;
@@ -35,18 +36,23 @@ import org.gjt.sp.jedit.View;
 import org.gjt.sp.util.*;
 //}}}
 
+/**
+ * HyperSearch results window.
+ * @author Slava Pestov
+ * @version $Id: HyperSearchRequest.java 16331 2009-10-13 13:35:10Z kpouer $
+ */
 class HyperSearchRequest extends WorkRequest
 {
 	//{{{ HyperSearchRequest constructor
-	public HyperSearchRequest(View view, SearchMatcher matcher,
+	HyperSearchRequest(View view, SearchMatcher matcher,
 		HyperSearchResults results, Selection[] selection)
 	{
 		this.view = view;
 		this.matcher = matcher;
 
 		this.results = results;
-		this.searchString = SearchAndReplace.getSearchString();
-		this.rootSearchNode = new DefaultMutableTreeNode(searchString);
+		searchString = SearchAndReplace.getSearchString();
+		rootSearchNode = new DefaultMutableTreeNode(new HyperSearchOperationNode(searchString, matcher));
 
 		this.selection = selection;
 	} //}}}
@@ -71,14 +77,14 @@ class HyperSearchRequest extends WorkRequest
 			return;
 		}
 
-		setProgressMaximum(fileset.getFileCount(view));
+		setMaximum(fileset.getFileCount(view));
 
-		// to minimise synchronization and stuff like that, we only
+		// to minimize synchronization and stuff like that, we only
 		// show a status message at most twice a second
 
 		// initially zero, so that we always show the first message
-		long lastStatusTime = 0;
-
+		String searchingCaption = jEdit.getProperty("hypersearch-results.searching",
+				new String[] { SearchAndReplace.getSearchString() }) + ' ';
 		try
 		{
 			if(selection != null)
@@ -91,24 +97,51 @@ class HyperSearchRequest extends WorkRequest
 			{
 				int current = 0;
 
+				long lastStatusTime = 0;
+				int resultCount = 0;
+				boolean asked = false;
+				int maxResults = jEdit.getIntegerProperty("hypersearch.maxWarningResults");
 loop:				for(int i = 0; i < files.length; i++)
 				{
+					if(jEdit.getBooleanProperty("hyperSearch-stopButton"))
+					{
+						jEdit.setTemporaryProperty("hyperSearch-stopButton", "false");
+						Log.log(Log.MESSAGE, this, "Search stopped by user action (stop button)");
+						break;
+					}
+					if (!asked && resultCount > maxResults && maxResults != 0)
+					{
+						Log.log(Log.DEBUG, this, "Search in progress, " + resultCount +
+									 " occurrences found, asking the user to stop");
+						asked = true;
+						int ret = GUIUtilities.confirm(view, "hypersearch.tooManyResults",
+									       new Object[]{resultCount},
+									       JOptionPane.YES_NO_OPTION,
+									       JOptionPane.QUESTION_MESSAGE);
+						if (ret == JOptionPane.YES_OPTION)
+						{
+							Log.log(Log.MESSAGE, this, "Search stopped by user action");
+							break;
+						}
+					}
 					String file = files[i];
 					current++;
 
 					long currentTime = System.currentTimeMillis();
 					if(currentTime - lastStatusTime > 250)
 					{
-						setProgressValue(current);
+						setValue(current);
 						lastStatusTime = currentTime;
+						results.setSearchStatus(searchingCaption + file);
 					}
 
 					Buffer buffer = jEdit.openTemporary(null,null,file,false);
 					if(buffer == null)
 						continue loop;
 
-					doHyperSearch(buffer);
-				};
+					resultCount += doHyperSearch(buffer, 0, buffer.getLength());
+				}
+				Log.log(Log.MESSAGE, this, resultCount +" OCCURENCES");
 			}
 		}
 		catch(final Exception e)
@@ -131,7 +164,7 @@ loop:				for(int i = 0; i < files.length; i++)
 			{
 				public void run()
 				{
-					results.searchDone(rootSearchNode);
+					results.searchDone(rootSearchNode, selectNode);
 				}
 			});
 		}
@@ -146,6 +179,7 @@ loop:				for(int i = 0; i < files.length; i++)
 	private DefaultMutableTreeNode rootSearchNode;
 	private Selection[] selection;
 	private String searchString;
+	private DefaultMutableTreeNode selectNode;
 	//}}}
 
 	//{{{ searchInSelection() method
@@ -190,27 +224,18 @@ loop:				for(int i = 0; i < files.length; i++)
 	} //}}}
 
 	//{{{ doHyperSearch() method
-	private int doHyperSearch(Buffer buffer)
-		throws Exception
-	{
-		return doHyperSearch(buffer, 0, buffer.getLength());
-	} //}}}
-
-	//{{{ doHyperSearch() method
 	private int doHyperSearch(Buffer buffer, int start, int end)
 		throws Exception
 	{
 		setAbortable(false);
 
-		final DefaultMutableTreeNode bufferNode = new DefaultMutableTreeNode(
-			buffer.getPath());
+		HyperSearchFileNode hyperSearchFileNode = new HyperSearchFileNode(buffer.getPath());
+		DefaultMutableTreeNode bufferNode = new DefaultMutableTreeNode(hyperSearchFileNode);
 
 		int resultCount = doHyperSearch(buffer,start,end,bufferNode);
-
+		hyperSearchFileNode.setCount(resultCount);
 		if(resultCount != 0)
-		{
 			rootSearchNode.insert(bufferNode,rootSearchNode.getChildCount());
-		}
 
 		setAbortable(true);
 
@@ -222,27 +247,25 @@ loop:				for(int i = 0; i < files.length; i++)
 		DefaultMutableTreeNode bufferNode)
 	{
 		int resultCount = 0;
-
+		JEditTextArea textArea = jEdit.getActiveView().getTextArea();
+		int caretLine = textArea.getBuffer() == buffer ? textArea.getCaretLine() : -1;
 		try
 		{
 			buffer.readLock();
 
-			boolean endOfLine = (buffer.getLineEndOffset(
-				buffer.getLineOfOffset(end)) - 1 == end);
+			boolean endOfLine = buffer.getLineEndOffset(
+				buffer.getLineOfOffset(end)) - 1 == end;
 
-			Segment text = new Segment();
 			int offset = start;
 
 			HyperSearchResult lastResult = null;
-
 loop:			for(int counter = 0; ; counter++)
 			{
-				boolean startOfLine = (buffer.getLineStartOffset(
-					buffer.getLineOfOffset(offset)) == offset);
+				boolean startOfLine = buffer.getLineStartOffset(
+					buffer.getLineOfOffset(offset)) == offset;
 
-				buffer.getText(offset,end - offset,text);
 				SearchMatcher.Match match = matcher.nextMatch(
-					new CharIndexedSegment(text,false),
+					buffer.getSegment(offset, end - offset),
 					startOfLine,endOfLine,counter == 0,
 					false);
 				if(match == null)
@@ -254,16 +277,17 @@ loop:			for(int counter = 0; ; counter++)
 				{
 					lastResult = new HyperSearchResult(
 						buffer,newLine);
-					bufferNode.add(
-						new DefaultMutableTreeNode(
-						lastResult,false));
+					DefaultMutableTreeNode child = new DefaultMutableTreeNode(
+						lastResult, false);
+					if (lastResult.line == caretLine)
+						selectNode = child;
+					bufferNode.add(child);
 				}
 
 				lastResult.addOccur(offset + match.start,
 					offset + match.end);
 
 				offset += match.end;
-
 				resultCount++;
 			}
 		}

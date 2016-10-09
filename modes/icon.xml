@@ -8,23 +8,22 @@
 		<PROPERTY NAME="lineComment" VALUE="#" />
 		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
 		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
-		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 		<PROPERTY NAME="wordBreakChars" VALUE="|.\\:,+-*/=?^!@%&lt;&gt;&amp;" />
 	</PROPS>
-	<RULES ESCAPE="\" IGNORE_CASE="FALSE" 
-	    HIGHLIGHT_DIGITS="TRUE" 
-	    DIGIT_RE="(0x[[:xdigit:]]+[lL]?|[[:digit:]]+(e[[:digit:]]*)?[lLdDfF]?)">
+	<RULES IGNORE_CASE="FALSE"
+	    HIGHLIGHT_DIGITS="TRUE"
+	    DIGIT_RE="(0x[\p{XDigit}]+[lL]?|[\p{Digit}]+(e[\p{Digit}]*)?[lLdDfF]?)">
 		<!-- comments -->
 		<EOL_SPAN TYPE="COMMENT1">#</EOL_SPAN>
 
 		<!-- string literals -->
-		<SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
+		<SPAN TYPE="LITERAL1" ESCAPE="\" NO_LINE_BREAK="TRUE">
 			<BEGIN>"</BEGIN>
 			<END>"</END>
 		</SPAN>
 
 		<!-- cset literals -->
-		<SPAN TYPE="LITERAL2" NO_LINE_BREAK="TRUE">
+		<SPAN TYPE="LITERAL2" ESCAPE="\" NO_LINE_BREAK="TRUE">
 			<BEGIN>'</BEGIN>
 			<END>'</END>
 		</SPAN>
@@ -32,7 +31,7 @@
 		<SEQ TYPE="OPERATOR">~===</SEQ>
 		<SEQ TYPE="OPERATOR">===</SEQ>
 		<SEQ TYPE="OPERATOR">|||</SEQ> <!-- list concatenation -->
-		
+
 		<!-- lexical operators -->
 		<SEQ TYPE="OPERATOR">&gt;&gt;=</SEQ> <!-- ">>=" -->
 		<SEQ TYPE="OPERATOR">&gt;&gt;</SEQ> <!-- ">>" -->
@@ -41,7 +40,7 @@
 		<SEQ TYPE="OPERATOR">~==</SEQ>
 		<SEQ TYPE="OPERATOR">==</SEQ>
 		<SEQ TYPE="OPERATOR">||</SEQ>
-		
+
 		<!-- set operators -->
 		<SEQ TYPE="OPERATOR">++</SEQ> <!-- union -->
 		<SEQ TYPE="OPERATOR">**</SEQ> <!-- intersection -->
@@ -59,7 +58,7 @@
 		<SEQ TYPE="OPERATOR">:=</SEQ>
 		<SEQ TYPE="OPERATOR">-:</SEQ>
 		<SEQ TYPE="OPERATOR">+:</SEQ>
-		
+
 		<SEQ TYPE="OPERATOR">~</SEQ>
 		<SEQ TYPE="OPERATOR">:</SEQ>
 		<SEQ TYPE="OPERATOR">!</SEQ>
@@ -78,9 +77,10 @@
 		<SEQ TYPE="OPERATOR">+</SEQ>
 		<SEQ TYPE="OPERATOR">=</SEQ>
 		<SEQ TYPE="OPERATOR">/</SEQ>
-		
+
 		<!-- Function calls -->
-		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
+		<MARK_PREVIOUS TYPE="FUNCTION" MATCH_TYPE="OPERATOR">(</MARK_PREVIOUS>
+		<SEQ TYPE="OPERATOR">)</SEQ>
 
 		<KEYWORDS>
 			<KEYWORD1>by</KEYWORD1>
@@ -100,7 +100,7 @@
 			<KEYWORD1>until</KEYWORD1>
 			<KEYWORD1>while</KEYWORD1>
 
-			<KEYWORD2>break</KEYWORD2> 
+			<KEYWORD2>break</KEYWORD2>
 			<KEYWORD2>end</KEYWORD2>
 			<KEYWORD2>fail</KEYWORD2>
 			<KEYWORD2>global</KEYWORD2>
@@ -112,7 +112,7 @@
 			<KEYWORD2>return</KEYWORD2>
 			<KEYWORD2>static</KEYWORD2>
 			<KEYWORD2>suspend</KEYWORD2>
-			
+
 			<KEYWORD3>&amp;allocated</KEYWORD3>
 			<KEYWORD3>&amp;ascii</KEYWORD3>
 			<KEYWORD3>&amp;clock</KEYWORD3>
@@ -146,7 +146,7 @@
 			<KEYWORD3>&amp;pos</KEYWORD3>
 			<KEYWORD3>&amp;progname</KEYWORD3>
 			<KEYWORD3>&amp;random</KEYWORD3>
-			<KEYWORD3>&amp;regions</KEYWORD3> 
+			<KEYWORD3>&amp;regions</KEYWORD3>
 			<KEYWORD3>&amp;source</KEYWORD3>
 			<KEYWORD3>&amp;storage</KEYWORD3>
 			<KEYWORD3>&amp;subject</KEYWORD3>
@@ -165,7 +165,7 @@
 			<KEYWORD3>$include</KEYWORD3>
 			<KEYWORD3>$line</KEYWORD3>
 			<KEYWORD3>$undef</KEYWORD3>
-			
+
 			<!-- predefined prepocessor symbols -->
 			<KEYWORD3>_MACINTOSH</KEYWORD3>
 			<KEYWORD3>_MS_WINDOWS_NT</KEYWORD3>
@@ -180,7 +180,7 @@
 			<KEYWORD3>_VMS</KEYWORD3>
 			<KEYWORD3>_WINDOW_FUNCTIONS</KEYWORD3>
 			<KEYWORD3>_X_WINDOW_SYSTEM</KEYWORD3>
-						
+
 			<KEYWORD4>co-expression</KEYWORD4>
 			<KEYWORD4>cset</KEYWORD4>
 			<KEYWORD4>file</KEYWORD4>

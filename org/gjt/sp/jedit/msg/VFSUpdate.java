@@ -24,7 +24,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Message sent when a file or directory changes.
  * @author Slava Pestov
- * @version $Id: VFSUpdate.java,v 1.3 2002/05/14 07:34:55 spestov Exp $
+ * @version $Id: VFSUpdate.java 12504 2008-04-22 23:12:43Z ezust $
  *
  * @since jEdit 2.6pre4
  */

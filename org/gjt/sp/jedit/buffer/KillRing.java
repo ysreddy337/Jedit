@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2003 Slava Pestov
+ * Copyright (C) 2003, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -22,192 +22,150 @@
 
 package org.gjt.sp.jedit.buffer;
 
-import com.microstar.xml.*;
 import javax.swing.event.ListDataListener;
-import javax.swing.ListModel;
-import java.io.*;
-import java.util.*;
-import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
+import java.util.List;
 
-public class KillRing
+import org.gjt.sp.jedit.gui.MutableListModel;
+
+/**
+ * The kill ring retains deleted text. This class is a singleton -- only one
+ * kill ring is used for all of jEdit. Nothing prevents plugins from making their
+ * own kill rings for whatever reason, though.
+ */
+public class KillRing implements MutableListModel
 {
-	//{{{ propertiesChanged() method
-	public static void propertiesChanged()
+	//{{{ getInstance() method
+	public static KillRing getInstance()
 	{
-		int newSize = jEdit.getIntegerProperty("history",25);
+		return killRing;
+	} //}}}
+
+	//{{{ setInstance() method
+	public static void setInstance(KillRing killRing)
+	{
+		KillRing.killRing = killRing;
+	} //}}}
+
+	//{{{ propertiesChanged() method
+	public void propertiesChanged(int historySize)
+	{
+		int newSize = Math.max(1, historySize);
 		if(ring == null)
-			ring = new UndoManager.Remove[newSize];
+			ring = new UndoManager.RemovedContent[newSize];
 		else if(newSize != ring.length)
 		{
-			UndoManager.Remove[] newRing = new UndoManager.Remove[
+			UndoManager.RemovedContent[] newRing = new UndoManager.RemovedContent[
 				newSize];
-			ListModel model = new RingListModel();
-			int newCount = Math.min(model.getSize(),newSize);
+			int newCount = Math.min(getSize(),newSize);
 			for(int i = 0; i < newCount; i++)
 			{
-				newRing[i] = (UndoManager.Remove)
-					model.getElementAt(i);
+				newRing[i] = (UndoManager.RemovedContent)getElementAt(i);
 			}
 			ring = newRing;
 			count = newCount;
 			wrap = false;
 		}
-		else if(count == ring.length)
+
+		if(count == ring.length)
 		{
 			count = 0;
 			wrap = true;
 		}
 	} //}}}
 
-	//{{{ getListModel() method
-	public static ListModel getListModel()
+	public void load() {}
+
+	public void save() {}
+
+	//{{{ reset() method
+	/**
+	 * This method is made to be used by implementation of load()
+	 * method to initialize (or reset) the killring by a loaded
+	 * sequence of objects.
+	 *
+	 * Each element is converted to an element of the killring as
+	 * followings:
+	 *   - If it is a String, it is converted as if it is a result of
+	 *     getElementAt(n).toString().
+	 *   - Otherwise, it is converted as if it is a Object which was
+	 *     obtained by getElementAt(n).
+	 *
+	 * @since jEdit 4.3pre12
+	 */
+	protected void reset(List source)
 	{
-		return new RingListModel();
+		UndoManager.RemovedContent[] newRing
+			= new UndoManager.RemovedContent[source.size()];
+		int i = 0;
+		for(Object x: source)
+		{
+			UndoManager.RemovedContent element;
+			if(x instanceof String)
+			{
+				element = new UndoManager.RemovedContent(
+					(String)x);
+			}
+			else
+			{
+				element = (UndoManager.RemovedContent)x;
+			}
+			newRing[i++] = element;
+		}
+		ring = newRing;
+		count = 0;
+		wrap = true;
 	} //}}}
 
-	//{{{ load() method
-	public static void load()
+	//{{{ MutableListModel implementation
+	public void addListDataListener(ListDataListener listener) {}
+
+	public void removeListDataListener(ListDataListener listener) {}
+
+	//{{{ getElementAt() method
+	public Object getElementAt(int index)
 	{
-		String settingsDirectory = jEdit.getSettingsDirectory();
-		if(settingsDirectory == null)
-			return;
-
-		File killRing = new File(MiscUtilities.constructPath(
-			settingsDirectory,"killring.xml"));
-		if(!killRing.exists())
-			return;
-
-		killRingModTime = killRing.lastModified();
-		Log.log(Log.MESSAGE,KillRing.class,"Loading killring.xml");
-
-		KillRingHandler handler = new KillRingHandler();
-		XmlParser parser = new XmlParser();
-		Reader in = null;
-		parser.setHandler(handler);
-		try
-		{
-			in = new BufferedReader(new FileReader(killRing));
-			parser.parse(null, null, in);
-		}
-		catch(XmlException xe)
-		{
-			int line = xe.getLine();
-			String message = xe.getMessage();
-			Log.log(Log.ERROR,KillRing.class,killRing + ":" + line
-				+ ": " + message);
-		}
-		catch(FileNotFoundException fnf)
-		{
-			//Log.log(Log.DEBUG,BufferHistory.class,fnf);
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,KillRing.class,e);
-		}
-		finally
-		{
-			try
-			{
-				if(in != null)
-					in.close();
-			}
-			catch(IOException io)
-			{
-				Log.log(Log.ERROR,KillRing.class,io);
-			}
-		}
-
-		ring = (UndoManager.Remove[])handler.list.toArray(
-			new UndoManager.Remove[handler.list.size()]);
-		count = ring.length;
+		return ring[virtualToPhysicalIndex(index)];
 	} //}}}
 
-	//{{{ save() method
-	public static void save()
+	//{{{ getSize() method
+	public int getSize()
 	{
-		String settingsDirectory = jEdit.getSettingsDirectory();
-		if(settingsDirectory == null)
-			return;
-
-		File file1 = new File(MiscUtilities.constructPath(
-			settingsDirectory, "#killring.xml#save#"));
-		File file2 = new File(MiscUtilities.constructPath(
-			settingsDirectory, "killring.xml"));
-		if(file2.exists() && file2.lastModified() != killRingModTime)
-		{
-			Log.log(Log.WARNING,KillRing.class,file2
-				+ " changed on disk; will not save recent"
-				+ " files");
-			return;
-		}
-
-		jEdit.backupSettingsFile(file2);
-
-		Log.log(Log.MESSAGE,KillRing.class,"Saving killring.xml");
-
-		String lineSep = System.getProperty("line.separator");
-
-		BufferedWriter out = null;
-
-		try
-		{
-			out = new BufferedWriter(new FileWriter(file1));
-
-			out.write("<?xml version=\"1.0\"?>");
-			out.write(lineSep);
-			out.write("<!DOCTYPE KILLRING SYSTEM \"killring.dtd\">");
-			out.write(lineSep);
-			out.write("<KILLRING>");
-			out.write(lineSep);
-
-			ListModel model = getListModel();
-			int size = model.getSize();
-			for(int i = size - 1; i >=0; i--)
-			{
-				out.write("<ENTRY>");
-				out.write(MiscUtilities.charsToEntities(
-					model.getElementAt(i).toString()));
-				out.write("</ENTRY>");
-				out.write(lineSep);
-			}
-
-			out.write("</KILLRING>");
-			out.write(lineSep);
-
-			out.close();
-
-			/* to avoid data loss, only do this if the above
-			 * completed successfully */
-			file2.delete();
-			file1.renameTo(file2);
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,KillRing.class,e);
-		}
-		finally
-		{
-			try
-			{
-				if(out != null)
-					out.close();
-			}
-			catch(IOException e)
-			{
-			}
-		}
-
-		killRingModTime = file2.lastModified();
+		if(wrap)
+			return ring.length;
+		else
+			return count;
 	} //}}}
+
+	//{{{ removeElement() method
+	public boolean removeElement(Object value)
+	{
+		for(int i = 0; i < getSize(); i++)
+		{
+			if(ring[i].equals(value))
+			{
+				remove(i);
+				return true;
+			}
+		}
+		return false;
+	} //}}}
+
+	//{{{ insertElementAt() method
+	public void insertElementAt(Object value, int index)
+	{
+		/* This is not terribly efficient, but this method is only
+		called by the 'Paste Deleted' dialog where the performance
+		is not exactly vital */
+		remove(index);
+		add((UndoManager.RemovedContent)value);
+	} //}}}
+
+	//}}}
 
 	//{{{ Package-private members
-	static UndoManager.Remove[] ring;
-	static int count;
-	static boolean wrap;
 
 	//{{{ changed() method
-	static void changed(UndoManager.Remove rem)
+	void changed(UndoManager.RemovedContent rem)
 	{
 		if(rem.inKillRing)
 		{
@@ -236,7 +194,7 @@ public class KillRing
 	} //}}}
 
 	//{{{ add() method
-	static void add(UndoManager.Remove rem)
+	void add(UndoManager.RemovedContent rem)
 	{
 		// compare existing entries' hashcode with this
 		int length = (wrap ? ring.length : count);
@@ -282,20 +240,16 @@ public class KillRing
 	} //}}}
 
 	//{{{ remove() method
-	static void remove(int i)
+	void remove(int i)
 	{
 		if(wrap)
 		{
-			UndoManager.Remove[] newRing = new UndoManager.Remove[
+			UndoManager.RemovedContent[] newRing = new UndoManager.RemovedContent[
 				ring.length];
 			int newCount = 0;
 			for(int j = 0; j < ring.length; j++)
 			{
-				int index;
-				if(j < count)
-					index = count - j - 1;
-				else
-					index = count + ring.length - j - 1;
+				int index = virtualToPhysicalIndex(j);
 
 				if(i == index)
 				{
@@ -319,88 +273,28 @@ public class KillRing
 	//}}}
 
 	//{{{ Private members
-	private static long killRingModTime;
+	private UndoManager.RemovedContent[] ring;
+	private int count;
+	private boolean wrap;
+	private static KillRing killRing = new KillRing();
 
-	private KillRing() {}
+	//{{{ virtualToPhysicalIndex() method
+	/**
+	 * Since the kill ring has a wrap-around representation, we need to
+	 * convert user-visible indices to actual indices in the array.
+	 */
+	private int virtualToPhysicalIndex(int index)
+	{
+		if(wrap)
+		{
+			if(index < count)
+				return count - index - 1;
+			else
+				return count + ring.length - index - 1;
+		}
+		else
+			return count - index - 1;
+	} //}}}
+
 	//}}}
-
-	//{{{ RingListModel class
-	static class RingListModel implements ListModel
-	{
-		public void addListDataListener(ListDataListener listener)
-		{
-		}
-
-		public void removeListDataListener(ListDataListener listener)
-		{
-		}
-
-		public Object getElementAt(int index)
-		{
-			UndoManager.Remove rem;
-
-			if(wrap)
-			{
-				if(index < count)
-					rem = ring[count - index - 1];
-				else
-					rem = ring[count + ring.length - index - 1];
-			}
-			else
-				rem = ring[count - index - 1];
-
-			return rem;
-		}
-
-		public int getSize()
-		{
-			if(wrap)
-				return ring.length;
-			else
-				return count;
-		}
-	} //}}}
-
-	//{{{ KillRingHandler class
-	static class KillRingHandler extends HandlerBase
-	{
-		List list = new LinkedList();
-
-		public Object resolveEntity(String publicId, String systemId)
-		{
-			if("killring.dtd".equals(systemId))
-			{
-				// this will result in a slight speed up, since we
-				// don't need to read the DTD anyway, as AElfred is
-				// non-validating
-				return new StringReader("<!-- -->");
-			}
-
-			return null;
-		}
-
-		public void doctypeDecl(String name, String publicId,
-			String systemId) throws Exception
-		{
-			if("KILLRING".equals(name))
-				return;
-
-			Log.log(Log.ERROR,this,"killring.xml: DOCTYPE must be KILLRING");
-		}
-
-		public void endElement(String name)
-		{
-			if(name.equals("ENTRY"))
-			{
-				list.add(new UndoManager.Remove(null,0,0,charData));
-			}
-		}
-
-		public void charData(char[] ch, int start, int length)
-		{
-			charData = new String(ch,start,length);
-		}
-
-		private String charData;
-	} //}}}
 }

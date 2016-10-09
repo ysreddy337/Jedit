@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2001, 2003 Slava Pestov
+ * Copyright (C) 2001, 2005 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,7 +23,6 @@
 package org.gjt.sp.jedit.buffer;
 
 //{{{ Imports
-import org.gjt.sp.jedit.Buffer;
 import org.gjt.sp.util.Log;
 //}}}
 
@@ -35,13 +34,13 @@ import org.gjt.sp.util.Log;
  * called through, implements such protection.
  *
  * @author Slava Pestov
- * @version $Id: UndoManager.java,v 1.25 2004/07/04 06:56:17 spestov Exp $
+ * @version $Id: UndoManager.java 16098 2009-08-27 21:59:29Z shlomy $
  * @since jEdit 4.0pre1
  */
 public class UndoManager
 {
 	//{{{ UndoManager constructor
-	public UndoManager(Buffer buffer)
+	public UndoManager(JEditBuffer buffer)
 	{
 		this.buffer = buffer;
 	} //}}}
@@ -59,6 +58,12 @@ public class UndoManager
 		undoCount = 0;
 	} //}}}
 
+	//{{{ canUndo() method
+	public boolean canUndo()
+	{
+		return (undosLast != null);
+	} //}}}
+
 	//{{{ undo() method
 	public int undo()
 	{
@@ -69,6 +74,7 @@ public class UndoManager
 			return -1;
 		else
 		{
+			reviseUndoId();
 			undoCount--;
 
 			int caret = undosLast.undo();
@@ -78,6 +84,12 @@ public class UndoManager
 				undosFirst = null;
 			return caret;
 		}
+	} //}}}
+
+	//{{{ canRedo() method
+	public boolean canRedo()
+	{
+		return (redosFirst != null);
 	} //}}}
 
 	//{{{ redo() method
@@ -90,6 +102,7 @@ public class UndoManager
 			return -1;
 		else
 		{
+			reviseUndoId();
 			undoCount++;
 
 			int caret = redosFirst.redo();
@@ -105,7 +118,10 @@ public class UndoManager
 	public void beginCompoundEdit()
 	{
 		if(compoundEditCount == 0)
+		{
 			compoundEdit = new CompoundEdit();
+			reviseUndoId();
+		}
 
 		compoundEditCount++;
 	} //}}}
@@ -137,6 +153,12 @@ public class UndoManager
 	public boolean insideCompoundEdit()
 	{
 		return compoundEditCount != 0;
+	} //}}}
+
+	//{{{ getUndoId() method
+	public Object getUndoId()
+	{
+		return undoId;
 	} //}}}
 
 	//{{{ contentInserted() method
@@ -174,7 +196,10 @@ public class UndoManager
 		if(compoundEdit != null)
 			compoundEdit.add(ins);
 		else
+		{
+			reviseUndoId();
 			addEdit(ins);
+		}
 	} //}}}
 
 	//{{{ contentRemoved() method
@@ -189,19 +214,19 @@ public class UndoManager
 			Remove rem = (Remove)toMerge;
 			if(rem.offset == offset)
 			{
-				rem.str = rem.str.concat(text);
-				rem.hashcode = rem.str.hashCode();
+				rem.content.str = rem.content.str.concat(text);
+				rem.content.hashcode = rem.content.str.hashCode();
 				rem.length += length;
-				KillRing.changed(rem);
+				KillRing.getInstance().changed(rem.content);
 				return;
 			}
 			else if(offset + length == rem.offset)
 			{
-				rem.str = text.concat(rem.str);
-				rem.hashcode = rem.str.hashCode();
+				rem.content.str = text.concat(rem.content.str);
+				rem.content.hashcode = rem.content.str.hashCode();
 				rem.length += length;
 				rem.offset = offset;
-				KillRing.changed(rem);
+				KillRing.getInstance().changed(rem.content);
 				return;
 			}
 		}
@@ -216,13 +241,16 @@ public class UndoManager
 		if(compoundEdit != null)
 			compoundEdit.add(rem);
 		else
+		{
+			reviseUndoId();
 			addEdit(rem);
+		}
 
-		KillRing.add(rem);
+		KillRing.getInstance().add(rem.content);
 	} //}}}
 
-	//{{{ bufferSaved() method
-	public void bufferSaved()
+	//{{{ resetClearDirty method
+	public void resetClearDirty()
 	{
 		redoClearDirty = getLastEdit();
 		if(redosFirst instanceof CompoundEdit)
@@ -234,7 +262,7 @@ public class UndoManager
 	//{{{ Private members
 
 	//{{{ Instance variables
-	private Buffer buffer;
+	private JEditBuffer buffer;
 
 	// queue of undos. last is most recent, first is oldest
 	private Edit undosFirst;
@@ -249,6 +277,7 @@ public class UndoManager
 	private int compoundEditCount;
 	private CompoundEdit compoundEdit;
 	private Edit undoClearDirty, redoClearDirty;
+	private Object undoId;
 	//}}}
 
 	//{{{ addEdit() method
@@ -295,6 +324,24 @@ public class UndoManager
 			return ((CompoundEdit)undosLast).last;
 		else
 			return undosLast;
+	} //}}}
+
+	//{{{ reviseUndoId()
+	/*
+	 * Revises a unique undoId for a the undo operation that is being
+	 * created as a result of a buffer content change, or that is being
+	 * used for undo/redo. Content changes that belong to the same undo
+	 * operation will have the same undoId.
+	 * 
+	 * This method should be called whenever:
+	 * - a buffer content change causes a new undo operation to be created;
+	 *   i.e. whenever a content change is not included in the same undo
+	 *   operation as the previous.
+	 * - an undo/redo is performed.
+	 */
+	private void reviseUndoId()
+	{
+		undoId = new Object();
 	} //}}}
 
 	//}}}
@@ -351,6 +398,26 @@ public class UndoManager
 		String str;
 	} //}}}
 
+	//{{{ RemovedContent clas
+	// This class is held in KillRing.
+	public static class RemovedContent
+	{
+		String str;
+		int hashcode;
+		boolean inKillRing;
+
+		public RemovedContent(String str)
+		{
+			this.str = str;
+			this.hashcode = str.hashCode();
+		}
+
+		public String toString()
+		{
+			return str;
+		}
+	}// }}}
+
 	//{{{ Remove class
 	static class Remove extends Edit
 	{
@@ -360,14 +427,13 @@ public class UndoManager
 			this.mgr = mgr;
 			this.offset = offset;
 			this.length = length;
-			this.str = str;
-			hashcode = str.hashCode();
+			this.content = new RemovedContent(str);
 		} //}}}
 
 		//{{{ undo() method
 		int undo()
 		{
-			mgr.buffer.insert(offset,str);
+			mgr.buffer.insert(offset,content.str);
 			if(mgr.undoClearDirty == this)
 				mgr.buffer.setDirty(false);
 			return offset + length;
@@ -382,18 +448,10 @@ public class UndoManager
 			return offset;
 		} //}}}
 
-		//{{{ toString() method
-		public String toString()
-		{
-			return str;
-		} //}}}
-
 		UndoManager mgr;
 		int offset;
 		int length;
-		String str;
-		int hashcode;
-		boolean inKillRing;
+		final RemovedContent content;
 	} //}}}
 
 	//{{{ CompoundEdit class

@@ -23,74 +23,113 @@
 package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
-import javax.swing.*;
-import java.awt.event.*;
-import java.awt.*;
-import org.gjt.sp.jedit.*;
+import java.awt.BorderLayout;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JPopupMenu;
+import javax.swing.JSeparator;
+import javax.swing.SwingUtilities;
+
+import org.gjt.sp.jedit.GUIUtilities;
+import org.gjt.sp.jedit.jEdit;
 //}}}
 
 /**
  * A container for dockable windows. This class should never be used
  * directly.
- * @version $Id: FloatingWindowContainer.java,v 1.18 2004/06/28 06:45:27 spestov Exp $
+ * @version $Id: FloatingWindowContainer.java 13259 2008-08-10 20:54:46Z shlomy $
  * @since jEdit 4.0pre1
  */
-public class FloatingWindowContainer extends JFrame implements DockableWindowContainer
+public class FloatingWindowContainer extends JFrame implements DockableWindowContainer,
+	PropertyChangeListener
 {
+	String dockableName = null;
 	//{{{ FloatingWindowContainer constructor
-	public FloatingWindowContainer(DockableWindowManager dockableWindowManager,
+	public FloatingWindowContainer(DockableWindowManagerImpl dockableWindowManager,
 		boolean clone)
 	{
 		this.dockableWindowManager = dockableWindowManager;
+
+		dockableWindowManager.addPropertyChangeListener(this);
 		this.clone = clone;
 		setIconImage(GUIUtilities.getPluginIcon());
 		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
 		Box caption = new Box(BoxLayout.X_AXIS);
 		caption.add(menu = new RolloverButton(GUIUtilities
-			.loadIcon("ToolbarMenu.gif")));
+			.loadIcon(jEdit.getProperty("dropdown-arrow.icon"))));
 		menu.addMouseListener(new MouseHandler());
+		menu.setToolTipText(jEdit.getProperty("docking.menu.label"));
 		Box separatorBox = new Box(BoxLayout.Y_AXIS);
 		separatorBox.add(Box.createVerticalStrut(3));
 		separatorBox.add(new JSeparator(JSeparator.HORIZONTAL));
 		separatorBox.add(Box.createVerticalStrut(3));
 		caption.add(separatorBox);
 		getContentPane().add(BorderLayout.NORTH,caption);
+	
+		
 	} //}}}
 
 	//{{{ register() method
-	public void register(DockableWindowManager.Entry entry)
+	public void register(DockableWindowManagerImpl.Entry entry)
 	{
 		this.entry = entry;
-		setTitle(entry.title);
+		dockableName = entry.factory.name;
+		
+		setTitle(entry.shortTitle());
 
 		getContentPane().add(BorderLayout.CENTER,entry.win);
 
 		pack();
-		GUIUtilities.loadGeometry(this,entry.factory.name);
+		Container parent = dockableWindowManager.getView();
+		GUIUtilities.loadGeometry(this, parent, dockableName);
+		GUIUtilities.addSizeSaver(this, parent, dockableName);
+		KeyListener listener = dockableWindowManager.closeListener(dockableName);
+		addKeyListener(listener);
+		getContentPane().addKeyListener(listener);
+		menu.addKeyListener(listener);
+		entry.win.addKeyListener(listener);
 		setVisible(true);
+		if (! entry.win.isVisible())
+			entry.win.setVisible(true);
 	} //}}}
 
 	//{{{ remove() method
-	public void remove(DockableWindowManager.Entry entry)
+	public void remove(DockableWindowManagerImpl.Entry entry)
 	{
-		entry.container = null;
 		dispose();
 	} //}}}
 
 	//{{{ unregister() method
-	public void unregister(DockableWindowManager.Entry entry)
+	public void unregister(DockableWindowManagerImpl.Entry entry)
 	{
-		dispose();
+		this.entry = null;
+		entry.btn = null;
+		entry.container = null;
+		// Note: entry.win must not be reset, to enable the dockable
+		// instance to be moved instead of recreated if it uses the
+		// MOVABLE attribute.
+		super.dispose();
 	} //}}}
 
 	//{{{ show() method
-	public void show(final DockableWindowManager.Entry entry)
+	public void show(final DockableWindowManagerImpl.Entry entry)
 	{
 		if(entry == null)
 			dispose();
 		else
 		{
+			setTitle(entry.longTitle());
 			toFront();
 			requestFocus();
 			SwingUtilities.invokeLater(new Runnable()
@@ -104,7 +143,7 @@ public class FloatingWindowContainer extends JFrame implements DockableWindowCon
 					}
 					else
 					{
-						entry.win.requestDefaultFocus();
+						entry.win.requestFocus();
 					}
 				}
 			});
@@ -112,37 +151,38 @@ public class FloatingWindowContainer extends JFrame implements DockableWindowCon
 	} //}}}
 
 	//{{{ isVisible() method
-	public boolean isVisible(DockableWindowManager.Entry entry)
+	public boolean isVisible(DockableWindowManagerImpl.Entry entry)
 	{
 		return true;
 	} //}}}
 
 	//{{{ dispose() method
+	@Override
 	public void dispose()
 	{
-		GUIUtilities.saveGeometry(this,entry.factory.name);
 		entry.container = null;
 		entry.win = null;
 		super.dispose();
 	} //}}}
 
 	//{{{ getDockableWindowManager() method
-	public DockableWindowManager getDockableWindowManager()
+	public DockableWindowManagerImpl getDockableWindowManager()
 	{
 		return dockableWindowManager;
 	} //}}}
 
 	//{{{ getMinimumSize() method
+	@Override
 	public Dimension getMinimumSize()
 	{
 		return new Dimension(0,0);
 	} //}}}
 
 	//{{{ Private members
-	private DockableWindowManager dockableWindowManager;
-	private boolean clone;
-	private DockableWindowManager.Entry entry;
-	private JButton menu;
+	private final DockableWindowManagerImpl dockableWindowManager;
+	private final boolean clone;
+	private DockableWindowManagerImpl.Entry entry;
+	private final JButton menu;
 	//}}}
 
 	//{{{ MouseHandler class
@@ -150,6 +190,7 @@ public class FloatingWindowContainer extends JFrame implements DockableWindowCon
 	{
 		JPopupMenu popup;
 
+		@Override
 		public void mousePressed(MouseEvent evt)
 		{
 			if(popup != null && popup.isVisible())
@@ -165,4 +206,13 @@ public class FloatingWindowContainer extends JFrame implements DockableWindowCon
 			}
 		}
 	} //}}}
+	public void propertyChange(PropertyChangeEvent evt)
+	{
+		if (dockableName == null) return;
+		String pn = evt.getPropertyName();
+		if (pn.startsWith(dockableName) && pn.endsWith("title"))
+			setTitle(evt.getNewValue().toString());
+	}
+	
 }
+

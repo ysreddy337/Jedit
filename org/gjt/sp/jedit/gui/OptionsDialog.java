@@ -31,27 +31,48 @@ import javax.swing.tree.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
+import java.util.List;
+
+
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * An abstract tabbed options dialog box.
+ * An abstract options dialog box.
  * @author Slava Pestov
- * @version $Id: OptionsDialog.java,v 1.38 2004/06/28 06:45:27 spestov Exp $
+ * @version $Id: OptionsDialog.java 14832 2009-03-22 23:34:45Z vanza $
  */
 public abstract class OptionsDialog extends EnhancedDialog
 	implements ActionListener, TreeSelectionListener
 {
+	//{{{ Instance variables
+	private String name;
+	private JSplitPane splitter;
+	protected JTree paneTree;
+	private JScrollPane stage;
+	private JButton ok;
+	private JButton cancel;
+	private JButton apply;
+	protected OptionPane currentPane;
+	private Map<Object, OptionPane> deferredOptionPanes;
+	//}}}
+
 	//{{{ OptionsDialog constructor
-	public OptionsDialog(Frame frame, String name, String pane)
+	/**
+	 * @param frame - the parent frame for dialogs created
+	 * @param name the name of an option pane - it must have a .title and .code
+	 *  		property defined in order to instantiate.
+	 * @param pane the initial pane to show when this is created.
+	 */
+	protected OptionsDialog(Frame frame, String name, String pane)
 	{
 		super(frame, jEdit.getProperty(name + ".title"), true);
 		init(name,pane);
 	} //}}}
 
 	//{{{ OptionsDialog constructor
-	public OptionsDialog(Dialog dialog, String name, String pane)
+	protected OptionsDialog(Dialog dialog, String name, String pane)
 	{
 		super(dialog, jEdit.getProperty(name + ".title"), true);
 		init(name,pane);
@@ -147,7 +168,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 
 		Object[] nodes = path.getPath();
 
-		StringBuffer buf = new StringBuffer();
+		StringBuilder buf = new StringBuilder();
 
 		OptionPane optionPane = null;
 
@@ -173,8 +194,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 			{
 				label = jEdit.getProperty("options."
 					+ node + ".label");
-				optionPane = (OptionPane)deferredOptionPanes
-					.get((String)node);
+				optionPane = deferredOptionPanes.get(node);
 				if(optionPane == null)
 				{
 					String propName = "options." + node + ".code";
@@ -219,7 +239,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 			return;
 
 		setTitle(jEdit.getProperty("options.title-template",
-			new Object[] { jEdit.getProperty(this.name + ".title"),
+			new Object[] { jEdit.getProperty(name + ".title"),
 			buf.toString() }));
 
 		try
@@ -232,10 +252,8 @@ public abstract class OptionsDialog extends EnhancedDialog
 			Log.log(Log.ERROR,this,t);
 		}
 
-		if(currentPane != null)
-			stage.remove(currentPane.getComponent());
 		currentPane = optionPane;
-		stage.add(BorderLayout.CENTER,currentPane.getComponent());
+		stage.setViewportView(currentPane.getComponent());
 		stage.revalidate();
 		stage.repaint();
 
@@ -248,36 +266,39 @@ public abstract class OptionsDialog extends EnhancedDialog
 	} //}}}
 
 	//{{{ Protected members
+	// {{{ createOptionTreeModel
+	/**
+	 * Creates the tree model that goes on the left of the option pane,
+	 * loading all the items that are needed.
+	 */
 	protected abstract OptionTreeModel createOptionTreeModel();
+	// }}}
+
 	protected abstract OptionGroup getDefaultGroup();
 	//}}}
 
-	//{{{ Private members
-
-	//{{{ Instance variables
-	private String name;
-	private JSplitPane splitter;
-	private JTree paneTree;
-	private JPanel stage;
-	private JButton ok;
-	private JButton cancel;
-	private JButton apply;
-	private OptionPane currentPane;
-	private Map deferredOptionPanes;
-	//}}}
-
 	//{{{ init() method
-	private void init(String name, String pane)
+	/**
+	 * @param name the name of this pane
+	 * @param pane - a sub-pane name to select (?)
+	 * Could someone please write better docs for this function?
+	 * Creates buttons, adds listeners, and makes the pane visible.
+	 * This method is called automatically from the constructor,
+	 *
+	 * and also calls init on each of the optionPanes?
+	 *
+	 * @since jEdit 4.3pre9 (was private before)
+	 */
+	protected void init(String name, String pane)
 	{
 		this.name = name;
 
-		deferredOptionPanes = new HashMap();
+		deferredOptionPanes = new HashMap<Object, OptionPane>();
 
 		JPanel content = new JPanel(new BorderLayout(12,12));
 		content.setBorder(new EmptyBorder(12,12,12,12));
 		setContentPane(content);
-
-		stage = new JPanel(new BorderLayout());
+		stage = new JScrollPane();
 
 		paneTree = new JTree(createOptionTreeModel());
 		paneTree.setVisibleRowCount(1);
@@ -291,10 +312,13 @@ public abstract class OptionsDialog extends EnhancedDialog
 		paneTree.setRootVisible(false);
 
 		JScrollPane scroller = new JScrollPane(paneTree,
-			JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
-			JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+						       ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
+						       ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+		scroller.setMinimumSize(new Dimension(100, 0));
 		splitter = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-			scroller,stage);
+					  jEdit.getBooleanProperty("appearance.continuousLayout"),
+					  scroller,
+					  stage);
 		content.add(splitter, BorderLayout.CENTER);
 
 		Box buttons = new Box(BoxLayout.X_AXIS);
@@ -331,7 +355,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 
 		// returns false if no such pane exists; calling with null
 		// param selects first option pane found
-		if(!selectPane(rootNode,pane))
+		if(!selectPane(rootNode, pane))
 			selectPane(rootNode,null);
 
 		splitter.setDividerLocation(paneTree.getPreferredSize().width
@@ -349,18 +373,20 @@ public abstract class OptionsDialog extends EnhancedDialog
 		setVisible(true);
 	} //}}}
 
+	//{{{ Private members
+
 	//{{{ selectPane() method
 	private boolean selectPane(OptionGroup node, String name)
 	{
-		return selectPane(node,name,new ArrayList());
+		return selectPane(node,name,new ArrayList<Object>());
 	} //}}}
 
 	//{{{ selectPane() method
-	private boolean selectPane(OptionGroup node, String name, ArrayList path)
+	private boolean selectPane(OptionGroup node, String name, List<Object> path)
 	{
 		path.add(node);
 
-		Enumeration e = node.getMembers();
+		Enumeration<Object> e = node.getMembers();
 		while(e.hasMoreElements())
 		{
 			Object obj = e.nextElement();
@@ -421,7 +447,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 		if(obj instanceof OptionGroup)
 		{
 			OptionGroup grp = (OptionGroup)obj;
-			Enumeration members = grp.getMembers();
+			Enumeration<Object> members = grp.getMembers();
 			while(members.hasMoreElements())
 			{
 				save(members.nextElement());
@@ -465,7 +491,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 	//}}}
 
 	//{{{ PaneNameRenderer class
-	class PaneNameRenderer extends DefaultTreeCellRenderer
+	public static class PaneNameRenderer extends DefaultTreeCellRenderer
 	{
 		public PaneNameRenderer()
 		{
@@ -487,17 +513,17 @@ public abstract class OptionsDialog extends EnhancedDialog
 			if (value instanceof OptionGroup)
 			{
 				setText(((OptionGroup)value).getLabel());
-				this.setFont(groupFont);
+				setFont(groupFont);
 			}
 			else if (value instanceof OptionPane)
 			{
 				name = ((OptionPane)value).getName();
-				this.setFont(paneFont);
+				setFont(paneFont);
 			}
 			else if (value instanceof String)
 			{
-				name = ((String)value);
-				this.setFont(paneFont);
+				name = (String) value;
+				setFont(paneFont);
 			}
 
 			if (name != null)
@@ -521,12 +547,22 @@ public abstract class OptionsDialog extends EnhancedDialog
 		}
 
 		private Font paneFont;
-		private Font groupFont;
+		private final Font groupFont;
 	} //}}}
 
 	//{{{ OptionTreeModel class
 	public class OptionTreeModel implements TreeModel
 	{
+		public OptionTreeModel()
+		{
+			this(new OptionGroup(null));
+		}
+
+		public OptionTreeModel(OptionGroup root)
+		{
+			this.root = root;
+		}
+
 		public void addTreeModelListener(TreeModelListener l)
 		{
 			listenerList.add(TreeModelListener.class, l);
@@ -677,7 +713,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 			}
 		}
 
-		private OptionGroup root = new OptionGroup(null);
-		private EventListenerList listenerList = new EventListenerList();
+		private final OptionGroup root;
+		private final EventListenerList listenerList = new EventListenerList();
 	} //}}}
 }

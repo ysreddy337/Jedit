@@ -22,10 +22,25 @@
 
 package org.gjt.sp.util;
 
-import java.io.*;
+//{{{ Imports
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.Writer;
+
+import java.text.DateFormat;
+
 import java.util.*;
-import javax.swing.*;
-import javax.swing.event.*;
+
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListDataListener;
+
+import javax.swing.ListModel;
+import javax.swing.SwingUtilities;
+
+import static java.text.DateFormat.MEDIUM;
+//}}}
 
 /**
  * This class provides methods for logging events. In terms of functionality,
@@ -41,7 +56,7 @@ import javax.swing.event.*;
  * This class can also optionally redirect standard output and error to the log.
  *
  * @author Slava Pestov
- * @version $Id: Log.java,v 1.14 2004/03/28 00:07:27 spestov Exp $
+ * @version $Id: Log.java 12789 2008-06-04 21:23:10Z kpouer $
  */
 public class Log
 {
@@ -122,7 +137,7 @@ public class Log
 		for(int i = 0; i < props.length; i++)
 		{
 			log(MESSAGE,Log.class,
-				props[i] + "=" + System.getProperty(props[i]));
+				props[i] + '=' + System.getProperty(props[i]));
 		}
 	} //}}}
 
@@ -218,6 +233,25 @@ public class Log
 
 	//{{{ log() method
 	/**
+	 * Logs an exception with a message.
+	 *
+	 * If an exception is the cause of a call to {@link #log}, then
+	 * the exception should be explicitly provided so that it can
+	 * be presented to the (debugging) user in a useful manner
+	 * (not just the exception message, but also the exception stack trace)
+	 *
+	 * @since jEdit 4.3pre5
+	 */
+	public static void log(int urgency, Object source, Object message,
+		Throwable exception)
+	{
+		// We can do nicer here, but this is a start...
+		log(urgency,source,message);
+		log(urgency,source,exception);
+	} //}}}
+
+	//{{{ log() method
+	/**
 	 * Logs a message. This method is thread-safe.<p>
 	 *
 	 * The following code sends a typical debugging message to the activity
@@ -287,21 +321,25 @@ public class Log
 	//{{{ Private members
 
 	//{{{ Instance variables
-	private static Object LOCK = new Object();
-	private static String[] log;
+	private static final Object LOCK;
+	private static final String[] log;
 	private static int logLineCount;
 	private static boolean wrap;
-	private static int level = WARNING;
+	private static int level;
 	private static Writer stream;
-	private static String lineSep;
-	private static PrintStream realOut;
-	private static PrintStream realErr;
-	private static LogListModel listModel;
+	private static final String lineSep;
+	private static final PrintStream realOut;
+	private static final PrintStream realErr;
+	private static final LogListModel listModel;
+	private static final DateFormat timeFormat;
+	private static final int MAX_THROWABLES = 10;
+	public static final List<Throwable> throwables;
 	//}}}
 
 	//{{{ Class initializer
 	static
 	{
+		LOCK = new Object();
 		level = WARNING;
 
 		realOut = System.out;
@@ -310,25 +348,16 @@ public class Log
 		log = new String[MAXLINES];
 		lineSep = System.getProperty("line.separator");
 		listModel = new LogListModel();
+		
+		timeFormat = DateFormat.getTimeInstance(MEDIUM);
+		throwables = Collections.synchronizedList(new ArrayList<Throwable>(MAX_THROWABLES));
 	} //}}}
 
 	//{{{ createPrintStream() method
 	private static PrintStream createPrintStream(final int urgency,
 		final Object source)
 	{
-		return new PrintStream(new OutputStream() {
-			public void write(int b)
-			{
-				byte[] barray = { (byte)b };
-				write(barray,0,1);
-			}
-
-			public void write(byte[] b, int off, int len)
-			{
-				String str = new String(b,off,len);
-				log(urgency,source,str);
-			}
-		});
+		return new LogPrintStream(urgency, source);
 	} //}}}
 
 	//{{{ _logException() method
@@ -337,7 +366,17 @@ public class Log
 		final Throwable message)
 	{
 		PrintStream out = createPrintStream(urgency,source);
-
+		if (urgency >= level)
+		{
+			synchronized (throwables)
+			{
+				if (throwables.size() == MAX_THROWABLES)
+				{
+					throwables.remove(0);
+				}
+				throwables.add(message);
+			}
+		}
 		synchronized(LOCK)
 		{
 			message.printStackTrace(out);
@@ -347,7 +386,7 @@ public class Log
 	//{{{ _log() method
 	private static void _log(int urgency, String source, String message)
 	{
-		String fullMessage = "[" + urgencyToString(urgency) + "] " + source
+		String fullMessage = timeFormat.format(new Date()) + " ["+Thread.currentThread().getName()+"] [" + urgencyToString(urgency) + "] " + source
 			+ ": " + message;
 
 		try
@@ -404,42 +443,45 @@ public class Log
 	//{{{ LogListModel class
 	static class LogListModel implements ListModel
 	{
-		Vector listeners = new Vector();
+		final List<ListDataListener> listeners = new ArrayList<ListDataListener>();
 
+		//{{{ fireIntervalAdded() method
 		private void fireIntervalAdded(int index1, int index2)
 		{
 			for(int i = 0; i < listeners.size(); i++)
 			{
-				ListDataListener listener = (ListDataListener)
-					listeners.elementAt(i);
+				ListDataListener listener = listeners.get(i);
 				listener.intervalAdded(new ListDataEvent(this,
 					ListDataEvent.INTERVAL_ADDED,
 					index1,index2));
 			}
-		}
+		} //}}}
 
+		//{{{ fireIntervalRemoved() method
 		private void fireIntervalRemoved(int index1, int index2)
 		{
 			for(int i = 0; i < listeners.size(); i++)
 			{
-				ListDataListener listener = (ListDataListener)
-					listeners.elementAt(i);
+				ListDataListener listener = listeners.get(i);
 				listener.intervalRemoved(new ListDataEvent(this,
 					ListDataEvent.INTERVAL_REMOVED,
 					index1,index2));
 			}
-		}
+		} //}}}
 
+		//{{{ addListDataListener() method
 		public void addListDataListener(ListDataListener listener)
 		{
-			listeners.addElement(listener);
-		}
+			listeners.add(listener);
+		} //}}}
 
+		//{{{ removeListDataListener() method
 		public void removeListDataListener(ListDataListener listener)
 		{
-			listeners.removeElement(listener);
-		}
+			listeners.remove(listener);
+		} //}}}
 
+		//{{{ getElementAt() method
 		public Object getElementAt(int index)
 		{
 			if(wrap)
@@ -451,19 +493,21 @@ public class Log
 			}
 			else
 				return log[index];
-		}
+		} //}}}
 
+		//{{{ getSize() method
 		public int getSize()
 		{
 			if(wrap)
 				return MAXLINES;
 			else
 				return logLineCount;
-		}
+		} //}}}
 
+		//{{{ update() method
 		void update(final int lineCount, final boolean oldWrap)
 		{
-			if(lineCount == 0 || listeners.size() == 0)
+			if(lineCount == 0 || listeners.isEmpty())
 				return;
 
 			SwingUtilities.invokeLater(new Runnable()
@@ -491,6 +535,92 @@ public class Log
 					}
 				}
 			});
-		}
+		} //}}}
+	} //}}}
+
+	//{{{ LogPrintStream class
+	/**
+	 * A print stream that uses the "Log" class to output the messages,
+	 * and has special treatment for the printf() function. Using this
+	 * stream has one caveat: printing messages that don't have a line
+	 * break at the end will have one added automatically...
+	 */
+	private static class LogPrintStream extends PrintStream {
+
+		private final ByteArrayOutputStream buffer;
+		private final OutputStream orig;
+
+		//{{{ LogPrintStream constructor
+		LogPrintStream(int urgency, Object source)
+		{
+			super(new LogOutputStream(urgency, source));
+			buffer = new ByteArrayOutputStream();
+			orig = out;
+		} //}}}
+
+		//{{{ printf() method
+		/**
+		 * This is a hack to allow "printf" to not print weird
+		 * stuff to the output. Since "printf" doesn't seem to
+		 * print the whole message in one shot, our output
+		 * stream above would break a line of log into several
+		 * lines; so we buffer the result of the printf call and
+		 * print the whole thing in one shot. A similar hack
+		 * would be needed for the "other" printf method, but
+		 * I'll settle for the common case only.
+		 */
+		public PrintStream printf(String format, Object... args)
+		{
+			synchronized (orig)
+			{
+				buffer.reset();
+				out = buffer;
+				super.printf(format, args);
+
+				try
+				{
+					byte[] data = buffer.toByteArray();
+					orig.write(data, 0, data.length);
+					out = orig;
+				}
+				catch (IOException ioe)
+				{
+					// don't do anything?
+				}
+				finally
+				{
+					buffer.reset();
+				}
+			}
+			return this;
+		} //}}}
+	} //}}}
+
+	//{{{ LogOutputStream class
+	private static class LogOutputStream extends OutputStream
+	{
+		private final int 	urgency;
+		private final Object 	source;
+
+		//{{{ LogOutputStream constructor
+		LogOutputStream(int urgency, Object source)
+		{
+			this.urgency 	= urgency;
+			this.source 	= source;
+		} //}}}
+
+		//{{{ write() method
+		public synchronized void write(int b)
+		{
+			byte[] barray = { (byte)b };
+			write(barray,0,1);
+		} //}}}
+
+		//{{{ write() method
+		public synchronized void write(byte[] b, int off, int len)
+		{
+			String str = new String(b,off,len);
+			log(urgency,source,str);
+		} //}}}
 	} //}}}
 }

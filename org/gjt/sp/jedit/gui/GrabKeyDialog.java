@@ -28,8 +28,10 @@ import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.List;
+
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.jedit.input.AbstractInputHandler;
 import org.gjt.sp.util.Log;
 //}}}
 
@@ -39,31 +41,13 @@ import org.gjt.sp.util.Log;
 public class GrabKeyDialog extends JDialog
 {
 	//{{{ toString() method
+	/**
+	 * @deprecated use {@link org.gjt.sp.jedit.input.AbstractInputHandler#toString(java.awt.event.KeyEvent)}
+	 */
+	@Deprecated
 	public static String toString(KeyEvent evt)
 	{
-		String id;
-		switch(evt.getID())
-		{
-		case KeyEvent.KEY_PRESSED:
-			id = "KEY_PRESSED";
-			break;
-		case KeyEvent.KEY_RELEASED:
-			id = "KEY_RELEASED";
-			break;
-		case KeyEvent.KEY_TYPED:
-			id = "KEY_TYPED";
-			break;
-		default:
-			id = "unknown type";
-			break;
-		}
-
-		return id + ",keyCode=0x"
-			+ Integer.toString(evt.getKeyCode(),16)
-			+ ",keyChar=0x"
-			+ Integer.toString(evt.getKeyChar(),16)
-			+ ",modifiers=0x"
-			+ Integer.toString(evt.getModifiers(),16);
+		return AbstractInputHandler.toString(evt);
 	} //}}}
 
 	//{{{ GrabKeyDialog constructor
@@ -78,7 +62,7 @@ public class GrabKeyDialog extends JDialog
 	 * @since jEdit 4.1pre7
 	 */
 	public GrabKeyDialog(Dialog parent, KeyBinding binding,
-		Vector allBindings, Buffer debugBuffer)
+		List<KeyBinding> allBindings, Buffer debugBuffer)
 	{
 		super(parent,jEdit.getProperty("grab-key.title"),true);
 
@@ -97,7 +81,7 @@ public class GrabKeyDialog extends JDialog
 	 * @since jEdit 4.1pre7
 	 */
 	public GrabKeyDialog(Frame parent, KeyBinding binding,
-		Vector allBindings, Buffer debugBuffer)
+		List<KeyBinding> allBindings, Buffer debugBuffer)
 	{
 		super(parent,jEdit.getProperty("grab-key.title"),true);
 
@@ -143,12 +127,14 @@ public class GrabKeyDialog extends JDialog
 	 * Makes the tab key work in Java 1.4.
 	 * @since jEdit 3.2pre4
 	 */
+	@Override
 	public boolean getFocusTraversalKeysEnabled()
 	{
 		return false;
 	} //}}}
 
 	//{{{ processKeyEvent() method
+	@Override
 	protected void processKeyEvent(KeyEvent evt)
 	{
 		shortcut.processKeyEvent(evt);
@@ -165,12 +151,12 @@ public class GrabKeyDialog extends JDialog
 	private JButton clear;
 	private boolean isOK;
 	private KeyBinding binding;
-	private Vector allBindings;
+	private List<KeyBinding> allBindings;
 	private Buffer debugBuffer;
 	//}}}
 
 	//{{{ init() method
-	private void init(KeyBinding binding, Vector allBindings, Buffer debugBuffer)
+	private void init(KeyBinding binding, List<KeyBinding> allBindings, Buffer debugBuffer)
 	{
 		this.binding = binding;
 		this.allBindings = allBindings;
@@ -183,18 +169,10 @@ public class GrabKeyDialog extends JDialog
 		JPanel content = new JPanel(new GridLayout(0,1,0,6))
 		{
 			/**
-			 * Returns if this component can be traversed by pressing the
-			 * Tab key. This returns false.
-			 */
-			public boolean isManagingFocus()
-			{
-				return false;
-			}
-
-			/**
 			 * Makes the tab key work in Java 1.4.
 			 * @since jEdit 3.2pre4
 			 */
+			@Override
 			public boolean getFocusTraversalKeysEnabled()
 			{
 				return false;
@@ -211,6 +189,9 @@ public class GrabKeyDialog extends JDialog
 		Box input = Box.createHorizontalBox();
 
 		shortcut = new InputPane();
+		Dimension size = shortcut.getPreferredSize();
+		size.width = Integer.MAX_VALUE;
+		shortcut.setMaximumSize(size);
 		input.add(shortcut);
 		input.add(Box.createHorizontalStrut(12));
 
@@ -232,7 +213,8 @@ public class GrabKeyDialog extends JDialog
 			buttons.add(ok);
 			buttons.add(Box.createHorizontalStrut(12));
 
-			if(binding.isAssigned()) {
+			if(binding.isAssigned())
+			{
 				// show "remove" button
 				remove = new JButton(jEdit.getProperty("grab-key.remove"));
 				remove.addActionListener(new ActionHandler());
@@ -261,8 +243,13 @@ public class GrabKeyDialog extends JDialog
 	} //}}}
 
 	//{{{ getSymbolicName() method
-	private String getSymbolicName(int keyCode)
+	public static String getSymbolicName(int keyCode)
 	{
+		if (Debug.DUMP_KEY_EVENTS)
+		{
+			Log.log(Log.DEBUG,GrabKeyDialog.class,"getSymbolicName("+keyCode+").");
+		}
+
 		if(keyCode == KeyEvent.VK_UNDEFINED)
 			return null;
 		/* else if(keyCode == KeyEvent.VK_OPEN_BRACKET)
@@ -289,7 +276,7 @@ public class GrabKeyDialog extends JDialog
 		}
 		catch(Exception e)
 		{
-			Log.log(Log.ERROR,this,e);
+			Log.log(Log.ERROR,GrabKeyDialog.class,e);
 		}
 
 		return null;
@@ -323,29 +310,26 @@ public class GrabKeyDialog extends JDialog
 		if(shortcut == null || shortcut.length() == 0)
 			return null;
 
-		String spacedShortcut = shortcut + " ";
-		Enumeration e = allBindings.elements();
+		String spacedShortcut = shortcut + ' ';
 
-		while(e.hasMoreElements())
+		for (KeyBinding kb : allBindings)
 		{
-			KeyBinding kb = (KeyBinding)e.nextElement();
-
-			if(!kb.isAssigned())
+			if (!kb.isAssigned())
 				continue;
 
-			String spacedKbShortcut = kb.shortcut + " ";
+			String spacedKbShortcut = kb.shortcut + ' ';
 
 			// eg, trying to bind C+n C+p if C+n already bound
-			if(spacedShortcut.startsWith(spacedKbShortcut))
+			if (spacedShortcut.startsWith(spacedKbShortcut))
 				return kb;
 
 			// eg, trying to bind C+e if C+e is a prefix
-			if(spacedKbShortcut.startsWith(spacedShortcut))
+			if (spacedKbShortcut.startsWith(spacedShortcut))
 			{
 				// create a temporary (synthetic) prefix
 				// KeyBinding, that won't be saved
-				return new KeyBinding(kb.name,kb.label,
-					shortcut,true);
+				return new KeyBinding(kb.name, kb.label,
+						      shortcut, true);
 			}
 		}
 
@@ -382,26 +366,31 @@ public class GrabKeyDialog extends JDialog
 	} //}}}
 
 	//{{{ InputPane class
-	class InputPane extends JTextField
+	private class InputPane extends JTextField
 	{
 		//{{{ getFocusTraversalKeysEnabled() method
 		/**
 		 * Makes the tab key work in Java 1.4.
 		 * @since jEdit 3.2pre4
 		 */
+		@Override
 		public boolean getFocusTraversalKeysEnabled()
 		{
 			return false;
 		} //}}}
 
 		//{{{ processKeyEvent() method
+		@Override
 		protected void processKeyEvent(KeyEvent _evt)
 		{
 			KeyEvent evt = KeyEventWorkaround.processKeyEvent(_evt);
+			if(!KeyEventWorkaround.isBindable(_evt.getKeyCode()))
+				evt = null;
+
 			if(debugBuffer != null)
 			{
 				debugBuffer.insert(debugBuffer.getLength(),
-					"Event " + GrabKeyDialog.toString(_evt)
+					"Event " + AbstractInputHandler.toString(_evt)
 					+ (evt == null ? " filtered\n"
 					: " passed\n"));
 			}
@@ -413,35 +402,54 @@ public class GrabKeyDialog extends JDialog
 
 			KeyEventTranslator.Key key = KeyEventTranslator
 				.translateKeyEvent(evt);
+
+			if (Debug.DUMP_KEY_EVENTS)
+			{
+				Log.log(Log.DEBUG,GrabKeyDialog.class,"processKeyEvent() key="+key+", _evt="+_evt+'.');
+			}
+
 			if(key == null)
 				return;
 
 			if(debugBuffer != null)
 			{
 				debugBuffer.insert(debugBuffer.getLength(),
-					"==> Translated to " + key + "\n");
+					"==> Translated to " + key + '\n');
 			}
 
-			StringBuffer keyString = new StringBuffer(getText());
+			StringBuilder keyString = new StringBuilder(getText());
 
 			if(getDocument().getLength() != 0)
 				keyString.append(' ');
 
 			if(key.modifiers != null)
+			{
 				keyString.append(key.modifiers).append('+');
+			}
 
-			if(key.input == ' ')
-				keyString.append("SPACE");
-			else if(key.input != '\0')
-				keyString.append(key.input);
+			String symbolicName = getSymbolicName(key.key);
+
+			if(symbolicName != null)
+			{
+				keyString.append(symbolicName);
+			}
 			else
 			{
-				String symbolicName = getSymbolicName(key.key);
-
-				if(symbolicName == null)
+				if (key.input != '\0')
+				{
+					if (key.input == ' ')
+					{
+						keyString.append("SPACE");
+					}
+					else
+					{
+						keyString.append(key.input);
+					}
+				}
+				else
+				{
 					return;
-
-				keyString.append(symbolicName);
+				}
 			}
 
 			setText(keyString.toString());
@@ -451,7 +459,7 @@ public class GrabKeyDialog extends JDialog
 	} //}}}
 
 	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
+	private class ActionHandler implements ActionListener
 	{
 		//{{{ actionPerformed() method
 		public void actionPerformed(ActionEvent evt)

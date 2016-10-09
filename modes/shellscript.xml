@@ -7,9 +7,14 @@
 		<PROPERTY NAME="lineComment" VALUE="#" />
 		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
 		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
-		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
+		<PROPERTY NAME="indentNextLines"
+			VALUE="^.*(then|else|case.*in)$" />
+		<PROPERTY NAME="unindentThisLine"
+			VALUE="^\s*(fi|else|esac|.*\))$" />
+		<PROPERTY NAME="unindentNextLines"
+			VALUE="^\s*(fi|else|esac)$" />
 	</PROPS>
-	<RULES ESCAPE="\" IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE">
+	<RULES IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE" ESCAPE="\">
 		<!-- Comments -->
 		<EOL_SPAN TYPE="COMMENT2">#!</EOL_SPAN>
 		<EOL_SPAN TYPE="COMMENT1">#</EOL_SPAN>
@@ -27,7 +32,7 @@
 		<MARK_FOLLOWING TYPE="KEYWORD2">$$</MARK_FOLLOWING>
 		<MARK_FOLLOWING TYPE="KEYWORD2">$&lt;</MARK_FOLLOWING>
 		<MARK_FOLLOWING TYPE="KEYWORD2">$</MARK_FOLLOWING>
-		<MARK_PREVIOUS TYPE="KEYWORD2" EXCLUDE_MATCH="TRUE">=</MARK_PREVIOUS>
+		<MARK_PREVIOUS TYPE="KEYWORD2" MATCH_TYPE="OPERATOR">=</MARK_PREVIOUS>
 
 		<!-- weird stuff -->
 		<SPAN TYPE="KEYWORD3" DELEGATE="EXEC">
@@ -52,15 +57,15 @@
 			<BEGIN>"</BEGIN>
 			<END>"</END>
 		</SPAN>
-		<SPAN TYPE="LITERAL1">
+		<SPAN TYPE="LITERAL1" ESCAPE="\">
 			<BEGIN>'</BEGIN>
 			<END>'</END>
 		</SPAN>
 
 		<!-- Readins -->
-		<SPAN_REGEXP HASH_CHAR="<" TYPE="LITERAL1" DELEGATE="LITERAL">
-			<BEGIN><![CDATA[<<[[:space:]'"]*([[:alnum:]_]+)[[:space:]'"]*]]></BEGIN>
-			<END>$1</END>
+		<SPAN_REGEXP HASH_CHAR="&lt;&lt;" TYPE="LITERAL1" DELEGATE="LITERAL">
+			<BEGIN><![CDATA[<<[\p{Space}'"]*([\p{Alnum}_]+)[\p{Space}'"]*]]></BEGIN>
+			<END AT_LINE_START="TRUE">$1</END>
 		</SPAN_REGEXP>
 
 		<!-- Operators -->
@@ -74,7 +79,8 @@
 		<MARK_FOLLOWING TYPE="KEYWORD2">%</MARK_FOLLOWING>
 
 		<!-- functions -->
-		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
+		<MARK_PREVIOUS TYPE="FUNCTION" MATCH_TYPE="OPERATOR">(</MARK_PREVIOUS>
+		<SEQ TYPE="OPERATOR">)</SEQ>
 
 		<KEYWORDS>
 			<KEYWORD1>if</KEYWORD1>

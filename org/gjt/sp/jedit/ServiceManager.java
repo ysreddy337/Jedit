@@ -22,15 +22,18 @@
 
 package org.gjt.sp.jedit;
 
-import com.microstar.xml.*;
 import java.io.*;
 import java.net.URL;
 import java.util.*;
 import org.gjt.sp.util.Log;
+import org.gjt.sp.util.XMLUtilities;
+import org.gjt.sp.util.StandardUtilities;
+import org.gjt.sp.jedit.buffer.FoldHandlerProvider;
+import org.gjt.sp.jedit.buffer.FoldHandler;
 
 /**
  * A generic way for plugins to provide various API extensions.<p>
- * 
+ *
  * Services are loaded from files named <code>services.xml</code> inside the
  * plugin JAR. A service definition file has the following form:
  *
@@ -67,6 +70,8 @@ import org.gjt.sp.util.Log;
  * <ul>
  * <li>{@link org.gjt.sp.jedit.buffer.FoldHandler}</li>
  * <li>{@link org.gjt.sp.jedit.io.VFS}</li>
+ * <li>{@link org.gjt.sp.jedit.io.Encoding}</li>
+ * <li>{@link org.gjt.sp.jedit.io.EncodingDetector}</li>
  * </ul>
  *
  * Plugins may provide more.<p>
@@ -80,7 +85,7 @@ import org.gjt.sp.util.Log;
  *
  * @since jEdit 4.2pre1
  * @author Slava Pestov
- * @version $Id: ServiceManager.java,v 1.8 2004/03/28 00:07:26 spestov Exp $
+ * @version $Id: ServiceManager.java 14125 2008-12-01 10:06:24Z kpouer $
  */
 public class ServiceManager
 {
@@ -92,44 +97,18 @@ public class ServiceManager
 	public static void loadServices(PluginJAR plugin, URL uri,
 		PluginJAR.PluginCacheEntry cache)
 	{
-		Reader in = null;
-
+		ServiceListHandler dh = new ServiceListHandler(plugin,uri);
 		try
 		{
-			Log.log(Log.DEBUG,jEdit.class,"Loading services from " + uri);
-
-			ServiceListHandler dh = new ServiceListHandler(plugin,uri);
-			XmlParser parser = new XmlParser();
-			parser.setHandler(dh);
-			in = new BufferedReader(
-				new InputStreamReader(
-				uri.openStream()));
-			parser.parse(null, null, in);
-			if(cache != null)
+			if (!XMLUtilities.parseXML(uri.openStream(), dh)
+				&& cache != null)
+			{
 				cache.cachedServices = dh.getCachedServices();
-		}
-		catch(XmlException xe)
-		{
-			int line = xe.getLine();
-			String message = xe.getMessage();
-			Log.log(Log.ERROR,ServiceManager.class,uri + ":" + line
-				+ ": " + message);
-		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,ServiceManager.class,e);
-		}
-		finally
-		{
-			try
-			{
-				if(in != null)
-					in.close();
 			}
-			catch(IOException io)
-			{
-				Log.log(Log.ERROR,ServiceManager.class,io);
-			}
+		}
+		catch (IOException ioe)
+		{
+			Log.log(Log.ERROR, ServiceManager.class, ioe);
 		}
 	} //}}}
 
@@ -141,10 +120,10 @@ public class ServiceManager
 	 */
 	public static void unloadServices(PluginJAR plugin)
 	{
-		Iterator descriptors = serviceMap.keySet().iterator();
+		Iterator<Descriptor> descriptors = serviceMap.keySet().iterator();
 		while(descriptors.hasNext())
 		{
-			Descriptor d = (Descriptor)descriptors.next();
+			Descriptor d = descriptors.next();
 			if(d.plugin == plugin)
 				descriptors.remove();
 		}
@@ -152,7 +131,7 @@ public class ServiceManager
 
 	//{{{ registerService() method
 	/**
-	 * Registers a service. Plugins should provide a 
+	 * Registers a service. Plugins should provide a
 	 * <code>services.xml</code> file instead of calling this directly.
 	 *
 	 * @param clazz The service class
@@ -192,16 +171,13 @@ public class ServiceManager
 	 */
 	public static String[] getServiceTypes()
 	{
-		HashSet returnValue = new HashSet();
+		Set<String> returnValue = new HashSet<String>();
 
-		Iterator descriptors = serviceMap.keySet().iterator();
-		while(descriptors.hasNext())
-		{
-			Descriptor d = (Descriptor)descriptors.next();
+		Set<Descriptor> keySet = serviceMap.keySet();
+		for (Descriptor d : keySet)
 			returnValue.add(d.clazz);
-		}
 
-		return (String[])returnValue.toArray(
+		return returnValue.toArray(
 			new String[returnValue.size()]);
 	} //}}}
 
@@ -217,17 +193,15 @@ public class ServiceManager
 	 */
 	public static String[] getServiceNames(String clazz)
 	{
-		ArrayList returnValue = new ArrayList();
+		List<String> returnValue = new ArrayList<String>();
 
-		Iterator descriptors = serviceMap.keySet().iterator();
-		while(descriptors.hasNext())
-		{
-			Descriptor d = (Descriptor)descriptors.next();
+		Set<Descriptor> keySet = serviceMap.keySet();
+		for (Descriptor d : keySet)
 			if(d.clazz.equals(clazz))
 				returnValue.add(d.name);
-		}
 
-		return (String[])returnValue.toArray(
+
+		return returnValue.toArray(
 			new String[returnValue.size()]);
 	} //}}}
 
@@ -246,7 +220,7 @@ public class ServiceManager
 	{
 		// they never taught you this in undergrad computer science
 		Descriptor key = new Descriptor(clazz,name);
-		Descriptor value = (Descriptor)serviceMap.get(key);
+		Descriptor value = serviceMap.get(key);
 		if(value == null)
 		{
 			// unknown service - <clazz,name> not in table
@@ -259,7 +233,7 @@ public class ServiceManager
 				loadServices(value.plugin,
 					value.plugin.getServicesURI(),
 					null);
-				value = (Descriptor)serviceMap.get(key);
+				value = serviceMap.get(key);
 			}
 			return value.getInstance();
 		}
@@ -281,14 +255,14 @@ public class ServiceManager
 	//}}}
 
 	//{{{ Private members
-	private static Map serviceMap = new HashMap();
+	private static final Map<Descriptor, Descriptor> serviceMap = new HashMap<Descriptor, Descriptor>();
 	//}}}
 
 	//{{{ Descriptor class
 	static class Descriptor
 	{
-		String clazz;
-		String name;
+		final String clazz;
+		final String name;
 		String code;
 		PluginJAR plugin;
 		Object instance;
@@ -348,4 +322,44 @@ public class ServiceManager
 				return false;
 		}
 	} //}}}
+
+	/**
+	 * A FoldHandler based on the ServiceManager
+	 * @author Matthieu Casanova
+	 * @since jEdit 4.3pre10
+	 */
+	public static class ServiceFoldHandlerProvider implements FoldHandlerProvider
+	{
+		/**
+		 * The service type. See {@link org.gjt.sp.jedit.ServiceManager}.
+		 * @since jEdit 4.3pre10
+		 */
+		public static final String SERVICE = "org.gjt.sp.jedit.buffer.FoldHandler";
+
+		/**
+		 * Returns the fold handler with the specified name, or null if
+		 * there is no registered handler with that name.
+		 * @param name The name of the desired fold handler
+		 * @return the FoldHandler or null if it doesn't exist
+		 * @since jEdit 4.3pre10
+		 */
+		public FoldHandler getFoldHandler(String name)
+		{
+			FoldHandler handler = (FoldHandler) getService(SERVICE,name);
+			return handler;
+		}
+
+		/**
+		 * Returns an array containing the names of all registered fold
+		 * handlers.
+		 *
+		 * @since jEdit 4.3pre10
+		 */
+		public String[] getFoldModes()
+		{
+			String[] handlers = getServiceNames(SERVICE);
+			Arrays.sort(handlers,new StandardUtilities.StringCompare<String>());
+			return handlers;
+		}
+	}
 }

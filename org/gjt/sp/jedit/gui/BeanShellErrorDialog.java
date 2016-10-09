@@ -33,7 +33,7 @@ import org.gjt.sp.jedit.*;
  * A dialog box showing a stack trace. Perhaps badly named, since any error, not
  * just a BeanShell error can be shown.
  * @author Slava Pestov
- * @version $Id: BeanShellErrorDialog.java,v 1.7 2004/04/05 03:11:47 spestov Exp $
+ * @version $Id: BeanShellErrorDialog.java 12504 2008-04-22 23:12:43Z ezust $
  */
 public class BeanShellErrorDialog extends TextAreaDialog
 {

@@ -1,4 +1,4 @@
-$Id: changes42.txt,v 1.1 2003/04/30 05:28:54 spestov Exp $
+$Id: changes42.txt 4665 2003-04-30 05:28:55Z spestov $
 
 Changes made to QuickNotepad plugin for jEdit 4.2:
 
