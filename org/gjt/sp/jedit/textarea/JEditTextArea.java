@@ -2075,7 +2075,7 @@ forward_scan:		do
 
 		if(caret == newCaret)
 		{
-			if(focusedComponent == this)
+			if(view.getTextArea() == this)
 				finishCaretUpdate(doElectricScroll,false);
 			return;
 		}
@@ -2902,10 +2902,6 @@ loop:		for(int i = lineNo - 1; i >= 0; i--)
 		else if(!multi)
 			selectNone();
 		moveCaretPosition(newCaret);
-
-		// so that end followed by up arrow will always put caret at
-		// the end of the previous line, for example
-		setMagicCaretPosition(Integer.MAX_VALUE);
 	} //}}}
 
 	//{{{ goToStartOfWhiteSpace() method
@@ -6196,17 +6192,22 @@ loop:			for(int i = lineNo + 1; i < getLineCount(); i++)
 				dragStartOffset = dragStart
 					- getLineStartOffset(dragStartLine);
 			}
-			else if(control)
-			{
-				if(!multi)
-					selectNone();
-
-				moveCaretPosition(xyToOffset(evt.getX(),
-					evt.getY(),false),false);
-				selectToMatchingBracket();
-			}
 			else
 			{
+				int offset = xyToOffset(evt.getX(),evt.getY(),false);
+				if(offset != buffer.getLength())
+				{
+					buffer.getText(offset,1,lineSegment);
+					switch(lineSegment.array[lineSegment.offset])
+					{
+					case '(': case '[': case '{':
+					case ')': case ']': case '}':
+						moveCaretPosition(offset,false);
+						selectToMatchingBracket();
+						return;
+					}
+				}
+
 				if(!multi)
 					selectNone();
 
@@ -6250,6 +6251,9 @@ loop:			for(int i = lineNo + 1; i < getLineCount(); i++)
 		private void doTripleClick(MouseEvent evt)
 		{
 			int newCaret = getLineEndOffset(dragStartLine);
+			if(dragStartLine == buffer.getLineCount() - 1)
+				newCaret--;
+
 			addToSelection(new Selection.Range(
 				getLineStartOffset(dragStartLine),
 				newCaret));
