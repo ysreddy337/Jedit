@@ -11,7 +11,7 @@
 		   - Keywords begin, module, task, etc. always indented
 		   - Keywords if, while, etc. indent only if ; not on the same line
 		-->
-		<PROPERTY NAME="indentPrevLine" VALUE="(.*:\s*)|(\s*(begin|fork|task|table|specify|primitive|module|generate|function|case[xz]?)\&gt;.*)|(\s*(always|if|else|for|forever|initial|repeat|while)\&gt;[^;]*)" />
+		<PROPERTY NAME="indentNextLines" VALUE="(.*:\s*)|(\s*(begin|fork|task|table|specify|primitive|module|generate|function|case[xz]?)\&gt;.*)|(\s*(always|if|else|for|forever|initial|repeat|while)\&gt;[^;]*)" />
 
 		<PROPERTY NAME="commentStart" VALUE="/*" />
 		<PROPERTY NAME="commentEnd" VALUE="*/" />
@@ -19,11 +19,8 @@
 		<PROPERTY NAME="noWordSep" VALUE="_'" />
 		<PROPERTY NAME="wordBreakChars" VALUE=",+-=&lt;&gt;/?^&amp;*" />
 	</PROPS>
-	<RULES ESCAPE="\" IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
+	<RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE"
+		DIGIT_RE="([[:digit:]]|_)+" NO_WORD_SEP="'">
 		<!-- Comments -->
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>/*</BEGIN>
@@ -37,11 +34,10 @@
 			<END>"</END>
 		</SPAN>
 
-		<!-- Integer literals: Can't handle 123_456 but 'd123_456 is ok --> 
-		<MARK_FOLLOWING TYPE="DIGIT">'d</MARK_FOLLOWING>
-		<MARK_FOLLOWING TYPE="DIGIT">'h</MARK_FOLLOWING>
-		<MARK_FOLLOWING TYPE="DIGIT">'b</MARK_FOLLOWING>
-		<MARK_FOLLOWING TYPE="DIGIT">'o</MARK_FOLLOWING>
+		<SEQ TYPE="DIGIT">'d</SEQ>
+		<SEQ TYPE="DIGIT">'h</SEQ>
+		<SEQ TYPE="DIGIT">'b</SEQ>
+		<SEQ TYPE="DIGIT">'o</SEQ>
 
 		<!-- Function calls, module instantiation, system tasks with args -->
 		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
@@ -63,18 +59,7 @@
 		<SEQ TYPE="OPERATOR">}</SEQ>
 		<SEQ TYPE="OPERATOR">{</SEQ>
 
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">:</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">]</SEQ>
-		<SEQ TYPE="NULL">[</SEQ>
-		<SEQ TYPE="NULL">(</SEQ>
-		<SEQ TYPE="NULL">)</SEQ>
-		<SEQ TYPE="NULL">?</SEQ>
-		<SEQ TYPE="NULL">#</SEQ>
-		<SEQ TYPE="NULL">@</SEQ>
-
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<!-- Regular Keywords -->
 			<KEYWORD1>always</KEYWORD1>
 			<KEYWORD1>assign</KEYWORD1>

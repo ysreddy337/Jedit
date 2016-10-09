@@ -26,12 +26,11 @@ package org.gjt.sp.jedit.gui;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
-import org.gjt.sp.jedit.textarea.JEditTextArea;
 import org.gjt.sp.jedit.EditAction;
 import org.gjt.sp.jedit.GUIUtilities;
 //}}}
 
-public class EnhancedButton extends JButton
+public class EnhancedButton extends RolloverButton
 {
 	//{{{ EnhancedButton constructor
 	public EnhancedButton(Icon icon, String toolTip, EditAction action)
@@ -50,10 +49,6 @@ public class EnhancedButton extends JButton
 			setEnabled(false);
 
 		setToolTipText(toolTip);
-
-		Insets zeroInsets = new Insets(0,0,0,0);
-		setMargin(zeroInsets);
-		setRequestFocusEnabled(false);
 	} //}}}
 
 	//{{{ isFocusTraversable() method

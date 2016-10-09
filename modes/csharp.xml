@@ -7,21 +7,28 @@
 		<PROPERTY NAME="commentStart" VALUE="/*" />
 		<PROPERTY NAME="commentEnd" VALUE="*/" />
 		<PROPERTY NAME="lineComment" VALUE="//" />
+
+		<!-- Auto indent -->
 		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
 		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
-		<PROPERTY NAME="indentPrevLine"
-			VALUE="\s*(((if|while)\s*\(|else\s*(\{|$)|else\s+if\s*\(|case\s+.+:|default:)[^;]*|for\s*\(.*)" />
+		<PROPERTY NAME="indentNextLine"
+			VALUE="\s*(((if|while)\s*\(|else\s*|else\s+if\s*\(|for\s*\(.*\))[^{;]*)" />
+		<!-- set this to 'true' if you want to use GNU coding style -->
 		<PROPERTY NAME="doubleBracketIndent" VALUE="false" />
+		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 	</PROPS>
-	<RULES ESCAPE="\" HIGHLIGHT_DIGITS="TRUE" IGNORE_CASE="FALSE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
+	<RULES ESCAPE="\"
+		IGNORE_CASE="FALSE"
+		HIGHLIGHT_DIGITS="TRUE"
+		DIGIT_RE="(0x[[:xdigit:]]+[lL]?|[[:digit:]]+(e[[:digit:]]*)?[lLdDfF]?)">
 
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>/*</BEGIN>
 			<END>*/</END>
 		</SPAN>
+
+		<!-- DocComments may have XML in them -->
+		<EOL_SPAN TYPE="COMMENT2" DELEGATE="DOC_COMMENT">///</EOL_SPAN>
 
 		<EOL_SPAN TYPE="COMMENT1">//</EOL_SPAN>
 
@@ -62,7 +69,6 @@
 		<SEQ TYPE="OPERATOR">,</SEQ>
 		<SEQ TYPE="OPERATOR">.</SEQ>
 		<SEQ TYPE="OPERATOR">!</SEQ>
-		<SEQ TYPE="NULL">)</SEQ>
 		<SEQ TYPE="OPERATOR">[</SEQ>
 		<SEQ TYPE="OPERATOR">]</SEQ>
 		<SEQ TYPE="OPERATOR">+</SEQ>
@@ -81,7 +87,7 @@
 
 		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
 
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<KEYWORD1>abstract</KEYWORD1>
 			<KEYWORD1>as</KEYWORD1>
 			<KEYWORD1>base</KEYWORD1>
@@ -162,6 +168,19 @@
 			<LITERAL2>this</LITERAL2>
 			<LITERAL2>true</LITERAL2>
 		</KEYWORDS>
+	</RULES>
+
+	<RULES SET="DOC_COMMENT" DEFAULT="COMMENT2" IGNORE_CASE="TRUE">
+		<!-- XML comments -->
+		<SPAN TYPE="COMMENT1">
+			<BEGIN>&lt;--</BEGIN>
+			<END>--&gt;</END>
+		</SPAN>
+		<!-- XML tags -->
+		<SPAN TYPE="MARKUP" DELEGATE="xml::TAGS">
+			<BEGIN>&lt;</BEGIN>
+			<END>&gt;</END>
+		</SPAN>
 	</RULES>
 </MODE>
 

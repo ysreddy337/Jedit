@@ -6,6 +6,7 @@
 	<PROPS>
 		<PROPERTY NAME="indentOpenBrackets" VALUE="{[(" />
 		<PROPERTY NAME="indentCloseBrackets" VALUE="}])" />
+		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 		<PROPERTY NAME="commentStart" VALUE="comment {" />
 		<PROPERTY NAME="commentEnd" VALUE="}" />
 		<PROPERTY NAME="lineComment" VALUE=";" />
@@ -13,10 +14,6 @@
 		<PROPERTY NAME="wordBreakChars" VALUE=",+-=&lt;&gt;/?^&amp;*" />
 	</PROPS>
 	<RULES ESCAPE="\" IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="FALSE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- Javadoc comment -->
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>comment {</BEGIN>
@@ -49,19 +46,10 @@
 		<SEQ TYPE="OPERATOR">*</SEQ>
 		<SEQ TYPE="OPERATOR">&gt;</SEQ>
 		<SEQ TYPE="OPERATOR">&lt;</SEQ>
-		<SEQ TYPE="NULL">}</SEQ>
-		<SEQ TYPE="NULL">{</SEQ>
-		<SEQ TYPE="NULL">.</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">]</SEQ>
-		<SEQ TYPE="NULL">[</SEQ>
-		<SEQ TYPE="NULL">(</SEQ>
-		<SEQ TYPE="NULL">)</SEQ>
 
 		<MARK_FOLLOWING TYPE="LITERAL2" EXCLUDE_MATCH="TRUE">'</MARK_FOLLOWING>
 		
-		<KEYWORDS IGNORE_CASE="TRUE">
+		<KEYWORDS>
 			<KEYWORD1>abs</KEYWORD1>
 			<KEYWORD1>absolute</KEYWORD1>
 			<KEYWORD1>add</KEYWORD1>

@@ -20,21 +20,28 @@
 package org.gjt.sp.jedit.gui;
 
 import java.awt.*;
-import java.net.URL;
 import org.gjt.sp.jedit.jEdit;
 import org.gjt.sp.util.Log;
 
 /**
- * This file only uses AWT APIs so that it is displayed faster on startup.
+ * The splash screen displayed on startup.<p>
+ *
+ * This file only uses AWT APIs so that it can be displayed as soon as possible
+ * after jEdit is launched.
  */
 public class SplashScreen extends Canvas
 {
 	public SplashScreen()
 	{
 		setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+		setBackground(Color.white);
+
+		Font font = new Font("Dialog",Font.PLAIN,10);
+		setFont(font);
+		fm = getFontMetrics(font);
 
 		image = getToolkit().getImage(
-			getClass().getResource("/org/gjt/sp/jedit/icons/splash.gif"));
+			getClass().getResource("/org/gjt/sp/jedit/icons/splash.png"));
 		MediaTracker tracker = new MediaTracker(this);
 		tracker.addImage(image,0);
 
@@ -51,7 +58,7 @@ public class SplashScreen extends Canvas
 
 		Dimension screen = getToolkit().getScreenSize();
 		Dimension size = new Dimension(image.getWidth(this) + 2,
-			image.getHeight(this) + 2);
+			image.getHeight(this) + 2 + PROGRESS_HEIGHT);
 		win.setSize(size);
 
 		win.setLayout(new BorderLayout());
@@ -110,16 +117,26 @@ public class SplashScreen extends Canvas
 		{
 			offscreenImg = createImage(size.width,size.height);
 			offscreenGfx = offscreenImg.getGraphics();
+			offscreenGfx.setFont(getFont());
 		}
 
-		offscreenGfx.setColor(Color.black);
+		offscreenGfx.setColor(Color.gray);
 		offscreenGfx.drawRect(0,0,size.width - 1,size.height - 1);
 
 		offscreenGfx.drawImage(image,1,1,this);
 
 		// XXX: This should not be hardcoded
-		offscreenGfx.setColor(new Color(206,206,229));
-		offscreenGfx.fillRect(9,199,(384 * progress) / 7,14);
+		offscreenGfx.setColor(new Color(168,173,189));
+		offscreenGfx.fillRect(1,image.getHeight(this) + 1,
+			((win.getWidth() - 2) * progress) / 6,PROGRESS_HEIGHT);
+
+		offscreenGfx.setColor(Color.gray);
+
+		String str = "Version " + jEdit.getVersion();
+
+		offscreenGfx.drawString(str,
+			(getWidth() - fm.stringWidth(str)) / 2,
+			image.getHeight(this)+1 - fm.getDescent() - 10);
 
 		g.drawImage(offscreenImg,0,0,this);
 
@@ -127,9 +144,11 @@ public class SplashScreen extends Canvas
 	}
 
 	// private members
+	private FontMetrics fm;
 	private Window win;
 	private Image image;
 	private Image offscreenImg;
 	private Graphics offscreenGfx;
 	private int progress;
+	private static final int PROGRESS_HEIGHT = 20;
 }

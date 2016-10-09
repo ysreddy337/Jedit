@@ -1,6 +1,9 @@
 /*
  * AboutDialog.java - About jEdit dialog box
- * Copyright (C) 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,15 +22,18 @@
 
 package org.gjt.sp.jedit.gui;
 
+//{{{ Imports
 import javax.swing.border.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import java.util.*;
 import org.gjt.sp.jedit.*;
+//}}}
 
 public class AboutDialog extends EnhancedDialog
 {
+	//{{{ AboutDialog constructor
 	public AboutDialog(View view)
 	{
 		super(view,jEdit.getProperty("about.title"),true);
@@ -54,87 +60,104 @@ public class AboutDialog extends EnhancedDialog
 		setResizable(false);
 		setLocationRelativeTo(view);
 		show();
-	}
+	} //}}}
 
+	//{{{ ok() method
 	public void ok()
 	{
 		dispose();
-	}
+	} //}}}
 
+	//{{{ cancel() method
 	public void cancel()
 	{
 		dispose();
-	}
+	} //}}}
 
 	// private members
 	private JButton close;
 
+	//{{{ ActionHandler class
 	class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
 		{
 			dispose();
 		}
-	}
+	} //}}}
 
+	//{{{ AboutPanel class
 	static class AboutPanel extends JComponent
 	{
 		ImageIcon image;
 		Vector text;
 		int scrollPosition;
 		AnimationThread thread;
+		int maxWidth;
+		FontMetrics fm;
+
+		public static int TOP = 120;
+		public static int BOTTOM = 30;
 
 		AboutPanel()
 		{
 			setFont(UIManager.getFont("Label.font"));
-			setForeground(new Color(206,206,229));
+			fm = getFontMetrics(getFont());
+
+			setForeground(new Color(96,96,96));
 			image = new ImageIcon(getClass().getResource(
-				"/org/gjt/sp/jedit/icons/about.gif"));
-			setBorder(new MatteBorder(1,1,1,1,Color.black));
+				"/org/gjt/sp/jedit/icons/about.png"));
+
+			setBorder(new MatteBorder(1,1,1,1,Color.gray));
 
 			text = new Vector(50);
 			StringTokenizer st = new StringTokenizer(
 				jEdit.getProperty("about.text"),"\n");
 			while(st.hasMoreTokens())
 			{
-				text.addElement(st.nextToken());
+				String line = st.nextToken();
+				text.addElement(line);
+				maxWidth = Math.max(maxWidth,
+					fm.stringWidth(line) + 10);
 			}
 
-			scrollPosition = -300;
+			scrollPosition = -250;
 
 			thread = new AnimationThread();
 		}
 
-		public void paintComponent(Graphics _g)
+		public void paintComponent(Graphics g)
 		{
-			Graphics2D g = (Graphics2D)_g;
-
+			g.setColor(new Color(96,96,96));
 			image.paintIcon(this,g,1,1);
 
 			FontMetrics fm = g.getFontMetrics();
+
+			String[] args = { jEdit.getVersion() };
+			String version = jEdit.getProperty("about.version",args);
+			g.drawString(version,(getWidth() - fm.stringWidth(version)) / 2,
+				getHeight() - 5);
+
+			g = g.create((getWidth() - maxWidth) / 2,TOP,maxWidth,
+				getHeight() - TOP - BOTTOM);
+
 			int height = fm.getHeight();
 			int firstLine = scrollPosition / height;
 
 			int firstLineOffset = height - scrollPosition % height;
-			int lastLine = (scrollPosition + 320) / height - 3;
+			int lines = (getHeight() - TOP - BOTTOM) / height;
 
-			int y = 50 + firstLineOffset;
+			int y = firstLineOffset;
 
-			for(int i = firstLine; i <= lastLine; i++)
+			for(int i = 0; i <= lines; i++)
 			{
-				if(i >= 0 && i < text.size())
+				if(i + firstLine >= 0 && i + firstLine < text.size())
 				{
-					String line = (String)text.elementAt(i);
-					g.drawString(line,130 + (340
-						- fm.stringWidth(line)) / 2,y);
+					String line = (String)text.get(i + firstLine);
+					g.drawString(line,(maxWidth - fm.stringWidth(line))/2,y);
 				}
 				y += fm.getHeight();
 			}
-
-			String[] args = { jEdit.getVersion() };
-			String version = jEdit.getProperty("about.version",args);
-			g.drawString(version,130 + (340 - fm.stringWidth(version)) / 2,
-				370);
 		}
 
 		public Dimension getPreferredSize()
@@ -152,42 +175,49 @@ public class AboutDialog extends EnhancedDialog
 		public void removeNotify()
 		{
 			super.removeNotify();
-			thread.stop();
+			thread.kill();
 		}
 
 		class AnimationThread extends Thread
 		{
+			private boolean running = true;
+		
 			AnimationThread()
 			{
 				super("About box animation thread");
 				setPriority(Thread.MIN_PRIORITY);
 			}
+			
+			public void kill()
+			{
+				running = false;
+			}
 
 			public void run()
 			{
-				for(;;)
+				FontMetrics fm = getFontMetrics(getFont());
+				int max = (text.size() * fm.getHeight());
+
+				while (running)
 				{
-					long start = System.currentTimeMillis();
+					scrollPosition += 2;
 
-					scrollPosition++;
-
-					FontMetrics fm = getFontMetrics(getFont());
-					int max = text.size() * fm.getHeight();
 					if(scrollPosition > max)
-						scrollPosition = -300;
+						scrollPosition = -250;
 
 					try
 					{
-						Thread.sleep(Math.max(0,25 -
-							(System.currentTimeMillis() - start)));
+						Thread.sleep(100);
 					}
-					catch(InterruptedException ie)
+					catch(Exception e)
 					{
 					}
 
-					repaint();
+					repaint(getWidth() / 2 - maxWidth,
+						TOP,maxWidth * 2,
+						getHeight() - TOP - BOTTOM);
 				}
 			}
 		}
-	}
+	} //}}}
 }

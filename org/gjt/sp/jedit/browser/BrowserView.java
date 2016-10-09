@@ -12,7 +12,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -40,9 +40,9 @@ import org.gjt.sp.jedit.*;
 /**
  * VFS browser tree view.
  * @author Slava Pestov
- * @version $Id: BrowserView.java,v 1.33 2002/04/04 05:53:05 spestov Exp $
+ * @version $Id: BrowserView.java,v 1.58 2003/02/20 01:55:12 spestov Exp $
  */
-public class BrowserView extends JPanel
+class BrowserView extends JPanel
 {
 	//{{{ BrowserView constructor
 	public BrowserView(VFSBrowser browser, final boolean splitHorizontally)
@@ -50,8 +50,7 @@ public class BrowserView extends JPanel
 		this.browser = browser;
 		this.splitHorizontally = splitHorizontally;
 
-		parentModel = new DefaultListModel();
-		parentDirectories = new JList(parentModel);
+		parentDirectories = new JList();
 
 		parentDirectories.getSelectionModel().setSelectionMode(
 			TreeSelectionModel.SINGLE_TREE_SELECTION);
@@ -67,7 +66,11 @@ public class BrowserView extends JPanel
 		tree.setCellRenderer(renderer);
 		tree.setEditable(false);
 		tree.addTreeExpansionListener(new TreeHandler());
-		tree.putClientProperty("JTree.lineStyle", "Angled");
+
+		// looks bad with the OS X L&F, apparently...
+		if(!OperatingSystem.isMacOSLF())
+			tree.putClientProperty("JTree.lineStyle", "Angled");
+
 		tree.setRootVisible(false);
 		tree.setShowsRootHandles(true);
 		tree.setVisibleRowCount(12);
@@ -76,9 +79,10 @@ public class BrowserView extends JPanel
 		parentScroller.setMinimumSize(new Dimension(0,0));
 		JScrollPane treeScroller = new JScrollPane(tree);
 		treeScroller.setMinimumSize(new Dimension(0,0));
-		splitPane = new JSplitPane( 
+		splitPane = new JSplitPane(
 			splitHorizontally ? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT,
 			parentScroller,treeScroller);
+		splitPane.setOneTouchExpandable(true);
 
 		SwingUtilities.invokeLater(new Runnable()
 		{
@@ -112,11 +116,10 @@ public class BrowserView extends JPanel
 		propertiesChanged();
 	} //}}}
 
-	//{{{ requestDefaultFocus() method
-	public boolean requestDefaultFocus()
+	//{{{ focusOnFileView() method
+	public void focusOnFileView()
 	{
 		tree.requestFocus();
-		return true;
 	} //}}}
 
 	//{{{ removeNotify() method
@@ -156,13 +159,22 @@ public class BrowserView extends JPanel
 		tree.setSelectionPaths(new TreePath[0]);
 	} //}}}
 
+	//{{{ loadDirectory() method
+	public void loadDirectory(String path)
+	{
+		// called by VFSBrowser.setDirectory()
+		tmpExpanded.clear();
+		loadDirectory(rootNode,path,false);
+	} //}}}
+
 	//{{{ directoryLoaded() method
 	public void directoryLoaded(DefaultMutableTreeNode node,
 		String path, Vector directory)
 	{
 		if(node == rootNode)
 		{
-			parentModel.removeAllElements();
+			DefaultListModel parentList = new DefaultListModel();
+
 			String parent = path;
 
 			if(parent.length() != 1 && (parent.endsWith("/")
@@ -171,8 +183,18 @@ public class BrowserView extends JPanel
 
 			for(;;)
 			{
-				parentModel.insertElementAt(parent,0);
-				String newParent = MiscUtilities.getParentOfPath(parent);
+				VFS _vfs = VFSManager.getVFSForPath(
+					parent);
+				// create a DirectoryEntry manually
+				// instead of using _vfs._getDirectoryEntry()
+				// since so many VFS's have broken
+				// implementations of this method
+				parentList.insertElementAt(new VFS.DirectoryEntry(
+					_vfs.getFileName(parent),
+					parent,parent,
+					VFS.DirectoryEntry.DIRECTORY,
+					0L,false),0);
+				String newParent = _vfs.getParentOfPath(parent);
 				if(newParent.length() != 1 && (newParent.endsWith("/")
 					|| newParent.endsWith(File.separator)))
 					newParent = newParent.substring(0,newParent.length() - 1);
@@ -183,9 +205,10 @@ public class BrowserView extends JPanel
 					parent = newParent;
 			}
 
-			int index = parentModel.getSize() - 1;
+			parentDirectories.setModel(parentList);
+			int index = parentList.getSize() - 1;
 			parentDirectories.setSelectedIndex(index);
-			parentDirectories.ensureIndexIsVisible(parentModel.getSize() - 1);
+			parentDirectories.ensureIndexIsVisible(index);
 		}
 
 		node.removeAllChildren();
@@ -202,7 +225,10 @@ public class BrowserView extends JPanel
 				DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(file,allowsChildren);
 				node.add(newNode);
 				if(tmpExpanded.get(file.path) != null)
+				{
+					tmpExpanded.remove(file.path);
 					toExpand.addElement(new TreePath(newNode.getPath()));
+				}
 			}
 		}
 
@@ -225,14 +251,6 @@ public class BrowserView extends JPanel
 	public void updateFileView()
 	{
 		tree.repaint();
-	} //}}}
-
-	//{{{ loadDirectory() method
-	public void loadDirectory(String path)
-	{
-		// called by VFSBrowser.setDirectory()
-		tmpExpanded.clear();
-		loadDirectory(rootNode,path,false);
 	} //}}}
 
 	//{{{ maybeReloadDirectory() method
@@ -283,6 +301,12 @@ public class BrowserView extends JPanel
 		splitPane.setBorder(null);
 	} //}}}
 
+	//{{{ getTree() method
+	public BrowserJTree getTree()
+	{
+		return tree;
+	} //}}}
+
 	//{{{ Private members
 
 	//{{{ Instance variables
@@ -290,8 +314,7 @@ public class BrowserView extends JPanel
 
 	private JSplitPane splitPane;
 	private JList parentDirectories;
-	private DefaultListModel parentModel;
-	private JTree tree;
+	private BrowserJTree tree;
 	private Hashtable tmpExpanded;
 	private DefaultTreeModel model;
 	private DefaultMutableTreeNode rootNode;
@@ -353,25 +376,19 @@ public class BrowserView extends JPanel
 	private void loadDirectory(DefaultMutableTreeNode node, String path,
 		boolean showLoading)
 	{
-		int rowCount = tree.getRowCount();
-		for(int i = 0; i < rowCount; i++)
-		{
-			TreePath treePath = tree.getPathForRow(i);
-			if(tree.isExpanded(treePath))
-			{
-				DefaultMutableTreeNode _node = (DefaultMutableTreeNode)
-					treePath.getLastPathComponent();
-				VFS.DirectoryEntry file = ((VFS.DirectoryEntry)
-					_node.getUserObject());
+		saveExpansionState(node);
 
-				tmpExpanded.put(file.path,file.path);
-			}
-		}
+		path = MiscUtilities.constructPath(browser.getDirectory(),path);
+		VFS vfs = VFSManager.getVFSForPath(path);
+
+		Object session = vfs.createVFSSession(path,this);
+		if(session == null)
+			return;
 
 		if(node == rootNode)
 		{
-			parentModel.removeAllElements();
-			parentModel.addElement(new LoadingPlaceholder());
+			setListModel(parentDirectories,new Object[] {
+				new LoadingPlaceholder() });
 		}
 
 		if(showLoading)
@@ -381,14 +398,68 @@ public class BrowserView extends JPanel
 			model.reload(node);
 		}
 
-		browser.loadDirectory(node,path,node == rootNode);
+		VFSManager.runInWorkThread(new BrowserIORequest(
+			BrowserIORequest.LIST_DIRECTORY,browser,
+			session,vfs,path,null,node,node == rootNode));
+	} //}}}
+
+	//{{{ saveExpansionState() method
+	private void saveExpansionState(DefaultMutableTreeNode node)
+	{
+		for(int i = 0; i < node.getChildCount(); i++)
+		{
+			DefaultMutableTreeNode child = (DefaultMutableTreeNode)
+				node.getChildAt(i);
+
+			TreePath treePath = new TreePath(child.getPath());
+
+			if(tree.isExpanded(treePath))
+			{
+				VFS.DirectoryEntry file = ((VFS.DirectoryEntry)
+					child.getUserObject());
+
+				tmpExpanded.put(file.path,file.path);
+
+				if(file.type != VFS.DirectoryEntry.FILE)
+					saveExpansionState(child);
+			}
+		}
 	} //}}}
 
 	//{{{ showFilePopup() method
-	private void showFilePopup(VFS.DirectoryEntry file, Point point)
+	private void showFilePopup(VFS.DirectoryEntry[] files, Component comp,
+		Point point)
 	{
-		popup = new BrowserCommandsMenu(browser,file);
-		GUIUtilities.showPopupMenu(popup,tree,point.x+1,point.y+1);
+		popup = new BrowserCommandsMenu(browser,files);
+		// for the parent directory right-click; on the click we select
+		// the clicked item, but when the popup goes away we select the
+		// currently showing directory.
+		popup.addPopupMenuListener(new PopupMenuListener()
+		{
+			public void popupMenuCanceled(PopupMenuEvent e) {}
+
+			public void popupMenuWillBecomeVisible(PopupMenuEvent e) {}
+
+			public void popupMenuWillBecomeInvisible(PopupMenuEvent e)
+			{
+				int index = parentDirectories.getModel().getSize() - 1;
+				parentDirectories.setSelectedIndex(index);
+			}
+		});
+		GUIUtilities.showPopupMenu(popup,comp,point.x,point.y);
+	} //}}}
+
+	//{{{ setListModel() method
+	/**
+	 * This should be in the JDK API.
+	 */
+	private void setListModel(JList list, final Object[] model)
+	{
+		list.setModel(new AbstractListModel()
+		{
+			public int getSize() { return model.length; }
+			public Object getElementAt(int i) { return model[i]; }
+		});
 	} //}}}
 
 	//}}}
@@ -427,7 +498,7 @@ public class BrowserView extends JPanel
 				isSelected,cellHasFocus);
 
 			ParentDirectoryRenderer.this.setBorder(new EmptyBorder(
-				1,index * 10 + 1,1,1));
+				1,index * 5 + 1,1,1));
 
 			if(value instanceof LoadingPlaceholder)
 			{
@@ -436,13 +507,17 @@ public class BrowserView extends JPanel
 				setIcon(showIcons ? FileCellRenderer.loadingIcon : null);
 				setText(jEdit.getProperty("vfs.browser.tree.loading"));
 			}
-			else
+			else if(value instanceof VFS.DirectoryEntry)
 			{
+				VFS.DirectoryEntry dirEntry = (VFS.DirectoryEntry)value;
 				ParentDirectoryRenderer.this.setFont(boldFont);
 
-				setIcon(showIcons ? FileCellRenderer.openDirIcon : null);
-				setText(MiscUtilities.getFileName(value.toString()));
+				setIcon(showIcons ? FileCellRenderer.getIconForFile(dirEntry,true)
+					: null);
+				setText(dirEntry.name);
 			}
+			else if(value == null)
+				setText("VFS does not follow VFS API");
 
 			return this;
 		}
@@ -451,20 +526,54 @@ public class BrowserView extends JPanel
 	//{{{ MouseHandler class
 	class MouseHandler extends MouseAdapter
 	{
-		public void mouseClicked(MouseEvent evt)
+		public void mousePressed(MouseEvent evt)
 		{
-			// ignore double clicks
-			if(evt.getClickCount() % 2 == 0)
+			int row = parentDirectories.locationToIndex(evt.getPoint());
+			if(row != -1)
+			{
+				Object obj = parentDirectories.getModel()
+					.getElementAt(row);
+				if(obj instanceof VFS.DirectoryEntry)
+				{
+					VFS.DirectoryEntry dirEntry = ((VFS.DirectoryEntry)obj);
+					if(GUIUtilities.isPopupTrigger(evt))
+					{
+						if(popup != null && popup.isVisible())
+						{
+							popup.setVisible(false);
+							popup = null;
+						}
+						else
+						{
+							parentDirectories.setSelectedIndex(row);
+							showFilePopup(new VFS.DirectoryEntry[] {
+								dirEntry },parentDirectories,
+								evt.getPoint());
+						}
+					}
+				}
+			}
+		}
+
+		public void mouseReleased(MouseEvent evt)
+		{
+			if(evt.getClickCount() % 2 != 0 &&
+				!GUIUtilities.isMiddleButton(evt.getModifiers()))
 				return;
 
 			int row = parentDirectories.locationToIndex(evt.getPoint());
 			if(row != -1)
 			{
-				Object obj = parentModel.getElementAt(row);
-				if(obj instanceof String)
+				Object obj = parentDirectories.getModel()
+					.getElementAt(row);
+				if(obj instanceof VFS.DirectoryEntry)
 				{
-					browser.setDirectory((String)obj);
-					requestDefaultFocus();
+					VFS.DirectoryEntry dirEntry = ((VFS.DirectoryEntry)obj);
+					if(!GUIUtilities.isPopupTrigger(evt))
+					{
+						browser.setDirectory(dirEntry.path);
+						focusOnFileView();
+					}
 				}
 			}
 		}
@@ -493,7 +602,7 @@ public class BrowserView extends JPanel
 			return null;
 		} //}}}
 
-		//{{{ getToolTipLocation() method
+		/* //{{{ getToolTipLocation() method
 		public final Point getToolTipLocation(MouseEvent evt)
 		{
 			TreePath path = getPathForLocation(evt.getX(), evt.getY());
@@ -507,10 +616,10 @@ public class BrowserView extends JPanel
 				}
 			}
 			return null;
-		} //}}}
+		} //}}} */
 
 		//{{{ processKeyEvent() method
-		protected void processKeyEvent(KeyEvent evt)
+		public void processKeyEvent(KeyEvent evt)
 		{
 			// could make things somewhat easier...
 			// ... but KeyEventWorkaround 'output contract' will
@@ -523,8 +632,16 @@ public class BrowserView extends JPanel
 			{
 				switch(evt.getKeyCode())
 				{
+				case KeyEvent.VK_UP:
+				case KeyEvent.VK_DOWN:
+					super.processKeyEvent(evt);
+					if(browser.getMode() != VFSBrowser.BROWSER)
+						browser.filesSelected();
+					break;
 				case KeyEvent.VK_ENTER:
-					browser.filesActivated(evt.isShiftDown(),false);
+					browser.filesActivated((evt.isShiftDown()
+						? VFSBrowser.M_OPEN_NEW_VIEW
+						: VFSBrowser.M_OPEN),false);
 					evt.consume();
 					break;
 				case KeyEvent.VK_LEFT:
@@ -543,6 +660,10 @@ public class BrowserView extends JPanel
 					return;
 				}
 
+				// hack...
+				if(evt.isShiftDown() && evt.getKeyChar() == '\n')
+					return;
+
 				switch(evt.getKeyChar())
 				{
 				case '~':
@@ -554,12 +675,11 @@ public class BrowserView extends JPanel
 				case '-':
 					View view = browser.getView();
 					Buffer buffer = view.getBuffer();
-					browser.setDirectory(MiscUtilities.getParentOfPath(
-						buffer.getPath()));
+					browser.setDirectory(buffer.getDirectory());
 					break;
 				default:
 					typeSelectBuffer.append(evt.getKeyChar());
-					doTypeSelect(typeSelectBuffer.toString());
+					doTypeSelect(typeSelectBuffer.toString(),true);
 
 					timer.stop();
 					timer.setInitialDelay(750);
@@ -578,11 +698,13 @@ public class BrowserView extends JPanel
 		//{{{ processMouseEvent() method
 		protected void processMouseEvent(MouseEvent evt)
 		{
-			ToolTipManager ttm = ToolTipManager.sharedInstance();
+			//ToolTipManager ttm = ToolTipManager.sharedInstance();
+
+			TreePath path = getPathForLocation(evt.getX(),evt.getY());
 
 			switch(evt.getID())
 			{
-			//{{{ MOUSE_ENTERED...
+			/* //{{{ MOUSE_ENTERED...
 			case MouseEvent.MOUSE_ENTERED:
 				toolTipInitialDelay = ttm.getInitialDelay();
 				toolTipReshowDelay = ttm.getReshowDelay();
@@ -595,109 +717,95 @@ public class BrowserView extends JPanel
 				ttm.setInitialDelay(toolTipInitialDelay);
 				ttm.setReshowDelay(toolTipReshowDelay);
 				super.processMouseEvent(evt);
-				break; //}}}
+				break; //}}} */
 			//{{{ MOUSE_CLICKED...
 			case MouseEvent.MOUSE_CLICKED:
-				if((evt.getModifiers() & MouseEvent.BUTTON2_MASK) != 0)
+				if(path != null)
 				{
-					TreePath path = getPathForLocation(evt.getX(),evt.getY());
-					if(path == null)
-					{
-						super.processMouseEvent(evt);
-						break;
-					}
-
-					if(!isPathSelected(path))
-						setSelectionPath(path);
-
-					browser.filesActivated(evt.isShiftDown(),true);
-					break;
-				}
-				else if((evt.getModifiers() & MouseEvent.BUTTON1_MASK) != 0)
-				{
-					TreePath path = getPathForLocation(evt.getX(),evt.getY());
-					if(path == null)
-					{
-						super.processMouseEvent(evt);
-						break;
-					}
-
-					if(!isPathSelected(path))
-						setSelectionPath(path);
-
-					if(evt.getClickCount() == 1)
-					{
-						browser.filesSelected();
-						super.processMouseEvent(evt);
-					}
 					// A double click is not only when clickCount == 2
 					// because every other click can open a new directory
-					if(evt.getClickCount() % 2 == 0)
+					if((evt.getModifiers() & MouseEvent.BUTTON1_MASK) != 0
+						&& evt.getClickCount() % 2 == 0)
 					{
+						setSelectionPath(path);
+
 						// don't pass double-clicks to tree, otherwise
 						// directory nodes will be expanded and we don't
 						// want that
-						browser.filesActivated(evt.isShiftDown(),true);
+						browser.filesActivated((evt.isShiftDown()
+							? VFSBrowser.M_OPEN_NEW_VIEW
+							: VFSBrowser.M_OPEN),true);
 						break;
 					}
+					else if(GUIUtilities.isMiddleButton(evt.getModifiers()))
+					{
+						browser.filesActivated((evt.isShiftDown()
+							? VFSBrowser.M_OPEN_NEW_VIEW
+							: VFSBrowser.M_OPEN),true);
+					}
+					else if((evt.getModifiers() & MouseEvent.BUTTON1_MASK) != 0)
+					{
+						if(!isPathSelected(path))
+							setSelectionPath(path);
+					}
+
+					super.processMouseEvent(evt);
+					break;
 				}
 				else if(GUIUtilities.isPopupTrigger(evt))
-					; // do nothing
-
-				super.processMouseEvent(evt);
-				break; //}}}
+					break;
+			//}}}
 			//{{{ MOUSE_PRESSED...
 			case MouseEvent.MOUSE_PRESSED:
 				if((evt.getModifiers() & MouseEvent.BUTTON1_MASK) != 0)
 				{
-					if(popup != null && popup.isVisible())
-						popup.setVisible(false);
-
-					// A double click is not only when clickCount == 2
-					// because every other click can open a new directory
 					if(evt.getClickCount() % 2 == 0)
 						break;
+				}
+
+				if(GUIUtilities.isMiddleButton(evt.getModifiers()))
+				{
+					if(!isPathSelected(path))
+						setSelectionPath(path);
 				}
 				else if(GUIUtilities.isPopupTrigger(evt))
 				{
 					if(popup != null && popup.isVisible())
 					{
 						popup.setVisible(false);
+						popup = null;
 						break;
 					}
 
-					TreePath path = getPathForLocation(evt.getX(),evt.getY());
 					if(path == null)
-						showFilePopup(null,evt.getPoint());
+						showFilePopup(null,this,evt.getPoint());
 					else
 					{
-						setSelectionPath(path);
-						browser.filesSelected();
+						if(!isPathSelected(path))
+							setSelectionPath(path);
 
-						Object userObject = ((DefaultMutableTreeNode)path
-							.getLastPathComponent()).getUserObject();
-						if(userObject instanceof VFS.DirectoryEntry)
-						{
-							VFS.DirectoryEntry file = (VFS.DirectoryEntry)
-								userObject;
-							showFilePopup(file,evt.getPoint());
-						}
-						else
-							showFilePopup(null,evt.getPoint());
+						showFilePopup(getSelectedFiles(),this,evt.getPoint());
 					}
 
 					break;
 				}
 
 				super.processMouseEvent(evt);
-				break; //}}}
+				break;
+			//}}}
 			//{{{ MOUSE_RELEASED...
 			case MouseEvent.MOUSE_RELEASED:
-				// A double click is not only when clickCount == 2
-				// because every other click can open a new directory
+				if(!GUIUtilities.isPopupTrigger(evt)
+					&& path != null)
+				{
+					browser.filesSelected();
+				}
+
 				if(evt.getClickCount() % 2 != 0)
 					super.processMouseEvent(evt);
-				break; //}}}
+
+				break;
+			//}}}
 			default:
 				super.processMouseEvent(evt);
 				break;
@@ -718,26 +826,28 @@ public class BrowserView extends JPanel
 		} //}}}
 
 		//{{{ doTypeSelect() method
-		private void doTypeSelect(String str)
+		void doTypeSelect(String str, boolean ignoreCase)
 		{
 			if(getSelectionCount() == 0)
-				doTypeSelect(str,0,getRowCount());
+				doTypeSelect(str,0,getRowCount(),ignoreCase);
 			else
 			{
 				int start = getMaxSelectionRow();
-				boolean retVal = doTypeSelect(str,start,getRowCount());
+				boolean retVal = doTypeSelect(str,start,getRowCount(),
+					ignoreCase);
 
 				if(!retVal)
 				{
 					// scan from selection to end failed, so
 					// scan from start to selection
-					doTypeSelect(str,0,start);
+					doTypeSelect(str,0,start,ignoreCase);
 				}
 			}
 		} //}}}
 
 		//{{{ doTypeSelect() method
-		private boolean doTypeSelect(String str, int start, int end)
+		private boolean doTypeSelect(String str, int start, int end,
+			boolean ignoreCase)
 		{
 			for(int i = start; i < end; i++)
 			{
@@ -747,7 +857,10 @@ public class BrowserView extends JPanel
 				if(obj instanceof VFS.DirectoryEntry)
 				{
 					VFS.DirectoryEntry file = (VFS.DirectoryEntry)obj;
-					if(file.name.regionMatches(true,0,str,0,str.length()))
+					String matchAgainst = (MiscUtilities.isAbsolutePath(str)
+						? file.path : file.name);
+					if(matchAgainst.regionMatches(ignoreCase,
+						0,str,0,str.length()))
 					{
 						setSelectionRow(i);
 						scrollRowToVisible(i);

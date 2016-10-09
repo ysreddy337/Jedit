@@ -10,13 +10,10 @@
 		<PROPERTY NAME="commentEnd" VALUE="&quot;" />
 		<PROPERTY NAME="indentOpenBrackets" VALUE="[" />
 		<PROPERTY NAME="indentCloseBrackets" VALUE="]" />
+		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 
 	</PROPS>
 	<RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- Standard literals -->
 		<SPAN TYPE="LITERAL1" NO_LINE_BREAK="FALSE">
 			<BEGIN>'</BEGIN>
@@ -28,14 +25,6 @@
 			<END>"</END>
 		</SPAN>
 
-		<SEQ TYPE="NULL">)</SEQ>
-		<SEQ TYPE="NULL">(</SEQ>
-		<SEQ TYPE="NULL">]</SEQ>
-		<SEQ TYPE="NULL">[</SEQ>
-		<SEQ TYPE="NULL">.</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">^</SEQ>
 		<SEQ TYPE="OPERATOR">:=</SEQ>
 		<SEQ TYPE="OPERATOR">_</SEQ>
 		<SEQ TYPE="OPERATOR">=</SEQ>
@@ -54,7 +43,7 @@
 		<MARK_FOLLOWING TYPE="LITERAL1" EXCLUDE_MATCH="TRUE">$</MARK_FOLLOWING>
 
 
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<!-- Constants -->
 			<KEYWORD1>true</KEYWORD1>
 			<KEYWORD1>false</KEYWORD1>

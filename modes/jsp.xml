@@ -8,12 +8,8 @@
 		<PROPERTY NAME="commentEnd" VALUE="--%&gt;" />
 	</PROPS>
 	<RULES IGNORE_CASE="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- JSP comment -->
-		<SPAN TYPE="COMMENT1">
+		<SPAN TYPE="COMMENT2">
 			<BEGIN>&lt;%--</BEGIN>
 			<END>--%&gt;</END>
 		</SPAN>
@@ -43,20 +39,20 @@
 		</SPAN>
 
 		<!-- SGML comment -->
-		<SPAN TYPE="COMMENT2" DELEGATE="COMMENT">
+		<SPAN TYPE="COMMENT1" DELEGATE="COMMENT">
 			<BEGIN>&lt;!--</BEGIN>
 			<END>--&gt;</END>
 		</SPAN>
 
 		<!-- JavaScript -->
-		<SPAN TYPE="MARKUP" DELEGATE="javascript::MAIN">
-			<BEGIN>&lt;SCRIPT&gt;</BEGIN>
+		<SPAN TYPE="MARKUP" DELEGATE="html::JAVASCRIPT">
+			<BEGIN>&lt;SCRIPT</BEGIN>
 			<END>&lt;/SCRIPT&gt;</END>
 		</SPAN>
 
 		<!-- stylesheet -->
-		<SPAN TYPE="MARKUP" DELEGATE="css::MAIN">
-			<BEGIN>&lt;STYLE&gt;</BEGIN>
+		<SPAN TYPE="MARKUP" DELEGATE="html::CSS">
+			<BEGIN>&lt;STYLE</BEGIN>
 			<END>&lt;/STYLE&gt;</END>
 		</SPAN>
 
@@ -77,9 +73,9 @@
 			<END>;</END>
 		</SPAN>
 	</RULES>
-	<RULES SET="COMMENT" IGNORE_CASE="TRUE">
+	<RULES SET="COMMENT" DEFAULT="COMMENT1" IGNORE_CASE="TRUE">
 		<!-- JSP comment -->
-		<SPAN TYPE="COMMENT1">
+		<SPAN TYPE="COMMENT2">
 			<BEGIN>&lt;%--</BEGIN>
 			<END>--%&gt;</END>
 		</SPAN>
@@ -97,10 +93,6 @@
 		</SPAN>
     </RULES>
 	<RULES SET="DIRECTIVES" DEFAULT="MARKUP">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- JSP scriptlet expression -->
 		<SPAN TYPE="KEYWORD1" DELEGATE="java::MAIN">
 			<BEGIN>&lt;%=</BEGIN>
@@ -118,7 +110,6 @@
 		</SPAN>
 
 		<SEQ TYPE="MARKUP">/</SEQ>
-		<SEQ TYPE="NULL">=</SEQ>
 		<MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE">:</MARK_PREVIOUS>
 		<SEQ TYPE="OPERATOR">:</SEQ>
 
@@ -157,12 +148,8 @@
 	</RULES>
 
 	<RULES SET="TAGS" DEFAULT="MARKUP">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- JSP comment -->
-		<SPAN TYPE="COMMENT1">
+		<SPAN TYPE="COMMENT2">
 			<BEGIN>&lt;%--</BEGIN>
 			<END>--%&gt;</END>
 		</SPAN>
@@ -185,14 +172,9 @@
 
 		<SEQ TYPE="MARKUP">/</SEQ>
 		<MARK_FOLLOWING TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">:</MARK_FOLLOWING>
-		<SEQ TYPE="NULL">=</SEQ>
 		<SEQ TYPE="OPERATOR">:</SEQ>
 	</RULES>
 	<RULES SET="ATTRVALUE" DEFAULT="LITERAL1">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- JSP scriptlet expression -->
 		<SPAN TYPE="KEYWORD1" DELEGATE="java::MAIN">
 			<BEGIN>&lt;%=</BEGIN>

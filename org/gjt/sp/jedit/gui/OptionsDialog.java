@@ -1,6 +1,9 @@
 /*
- * OptionsDialog.java - Global options dialog
- * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
+ * OptionsDialog.java - Tree options dialog
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 1998, 2003 Slava Pestov
  * Portions copyright (C) 1999 mike dillon
  *
  * This program is free software; you can redistribute it and/or
@@ -20,6 +23,7 @@
 
 package org.gjt.sp.jedit.gui;
 
+//{{{ Imports
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
@@ -28,116 +32,57 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.jedit.options.*;
-import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * An abstract tabbed options dialog box.
  * @author Slava Pestov
- * @version $Id: OptionsDialog.java,v 1.7 2002/01/17 10:37:54 spestov Exp $
+ * @version $Id: OptionsDialog.java,v 1.29 2003/02/05 01:01:52 spestov Exp $
  */
-public class OptionsDialog extends EnhancedDialog
+public abstract class OptionsDialog extends EnhancedDialog
 	implements ActionListener, TreeSelectionListener
 {
-	public OptionsDialog(View view)
+	//{{{ OptionsDialog constructor
+	public OptionsDialog(Frame frame, String name, String pane)
 	{
-		super(view, jEdit.getProperty("options.title"), true);
+		super(frame, jEdit.getProperty(name + ".title"), true);
+		init(name,pane);
+	} //}}}
 
-		view.showWaitCursor();
+	//{{{ OptionsDialog constructor
+	public OptionsDialog(Dialog dialog, String name, String pane)
+	{
+		super(dialog, jEdit.getProperty(name + ".title"), true);
+		init(name,pane);
+	} //}}}
 
-		JPanel content = new JPanel(new BorderLayout());
-		content.setBorder(new EmptyBorder(12,12,12,12));
-		setContentPane(content);
-
-		content.setLayout(new BorderLayout());
-
-		JPanel stage = new JPanel(new BorderLayout());
-		stage.setBorder(new EmptyBorder(0,6,0,0));
-		content.add(stage, BorderLayout.CENTER);
-
-		// currentLabel displays the path of the currently selected
-		// OptionPane at the top of the stage area
-		currentLabel = new JLabel();
-		currentLabel.setHorizontalAlignment(JLabel.LEFT);
-		currentLabel.setBorder(BorderFactory.createMatteBorder(0, 0, 1,
-			0, Color.black));
-		stage.add(currentLabel, BorderLayout.NORTH);
-
-		cardPanel = new JPanel(new CardLayout());
-		cardPanel.setBorder(new EmptyBorder(5,0,0,0));
-		stage.add(cardPanel, BorderLayout.CENTER);
-
-		paneTree = new JTree(createOptionTreeModel());
-
-		paneTree.setCellRenderer(new PaneNameRenderer());
-		paneTree.putClientProperty("JTree.lineStyle", "Angled");
-		paneTree.setShowsRootHandles(true);
-		paneTree.setRootVisible(false);
-		content.add(new JScrollPane(paneTree,
-			JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
-			JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED),
-			BorderLayout.WEST);
-
-		JPanel buttons = new JPanel();
-		buttons.setBorder(new EmptyBorder(12,0,0,0));
-		buttons.setLayout(new BoxLayout(buttons,BoxLayout.X_AXIS));
-		buttons.add(Box.createGlue());
-
-		ok = new JButton(jEdit.getProperty("common.ok"));
-		ok.addActionListener(this);
-		buttons.add(ok);
-		buttons.add(Box.createHorizontalStrut(6));
-		getRootPane().setDefaultButton(ok);
-		cancel = new JButton(jEdit.getProperty("common.cancel"));
-		cancel.addActionListener(this);
-		buttons.add(cancel);
-		buttons.add(Box.createHorizontalStrut(6));
-		apply = new JButton(jEdit.getProperty("common.apply"));
-		apply.addActionListener(this);
-		buttons.add(apply);
-
-		buttons.add(Box.createGlue());
-
-		content.add(buttons, BorderLayout.SOUTH);
-
-		// register the Options dialog as a TreeSelectionListener.
-		// this is done before the initial selection to ensure that the
-		// first selected OptionPane is displayed on startup.
-		paneTree.getSelectionModel().addTreeSelectionListener(this);
-
-		paneTree.expandPath(new TreePath(
-			new Object[] { paneTree.getModel().getRoot(), jEditGroup }));
-		paneTree.setSelectionRow(0);
-
-		view.hideWaitCursor();
-
-		pack();
-		setLocationRelativeTo(view);
-		show();
-	}
-
+	//{{{ addOptionGroup() method
 	public void addOptionGroup(OptionGroup group)
 	{
-		addOptionGroup(group, pluginsGroup);
-	}
+		addOptionGroup(group, getDefaultGroup());
+	} //}}}
 
+	//{{{ addOptionPane() method
 	public void addOptionPane(OptionPane pane)
 	{
-		addOptionPane(pane, pluginsGroup);
-	}
+		addOptionPane(pane, getDefaultGroup());
+	} //}}}
 
-	// EnhancedDialog implementation
+	//{{{ ok() method
 	public void ok()
 	{
+		jEdit.setProperty(name + ".last",currentPane);
 		ok(true);
-	}
+	} //}}}
 
+	//{{{ cancel() method
 	public void cancel()
 	{
+		jEdit.setProperty(name + ".last",currentPane);
 		dispose();
-	}
-	// end EnhancedDialog implementation
+	} //}}}
 
+	//{{{ ok() method
 	public void ok(boolean dispose)
 	{
 		OptionTreeModel m = (OptionTreeModel) paneTree
@@ -153,8 +98,17 @@ public class OptionsDialog extends EnhancedDialog
 		// get rid of this dialog if necessary
 		if(dispose)
 			dispose();
-	}
+	} //}}}
 
+	//{{{ dispose() method
+	public void dispose()
+	{
+		GUIUtilities.saveGeometry(this,name);
+		jEdit.setIntegerProperty(name + ".splitter",splitter.getDividerLocation());
+		super.dispose();
+	} //}}}
+
+	//{{{ actionPerformed() method
 	public void actionPerformed(ActionEvent evt)
 	{
 		Object source = evt.getSource();
@@ -171,8 +125,9 @@ public class OptionsDialog extends EnhancedDialog
 		{
 			ok(false);
 		}
-	}
+	} //}}}
 
+	//{{{ valueChanged() method
 	public void valueChanged(TreeSelectionEvent evt)
 	{
 		TreePath path = evt.getPath();
@@ -228,85 +183,22 @@ public class OptionsDialog extends EnhancedDialog
 
 		optionPane.init();
 
-		pack();
 		((CardLayout)cardPanel.getLayout()).show(cardPanel, name);
-	}
 
-	// private members
-	private Hashtable panes;
-	private JTree paneTree;
-	private JPanel cardPanel;
-	private JLabel currentLabel;
-	private JButton ok;
-	private JButton cancel;
-	private JButton apply;
-	private OptionGroup jEditGroup;
-	private OptionGroup pluginsGroup;
+		// workaround...
+		addNotify();
 
-	private OptionTreeModel createOptionTreeModel()
-	{
-		OptionTreeModel paneTreeModel = new OptionTreeModel();
-		OptionGroup rootGroup = (OptionGroup) paneTreeModel.getRoot();
+		updateSize();
 
-		addOptionPane(new OverviewOptionPane(), rootGroup);
+		currentPane = name;
+	} //}}}
 
-		// initialize the jEdit branch of the options tree
-		jEditGroup = new OptionGroup("jedit");
+	//{{{ Protected members
+	protected abstract OptionTreeModel createOptionTreeModel();
+	protected abstract OptionGroup getDefaultGroup();
 
-		addOptionPane(new GeneralOptionPane(), jEditGroup);
-		addOptionPane(new AppearanceOptionPane(), jEditGroup);
-		addOptionPane(new TextAreaOptionPane(), jEditGroup);
-		addOptionPane(new GutterOptionPane(), jEditGroup);
-		addOptionPane(new ColorOptionPane(), jEditGroup);
-		addOptionPane(new StyleOptionPane(), jEditGroup);
-		addOptionPane(new LoadSaveOptionPane(), jEditGroup);
-		addOptionPane(new EditingOptionPane(), jEditGroup);
-		addOptionPane(new ModeOptionPane(), jEditGroup);
-		addOptionPane(new ShortcutsOptionPane(), jEditGroup);
-		addOptionPane(new DockingOptionPane(), jEditGroup);
-		addOptionPane(new ContextOptionPane(), jEditGroup);
-		addOptionPane(new ToolBarOptionPane(), jEditGroup);
-		addOptionPane(new AbbrevsOptionPane(), jEditGroup);
-		addOptionPane(new PrintOptionPane(), jEditGroup);
-		addOptionPane(new FirewallOptionPane(), jEditGroup);
-
-		OptionGroup browserGroup = new OptionGroup("browser");
-		addOptionPane(new BrowserOptionPane(), browserGroup);
-		addOptionPane(new BrowserColorsOptionPane(), browserGroup);
-		addOptionGroup(browserGroup, jEditGroup);
-
-		addOptionGroup(jEditGroup, rootGroup);
-
-		// initialize the Plugins branch of the options tree
-		pluginsGroup = new OptionGroup("plugins");
-
-		// Query plugins for option panes
-		EditPlugin[] plugins = jEdit.getPlugins();
-		for(int i = 0; i < plugins.length; i++)
-		{
-			EditPlugin ep = plugins[i];
-			try
-			{
-				ep.createOptionPanes(this);
-			}
-			catch(Throwable t)
-			{
-				Log.log(Log.ERROR, ep,
-					"Error creating option pane");
-				Log.log(Log.ERROR, ep, t);
-			}
-		}
-
-		// only add the Plugins branch if there are OptionPanes
-		if (pluginsGroup.getMemberCount() > 0)
-		{
-			addOptionGroup(pluginsGroup, rootGroup);
-		}
-
-		return paneTreeModel;
-	}
-
-	private void addOptionGroup(OptionGroup child, OptionGroup parent)
+	//{{{ addOptionGroup() method
+	protected void addOptionGroup(OptionGroup child, OptionGroup parent)
 	{
 		Enumeration enum = child.getMembers();
 
@@ -325,17 +217,193 @@ public class OptionsDialog extends EnhancedDialog
 		}
 
 		parent.addOptionGroup(child);
-	}
+	} //}}}
 
-	private void addOptionPane(OptionPane pane, OptionGroup parent)
+	//{{{ addOptionPane() method
+	protected void addOptionPane(OptionPane pane, OptionGroup parent)
 	{
 		String name = pane.getName();
+		if(firstPane == null)
+			firstPane = name;
 
 		cardPanel.add(pane.getComponent(), name);
 
 		parent.addOptionPane(pane);
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ Private members
+
+	//{{{ Instance variables
+	private String name;
+	private JSplitPane splitter;
+	private JTree paneTree;
+	private JPanel cardPanel;
+	private JLabel currentLabel;
+	private JButton ok;
+	private JButton cancel;
+	private JButton apply;
+	private String currentPane;
+	private String firstPane;
+	//}}}
+
+	//{{{ init() method
+	private void init(String name, String pane)
+	{
+		this.name = name;
+
+		JPanel content = new JPanel(new BorderLayout(12,12));
+		content.setBorder(new EmptyBorder(12,12,12,12));
+		setContentPane(content);
+
+		JPanel stage = new JPanel(new BorderLayout(6,6));
+
+		// currentLabel displays the path of the currently selected
+		// OptionPane at the top of the stage area
+		currentLabel = new JLabel();
+		currentLabel.setHorizontalAlignment(JLabel.LEFT);
+		stage.add(currentLabel, BorderLayout.NORTH);
+
+		cardPanel = new JPanel(new CardLayout());
+		stage.add(cardPanel, BorderLayout.CENTER);
+
+		paneTree = new JTree(createOptionTreeModel());
+		paneTree.setVisibleRowCount(1);
+		paneTree.setCellRenderer(new PaneNameRenderer());
+
+		// looks bad with the OS X L&F, apparently...
+		if(!OperatingSystem.isMacOSLF())
+			paneTree.putClientProperty("JTree.lineStyle", "Angled");
+
+		paneTree.setShowsRootHandles(true);
+		paneTree.setRootVisible(false);
+
+		JScrollPane scroller = new JScrollPane(paneTree,
+			JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
+			JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+		splitter = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+			scroller,stage);
+		splitter.setDividerLocation(scroller.getPreferredSize().width);
+		content.add(splitter, BorderLayout.CENTER);
+
+		Box buttons = new Box(BoxLayout.X_AXIS);
+		buttons.add(Box.createGlue());
+
+		ok = new JButton(jEdit.getProperty("common.ok"));
+		ok.addActionListener(this);
+		buttons.add(ok);
+		buttons.add(Box.createHorizontalStrut(6));
+		getRootPane().setDefaultButton(ok);
+		cancel = new JButton(jEdit.getProperty("common.cancel"));
+		cancel.addActionListener(this);
+		buttons.add(cancel);
+		buttons.add(Box.createHorizontalStrut(6));
+		apply = new JButton(jEdit.getProperty("common.apply"));
+		apply.addActionListener(this);
+		buttons.add(apply);
+
+		buttons.add(Box.createGlue());
+
+		content.add(buttons, BorderLayout.SOUTH);
+
+		// register the Options dialog as a TreeSelectionListener.
+		// this is done before the initial selection to ensure that the
+		// first selected OptionPane is displayed on startup.
+		paneTree.getSelectionModel().addTreeSelectionListener(this);
+
+		OptionGroup rootNode = (OptionGroup)paneTree.getModel().getRoot();
+		for(int i = 0; i < rootNode.getMemberCount(); i++)
+		{
+			paneTree.expandPath(new TreePath(
+			new Object[] { rootNode, rootNode.getMember(i) }));
+		}
+
+		if(pane == null || !selectPane(rootNode,pane))
+			selectPane(rootNode,firstPane);
+
+		GUIUtilities.loadGeometry(this,name);
+		int dividerLocation = jEdit.getIntegerProperty(name + ".splitter",-1);
+		if(dividerLocation != -1)
+			splitter.setDividerLocation(dividerLocation);
+
+		// in case saved geometry is too small
+		updateSize();
+
+		show();
+	} //}}}
+
+	//{{{ selectPane() method
+	private boolean selectPane(OptionGroup node, String name)
+	{
+		return selectPane(node,name,new ArrayList());
+	} //}}}
+
+	//{{{ selectPane() method
+	private boolean selectPane(OptionGroup node, String name, ArrayList path)
+	{
+		path.add(node);
+
+		Enumeration enum = node.getMembers();
+		while(enum.hasMoreElements())
+		{
+			Object obj = enum.nextElement();
+			if(obj instanceof OptionGroup)
+			{
+				OptionGroup grp = (OptionGroup)obj;
+				if(grp.getName().equals(name))
+				{
+					path.add(grp);
+					path.add(grp.getMember(0));
+					TreePath treePath = new TreePath(
+						path.toArray());
+					paneTree.scrollPathToVisible(treePath);
+					paneTree.setSelectionPath(treePath);
+					return true;
+				}
+				else if(selectPane((OptionGroup)obj,name,path))
+					return true;
+			}
+			else
+			{
+				OptionPane pane = (OptionPane)obj;
+				if(pane.getName().equals(name))
+				{
+					path.add(pane);
+					TreePath treePath = new TreePath(
+						path.toArray());
+					paneTree.scrollPathToVisible(treePath);
+					paneTree.setSelectionPath(treePath);
+					return true;
+				}
+			}
+		}
+
+		path.remove(node);
+
+		return false;
+	} //}}}
+
+	//{{{ updateSize() method
+	private void updateSize()
+	{
+		Dimension currentSize = getSize();
+		Dimension requestedSize = getPreferredSize();
+		Dimension newSize = new Dimension(
+			Math.max(currentSize.width,requestedSize.width),
+			Math.max(currentSize.height,requestedSize.height)
+		);
+		if(newSize.width < 300)
+			newSize.width = 300;
+		if(newSize.height < 200)
+			newSize.height = 200;
+		setSize(newSize);
+		validate();
+	} //}}}
+
+	//}}}
+
+	//{{{ PaneNameRenderer class
 	class PaneNameRenderer extends DefaultTreeCellRenderer
 	{
 		public PaneNameRenderer()
@@ -375,11 +443,7 @@ public class OptionsDialog extends EnhancedDialog
 
 				if (label == null)
 				{
-					// hahaha, suckers!!!
-					Log.log(Log.WARNING,this,
-						"options." + name + ".label"
-						+ " property not defined");
-					setText(name);
+					setText("NO LABEL PROPERTY: " + name);
 				}
 				else
 				{
@@ -394,9 +458,10 @@ public class OptionsDialog extends EnhancedDialog
 
 		private Font paneFont;
 		private Font groupFont;
-	}
+	} //}}}
 
-	class OptionTreeModel implements TreeModel
+	//{{{ OptionTreeModel class
+	public class OptionTreeModel implements TreeModel
 	{
 		public void addTreeModelListener(TreeModelListener l)
 		{
@@ -550,5 +615,5 @@ public class OptionsDialog extends EnhancedDialog
 
 		private OptionGroup root = new OptionGroup(null);
 		private EventListenerList listenerList = new EventListenerList();
-	}
+	} //}}}
 }

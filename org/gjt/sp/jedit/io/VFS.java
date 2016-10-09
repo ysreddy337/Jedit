@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000 Slava Pestov
+ * Copyright (C) 2000, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,17 +27,55 @@ import gnu.regexp.*;
 import java.awt.Color;
 import java.awt.Component;
 import java.io.*;
-import java.util.Vector;
+import java.util.*;
+import org.gjt.sp.jedit.buffer.BufferIORequest;
 import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * A virtual filesystem implementation. Note tha methods whose names are
- * prefixed with "_" are called from the I/O thread.
+ * A virtual filesystem implementation.<p>
+ *
+ * <b>Session objects:</b><p>
+ *
+ * A session is used to persist things like login information, any network
+ * sockets, etc. File system implementations that do not need this kind of
+ * persistence return a dummy object as a session.<p>
+ *
+ * Methods whose names are prefixed with "_" expect to be given a
+ * previously-obtained session object. A session must be obtained from the AWT
+ * thread in one of two ways:
+ *
+ * <ul>
+ * <li>{@link #createVFSSession(String,Component)}</li>
+ * <li>{@link #showBrowseDialog(Object[],Component)}</li>
+ * </ul>
+ *
+ * When done, the session must be disposed of using
+ * {@link #_endVFSSession(Object,Component)}.<p>
+ *
+ * <b>Thread safety:</b><p>
+ *
+ * The following methods cannot be called from an I/O thread:
+ *
+ * <ul>
+ * <li>{@link #createVFSSession(String,Component)}</li>
+ * <li>{@link #insert(View,Buffer,String)}</li>
+ * <li>{@link #load(View,Buffer,String)}</li>
+ * <li>{@link #save(View,Buffer,String)}</li>
+ * <li>{@link #showBrowseDialog(Object[],Component)}</li>
+ * </ul>
+ *
+ * All remaining methods are (required to be) thread-safe.
+ *
+ * @see VFSManager#registerVFS(String,VFS)
+ * @see VFSManager#getVFSByName(String)
+ * @see VFSManager#getVFSForPath(String)
+ * @see VFSManager#getVFSForProtocol(String)
+ *
  * @author Slava Pestov
- * @author $Id: VFS.java,v 1.13 2002/03/10 05:36:13 spestov Exp $
+ * @author $Id: VFS.java,v 1.25 2003/02/11 02:31:06 spestov Exp $
  */
 public abstract class VFS
 {
@@ -57,9 +95,17 @@ public abstract class VFS
 
 	/**
 	 * If set, a menu item for this VFS will appear in the browser's
-	 * 'More' menu. If not set, it will still be possible to type in
-	 * URLs in this VFS in the browser, but there won't be a user-visible
+	 * <b>Plugins</b> menu. The property <code>vfs.<i>name</i>.label</code>
+	 * is used as a menu item label.<p>
+	 *
+	 * When invoked, the menu item calls the
+	 * {@link #showBrowseDialog(Object[],Component)} method of the VFS,
+	 * and then lists the directory returned by that method.<p>
+	 *
+	 * If this capability is not set, it will still be possible to type in
+	 * URLs for this VFS in the browser, but there won't be a user-visible
 	 * way of doing this.
+	 *
 	 * @since jEdit 2.6pre2
 	 */
 	public static final int BROWSE_CAP = 1 << 2;
@@ -77,10 +123,17 @@ public abstract class VFS
 	public static final int RENAME_CAP = 1 << 4;
 
 	/**
-	 * Make directory file capability.
+	 * Make directory capability.
 	 * @since jEdit 2.6pre2
 	 */
 	public static final int MKDIR_CAP = 1 << 5;
+
+	/**
+	 * Low latency capability. If this is not set, then a confirm dialog
+	 * will be shown before doing a directory search in this VFS.
+	 * @since jEdit 4.1pre1
+	 */
+	public static final int LOW_LATENCY_CAP = 1 << 6;
 
 	//}}}
 
@@ -193,18 +246,19 @@ public abstract class VFS
 
 	//{{{ constructPath() method
 	/**
-	 * This method should not be called directly! To ensure correct
-	 * behavior, you <b>must</b> call
-	 * <code>MiscUtilities.constructPath()</code> instead.<p>
-	 *
 	 * Constructs a path from the specified directory and
 	 * file name component. This must be overridden to return a
 	 * non-null value, otherwise browsing this filesystem will
-	 * not work.
+	 * not work.<p>
+	 *
+	 * Unless you are writing a VFS, this method should not be called
+	 * directly. To ensure correct behavior, you <b>must</b> call
+	 * {@link org.gjt.sp.jedit.MiscUtilities#constructPath(String,String)}
+	 * instead.
+	 *
 	 * @param parent The parent directory
 	 * @param path The path
 	 * @since jEdit 2.6pre2
-	 * @see org.gjt.sp.jedit.MiscUtilities#constructPath(String,String)
 	 */
 	public String constructPath(String parent, String path)
 	{
@@ -221,6 +275,24 @@ public abstract class VFS
 		return '/';
 	} //}}}
 
+	//{{{ getTwoStageSaveName() method
+	/**
+	 * Returns a temporary file name based on the given path.
+	 *
+	 * By default jEdit first saves a file to <code>#<i>name</i>#save#</code>
+	 * and then renames it to the original file. However some virtual file
+	 * systems might not support the <code>#</code> character in filenames,
+	 * so this method permits the VFS to override this behavior.
+	 *
+	 * @param path The path name
+	 * @since jEdit 4.1pre7
+	 */
+	public String getTwoStageSaveName(String path)
+	{
+		return MiscUtilities.constructPath(getParentOfPath(path),
+			'#' + getFileName(path) + "#save#");
+	} //}}}
+
 	//{{{ reloadDirectory() method
 	/**
 	 * Called before a directory is reloaded by the file system browser.
@@ -235,7 +307,7 @@ public abstract class VFS
 	 * so it should not do any I/O. It could, however, prompt for
 	 * a login name and password, for example.
 	 * @param path The path in question
-	 * @param comp The component that will parent error dialog boxes
+	 * @param comp The component that will parent any dialog boxes shown
 	 * @return The session
 	 * @since jEdit 2.6pre3
 	 */
@@ -336,7 +408,7 @@ public abstract class VFS
 		return true;
 	} //}}}
 
-	// the remaining methods are only called from the I/O thread
+	// the remaining methods are called from the I/O thread
 
 	//{{{ _canonPath() method
 	/**
@@ -356,11 +428,56 @@ public abstract class VFS
 
 	//{{{ _listDirectory() method
 	/**
-	 * Lists the specified directory. Note that this must be a full
-	 * URL, including the host name, path name, and so on. The
-	 * username and password is obtained from the session.
+	 * A convinience method that matches file names against globs, and can
+	 * optionally list the directory recursively.
 	 * @param session The session
-	 * @param directory The directory
+	 * @param directory The directory. Note that this must be a full
+	 * URL, including the host name, path name, and so on. The
+	 * username and password (if needed by the VFS) is obtained from the
+	 * session instance.
+	 * @param glob Only file names matching this glob will be returned
+	 * @param recursive If true, subdirectories will also be listed.
+	 * @param comp The component that will parent error dialog boxes
+	 * @exception IOException if an I/O error occurred
+	 * @since jEdit 4.1pre1
+	 */
+	public String[] _listDirectory(Object session, String directory,
+		String glob, boolean recursive, Component comp)
+		throws IOException
+	{
+		Log.log(Log.DEBUG,this,"Listing " + directory);
+		ArrayList files = new ArrayList(100);
+
+		RE filter;
+		try
+		{
+			filter = new RE(MiscUtilities.globToRE(glob),
+				RE.REG_ICASE);
+		}
+		catch(REException e)
+		{
+			Log.log(Log.ERROR,this,e);
+			return null;
+		}
+
+		_listDirectory(session,new ArrayList(),files,directory,filter,
+			recursive,comp);
+
+		String[] retVal = (String[])files.toArray(new String[files.size()]);
+
+		Arrays.sort(retVal,new MiscUtilities.StringICaseCompare());
+
+		return retVal;
+	} //}}}
+
+	//{{{ _listDirectory() method
+	/**
+	 * Lists the specified directory. 
+	 * @param session The session
+	 * @param directory The directory. Note that this must be a full
+	 * URL, including the host name, path name, and so on. The
+	 * username and password (if needed by the VFS) is obtained from the
+	 * session instance.
 	 * @param comp The component that will parent error dialog boxes
 	 * @exception IOException if an I/O error occurred
 	 * @since jEdit 2.7pre1
@@ -552,12 +669,15 @@ public abstract class VFS
 	 * Called after a file has been saved.
 	 * @param session The VFS session
 	 * @param buffer The buffer
+	 * @param path The path the buffer was saved to (can be different from
+	 * {@link org.gjt.sp.jedit.Buffer#getPath()} if the user invoked the
+	 * <b>Save a Copy As</b> command, for example).
 	 * @param comp The component that will parent error dialog boxes
 	 * @exception IOException If an I/O error occurs
-	 * @since jEdit 3.1pre1
+	 * @since jEdit 4.1pre9
 	 */
-	public void _saveComplete(Object session, Buffer buffer, Component comp)
-		throws IOException {} //}}}
+	public void _saveComplete(Object session, Buffer buffer, String path,
+		Component comp) throws IOException {} //}}}
 
 	//{{{ _endVFSSession() method
 	/**
@@ -622,6 +742,55 @@ public abstract class VFS
 		});
 	} //}}}
 
+	//{{{ _listDirectory() method
+	private void _listDirectory(Object session, ArrayList stack,
+		ArrayList files, String directory, RE glob, boolean recursive,
+		Component comp) throws IOException
+	{
+		if(stack.contains(directory))
+		{
+			Log.log(Log.ERROR,this,
+				"Recursion in _listDirectory(): "
+				+ directory);
+			return;
+		}
+		else
+			stack.add(directory);
+
+		VFS.DirectoryEntry[] _files = _listDirectory(session,directory,
+			comp);
+		if(_files == null || _files.length == 0)
+			return;
+
+		for(int i = 0; i < _files.length; i++)
+		{
+			VFS.DirectoryEntry file = _files[i];
+
+			if(file.type == VFS.DirectoryEntry.DIRECTORY
+				|| file.type == VFS.DirectoryEntry.FILESYSTEM)
+			{
+				if(recursive)
+				{
+					// resolve symlinks to avoid loops
+					String canonPath = _canonPath(session,file.path,comp);
+
+					_listDirectory(session,stack,files,
+						canonPath,glob,recursive,
+						comp);
+				}
+			}
+			else
+			{
+				if(!glob.isMatch(file.name))
+					continue;
+
+				Log.log(Log.DEBUG,this,file.path);
+
+				files.add(file.path);
+			}
+		}
+	} //}}}
+
 	//{{{ loadColors() method
 	private static void loadColors()
 	{
@@ -647,7 +816,8 @@ public abstract class VFS
 				}
 				catch(REException e)
 				{
-					Log.log(Log.ERROR,VFS.class,"Error loading file list colors:");
+					Log.log(Log.ERROR,VFS.class,"Invalid regular expression: "
+						+ glob);
 					Log.log(Log.ERROR,VFS.class,e);
 				}
 			}

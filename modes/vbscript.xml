@@ -9,10 +9,6 @@
 	</PROPS>
 
 	<RULES IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<SPAN TYPE="LITERAL1" NO_LINE_BREAK="TRUE">
 			<BEGIN>"</BEGIN>
 			<END>"</END>
@@ -25,8 +21,6 @@
 
 		<EOL_SPAN TYPE="COMMENT1">'</EOL_SPAN>
 		<EOL_SPAN TYPE="COMMENT1">rem </EOL_SPAN>
-		<SEQ TYPE="NULL">)</SEQ>
-		<SEQ TYPE="NULL">(</SEQ>
 
 		<!-- Comparison operators -->
 		<SEQ TYPE="OPERATOR">&lt;</SEQ>
@@ -59,9 +53,8 @@
 		<!-- Instruction separator -->
 		<MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE"
 			AT_LINE_START="TRUE">:</MARK_PREVIOUS>
-		<SEQ TYPE="NULL">:</SEQ>
 
-		<KEYWORDS IGNORE_CASE="TRUE">
+		<KEYWORDS>
 			<!-- Conditional Statements -->
 			<KEYWORD1>if</KEYWORD1>
 			<KEYWORD1>then</KEYWORD1>

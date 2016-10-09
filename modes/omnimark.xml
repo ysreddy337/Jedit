@@ -9,17 +9,11 @@
 
 <MODE>
     <PROPS>
-        <PROPERTY NAME="indentPrevLine" VALUE="\s*((PROCESS|MARKUP|EXTERNAL|DOCUMENT|DTD|ELEMENT|FIND|TRANSLATE)((-|\s).*|\s*)|(DO|ELSE|REPEAT|MATCH|CASE|USING|GROUP|DEFINE|MACRO)(\s+.*|\s*))" />
-        <PROPERTY NAME="doubleBracketIndent" VALUE="false" />
+        <PROPERTY NAME="indentNextLines" VALUE="\s*((PROCESS|MARKUP|EXTERNAL|DOCUMENT|DTD|ELEMENT|FIND|TRANSLATE)((-|\s).*|\s*)|(DO|ELSE|REPEAT|MATCH|CASE|USING|GROUP|DEFINE|MACRO)(\s+.*|\s*))" />
         <PROPERTY NAME="lineComment" VALUE=";" />
-        <PROPERTY NAME="blockComment" VALUE=";" />
         <PROPERTY NAME="noWordSep" VALUE="-_" />
     </PROPS>
     <RULES ESCAPE="%" IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE">
-        <!-- whitespace: (space and tab) -->
-        <WHITESPACE> </WHITESPACE>
-        <WHITESPACE>	</WHITESPACE>
-
         <!-- Comments -->
         <EOL_SPAN TYPE="COMMENT1">#!</EOL_SPAN>
         <EOL_SPAN TYPE="COMMENT1">;</EOL_SPAN>
@@ -54,15 +48,8 @@
         <SEQ TYPE="OPERATOR">?</SEQ>
         <SEQ TYPE="OPERATOR">!</SEQ>
 
-        <SEQ TYPE="NULL">(</SEQ>
-        <SEQ TYPE="NULL">)</SEQ>
-        <SEQ TYPE="NULL">{</SEQ>
-        <SEQ TYPE="NULL">}</SEQ>
-        <SEQ TYPE="NULL">[</SEQ>
-        <SEQ TYPE="NULL">]</SEQ>
-
         <!-- Keywords -->
-        <KEYWORDS IGNORE_CASE="TRUE">
+        <KEYWORDS>
             <KEYWORD2>#ADDITIONAL-INFO</KEYWORD2>
             <KEYWORD2>#APPINFO</KEYWORD2>
             <KEYWORD2>#ARGS</KEYWORD2>

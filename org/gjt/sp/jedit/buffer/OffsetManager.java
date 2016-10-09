@@ -38,7 +38,7 @@ import org.gjt.sp.util.Log;
  * called through, implements such protection.
  *
  * @author Slava Pestov
- * @version $Id: OffsetManager.java,v 1.26 2002/03/17 03:05:24 spestov Exp $
+ * @version $Id: OffsetManager.java,v 1.33 2003/02/23 04:05:21 spestov Exp $
  * @since jEdit 4.0pre1
  */
 public class OffsetManager
@@ -59,6 +59,8 @@ public class OffsetManager
 		virtualLineCounts = new int[8];
 		for(int i = 0; i < 8; i++)
 			virtualLineCounts[i] = 1;
+
+		gapLine = -1;
 	} //}}}
 
 	//{{{ getLineCount() method
@@ -121,12 +123,19 @@ public class OffsetManager
 	//{{{ getLineEndOffset() method
 	public final int getLineEndOffset(int line)
 	{
-		return (int)(lineInfo[line] & END_MASK);
+		int end = (int)(lineInfo[line] & END_MASK);
+		if(gapLine != -1 && line >= gapLine)
+			return end + gapWidth;
+		else
+			return end;
 	} //}}}
 
 	//{{{ isFoldLevelValid() method
 	public final boolean isFoldLevelValid(int line)
 	{
+		if(gapLine != -1 && line >= gapLine)
+			return false;
+
 		return (lineInfo[line] & FOLD_LEVEL_VALID_MASK) != 0;
 	} //}}}
 
@@ -141,6 +150,9 @@ public class OffsetManager
 	// Also sets 'fold level valid' flag
 	public final void setFoldLevel(int line, int level)
 	{
+		if(gapLine != -1 && line >= gapLine)
+			moveGap(line + 1,0,"setFoldLevel");
+
 		lineInfo[line] = ((lineInfo[line] & ~FOLD_LEVEL_MASK)
 			| ((long)level << FOLD_LEVEL_SHIFT)
 			| FOLD_LEVEL_VALID_MASK);
@@ -163,6 +175,8 @@ public class OffsetManager
 			lineInfo[line] = (lineInfo[line] & ~mask);
 	} //}}}
 
+	/* the next two methods are not used!
+
 	//{{{ getScreenLineCount() method
 	public final int getScreenLineCount(int line)
 	{
@@ -177,9 +191,14 @@ public class OffsetManager
 			| ((long)count << SCREEN_LINES_SHIFT));
 	} //}}}
 
+	*/
+
 	//{{{ isLineContextValid() method
 	public final boolean isLineContextValid(int line)
 	{
+		if(gapLine != -1 && line >= gapLine)
+			return false;
+
 		return (lineInfo[line] & CONTEXT_VALID_MASK) != 0;
 	} //}}}
 
@@ -193,6 +212,9 @@ public class OffsetManager
 	// Also sets 'context valid' to true
 	public final void setLineContext(int line, TokenMarker.LineContext context)
 	{
+		if(gapLine != -1 && line >= gapLine)
+			moveGap(line + 1,0,"setLineContext");
+
 		lineContext[line] = context;
 		lineInfo[line] |= CONTEXT_VALID_MASK;
 	} //}}}
@@ -255,6 +277,9 @@ public class OffsetManager
 		if(foldLevel == 0)
 		{
 			newVirtualLineCount = lineCount;
+
+			for(int i = 0; i < lineCount; i++)
+				lineInfo[i] |= VISIBLE_MASK;
 		}
 		else
 		{
@@ -291,6 +316,8 @@ public class OffsetManager
 		//{{{ Update line info and line context arrays
 		if(numLines > 0)
 		{
+			moveGap(-1,0,"contentInserted");
+
 			lineCount += numLines;
 
 			if(lineInfo.length <= lineCount)
@@ -332,9 +359,9 @@ public class OffsetManager
 			{
 				// need the line end offset to be in place
 				// for following fold level calculations
-				lineInfo[startLine + i] = (((offset + endOffsets.get(i) + 1)
-					& ~(FOLD_LEVEL_VALID_MASK | CONTEXT_VALID_MASK))
-					| visible);
+				lineInfo[startLine + i] = (offset
+					+ endOffsets.get(i) + 1)
+					| visible;
 			}
 
 			//{{{ Unrolled
@@ -356,11 +383,8 @@ public class OffsetManager
 				virtualLineCounts[7] += numLines;
 			//}}}
 		} //}}}
-		//{{{ Update remaining line start offsets
-		for(int i = endLine; i < lineCount; i++)
-		{
-			setLineEndOffset(i,getLineEndOffset(i) + length);
-		} //}}}
+
+		moveGap(endLine,length,"contentInserted");
 
 		updatePositionsForInsert(offset,length);
 	} //}}}
@@ -396,6 +420,8 @@ public class OffsetManager
 		//{{{ Update line info and line context arrays
 		if(numLines > 0)
 		{
+			moveGap(-1,0,"contentRemoved");
+
 			lineCount -= numLines;
 			System.arraycopy(lineInfo,startLine + numLines,lineInfo,
 				startLine,lineCount - startLine);
@@ -403,11 +429,7 @@ public class OffsetManager
 				startLine,lineCount - startLine);
 		} //}}}
 
-		//{{{ Update remaining line start offsets
-		for(int i = startLine; i < lineCount; i++)
-		{
-			setLineEndOffset(i,getLineEndOffset(i) - length);
-		} //}}}
+		moveGap(startLine,-length,"contentRemoved");
 
 		updatePositionsForRemove(offset,length);
 	} //}}}
@@ -415,12 +437,7 @@ public class OffsetManager
 	//{{{ lineInfoChangedFrom() method
 	public void lineInfoChangedFrom(int startLine)
 	{
-		for(int i = startLine; i < lineCount; i++)
-		{
-			lineInfo[i] &= ~(FOLD_LEVEL_VALID_MASK
-				| CONTEXT_VALID_MASK);
-			lineContext[i] = null;
-		}
+		moveGap(startLine,0,"lineInfoChangedFrom");
 	} //}}}
 
 	//{{{ Private members
@@ -466,6 +483,14 @@ public class OffsetManager
 	private int positionCount;
 
 	private int[] virtualLineCounts;
+
+	/**
+	 * If -1, then there is no gap.
+	 * Otherwise, all lines from this line onwards need to have gapWidth
+	 * added to their end offsets.
+	 */
+	private int gapLine;
+	private int gapWidth;
 	//}}}
 
 	//{{{ setLineEndOffset() method
@@ -473,6 +498,56 @@ public class OffsetManager
 	{
 		lineInfo[line] = ((lineInfo[line] & ~(END_MASK
 			| FOLD_LEVEL_VALID_MASK | CONTEXT_VALID_MASK)) | end);
+		// what is the point of this -- DO NOT UNCOMMENT THIS IT
+		// CAUSES A PERFORMANCE LOSS; nextLineRequested becomes true
+		//lineContext[line] = null;
+	} //}}}
+
+	//{{{ moveGap() method
+	private final void moveGap(int newGapLine, int newGapWidth, String method)
+	{
+		if(gapLine == -1)
+			gapWidth = newGapWidth;
+		else if(newGapLine == -1)
+		{
+			//if(gapWidth != 0)
+			{
+				//if(DEBUG && gapLine != lineCount)
+				//	System.err.println(method + ": update from " + gapLine + " to " + lineCount);
+				for(int i = gapLine; i < lineCount; i++)
+					setLineEndOffset(i,getLineEndOffset(i));
+			}
+
+			gapWidth = newGapWidth;
+		}
+		else if(newGapLine < gapLine)
+		{
+			//if(gapWidth != 0)
+			{
+				//if(DEBUG && newGapLine != gapLine)
+				//	System.err.println(method + ": update from " + newGapLine + " to " + gapLine);
+				for(int i = newGapLine; i < gapLine; i++)
+					setLineEndOffset(i,getLineEndOffset(i) - gapWidth);
+			}
+			gapWidth += newGapWidth;
+		}
+		else //if(newGapLine >= gapLine)
+		{
+			//if(gapWidth != 0)
+			{
+				//if(DEBUG && gapLine != newGapLine)
+				//	System.err.println(method + ": update from " + gapLine + " to " + newGapLine);
+				for(int i = gapLine; i < newGapLine; i++)
+					setLineEndOffset(i,getLineEndOffset(i));
+			}
+
+			gapWidth += newGapWidth;
+		}
+
+		if(newGapLine == lineCount)
+			gapLine = -1;
+		else
+			gapLine = newGapLine;
 	} //}}}
 
 	//{{{ growPositionArray() method

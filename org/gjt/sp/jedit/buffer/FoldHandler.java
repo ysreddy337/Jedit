@@ -28,9 +28,14 @@ import org.gjt.sp.jedit.Buffer;
 import org.gjt.sp.util.Log;
 
 /**
- * Interface for obtaining the fold level of a specified label.
+ * Interface for obtaining the fold level of a specified line.<p>
+ *
+ * Plugins can add and remove fold handlers using the
+ * {@link #registerFoldHandler(FoldHandler)} and
+ * {@link #unregisterFoldHandler(FoldHandler)} methods.
+ *
  * @author Slava Pestov
- * @version $Id: FoldHandler.java,v 1.3 2002/02/09 09:13:20 spestov Exp $
+ * @version $Id: FoldHandler.java,v 1.7 2003/02/08 20:13:27 spestov Exp $
  * @since jEdit 4.0pre1
  */
 public abstract class FoldHandler
@@ -60,9 +65,25 @@ public abstract class FoldHandler
 	public abstract int getFoldLevel(Buffer buffer, int lineIndex, Segment seg);
 	//}}}
 
+	//{{{ equals() method
+	/**
+	 * Returns if the specified fold handler is equal to this one.
+	 * @param o The object
+	 */
+	public boolean equals(Object o)
+	{
+		// Default implementation... subclasses can extend this.
+		if(o == null)
+			return false;
+		else
+			return getClass() == o.getClass();
+	} //}}}
+
 	//{{{ registerFoldHandler() method
 	/**
-	 * Adds a fold handler to the list of registered handlers
+	 * Adds a fold handler to the list of registered handlers.
+	 * Typically this will be called from a plugin's
+	 * {@link org.gjt.sp.jedit.EditPlugin#start()} method.
 	 * @param handler The fold handler to add
 	 * @since jEdit 4.0pre6
 	 */
@@ -75,6 +96,20 @@ public abstract class FoldHandler
 		}
 
 		foldHandlers.add(handler);
+	}
+	//}}}
+
+	//{{{ unregisterFoldHandler() method
+	/**
+	 * Removes a fold handler from the list of registered handlers.
+	 * Typically this will be called from a plugin's
+	 * {@link org.gjt.sp.jedit.EditPlugin#stop()} method.
+	 * @param handler The fold handler to add
+	 * @since jEdit 4.1pre2
+	 */
+	public static void unregisterFoldHandler(FoldHandler handler)
+	{
+		foldHandlers.remove(handler);
 	}
 	//}}}
 

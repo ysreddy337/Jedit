@@ -23,12 +23,12 @@
 package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
+import javax.swing.event.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import java.util.*;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
 //}}}
 
 public class MarkersMenu extends EnhancedMenu
@@ -39,85 +39,86 @@ public class MarkersMenu extends EnhancedMenu
 		super("markers");
 	} //}}}
 
-	//{{{ setPopupMenuVisible() method
-	public void setPopupMenuVisible(boolean b)
+	//{{{ menuSelected() method
+	public void menuSelected(MenuEvent evt)
 	{
-		if(b)
+		super.menuSelected(evt);
+		final View view = GUIUtilities.getView(this);
+
+		if(getMenuComponentCount() != 0)
 		{
-			final View view = GUIUtilities.getView(this);
-
-			if(getMenuComponentCount() != 0)
+			for(int i = getMenuComponentCount() - 1;
+				i >= 0;
+				i--)
 			{
-				for(int i = getMenuComponentCount() - 1;
-					i >= 0;
-					i--)
-				{
-					Component comp = getMenuComponent(i);
-					if(comp instanceof JSeparator)
-						break;
-					else
-						remove(comp);
-				}
-			}
-
-			Buffer buffer = view.getBuffer();
-
-			Vector markers = buffer.getMarkers();
-
-			if(markers.size() == 0)
-			{
-				JMenuItem mi = new JMenuItem(jEdit.getProperty(
-					"no-markers.label"));
-				mi.setEnabled(false);
-				add(mi);
-				super.setPopupMenuVisible(b);
-				return;
-			}
-
-			JMenu current = this;
-
-			for(int i = 0; i < markers.size(); i++)
-			{
-				final Marker marker = (Marker)markers.elementAt(i);
-				int lineNo = buffer.getLineOfOffset(marker.getPosition());
-
-				if(current.getItemCount() >= 20 && i != markers.size() - 1)
-				{
-					//current.addSeparator();
-					JMenu newCurrent = new JMenu(
-						jEdit.getProperty(
-						"common.more"));
-					current.add(newCurrent);
-					current = newCurrent;
-				}
-
-				JMenuItem mi = new MarkersMenuItem(buffer,
-					lineNo,marker.getShortcut());
-				mi.addActionListener(new ActionListener()
-				{
-					public void actionPerformed(ActionEvent evt)
-					{
-						view.getTextArea().setCaretPosition(
-							marker.getPosition());
-					}
-				});
-				current.add(mi);
+				Component comp = getMenuComponent(i);
+				if(comp instanceof JSeparator)
+					break;
+				else
+					remove(comp);
 			}
 		}
 
-		super.setPopupMenuVisible(b);
+		Buffer buffer = view.getBuffer();
+
+		Vector markers = buffer.getMarkers();
+
+		if(markers.size() == 0)
+		{
+			JMenuItem mi = new JMenuItem(jEdit.getProperty(
+				"no-markers.label"));
+			mi.setEnabled(false);
+			add(mi);
+			return;
+		}
+
+		int maxItems = jEdit.getIntegerProperty("menu.spillover",20);
+
+		JMenu current = this;
+
+		for(int i = 0; i < markers.size(); i++)
+		{
+			final Marker marker = (Marker)markers.elementAt(i);
+			int lineNo = buffer.getLineOfOffset(marker.getPosition());
+
+			if(current.getItemCount() >= maxItems && i != markers.size() - 1)
+			{
+				//current.addSeparator();
+				JMenu newCurrent = new JMenu(
+					jEdit.getProperty(
+					"common.more"));
+				current.add(newCurrent);
+				current = newCurrent;
+			}
+
+			JMenuItem mi = new MarkersMenuItem(buffer,
+				lineNo,marker.getShortcut());
+			mi.addActionListener(new ActionListener()
+			{
+				public void actionPerformed(ActionEvent evt)
+				{
+					view.getTextArea().setCaretPosition(
+						marker.getPosition());
+				}
+			});
+			current.add(mi);
+		}
 	} //}}}
+
+	public void menuDeselected(MenuEvent e) {}
+
+	public void menuCanceled(MenuEvent e) {}
 
 	//{{{ MarkersMenuItem class
 	static class MarkersMenuItem extends JMenuItem
 	{
-		//{{{MarkersMenuItem constructor
+		//{{{ MarkersMenuItem constructor
 		MarkersMenuItem(Buffer buffer, int lineNo, char shortcut)
 		{
 			String text = buffer.getLineText(lineNo).trim();
 			if(text.length() == 0)
 				text = jEdit.getProperty("markers.blank-line");
-			setText(lineNo + ": " + text);
+			setText((lineNo + 1) + ": " + text);
 
 			shortcutProp = "goto-marker.shortcut";
 			MarkersMenuItem.this.shortcut = shortcut;

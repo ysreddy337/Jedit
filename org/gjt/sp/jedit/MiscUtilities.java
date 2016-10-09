@@ -25,7 +25,7 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import gnu.regexp.RE;
+import javax.swing.text.Segment;
 import javax.swing.JMenuItem;
 import java.io.*;
 import java.util.*;
@@ -34,10 +34,39 @@ import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * Class with several useful miscellaneous functions.
+ * Path name manipulation, string manipulation, and more.<p>
+ *
+ * The most frequently used members of this class are:<p>
+ *
+ * <b>Some path name methods:</b><p>
+ * <ul>
+ * <li>{@link #getFileName(String)}</li>
+ * <li>{@link #getParentOfPath(String)}</li>
+ * <li>{@link #constructPath(String,String)}</li>
+ * </ul>
+ * <b>String comparison:</b><p>
+ 
+ * A {@link #compareStrings(String,String,boolean)} method that unlike
+ * <function>String.compareTo()</function>, correctly recognizes and handles
+ * embedded numbers.<p>
+ *
+ * This class also defines several inner classes for use with the
+ * sorting features of the Java collections API:
+ *
+ * <ul>
+ * <li>{@link MiscUtilities.StringCompare}</li>
+ * <li>{@link MiscUtilities.StringICaseCompare}</li>
+ * <li>{@link MiscUtilities.MenuItemCompare}</li>
+ * </ul>
+ *
+ * For example, you might call:<p>
+ *
+ * <code>Arrays.sort(myListOfStrings,
+ *     new MiscUtilities.StringICaseCompare());</code>
  *
  * @author Slava Pestov
- * @version $Id: MiscUtilities.java,v 1.22 2002/04/01 23:45:24 spestov Exp $
+ * @author John Gellene (API documentation)
+ * @version $Id: MiscUtilities.java,v 1.35 2003/02/20 01:55:12 spestov Exp $
  */
 public class MiscUtilities
 {
@@ -73,6 +102,32 @@ public class MiscUtilities
 			return System.getProperty("user.home");
 		else
 			return path;
+	} //}}}
+
+	//{{{ isPathAbsolute() method
+	/**
+	 * Returns if the specified path name is an absolute path or URL.
+	 * @since jEdit 4.1pre11
+	 */
+	public static boolean isAbsolutePath(String path)
+	{
+		if(isURL(path))
+			return true;
+		else if(OperatingSystem.isDOSDerived())
+		{
+			if(path.length() >= 2 && path.charAt(1) == ':')
+				return true;
+			if(path.startsWith("\\\\"))
+				return true;
+		}
+		else if(OperatingSystem.isUnix())
+		{
+			// nice and simple
+			if(path.length() > 0 && path.charAt(0) == '/')
+				return true;
+		}
+
+		return false;
 	} //}}}
 
 	//{{{ constructPath() method
@@ -121,7 +176,7 @@ public class MiscUtilities
 
 		if(OperatingSystem.isDOSDerived() && path.startsWith("\\"))
 			parent = parent.substring(0,2);
-		
+
 		VFS vfs = VFSManager.getVFSForPath(parent);
 		return vfs.constructPath(parent,path);
 	} //}}}
@@ -142,7 +197,7 @@ public class MiscUtilities
 
 	//{{{ concatPath() method
 	/**
-	 * Like constructPath(), except <code>path</code> will be
+	 * Like {@link #constructPath}, except <code>path</code> will be
 	 * appended to <code>parent</code> even if it is absolute.
 	 * @param path
 	 * @param parent
@@ -329,6 +384,32 @@ public class MiscUtilities
 		}
 	} //}}}
 
+	//{{{ fileToClass() method
+	/**
+	 * Converts a file name to a class name. All slash characters are
+	 * replaced with periods and the trailing '.class' is removed.
+	 * @param name The file name
+	 */
+	public static String fileToClass(String name)
+	{
+		char[] clsName = name.toCharArray();
+		for(int i = clsName.length - 6; i >= 0; i--)
+			if(clsName[i] == '/')
+				clsName[i] = '.';
+		return new String(clsName,0,clsName.length - 6);
+	} //}}}
+
+	//{{{ classToFile() method
+	/**
+	 * Converts a class name to a file name. All periods are replaced
+	 * with slashes and the '.class' extension is added.
+	 * @param name The class name
+	 */
+	public static String classToFile(String name)
+	{
+		return name.replace('.','/').concat(".class");
+	} //}}}
+
 	//}}}
 
 	//{{{ Text methods
@@ -407,9 +488,96 @@ loop:		for(int i = 0; i < str.length(); i++)
 		return whitespace;
 	} //}}}
 
+	//{{{ getVirtualWidth() method
+	/**
+	 * Returns the virtual column number (taking tabs into account) of the
+	 * specified offset in the segment.
+	 *
+	 * @param seg The segment
+	 * @param tabSize The tab size
+	 * @since jEdit 4.1pre1
+	 */
+	public static int getVirtualWidth(Segment seg, int tabSize)
+	{
+		int virtualPosition = 0;
+
+		for (int i = 0; i < seg.count; i++)
+		{
+			char ch = seg.array[seg.offset + i];
+
+			if (ch == '\t')
+			{
+				virtualPosition += tabSize
+					- (virtualPosition % tabSize);
+			}
+			else
+			{
+				++virtualPosition;
+			}
+		}
+
+		return virtualPosition;
+	} //}}}
+
+	//{{{ getOffsetOfVirtualColumn() method
+	/**
+	 * Returns the array offset of a virtual column number (taking tabs
+	 * into account) in the segment.
+	 *
+	 * @param seg The segment
+	 * @param tabSize The tab size
+	 * @param column The virtual column number
+	 * @param totalVirtualWidth If this array is non-null, the total
+	 * virtual width will be stored in its first location if this method
+	 * returns -1.
+	 *
+	 * @return -1 if the column is out of bounds
+	 *
+	 * @since jEdit 4.1pre1
+	 */
+	public static int getOffsetOfVirtualColumn(Segment seg, int tabSize,
+		int column, int[] totalVirtualWidth)
+	{
+		int virtualPosition = 0;
+
+		for (int i = 0; i < seg.count; i++)
+		{
+			char ch = seg.array[seg.offset + i];
+
+			if (ch == '\t')
+			{
+				int tabWidth = tabSize
+					- (virtualPosition % tabSize);
+				if(virtualPosition >= column)
+					return i;
+				else
+					virtualPosition += tabWidth;
+			}
+			else
+			{
+				if(virtualPosition >= column)
+					return i;
+				else
+					++virtualPosition;
+			}
+		}
+
+		if(totalVirtualWidth != null)
+			totalVirtualWidth[0] = virtualPosition;
+		return -1;
+	} //}}}
+
 	//{{{ createWhiteSpace() method
 	/**
-	 * Creates a string of white space with the specified length.
+	 * Creates a string of white space with the specified length.<p>
+	 *
+	 * To get a whitespace string tuned to the current buffer's
+	 * settings, call this method as follows:
+	 *
+	 * <pre>myWhitespace = MiscUtilities.createWhiteSpace(myLength,
+	 *     (buffer.getBooleanProperty("noTabs") ? 0
+	 *     : buffer.getTabSize()));</pre>
+	 *
 	 * @param len The length
 	 * @param tabSize The tab size, or 0 if tabs are not to be used
 	 */
@@ -435,7 +603,8 @@ loop:		for(int i = 0; i < str.length(); i++)
 
 	//{{{ globToRE() method
 	/**
-	 * Converts a Unix-style glob to a regular expression.
+	 * Converts a Unix-style glob to a regular expression.<p>
+	 *
 	 * ? becomes ., * becomes .*, {aa,bb} becomes (aa|bb).
 	 * @param glob The glob pattern
 	 */
@@ -560,69 +729,43 @@ loop:		for(int i = 0; i < str.length(); i++)
 
 	//{{{ charsToEscapes() method
 	/**
-	 * Escapes newlines, tabs, backslashes, quotes in the specified
+	 * Escapes newlines, tabs, backslashes, and quotes in the specified
 	 * string.
 	 * @param str The string
 	 * @since jEdit 2.3pre1
 	 */
 	public static String charsToEscapes(String str)
 	{
-		return charsToEscapes(str,false);
+		return charsToEscapes(str,"\n\t\\\"'");
 	} //}}}
 
 	//{{{ charsToEscapes() method
 	/**
-	 * Escapes newlines, tabs, backslashes, quotes in the specified
-	 * string.
+	 * Escapes the specified characters in the specified string.
 	 * @param str The string
-	 * @param history jEdit history files require additional escaping
-	 * @since jEdit 2.7pre2
+	 * @param extra Any characters that require escaping
+	 * @since jEdit 4.1pre3
 	 */
-	public static String charsToEscapes(String str, boolean history)
+	public static String charsToEscapes(String str, String toEscape)
 	{
 		StringBuffer buf = new StringBuffer();
 		for(int i = 0; i < str.length(); i++)
 		{
 			char c = str.charAt(i);
-			switch(c)
+			if(toEscape.indexOf(c) != -1)
 			{
-			case '\n':
-				buf.append("\\n");
-				break;
-			case '\t':
-				buf.append("\\t");
-				break;
-			case '[':
-				if(history)
-					buf.append("\\[");
+				if(c == '\n')
+					buf.append("\\n");
+				else if(c == '\t')
+					buf.append("\\t");
 				else
+				{
+					buf.append('\\');
 					buf.append(c);
-				break;
-			case ']':
-				if(history)
-					buf.append("\\]");
-				else
-					buf.append(c);
-				break;
-			case '"':
-				if(history)
-					buf.append(c);
-				else
-					buf.append("\\\"");
-				break;
-			case '\'':
-				if(history)
-					buf.append(c);
-				else
-					buf.append("\\\'");
-				break;
-			case '\\':
-				buf.append("\\\\");
-				break;
-			default:
-				buf.append(c);
-				break;
+				}
 			}
+			else
+				buf.append(c);
 		}
 		return buf.toString();
 	} //}}}
@@ -638,9 +781,12 @@ loop:		for(int i = 0; i < str.length(); i++)
 
 	//{{{ compareStrings() method
 	/**
-	 * A more intelligent version of String.compareTo() that handles
-	 * numbers specially. For example, it places "My file 2" before
-	 * "My file 10".
+	 * Compares two strings.<p>
+	 *
+	 * Unlike <function>String.compareTo()</function>,
+	 * this method correctly recognizes and handles embedded numbers.
+	 * For example, it places "My file 2" before "My file 10".<p>
+	 *
 	 * @param str1 The first string
 	 * @param str2 The second string
 	 * @param ignoreCase If true, case will be ignored
@@ -717,6 +863,27 @@ loop:		for(int i = 0; i < str.length(); i++)
 		}
 
 		return char1.length - char2.length;
+	} //}}}
+
+	//{{{ stringsEqual() method
+	/**
+	 * Returns if two strings are equal. This correctly handles null pointers,
+	 * as opposed to calling <code>s1.equals(s2)</code>.
+	 * @since jEdit 4.1pre5
+	 */
+	public static boolean stringsEqual(String s1, String s2)
+	{
+		if(s1 == null)
+		{
+			if(s2 == null)
+				return true;
+			else
+				return false;
+		}
+		else if(s2 == null)
+			return false;
+		else
+			return s1.equals(s2);
 	} //}}}
 
 	//}}}
@@ -822,6 +989,9 @@ loop:		for(int i = 0; i < str.length(); i++)
 	} //}}}
 
 	//{{{ MenuItemCompare class
+	/**
+	 * Compares menu item labels.
+	 */
 	public static class MenuItemCompare implements Compare
 	{
 		public int compare(Object obj1, Object obj2)
@@ -832,32 +1002,6 @@ loop:		for(int i = 0; i < str.length(); i++)
 	} //}}}
 
 	//}}}
-
-	//{{{ fileToClass() method
-	/**
-	 * Converts a file name to a class name. All slash characters are
-	 * replaced with periods and the trailing '.class' is removed.
-	 * @param name The file name
-	 */
-	public static String fileToClass(String name)
-	{
-		char[] clsName = name.toCharArray();
-		for(int i = clsName.length - 6; i >= 0; i--)
-			if(clsName[i] == '/')
-				clsName[i] = '.';
-		return new String(clsName,0,clsName.length - 6);
-	} //}}}
-
-	//{{{ classToFile() method
-	/**
-	 * Converts a class name to a file name. All periods are replaced
-	 * with slashes and the '.class' extension is added.
-	 * @param name The class name
-	 */
-	public static String classToFile(String name)
-	{
-		return name.replace('.','/').concat(".class");
-	} //}}}
 
 	//{{{ buildToVersion() method
 	/**
@@ -1013,94 +1157,55 @@ loop:		for(int i = 0; i < str.length(); i++)
 		return true;
 	} //}}}
 
-	//{{{ listFiles() method
+	//{{{ parsePermissions() method
 	/**
-	 * Returns an array containing the full path names of all files
-	 * within the specified directory that match the specified file
-	 * name glob.
-	 * @param directory The directory path
-	 * @param glob The file name glob
-	 * @param recurse If true, subdirectories will be listed as well
+	 * Parse a Unix-style permission string (rwxrwxrwx).
+	 * @param str The string (must be 9 characters long).
+	 * @since jEdit 4.1pre8
 	 */
-	public static String[] listDirectory(String directory, String glob,
-		boolean recurse)
+	public static int parsePermissions(String s)
 	{
-		Log.log(Log.DEBUG,MiscUtilities.class,"Listing " + directory);
-		Vector files = new Vector(100);
+		int permissions = 0;
 
-		RE filter;
-		try
+		if(s.length() == 9)
 		{
-			filter = new RE(globToRE(glob));
+			if(s.charAt(0) == 'r')
+				permissions += 0400;
+			if(s.charAt(1) == 'w')
+				permissions += 0200;
+			if(s.charAt(2) == 'x')
+				permissions += 0100;
+			else if(s.charAt(2) == 's')
+				permissions += 04100;
+			else if(s.charAt(2) == 'S')
+				permissions += 04000;
+			if(s.charAt(3) == 'r')
+				permissions += 040;
+			if(s.charAt(4) == 'w')
+				permissions += 020;
+			if(s.charAt(5) == 'x')
+				permissions += 010;
+			else if(s.charAt(5) == 's')
+				permissions += 02010;
+			else if(s.charAt(5) == 'S')
+				permissions += 02000;
+			if(s.charAt(6) == 'r')
+				permissions += 04;
+			if(s.charAt(7) == 'w')
+				permissions += 02;
+			if(s.charAt(8) == 'x')
+				permissions += 01;
+			else if(s.charAt(8) == 't')
+				permissions += 01001;
+			else if(s.charAt(8) == 'T')
+				permissions += 01000;
 		}
-		catch(Exception e)
-		{
-			Log.log(Log.ERROR,MiscUtilities.class,e);
-			return null;
-		}
 
-		listDirectory(new Vector(),files,new File(directory),filter,recurse);
-
-		String[] retVal = new String[files.size()];
-		files.copyInto(retVal);
-
-		quicksort(retVal,new StringICaseCompare());
-
-		return retVal;
+		return permissions;
 	} //}}}
 
 	//{{{ Private members
 	private MiscUtilities() {}
-
-	//{{{ listDirectory() method
-	private static void listDirectory(Vector stack, Vector files,
-		File directory, RE filter, boolean recurse)
-	{
-		if(stack.contains(directory))
-		{
-			Log.log(Log.ERROR,MiscUtilities.class,
-				"Recursion in listDirectory(): "
-				+ directory.getPath());
-			return;
-		}
-		else
-			stack.addElement(directory);
-
-		File[] _files = directory.listFiles();
-		if(_files == null)
-			return;
-
-		for(int i = 0; i < _files.length; i++)
-		{
-			File file = _files[i];
-			if(file.isDirectory())
-			{
-				if(recurse)
-				{
-					// resolve symlinks to avoid loops
-					try
-					{
-						file = new File(file.getCanonicalPath());
-					}
-					catch(IOException io)
-					{
-					}
-
-					listDirectory(stack,files,file,filter,recurse);
-				}
-			}
-			else
-			{
-				if(!filter.isMatch(file.getName()))
-					continue;
-
-				String path = file.getPath();
-				Log.log(Log.DEBUG,MiscUtilities.class,path);
-
-				files.addElement(path);
-			}
-		}
-	} //}}}
 
 	//{{{ resolveSymlinks() method
 	private static String resolveSymlinks(String path)

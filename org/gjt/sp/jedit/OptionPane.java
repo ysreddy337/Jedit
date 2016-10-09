@@ -22,16 +22,20 @@ package org.gjt.sp.jedit;
 import java.awt.Component;
 
 /**
- * The interface all option panes must implement.
+ * The interface all option panes must implement.<p>
  *
  * The <i>name</i> of an option pane is returned by the <code>getName()</code>
  * method. The label displayed in the option pane's tab is obtained from the
  * <code>options.<i>name</i>.label</code> property.<p>
  *
  * Note that in most cases it is much easier to extend
- * <code>AbstractOptionPane</code> instead.
+ * {@link AbstractOptionPane} instead.
  *
- * @see org.gjt.sp.jedit.AbstractOptionPane
+ * @see OptionGroup
+ * @see org.gjt.sp.jedit.gui.OptionsDialog#addOptionPane(OptionPane)
+ *
+ * @author Slava Pestov
+ * @version $Id: OptionPane.java,v 1.5 2003/02/08 20:13:27 spestov Exp $
  */
 public interface OptionPane
 {
@@ -39,6 +43,7 @@ public interface OptionPane
 	 * Returns the internal name of this option pane. The option pane's label
 	 * is set to the value of the property named
 	 * <code>options.<i>name</i>.label</code>.
+	 * @see jEdit#getProperty(String)
 	 */
 	String getName();
 
@@ -48,9 +53,7 @@ public interface OptionPane
 	Component getComponent();
 
 	/**
-	 * This method is called every time the option pane is displayed. The
-	 * <code>AbstractOptionPane</code> class uses this to create the option
-	 * pane's GUI only when needed.
+	 * This method is called every time the option pane is displayed.
 	 */
 	void init();
 

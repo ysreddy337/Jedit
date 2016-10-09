@@ -4,6 +4,7 @@
  * :folding=explicit:collapseFolds=1:
  *
  * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
+ * Portions copyright (C) 2002 Peter Cox
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,29 +25,20 @@ package org.gjt.sp.jedit.search;
 
 //{{{ Imports
 import javax.swing.*;
-import javax.swing.border.*;
 import javax.swing.event.*;
-import javax.swing.text.*;
 import javax.swing.tree.*;
 import java.awt.*;
 import java.awt.event.*;
-import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.msg.*;
 import org.gjt.sp.jedit.textarea.*;
-import org.gjt.sp.jedit.jEdit;
-import org.gjt.sp.jedit.Buffer;
-import org.gjt.sp.jedit.EBComponent;
-import org.gjt.sp.jedit.EBMessage;
-import org.gjt.sp.jedit.EditBus;
-import org.gjt.sp.jedit.View;
-import org.gjt.sp.util.Log;
+import org.gjt.sp.jedit.*;
 //}}}
 
 /**
  * HyperSearch results window.
  * @author Slava Pestov
- * @version $Id: HyperSearchResults.java,v 1.10 2002/02/03 06:37:56 spestov Exp $
+ * @version $Id: HyperSearchResults.java,v 1.23 2003/01/20 02:02:28 spestov Exp $
  */
 public class HyperSearchResults extends JPanel implements EBComponent
 {
@@ -60,8 +52,13 @@ public class HyperSearchResults extends JPanel implements EBComponent
 		this.view = view;
 
 		caption = new JLabel();
-		updateCaption(0,0);
-		add(BorderLayout.NORTH, caption);
+
+		JPanel topPanel = new JPanel(new BorderLayout());
+		topPanel.add(BorderLayout.CENTER,caption);
+		multi = new JCheckBox(jEdit.getProperty("hypersearch-results.multi"));
+		topPanel.add(BorderLayout.EAST,multi);
+		multi.addActionListener(new ActionHandler());
+		add(BorderLayout.NORTH, topPanel);
 
 		resultTreeRoot = new DefaultMutableTreeNode();
 		resultTreeModel = new DefaultTreeModel(resultTreeRoot);
@@ -70,10 +67,13 @@ public class HyperSearchResults extends JPanel implements EBComponent
 		resultTree.setVisibleRowCount(16);
 		resultTree.setRootVisible(false);
 		resultTree.setShowsRootHandles(true);
-		resultTree.putClientProperty("JTree.lineStyle", "Angled");
+
+		// looks bad with the OS X L&F, apparently...
+		if(!OperatingSystem.isMacOSLF())
+			resultTree.putClientProperty("JTree.lineStyle", "Angled");
+
 		resultTree.setEditable(false);
 
-		resultTree.addTreeSelectionListener(new TreeSelectionHandler());
 		resultTree.addKeyListener(new KeyHandler());
 		resultTree.addMouseListener(new MouseHandler());
 
@@ -96,6 +96,7 @@ public class HyperSearchResults extends JPanel implements EBComponent
 	{
 		super.addNotify();
 		EditBus.addToBus(this);
+		multi.setSelected(jEdit.getBooleanProperty("hypersearch-results.multi-toggle"));
 	} //}}}
 
 	//{{{ removeNotify() method
@@ -103,6 +104,7 @@ public class HyperSearchResults extends JPanel implements EBComponent
 	{
 		super.removeNotify();
 		EditBus.removeFromBus(this);
+		jEdit.setBooleanProperty("hypersearch-results.multi-toggle",multi.isSelected());
 	} //}}}
 
 	//{{{ handleMessage() method
@@ -112,39 +114,44 @@ public class HyperSearchResults extends JPanel implements EBComponent
 		{
 			BufferUpdate bmsg = (BufferUpdate)msg;
 			Buffer buffer = bmsg.getBuffer();
-			if(bmsg.getWhat() == BufferUpdate.LOADED)
+			Object what = bmsg.getWhat();
+			if(what == BufferUpdate.LOADED ||
+				what == BufferUpdate.CLOSED)
 			{
-				for(int i = resultTreeRoot.getChildCount() - 1; i >= 0; i--)
+				ResultVisitor visitor = null;
+				if (what == BufferUpdate.LOADED)
 				{
-					DefaultMutableTreeNode bufferNode = (DefaultMutableTreeNode)
-						resultTreeRoot.getChildAt(i);
-
-					for(int j = bufferNode.getChildCount() - 1;
-						j >= 0; j--)
-					{
-						HyperSearchResult result = (HyperSearchResult)
-							((DefaultMutableTreeNode)bufferNode
-							.getChildAt(j)).getUserObject();
-						if(buffer.getPath().equals(result.path))
-							result.bufferOpened(buffer);
-					}
+					visitor = new BufferLoadedVisitor();
 				}
-			}
-			else if(bmsg.getWhat() == BufferUpdate.CLOSED)
-			{
+				else // BufferUpdate.CLOSED
+				{
+					visitor = new BufferClosedVisitor();
+				}
+				// impl note: since multiple searches now allowed,
+				// extra level in hierarchy
 				for(int i = resultTreeRoot.getChildCount() - 1; i >= 0; i--)
 				{
-					DefaultMutableTreeNode bufferNode = (DefaultMutableTreeNode)
+					DefaultMutableTreeNode searchNode = (DefaultMutableTreeNode)
 						resultTreeRoot.getChildAt(i);
-
-					for(int j = bufferNode.getChildCount() - 1;
+					for(int j = searchNode.getChildCount() - 1;
 						j >= 0; j--)
 					{
-						HyperSearchResult result = (HyperSearchResult)
-							((DefaultMutableTreeNode)bufferNode
-							.getChildAt(j)).getUserObject();
-						if(buffer.getPath().equals(result.path))
-							result.bufferClosed();
+
+						DefaultMutableTreeNode bufferNode = (DefaultMutableTreeNode)
+							searchNode.getChildAt(j);
+
+						for(int k = bufferNode.getChildCount() - 1;
+							k >= 0; k--)
+						{
+							Object userObject =
+								((DefaultMutableTreeNode)bufferNode
+								.getChildAt(k)).getUserObject();
+							HyperSearchResult result = (HyperSearchResult)
+									userObject;
+
+							if(buffer.getPath().equals(result.path))
+								visitor.visit(buffer,result);
+						}
 					}
 				}
 			}
@@ -157,30 +164,79 @@ public class HyperSearchResults extends JPanel implements EBComponent
 		return resultTreeModel;
 	} //}}}
 
+	//{{{ getTree() method
+	/**
+	 * Returns the result tree.
+	 * @since jEdit 4.1pre9
+	 */
+	public JTree getTree()
+	{
+		return resultTree;
+	} //}}}
+
 	//{{{ searchStarted() method
 	public void searchStarted()
 	{
 		caption.setText(jEdit.getProperty("hypersearch-results.searching"));
-		resultTreeRoot.removeAllChildren();
-		resultTreeModel.reload(resultTreeRoot);
+	} //}}}
+
+	//{{{ searchFailed() method
+	public void searchFailed()
+	{
+		caption.setText(jEdit.getProperty("hypersearch-results.no-results"));
+
+		// collapse all nodes, as suggested on user mailing list...
+		for(int i = 0; i < resultTreeRoot.getChildCount(); i++)
+		{
+			DefaultMutableTreeNode node = (DefaultMutableTreeNode)
+				resultTreeRoot.getChildAt(i);
+			resultTree.collapsePath(new TreePath(new Object[] {
+				resultTreeRoot, node }));
+		}
 	} //}}}
 
 	//{{{ searchDone() method
-	public void searchDone(int resultCount, int bufferCount)
+	public void searchDone(final DefaultMutableTreeNode searchNode)
 	{
-		updateCaption(resultCount,bufferCount);
+		final int nodeCount = searchNode.getChildCount();
+		if (nodeCount < 1)
+		{
+			searchFailed();
+			return;
+		}
+
+		caption.setText(jEdit.getProperty("hypersearch-results.done"));
 
 		SwingUtilities.invokeLater(new Runnable()
 		{
 			public void run()
 			{
-				for(int i = 0; i < resultTreeRoot.getChildCount(); i++)
+				if(!multi.isSelected())
 				{
-					resultTree.expandPath(new TreePath(
-						((DefaultMutableTreeNode)
-						resultTreeRoot.getChildAt(i))
-						.getPath()));
+					for(int i = 0; i < resultTreeRoot.getChildCount(); i++)
+					{
+						resultTreeRoot.remove(0);
+					}
 				}
+
+				resultTreeRoot.add(searchNode);
+				resultTreeModel.reload(resultTreeRoot);
+
+				TreePath lastNode = null;
+
+				for(int i = 0; i < nodeCount; i++)
+				{
+					lastNode = new TreePath(
+						((DefaultMutableTreeNode)
+						searchNode.getChildAt(i))
+						.getPath());
+
+					resultTree.expandPath(lastNode);
+				}
+
+				resultTree.scrollPathToVisible(
+					new TreePath(new Object[] {
+					resultTreeRoot,searchNode }));
 			}
 		});
 	} //}}}
@@ -193,6 +249,8 @@ public class HyperSearchResults extends JPanel implements EBComponent
 	private DefaultMutableTreeNode resultTreeRoot;
 	private DefaultTreeModel resultTreeModel;
 
+	private JCheckBox multi;
+
 	//{{{ goToSelectedNode() method
 	private void goToSelectedNode()
 	{
@@ -200,10 +258,15 @@ public class HyperSearchResults extends JPanel implements EBComponent
 		if(path == null)
 			return;
 
-		Object value = ((DefaultMutableTreeNode)path
-			.getLastPathComponent()).getUserObject();
+		DefaultMutableTreeNode node = (DefaultMutableTreeNode)path
+			.getLastPathComponent();
+		Object value = node.getUserObject();
 
-		if(value instanceof String)
+		if(node.getParent() == resultTreeRoot)
+		{
+			// do nothing if clicked "foo (showing n occurrences in m files)"
+		}
+		else if(value instanceof String)
 		{
 			Buffer buffer = jEdit.openFile(view,(String)value);
 			if(buffer == null)
@@ -220,7 +283,7 @@ public class HyperSearchResults extends JPanel implements EBComponent
 				}
 			});
 		}
-		else
+		else if (value instanceof HyperSearchResult)
 		{
 			final HyperSearchResult result = (HyperSearchResult)value;
 			final Buffer buffer = result.getBuffer();
@@ -248,14 +311,24 @@ public class HyperSearchResults extends JPanel implements EBComponent
 		}
 	} //}}}
 
-	//{{{ updateCaption() method
-	private void updateCaption(int resultCount, int bufferCount)
-	{
-		Object[] pp = { new Integer(resultCount), new Integer(bufferCount) };
-		caption.setText(jEdit.getProperty("hypersearch-results.caption",pp));
-	} //}}}
-
 	//}}}
+
+	//{{{ ActionHandler class
+	public class ActionHandler implements ActionListener
+	{
+		public void actionPerformed(ActionEvent evt)
+		{
+			if(!multi.isSelected())
+			{
+				for(int i = resultTreeRoot.getChildCount() - 2; i >= 0; i--)
+				{
+					resultTreeModel.removeNodeFromParent(
+						(MutableTreeNode)resultTreeRoot
+						.getChildAt(i));
+				}
+			}
+		}
+	} //}}}
 
 	//{{{ KeyHandler class
 	class KeyHandler extends KeyAdapter
@@ -263,37 +336,89 @@ public class HyperSearchResults extends JPanel implements EBComponent
 		public void keyPressed(KeyEvent evt)
 		{
 			if(evt.getKeyCode() == KeyEvent.VK_ENTER)
+			{
 				goToSelectedNode();
+
+				// fuck me dead
+				SwingUtilities.invokeLater(new Runnable()
+				{
+					public void run()
+					{
+						resultTree.requestFocus();
+					}
+				});
+
+				evt.consume();
+			}
 		}
 	} //}}}
 
 	//{{{ MouseHandler class
 	class MouseHandler extends MouseAdapter
 	{
-		public void mouseClicked(MouseEvent evt)
+		//{{{ mousePressed() method
+		public void mousePressed(MouseEvent evt)
 		{
+			if(evt.isConsumed())
+				return;
+
 			TreePath path1 = resultTree.getPathForLocation(
 				evt.getX(),evt.getY());
 			if(path1 == null)
 				return;
 
 			resultTree.setSelectionPath(path1);
-			goToSelectedNode();
+			if (GUIUtilities.isPopupTrigger(evt))
+				showPopupMenu(evt);
+			else
+			{
+				goToSelectedNode();
 
-			view.toFront();
-			view.requestFocus();
-			view.getTextArea().requestFocus();
-		}
-	} //}}}
+				view.toFront();
+				view.requestFocus();
+				view.getTextArea().requestFocus();
+			}
+		} //}}}
 
-	//{{{ TreeSelectionHandler class
-	class TreeSelectionHandler implements TreeSelectionListener
-	{
-		public void valueChanged(TreeSelectionEvent evt)
+		//{{{ Private members
+		private JPopupMenu popupMenu;
+
+		//{{{ showPopupMenu method
+		private void showPopupMenu(MouseEvent evt)
 		{
-			goToSelectedNode();
-		}
+			if (popupMenu == null)
+			{
+				popupMenu = new JPopupMenu();
+				popupMenu.add(new RemoveTreeNodeAction());
+			}
+
+			GUIUtilities.showPopupMenu(popupMenu,evt.getComponent(),
+				evt.getX(),evt.getY());
+			evt.consume();
+		} //}}}
+
+		//}}}
 	} //}}}
+
+	//{{{ RemoveTreeNodeAction class
+	class RemoveTreeNodeAction extends AbstractAction
+	{
+		public RemoveTreeNodeAction()
+		{
+			super(jEdit.getProperty("hypersearch-results.remove-node"));
+		}
+
+		public void actionPerformed(ActionEvent evt)
+		{
+			TreePath path = resultTree.getSelectionPath();
+			if(path == null)
+				return;
+
+			MutableTreeNode value = (MutableTreeNode)path
+				.getLastPathComponent();
+			resultTreeModel.removeNodeFromParent(value);
+		}
+	}//}}}
 
 	//{{{ ResultCellRenderer class
 	class ResultCellRenderer extends DefaultTreeCellRenderer
@@ -317,7 +442,20 @@ public class HyperSearchResults extends JPanel implements EBComponent
 				expanded,leaf,row,hasFocus);
 			setIcon(null);
 			DefaultMutableTreeNode node = (DefaultMutableTreeNode)value;
-			if(node.getUserObject() instanceof String)
+
+			if (node.getParent() == resultTreeRoot)
+			{
+				ResultCellRenderer.this.setFont(boldFont);
+				int bufferCount = node.getChildCount();
+				int resultCount = 0;
+				for (int i = 0; i < bufferCount; i++)
+				{
+					resultCount += node.getChildAt(i).getChildCount();
+				}
+				Object[] pp = { node.toString(), new Integer(resultCount), new Integer(bufferCount) };
+				setText(jEdit.getProperty("hypersearch-results.result-caption",pp));
+			}
+			else if(node.getUserObject() instanceof String)
 			{
 				// file name
 				ResultCellRenderer.this.setFont(boldFont);
@@ -345,5 +483,33 @@ public class HyperSearchResults extends JPanel implements EBComponent
 
 			return this;
 		} //}}}
+	} //}}}
+
+	// these are used to eliminate code duplication. i don't normally use
+	// the visitor or "template method" pattern, but this code was contributed
+	// by Peter Cox and i don't feel like changing it around too much.
+
+	//{{{ ResultVisitor interface
+	interface ResultVisitor
+	{
+		public void visit(Buffer buffer, HyperSearchResult result);
+	} //}}}
+
+	//{{{ BufferLoadedVisitor class
+	class BufferLoadedVisitor implements ResultVisitor
+	{
+		public void visit(Buffer buffer, HyperSearchResult result)
+		{
+			result.bufferOpened(buffer);
+		}
+	} //}}}
+
+	//{{{ BufferClosedVisitor class
+	class BufferClosedVisitor implements ResultVisitor
+	{
+		public void visit(Buffer buffer, HyperSearchResult result)
+		{
+			result.bufferClosed();
+		}
 	} //}}}
 }

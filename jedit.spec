@@ -2,85 +2,76 @@
 ### RPM spec file for jEdit
 ###
 
-### This is a hack. For it to work, you must first install jEdit using
-<<<<<<< HEAD
-### the regular installer, then create a 'dummy' jedit31source.tar.gz
-=======
-### the regular installer, then create a 'dummy' jedit302source.tar.gz
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
-### file in the /usr/src/redhat/SOURCES directory.
+### To create the RPM, put the source tarball in the RPM SOURCES
+### directory, and invoke:
 
-### To create the RPM, invoke:
-### rpm -ba jedit.spec --target=noarch
+### rpm -ba jedit.spec
+
+### You will need to have ant, xsltproc, and DocBook-XML 4.1.2 installed
+### for this to work.
 
 Summary: Programmer's text editor written in Java
 Name: jedit
-<<<<<<< HEAD
-Version: 3.1
+Version: 4.1pre9
 Release: 1
-# REMIND: bump this with each RPM
-Serial: 11
+# REMIND: bump this with each RPM; 32 == 4.1pre9
+Serial: 32
 Copyright: GPL
-Group: Application/Editors
-Source0: http://download.sourceforge.net/jedit/jedit31source.tar.gz
-=======
-Version: 3.0.2
-Release: 1
-# REMIND: bump this with each RPM
-Serial: 2
-Copyright: GPL
-Group: Application/Editors
-Source0: http://download.sourceforge.net/jedit/jedit302source.tar.gz
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
-NoSource: 0
+Group: Applications/Editors
+Source0: http://prdownloads.sourceforge.net/jedit/jedit41pre9source.tar.gz
+Source1: jedit.sh.in
 URL: http://www.jedit.org
+Vendor: Slava Pestov <slava@jedit.org>
 Packager: Slava Pestov <slava@jedit.org>
+BuildArch: noarch
+BuildRoot: %{_tmppath}/%{name}-%{version}-root
 
 %description
 jEdit is an Open Source, cross platform text editor written in Java. It
-has many advanced features that make text editing easier, such as syntax
-highlighting, auto indent, abbreviation expansion, registers, macros,
-regular expressions, and multiple file search and replace.
+has an extensive feature set that includes syntax highlighting, auto indent,
+folding, word wrap, abbreviation expansion, multiple clipboards, powerful search
+and replace, and much more.
 
-jEdit requires Java 2 (or Java 1.1 with Swing 1.1) in order to work.
+Futhermore, jEdit is extremely customizable, and extensible, using either macros
+written in the BeanShell scripting language, or plugins written in Java.
+
+jEdit requires Java 2 version 1.3.
 
 %prep
-<<<<<<< HEAD
-rm -f /usr/doc/jedit-3.1
-ln -sf ../share/jedit/3.1/doc /usr/doc/jedit-3.1
-=======
-rm -f /usr/doc/jedit-3.0.2
-ln -sf ../share/jedit/3.0.2/doc /usr/doc/jedit-3.0.2
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+%setup -n jEdit
 
 %build
+export CLASSPATH="."
+
+ant docs-html-xsltproc dist
+
+# Build LatestVersion.jar
+(cd jars/LatestVersion && ant)
+
+# Build QuickNotepad.jar
+(cd jars/QuickNotepad && ant)
+
+# Create installer filelists
+sh installer/mk_filelist.sh
 
 %install
+[ -n "$RPM_BUILD_ROOT" -a "$RPM_BUILD_ROOT" != / ] && rm -rf $RPM_BUILD_ROOT
 
-<<<<<<< HEAD
-%files
-/usr/bin/jedit
-/usr/doc/jedit-3.1
-%docdir /usr/doc/jedit-3.1/
-/usr/share/jedit/3.1/
-=======
-%post
-# Create shell script here
-mkdir -p ${RPM_INSTALL_PREFIX}/bin
-echo "#!/bin/sh" > ${RPM_INSTALL_PREFIX}/bin/jedit
-echo "# Java heap size, in megabytes (see doc/README.txt)" \
-	>> ${RPM_INSTALL_PREFIX}/bin/jedit
-echo "JAVA_HEAP_SIZE=16" >> ${RPM_INSTALL_PREFIX}/bin/jedit
-echo 'exec java -mx${JAVA_HEAP_SIZE}m ${JEDIT} -classpath \
-	"${CLASSPATH}:'${RPM_INSTALL_PREFIX}'/share/jedit/3.0.2/jedit.jar" \
-	org.gjt.sp.jedit.jEdit $@' >> ${RPM_INSTALL_PREFIX}/bin/jedit
-chmod 755 ${RPM_INSTALL_PREFIX}/bin/jedit
+export CLASSPATH="."
 
-%preun
-rm ${RPM_INSTALL_PREFIX}/bin/jedit
+java installer.Install auto $RPM_BUILD_ROOT%{_datadir}/jedit/%{version}
+
+sed -e "s^@JEDIT_HOME@^"%{_datadir}"/jedit/"%{version}"^g" < %{SOURCE1} > \
+	$RPM_BUILD_ROOT%{_bindir}/jedit
+
+chmod +x $RPM_BUILD_ROOT%{_bindir}/jedit
+
+cp jedit.1 %{_mandir}/man1/jedit.1
+
+%clean
+[ -n "$RPM_BUILD_ROOT" -a "$RPM_BUILD_ROOT" != / ] && rm -rf $RPM_BUILD_ROOT
 
 %files
-/usr/doc/jedit-3.0.2
-%docdir /usr/doc/jedit-3.0.2/
-/usr/share/jedit/3.0.2/
->>>>>>> d5f8ea9e5f7b9c259ad11480490aa038259d1ee5
+%{_bindir}/jedit
+%{_datadir}/jedit/%{version}
+%{_mandir}/man1/jedit.1

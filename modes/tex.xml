@@ -7,9 +7,6 @@
 		<PROPERTY NAME="lineComment" VALUE="%" />
 	</PROPS>
 	<RULES>
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- $$...$$ -->
 		<SPAN TYPE="MARKUP" DELEGATE="MATH">
 			<BEGIN>$$</BEGIN>
@@ -32,6 +29,13 @@
 		<SEQ TYPE="KEYWORD1">\$</SEQ>
 		<SEQ TYPE="KEYWORD1">\\</SEQ>
 		<SEQ TYPE="KEYWORD1">\%</SEQ>
+                <SEQ TYPE="KEYWORD1">`$</SEQ>
+
+		<!-- \iffalse ... \fi - a block comment -->
+                <SPAN TYPE="COMMENT1">
+                        <BEGIN>\iffalse</BEGIN>
+                        <END>\fi</END>
+                </SPAN>
 
 		<!-- \... commands -->
 		<MARK_FOLLOWING TYPE="KEYWORD1">\</MARK_FOLLOWING>
@@ -40,39 +44,13 @@
 		<EOL_SPAN TYPE="COMMENT1">%</EOL_SPAN>
 
 		<!-- word separators -->
-		<SEQ TYPE="NULL">)</SEQ>
-		<SEQ TYPE="NULL">(</SEQ>
 		<SEQ TYPE="OPERATOR">{</SEQ>
 		<SEQ TYPE="OPERATOR">}</SEQ>
 		<SEQ TYPE="OPERATOR">[</SEQ>
 		<SEQ TYPE="OPERATOR">]</SEQ>
-		<SEQ TYPE="NULL">=</SEQ>
-		<SEQ TYPE="NULL">!</SEQ>
-		<SEQ TYPE="NULL">+</SEQ>
-		<SEQ TYPE="NULL">-</SEQ>
-		<SEQ TYPE="NULL">/</SEQ>
-		<SEQ TYPE="NULL">*</SEQ>
-		<SEQ TYPE="NULL">&gt;</SEQ>
-		<SEQ TYPE="NULL">&lt;</SEQ>
-		<SEQ TYPE="NULL">&amp;</SEQ>
-		<SEQ TYPE="NULL">|</SEQ>
-		<SEQ TYPE="NULL">^</SEQ>
-		<SEQ TYPE="NULL">~</SEQ>
-		<SEQ TYPE="NULL">.</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">?</SEQ>
-		<SEQ TYPE="NULL">:</SEQ>
-		<SEQ TYPE="NULL">'</SEQ>
-		<SEQ TYPE="NULL">"</SEQ>
-		<SEQ TYPE="NULL">`</SEQ>
 	</RULES>
 
 	<RULES SET="MATH" DEFAULT="MARKUP">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- some commands must be handled specially -->
 		<SEQ TYPE="KEYWORD3">\$</SEQ>
 		<SEQ TYPE="KEYWORD3">\\</SEQ>

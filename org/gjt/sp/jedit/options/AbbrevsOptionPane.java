@@ -30,7 +30,7 @@ import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import java.util.*;
-import org.gjt.sp.jedit.gui.EditAbbrevDialog;
+import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.*;
 //}}}
 
@@ -38,7 +38,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Abbrev editor.
  * @author Slava Pestov
- * @version $Id: AbbrevsOptionPane.java,v 1.5 2002/02/15 03:03:16 spestov Exp $
+ * @version $Id: AbbrevsOptionPane.java,v 1.9 2002/12/15 00:23:53 spestov Exp $
  */
 public class AbbrevsOptionPane extends AbstractOptionPane
 {
@@ -53,29 +53,20 @@ public class AbbrevsOptionPane extends AbstractOptionPane
 	{
 		setLayout(new BorderLayout());
 
-		JPanel panel = new JPanel(new BorderLayout());
+		JPanel panel = new JPanel(new BorderLayout(6,6));
+
+		expandOnInput = new JCheckBox(jEdit.getProperty("options.abbrevs"
+			+ ".expandOnInput"),Abbrevs.getExpandOnInput());
+
+		panel.add(expandOnInput,BorderLayout.NORTH);
 
 		JPanel panel2 = new JPanel();
 		panel2.setLayout(new BoxLayout(panel2,BoxLayout.X_AXIS));
 		panel2.setBorder(new EmptyBorder(0,0,6,0));
-
 		panel2.add(Box.createGlue());
-
-		expandOnInput = new JCheckBox(jEdit.getProperty("options.abbrevs"
-			+ ".expandOnInput"),Abbrevs.getExpandOnInput());
-		panel2.add(expandOnInput);
-
-		panel2.add(Box.createGlue());
-
-		panel.add(panel2,BorderLayout.NORTH);
-
-		JPanel panel3 = new JPanel();
-		panel3.setLayout(new BoxLayout(panel3,BoxLayout.X_AXIS));
-		panel3.setBorder(new EmptyBorder(0,0,6,0));
-		panel3.add(Box.createGlue());
 		JLabel label = new JLabel(jEdit.getProperty("options.abbrevs.set"));
 		label.setBorder(new EmptyBorder(0,0,0,12));
-		panel3.add(label);
+		panel2.add(label);
 
 		Hashtable _modeAbbrevs = Abbrevs.getModeAbbrevs();
 		modeAbbrevs = new Hashtable();
@@ -92,14 +83,16 @@ public class AbbrevsOptionPane extends AbstractOptionPane
 		setsComboBox = new JComboBox(sets);
 		ActionHandler actionHandler = new ActionHandler();
 		setsComboBox.addActionListener(actionHandler);
-		panel3.add(setsComboBox);
-		panel3.add(Box.createGlue());
-		panel.add(panel3,BorderLayout.SOUTH);
+		panel2.add(setsComboBox);
+		panel2.add(Box.createGlue());
+		panel.add(panel2,BorderLayout.SOUTH);
 
 		add(BorderLayout.NORTH,panel);
 
 		globalAbbrevs = new AbbrevsModel(Abbrevs.getGlobalAbbrevs());
 		abbrevsTable = new JTable(globalAbbrevs);
+		abbrevsTable.getColumnModel().getColumn(1).setCellRenderer(
+			new Renderer());
 		abbrevsTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 		abbrevsTable.getTableHeader().setReorderingAllowed(false);
 		abbrevsTable.getTableHeader().addMouseListener(new HeaderMouseHandler());
@@ -116,18 +109,18 @@ public class AbbrevsOptionPane extends AbstractOptionPane
 		buttons.setLayout(new BoxLayout(buttons,BoxLayout.X_AXIS));
 		buttons.setBorder(new EmptyBorder(6,0,0,0));
 
-		buttons.add(Box.createGlue());
-		add = new JButton(jEdit.getProperty("options.abbrevs.add"));
+		add = new RolloverButton(GUIUtilities.loadIcon("Plus.png"));
+		add.setToolTipText(jEdit.getProperty("options.abbrevs.add"));
 		add.addActionListener(actionHandler);
 		buttons.add(add);
-		buttons.add(Box.createHorizontalStrut(6));
-		edit = new JButton(jEdit.getProperty("options.abbrevs.edit"));
-		edit.addActionListener(actionHandler);
-		buttons.add(edit);
-		buttons.add(Box.createHorizontalStrut(6));
-		remove = new JButton(jEdit.getProperty("options.abbrevs.remove"));
+		remove = new RolloverButton(GUIUtilities.loadIcon("Minus.png"));
+		remove.setToolTipText(jEdit.getProperty("options.abbrevs.remove"));
 		remove.addActionListener(actionHandler);
 		buttons.add(remove);
+		edit = new RolloverButton(GUIUtilities.loadIcon("ButtonProperties.png"));
+		edit.setToolTipText(jEdit.getProperty("options.abbrevs.edit"));
+		edit.addActionListener(actionHandler);
+		buttons.add(edit);
 		buttons.add(Box.createGlue());
 
 		add(BorderLayout.SOUTH,buttons);
@@ -186,9 +179,9 @@ public class AbbrevsOptionPane extends AbstractOptionPane
 
 		String abbrev = (String)abbrevsModel.getValueAt(row,0);
 		String expansion = (String)abbrevsModel.getValueAt(row,1);
-	
+
 		EditAbbrevDialog dialog = new EditAbbrevDialog(
-			AbbrevsOptionPane.this,
+			GUIUtilities.getParentDialog(AbbrevsOptionPane.this),
 			abbrev,expansion);
 		abbrev = dialog.getAbbrev();
 		expansion = dialog.getExpansion();
@@ -198,6 +191,8 @@ public class AbbrevsOptionPane extends AbstractOptionPane
 			abbrevsModel.setValueAt(expansion,row,1);
 		}
 	} //}}}
+
+	//}}}
 
 	//{{{ HeaderMouseHandler class
 	class HeaderMouseHandler extends MouseAdapter
@@ -260,7 +255,7 @@ public class AbbrevsOptionPane extends AbstractOptionPane
 			else if(source == add)
 			{
 				EditAbbrevDialog dialog = new EditAbbrevDialog(
-					AbbrevsOptionPane.this,
+					GUIUtilities.getParentDialog(AbbrevsOptionPane.this),
 					null,null);
 				String abbrev = dialog.getAbbrev();
 				String expansion = dialog.getExpansion();
@@ -288,6 +283,28 @@ public class AbbrevsOptionPane extends AbstractOptionPane
 				abbrevsModel.remove(selectedRow);
 				updateEnabled();
 			}
+		}
+	} //}}}
+
+	//{{{ Renderer class
+	static class Renderer extends DefaultTableCellRenderer
+	{
+		public Component getTableCellRendererComponent(
+			JTable table,
+			Object value,
+			boolean isSelected,
+			boolean cellHasFocus,
+			int row,
+			int col)
+		{
+			String valueStr = value.toString();
+
+			// workaround for Swing's annoying processing of
+			// labels starting with <html>, which often breaks
+			if(valueStr.toLowerCase().startsWith("<html>"))
+				valueStr = " " + valueStr;
+			return super.getTableCellRendererComponent(table,valueStr,
+				isSelected,cellHasFocus,row,col);
 		}
 	} //}}}
 } //}}}

@@ -26,12 +26,10 @@ package org.gjt.sp.jedit.textarea;
 //{{{ Imports
 import java.awt.*;
 import java.awt.event.*;
-import java.util.ArrayList;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
 //}}}
 
 /**
@@ -47,7 +45,7 @@ import org.gjt.sp.util.Log;
  * @see JEditTextArea
  *
  * @author Mike Dillon and Slava Pestov
- * @version $Id: Gutter.java,v 1.23 2002/04/02 02:32:18 spestov Exp $
+ * @version $Id: Gutter.java,v 1.29 2003/01/14 02:09:23 spestov Exp $
  */
 public class Gutter extends JComponent implements SwingConstants
 {
@@ -105,210 +103,21 @@ public class Gutter extends JComponent implements SwingConstants
 		if (!textArea.getBuffer().isLoaded())
 			return;
 
-		// paint highlights and line numbers
 		int lineHeight = textArea.getPainter().getFontMetrics()
 			.getHeight();
 
 		int firstLine = clip.y / lineHeight;
 		int lastLine = (clip.y + clip.height - 1) / lineHeight;
 
-		FontMetrics pfm = textArea.getPainter().getFontMetrics();
-		Color fg = getForeground();
-
-		int baseline = (int)((this.baseline + lineHeight
-			- pfm.getDescent()) / 2.0);
-
-		boolean highlightCurrentLine = currentLineHighlightEnabled
-			&& textArea.selection.size() == 0;
-
 		int y = (clip.y - clip.y % lineHeight);
 
-		Buffer buffer = textArea.getBuffer();
 		textArea.chunkCache.updateChunksUpTo(lastLine);
 
 		for (int line = firstLine; line <= lastLine;
 			line++, y += lineHeight)
 		{
-			ChunkCache.LineInfo info = textArea.chunkCache.getLineInfo(line);
-			if(!info.chunksValid)
-				System.err.println("gutter paint: not valid");
-			int physicalLine = info.physicalLine;
-
-			//{{{ Paint text area extensions
-			if(physicalLine != -1)
-			{
-				int start = textArea.getScreenLineStartOffset(line);
-				int end = textArea.getScreenLineEndOffset(line);
-
-				extensionMgr.paintValidLine(gfx,line,physicalLine,start,end,y);
-			}
-			else
-				extensionMgr.paintInvalidLine(gfx,line,y);
-			//}}}
-
-			// Skip lines beyond EOF
-			if(physicalLine == -1)
-				return;
-
-			//{{{ Paint fold triangles
-			if(info.firstSubregion
-				&& physicalLine != buffer.getLineCount() - 1
-				&& buffer.isFoldStart(physicalLine))
-			{
-				int _y = y + lineHeight / 2;
-				gfx.setColor(foldColor);
-				if(textArea.getFoldVisibilityManager()
-					.isLineVisible(physicalLine + 1))
-				{
-					gfx.drawLine(1,_y - 3,10,_y - 3);
-					gfx.drawLine(2,_y - 2,9,_y - 2);
-					gfx.drawLine(3,_y - 1,8,_y - 1);
-					gfx.drawLine(4,_y,7,_y);
-					gfx.drawLine(5,_y + 1,6,_y + 1);
-				}
-				else
-				{
-					gfx.drawLine(4,_y - 5,4,_y + 4);
-					gfx.drawLine(5,_y - 4,5,_y + 3);
-					gfx.drawLine(6,_y - 3,6,_y + 2);
-					gfx.drawLine(7,_y - 2,7,_y + 1);
-					gfx.drawLine(8,_y - 1,8,_y);
-				}
-			} //}}}
-			//{{{ Paint bracket scope
-			else if(bracketHighlight)
-			{
-				int bracketLine = textArea.getBracketLine();
-				int caretLine = textArea.getCaretLine();
-
-				if(textArea.isBracketHighlightVisible()
-					&& physicalLine >= Math.min(caretLine,bracketLine)
-					&& physicalLine <= Math.max(caretLine,bracketLine))
-				{
-					int caretScreenLine;
-					if(caretLine > textArea.getLastPhysicalLine())
-						caretScreenLine = Integer.MAX_VALUE;
-					else
-					{
-						caretScreenLine = textArea
-							.getScreenLineOfOffset(
-							textArea.getCaretPosition());
-					}
-
-					int bracketScreenLine;
-					if(bracketLine > textArea.getLastPhysicalLine())
-						bracketScreenLine = Integer.MAX_VALUE;
-					else
-					{
-						bracketScreenLine = textArea.chunkCache
-							.getScreenLineOfOffset(
-							bracketLine,
-							textArea.getBracketPosition());
-					}
-
-					if(caretScreenLine > bracketScreenLine)
-					{
-						int tmp = caretScreenLine;
-						caretScreenLine = bracketScreenLine;
-						bracketScreenLine = tmp;
-					}
-
-					gfx.setColor(bracketHighlightColor);
-					if(bracketScreenLine == caretScreenLine)
-					{
-						// do nothing
-					}
-					else if(line == caretScreenLine)
-					{
-						gfx.fillRect(5,
-							y
-							+ lineHeight / 2,
-							5,
-							2);
-						gfx.fillRect(5,
-							y
-							+ lineHeight / 2,
-							2,
-							lineHeight - lineHeight / 2);
-					}
-					else if(line == bracketScreenLine)
-					{
-						gfx.fillRect(5,
-							y,
-							2,
-							lineHeight / 2);
-						gfx.fillRect(5,
-							y + lineHeight / 2,
-							5,
-							2);
-					}
-					else if(line > caretScreenLine
-						&& line < bracketScreenLine)
-					{
-						gfx.fillRect(5,
-							y,
-							2,
-							lineHeight);
-					}
-				}
-			} //}}}
-
-			//{{{ Paint line numbers
-			if(info.firstSubregion && expanded)
-			{
-				String number = Integer.toString(physicalLine + 1);
-
-				int offset;
-				switch (alignment)
-				{
-				case RIGHT:
-					offset = gutterSize.width - collapsedSize.width
-						- (fm.stringWidth(number) + 1);
-					break;
-				case CENTER:
-					offset = ((gutterSize.width - collapsedSize.width)
-						- fm.stringWidth(number)) / 2;
-					break;
-				case LEFT: default:
-					offset = 0;
-					break;
-				}
-
-				if (physicalLine == textArea.getCaretLine() && highlightCurrentLine)
-				{
-					gfx.setColor(currentLineHighlight);
-				}
-				else if (interval > 1 && (line
-					+ textArea.getFirstLine() + 1)
-					% interval == 0)
-					gfx.setColor(intervalHighlight);
-				else
-					gfx.setColor(fg);
-
-				gfx.drawString(number, FOLD_MARKER_SIZE + offset,
-					baseline + y);
-			} //}}}
+			paintLine(gfx,line,y);
 		}
-	} //}}}
-
-	//{{{ addCustomHighlight() method
-	/**
-	 * @deprecated Write a <code>TextAreaExtension</code> instead.
-	 */
-	public void addCustomHighlight(TextAreaHighlight highlight)
-	{
-		Log.log(Log.WARNING,this,"Old highlighter API not supported: "
-			+ highlight);
-	} //}}}
-
-	//{{{ removeCustomHighlight() method
-	/**
-	 * @deprecated Write a <code>TextAreaExtension</code> instead.
-	 */
-	public void removeCustomHighlight(TextAreaHighlight highlight)
-	{
-		Log.log(Log.WARNING,this,"Old highlighter API not supported: "
-			+ highlight);
 	} //}}}
 
 	//{{{ addExtension() method
@@ -350,6 +159,17 @@ public class Gutter extends JComponent implements SwingConstants
 	{
 		extensionMgr.removeExtension(extension);
 		repaint();
+	} //}}}
+
+	//{{{ getExtensions() method
+	/**
+	 * Returns an array of registered text area extensions. Useful for
+	 * debugging purposes.
+	 * @since jEdit 4.1pre5
+	 */
+	public TextAreaExtension[] getExtensions()
+	{
+		return extensionMgr.getExtensions();
 	} //}}}
 
 	//{{{ getToolTipText() method
@@ -696,6 +516,8 @@ public class Gutter extends JComponent implements SwingConstants
 	//}}}
 
 	//{{{ Private members
+
+	//{{{ Instance variables
 	private static final int FOLD_MARKER_SIZE = 12;
 
 	private View view;
@@ -728,6 +550,179 @@ public class Gutter extends JComponent implements SwingConstants
 
 	private int borderWidth;
 	private Border focusBorder, noFocusBorder;
+	//}}}
+
+	//{{{ paintLine() method
+	private void paintLine(Graphics2D gfx, int line, int y)
+	{
+		Buffer buffer = textArea.getBuffer();
+
+		int lineHeight = textArea.getPainter().getFontMetrics()
+			.getHeight();
+
+		ChunkCache.LineInfo info = textArea.chunkCache.getLineInfo(line);
+		if(!info.chunksValid)
+			System.err.println("gutter paint: not valid");
+		int physicalLine = info.physicalLine;
+
+		//{{{ Paint text area extensions
+		if(physicalLine != -1)
+		{
+			int start = textArea.getScreenLineStartOffset(line);
+			int end = textArea.getScreenLineEndOffset(line);
+
+			extensionMgr.paintValidLine(gfx,line,physicalLine,start,end,y);
+		}
+		else
+			extensionMgr.paintInvalidLine(gfx,line,y);
+		//}}}
+
+		// Skip lines beyond EOF
+		if(physicalLine == -1)
+			return;
+
+		//{{{ Paint fold triangles
+		if(info.firstSubregion
+			&& physicalLine != buffer.getLineCount() - 1
+			&& buffer.isFoldStart(physicalLine))
+		{
+			int _y = y + lineHeight / 2;
+			gfx.setColor(foldColor);
+			if(textArea.getFoldVisibilityManager()
+				.isLineVisible(physicalLine + 1))
+			{
+				gfx.drawLine(1,_y - 3,10,_y - 3);
+				gfx.drawLine(2,_y - 2,9,_y - 2);
+				gfx.drawLine(3,_y - 1,8,_y - 1);
+				gfx.drawLine(4,_y,7,_y);
+				gfx.drawLine(5,_y + 1,6,_y + 1);
+			}
+			else
+			{
+				gfx.drawLine(4,_y - 5,4,_y + 4);
+				gfx.drawLine(5,_y - 4,5,_y + 3);
+				gfx.drawLine(6,_y - 3,6,_y + 2);
+				gfx.drawLine(7,_y - 2,7,_y + 1);
+				gfx.drawLine(8,_y - 1,8,_y);
+			}
+		} //}}}
+		//{{{ Paint bracket scope
+		else if(bracketHighlight)
+		{
+			int bracketLine = textArea.getBracketLine();
+			int caretLine = textArea.getCaretLine();
+
+			if(textArea.isBracketHighlightVisible()
+				&& physicalLine >= Math.min(caretLine,bracketLine)
+				&& physicalLine <= Math.max(caretLine,bracketLine))
+			{
+				int caretScreenLine;
+				if(caretLine > textArea.getLastPhysicalLine())
+					caretScreenLine = Integer.MAX_VALUE;
+				else
+				{
+					caretScreenLine = textArea
+						.getScreenLineOfOffset(
+						textArea.getCaretPosition());
+				}
+
+				int bracketScreenLine;
+				if(bracketLine > textArea.getLastPhysicalLine())
+					bracketScreenLine = Integer.MAX_VALUE;
+				else
+				{
+					bracketScreenLine = textArea.chunkCache
+						.getScreenLineOfOffset(
+						bracketLine,
+						textArea.getBracketPosition());
+				}
+
+				if(caretScreenLine > bracketScreenLine)
+				{
+					int tmp = caretScreenLine;
+					caretScreenLine = bracketScreenLine;
+					bracketScreenLine = tmp;
+				}
+
+				gfx.setColor(bracketHighlightColor);
+				if(bracketScreenLine == caretScreenLine)
+				{
+					// do nothing
+				}
+				else if(line == caretScreenLine)
+				{
+					gfx.fillRect(5,
+						y
+						+ lineHeight / 2,
+						5,
+						2);
+					gfx.fillRect(5,
+						y
+						+ lineHeight / 2,
+						2,
+						lineHeight - lineHeight / 2);
+				}
+				else if(line == bracketScreenLine)
+				{
+					gfx.fillRect(5,
+						y,
+						2,
+						lineHeight / 2);
+					gfx.fillRect(5,
+						y + lineHeight / 2,
+						5,
+						2);
+				}
+				else if(line > caretScreenLine
+					&& line < bracketScreenLine)
+				{
+					gfx.fillRect(5,
+						y,
+						2,
+						lineHeight);
+				}
+			}
+		} //}}}
+
+		//{{{ Paint line numbers
+		if(info.firstSubregion && expanded)
+		{
+			String number = Integer.toString(physicalLine + 1);
+
+			int offset;
+			switch (alignment)
+			{
+			case RIGHT:
+				offset = gutterSize.width - collapsedSize.width
+					- (fm.stringWidth(number) + 1);
+				break;
+			case CENTER:
+				offset = ((gutterSize.width - collapsedSize.width)
+					- fm.stringWidth(number)) / 2;
+				break;
+			case LEFT: default:
+				offset = 0;
+				break;
+			}
+
+			boolean highlightCurrentLine = currentLineHighlightEnabled
+				&& textArea.selection.size() == 0;
+			if (physicalLine == textArea.getCaretLine() && highlightCurrentLine)
+			{
+				gfx.setColor(currentLineHighlight);
+			}
+			else if (interval > 1 && (line
+				+ textArea.getFirstLine() + 1)
+				% interval == 0)
+				gfx.setColor(intervalHighlight);
+			else
+				gfx.setColor(getForeground());
+
+			gfx.drawString(number, FOLD_MARKER_SIZE + offset,
+				baseline + y);
+		} //}}}
+	} //}}}
+
 	//}}}
 
 	//{{{ MouseHandler class
@@ -784,7 +779,28 @@ public class Gutter extends JComponent implements SwingConstants
 				//{{{ Clicking on fold triangle does various things
 				if(buffer.isFoldStart(line))
 				{
+					StringBuffer property = new StringBuffer(
+						"view.gutter.gutter");
+					if(e.isShiftDown())
+						property.append("Shift");
 					if(e.isControlDown())
+						property.append("Control");
+					if(e.isAltDown())
+						property.append("Alt");
+					property.append("Click");
+
+					String action = jEdit.getProperty(property
+						.toString());
+					if(action == null)
+					{
+						action = jEdit.getProperty(
+							"view.gutter.gutterClick");
+					}
+
+					if(action == null)
+						action = "toggleFold";
+
+					if(action.equals("selectFold"))
 					{
 						foldVisibilityManager
 							.expandFold(line,true);
@@ -798,9 +814,19 @@ public class Gutter extends JComponent implements SwingConstants
 					}
 					else
 					{
-						foldVisibilityManager
-							.expandFold(line,
-							e.isShiftDown());
+						if(action.equals(
+							"toggleFoldFully"))
+						{
+							foldVisibilityManager
+								.expandFold(line,
+								true);
+						}
+						else
+						{
+							foldVisibilityManager
+								.expandFold(line,
+								false);
+						}
 					}
 				} //}}}
 				//{{{ Clicking in bracket scope locates matching bracket
@@ -881,12 +907,11 @@ public class Gutter extends JComponent implements SwingConstants
 		{
 			if(isMarkerHighlightEnabled())
 			{
-				int start = textArea.xyToOffset(0,y);
-				if(start == -1)
+				int line = y / textArea.getPainter().getFontMetrics().getHeight();
+				int start = textArea.getScreenLineStartOffset(line);
+				int end = textArea.getScreenLineEndOffset(line);
+				if(start == -1 || end == -1)
 					return null;
-
-				int end = textArea.getScreenLineEndOffset(
-					textArea.getScreenLineOfOffset(start));
 
 				Marker marker = textArea.getBuffer().getMarkerInRange(start,end);
 				if(marker != null)

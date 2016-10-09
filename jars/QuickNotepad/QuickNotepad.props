@@ -1,16 +1,16 @@
 # Properties file for QuickNotepad plugin
-# $Id: QuickNotepad.props,v 1.8 2001/12/23 05:37:00 spestov Exp $
+# $Id: QuickNotepad.props,v 1.11 2003/02/09 20:37:14 spestov Exp $
 
 # general plugin information
 plugin.QuickNotepadPlugin.name=QuickNotepad
 plugin.QuickNotepadPlugin.author=John Gellene
-plugin.QuickNotepadPlugin.version=2.0
+# version number == jEdit version number
+plugin.QuickNotepadPlugin.version=4.1
 plugin.QuickNotepadPlugin.docs=QuickNotepad.html
-plugin.QuickNotepadPlugin.depend.0=jedit 04.00.01.00
+plugin.QuickNotepadPlugin.depend.0=jedit 04.01.01.00
 
 # action labels for actions supplied by dockables.xml
 quicknotepad.label=QuickNotepad
-quicknotepad-toggle.label=QuickNotepad
 
 # action labels for actions supplied by actions.xml
 quicknotepad.choose-file.label=Choose notepad file
@@ -26,9 +26,9 @@ quicknotepad.menu=quicknotepad - quicknotepad.choose-file \
 quicknotepad.title=QuickNotepad
 
 # plugin toolbar buttons
-quicknotepad.choose-file.icon=Open.gif
-quicknotepad.save-file.icon=Save.gif
-quicknotepad.copy-to-buffer.icon=Edit.gif
+quicknotepad.choose-file.icon=Open.png
+quicknotepad.save-file.icon=Save.png
+quicknotepad.copy-to-buffer.icon=CopyToBuffer.png
 
 # Option pane labels
 options.quicknotepad.label=QuickNotepad

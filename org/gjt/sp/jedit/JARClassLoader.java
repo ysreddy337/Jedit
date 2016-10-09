@@ -5,6 +5,7 @@
  *
  * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
  * Portions copyright (C) 1999 mike dillon
+ * Portions copyright (C) 2002 Marco Hunsicker
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -28,6 +29,7 @@ import java.io.*;
 import java.lang.reflect.Modifier;
 import java.net.*;
 import java.util.*;
+import java.util.jar.*;
 import java.util.zip.*;
 import org.gjt.sp.jedit.gui.DockableWindowManager;
 import org.gjt.sp.util.Log;
@@ -36,7 +38,7 @@ import org.gjt.sp.util.Log;
 /**
  * A class loader implementation that loads classes from JAR files.
  * @author Slava Pestov
- * @version $Id: JARClassLoader.java,v 1.14 2002/03/17 04:26:27 spestov Exp $
+ * @version $Id: JARClassLoader.java,v 1.22 2003/02/07 17:42:30 spestov Exp $
  */
 public class JARClassLoader extends ClassLoader
 {
@@ -51,10 +53,18 @@ public class JARClassLoader extends ClassLoader
 	} //}}}
 
 	//{{{ JARClassLoader constructor
+	public static long scanTime;
+	public static long startTime;
+
 	public JARClassLoader(String path)
 		throws IOException
 	{
-		zipFile = new ZipFile(path);
+		long time = System.currentTimeMillis();
+
+		this.path = path;
+		zipFile = new JarFile(path);
+		definePackages();
+
 		jar = new EditPlugin.JAR(path,this);
 
 		Enumeration entires = zipFile.entries();
@@ -64,21 +74,9 @@ public class JARClassLoader extends ClassLoader
 			String name = entry.getName();
 			String lname = name.toLowerCase();
 			if(lname.equals("actions.xml"))
-			{
-				jEdit.loadActions(
-					path + "!actions.xml",
-					new BufferedReader(new InputStreamReader(
-					zipFile.getInputStream(entry))),
-					jar.getActions());
-			}
+				pluginResources.add(entry);
 			if(lname.equals("dockables.xml"))
-			{
-				DockableWindowManager.loadDockableWindows(
-					path + "!dockables.xml",
-					new BufferedReader(new InputStreamReader(
-					zipFile.getInputStream(entry))),
-					jar.getActions());
-			}
+				pluginResources.add(entry);
 			else if(lname.endsWith(".props"))
 				jEdit.loadProps(zipFile.getInputStream(entry),true);
 			else if(name.endsWith(".class"))
@@ -86,11 +84,13 @@ public class JARClassLoader extends ClassLoader
 				classHash.put(MiscUtilities.fileToClass(name),this);
 
 				if(name.endsWith("Plugin.class"))
-					pluginClasses.addElement(name);
+					pluginClasses.add(name);
 			}
 		}
 
 		jEdit.addPluginJAR(jar);
+
+		scanTime += (System.currentTimeMillis() - time);
 	} //}}}
 
 	//{{{ loadClass() method
@@ -233,17 +233,23 @@ public class JARClassLoader extends ClassLoader
 	//{{{ startAllPlugins() method
 	void startAllPlugins()
 	{
+		long time = System.currentTimeMillis();
+
+		boolean ok = true;
+
 		for(int i = 0; i < pluginClasses.size(); i++)
 		{
-			String name = (String)pluginClasses.elementAt(i);
+			String name = (String)pluginClasses.get(i);
 			name = MiscUtilities.fileToClass(name);
 
 			try
 			{
-				loadPluginClass(name);
+				ok &= loadPluginClass(name);
 			}
 			catch(Throwable t)
 			{
+				ok = false;
+
 				Log.log(Log.ERROR,this,"Error while starting plugin " + name);
 				Log.log(Log.ERROR,this,t);
 
@@ -253,6 +259,51 @@ public class JARClassLoader extends ClassLoader
 					"plugin-error.start-error",args);
 			}
 		}
+
+		startTime += (System.currentTimeMillis() - time);
+		time = System.currentTimeMillis();
+
+		if(!ok)
+		{
+			// don't load actions and dockables if plugin didn't load.
+			return;
+		}
+
+		try
+		{
+			for(int i = 0; i < pluginResources.size(); i++)
+			{
+				ZipEntry entry = (ZipEntry)pluginResources.get(i);
+				String name = entry.getName();
+				if(name.equalsIgnoreCase("actions.xml"))
+				{
+					jEdit.loadActions(
+						path + "!actions.xml",
+						new BufferedReader(new InputStreamReader(
+						zipFile.getInputStream(entry))),
+						jar.getActions());
+				}
+				else if(name.equalsIgnoreCase("dockables.xml"))
+				{
+					DockableWindowManager.loadDockableWindows(
+						path + "!dockables.xml",
+						new BufferedReader(new InputStreamReader(
+						zipFile.getInputStream(entry))),
+						jar.getActions());
+				}
+			}
+		}
+		catch(IOException io)
+		{
+			Log.log(Log.ERROR,jEdit.class,"Cannot load"
+				+ " plugin " + MiscUtilities.getFileName(path));
+			Log.log(Log.ERROR,jEdit.class,io);
+
+			String[] args = { io.toString() };
+			jEdit.pluginError(path,"plugin-error.load-error",args);
+		}
+
+		scanTime += (System.currentTimeMillis() - time);
 	} //}}}
 
 	//{{{ Private members
@@ -262,12 +313,15 @@ public class JARClassLoader extends ClassLoader
 
 	private static Hashtable classHash = new Hashtable();
 
+	private String path;
+
 	private EditPlugin.JAR jar;
-	private Vector pluginClasses = new Vector();
-	private ZipFile zipFile;
+	private ArrayList pluginResources = new ArrayList();
+	private ArrayList pluginClasses = new ArrayList();
+	private JarFile zipFile;
 
 	//{{{ loadPluginClass() method
-	private void loadPluginClass(String name)
+	private boolean loadPluginClass(String name)
 		throws Exception
 	{
 		// Check if a plugin with the same name is already loaded
@@ -279,27 +333,26 @@ public class JARClassLoader extends ClassLoader
 			{
 				jEdit.pluginError(jar.getPath(),
 					"plugin-error.already-loaded",null);
-				return;
+				return false;
 			}
 		}
 
-		/* This is a bit silly... but WheelMouse 0.5 seems to be
+		/* This is a bit silly... but WheelMouse seems to be
 		 * unmaintained so the best solution is to add a hack here.
 		 */
 		if(name.equals("WheelMousePlugin")
-			&& jEdit.getProperty("plugin.WheelMousePlugin.version").equals("0.5")
 			&& OperatingSystem.hasJava14())
 		{
 			jar.addPlugin(new EditPlugin.Broken(name));
-			jEdit.pluginError(jar.getPath(),"plugin-error.update",null);
-			return;
+			jEdit.pluginError(jar.getPath(),"plugin-error.obsolete",null);
+			return false;
 		}
 
 		// Check dependencies
 		if(!checkDependencies(name))
 		{
 			jar.addPlugin(new EditPlugin.Broken(name));
-			return;
+			return false;
 		}
 
 		// JDK 1.1.8 throws a GPF when we do an isAssignableFrom()
@@ -321,17 +374,22 @@ public class JARClassLoader extends ClassLoader
 					name + " needs"
 					+ " 'name' and 'version' properties.");
 				jar.addPlugin(new EditPlugin.Broken(name));
-				return;
+				return false;
 			}
 
 			jar.getActions().setLabel(jEdit.getProperty(
 				"action-set.plugin",
 				new String[] { label }));
-
 			Log.log(Log.NOTICE,this,"Starting plugin " + label
-					+ " (version " + version + ")");
+				+ " (version " + version + ")");
 
 			jar.addPlugin((EditPlugin)clazz.newInstance());
+			return true;
+		}
+		else
+		{
+			// not a real plugin class
+			return true;
 		}
 	} //}}}
 
@@ -339,6 +397,8 @@ public class JARClassLoader extends ClassLoader
 	private boolean checkDependencies(String name)
 	{
 		int i = 0;
+
+		boolean ok = true;
 
 		String dep;
 		while((dep = jEdit.getProperty("plugin." + name + ".depend." + i++)) != null)
@@ -363,7 +423,7 @@ public class JARClassLoader extends ClassLoader
 					String[] args = { arg,
 						System.getProperty("java.version") };
 					jEdit.pluginError(jar.getPath(),"plugin-error.dep-jdk",args);
-					return false;
+					ok = false;
 				}
 			}
 			else if(what.equals("jedit"))
@@ -372,7 +432,7 @@ public class JARClassLoader extends ClassLoader
 				{
 					Log.log(Log.ERROR,this,"Invalid jEdit version"
 						+ " number: " + arg);
-					return false;
+					ok = false;
 				}
 
 				if(MiscUtilities.compareStrings(
@@ -383,7 +443,7 @@ public class JARClassLoader extends ClassLoader
 						jEdit.getVersion() };
 					jEdit.pluginError(jar.getPath(),
 						"plugin-error.dep-jedit",args);
-					return false;
+					ok = false;
 				}
 			}
 			else if(what.equals("plugin"))
@@ -408,24 +468,22 @@ public class JARClassLoader extends ClassLoader
 					jEdit.pluginError(jar.getPath(),
 						"plugin-error.dep-plugin.no-version",
 						args);
-					return false;
+					ok = false;
 				}
-
-				if(MiscUtilities.compareStrings(currVersion,
+				else if(MiscUtilities.compareStrings(currVersion,
 					needVersion,false) < 0)
 				{
 					String[] args = { needVersion, plugin, currVersion };
 					jEdit.pluginError(jar.getPath(),
 						"plugin-error.dep-plugin",args);
-					return false;
+					ok = false;
 				}
-
-				if(jEdit.getPlugin(plugin) instanceof EditPlugin.Broken)
+				else if(jEdit.getPlugin(plugin) instanceof EditPlugin.Broken)
 				{
 					String[] args = { plugin };
 					jEdit.pluginError(jar.getPath(),
 						"plugin-error.dep-plugin.broken",args);
-					return false;
+					ok = false;
 				}
 			}
 			else if(what.equals("class"))
@@ -439,7 +497,7 @@ public class JARClassLoader extends ClassLoader
 					String[] args = { arg };
 					jEdit.pluginError(jar.getPath(),
 						"plugin-error.dep-class",args);
-					return false;
+					ok = false;
 				}
 			}
 			else
@@ -450,7 +508,7 @@ public class JARClassLoader extends ClassLoader
 			}
 		}
 
-		return true;
+		return ok;
 	} //}}}
 
 	//{{{ _loadClass() method
@@ -509,6 +567,141 @@ public class JARClassLoader extends ClassLoader
 
 			throw new ClassNotFoundException(clazz);
 		}
+	} //}}}
+
+	//{{{ definePackages() method
+	/**
+	 * Defines all packages found in the given Java archive file. The
+	 * attributes contained in the specified Manifest will be used to obtain
+	 * package version and sealing information.
+	 */
+	private void definePackages()
+	{
+		try
+		{
+			Manifest manifest = zipFile.getManifest();
+
+			if(manifest != null)
+			{
+				Map entries = manifest.getEntries();
+				Iterator i = entries.keySet().iterator();
+
+				while(i.hasNext())
+				{
+					String path = (String)i.next();
+
+					if(!path.endsWith(".class"))
+					{
+						String name = path.replace('/', '.');
+
+						if(name.endsWith("."))
+							name = name.substring(0, name.length() - 1);
+
+						// code url not implemented
+						definePackage(path,name,manifest,null);
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			// should never happen, not severe anyway
+			Log.log(Log.ERROR, this,"Error extracting manifest info "
+				+ "for file " + zipFile);
+			Log.log(Log.ERROR, this, ex);
+		}
+	} //}}}
+
+	//{{{ definePackage() method
+	/**
+	 * Defines a new package by name in this ClassLoader. The attributes
+	 * contained in the specified Manifest will be used to obtain package
+	 * version and sealing information. For sealed packages, the additional
+	 * URL specifies the code source URL from which the package was loaded.
+	 */
+	private Package definePackage(String path, String name, Manifest man,
+		URL url) throws IllegalArgumentException
+	{
+		String specTitle = null;
+		String specVersion = null;
+		String specVendor = null;
+		String implTitle = null;
+		String implVersion = null;
+		String implVendor = null;
+		String sealed = null;
+		URL sealBase = null;
+
+		Attributes attr = man.getAttributes(path);
+
+		if(attr != null)
+		{
+			specTitle = attr.getValue(
+				Attributes.Name.SPECIFICATION_TITLE);
+			specVersion = attr.getValue(
+				Attributes.Name.SPECIFICATION_VERSION);
+			specVendor = attr.getValue(
+				Attributes.Name.SPECIFICATION_VENDOR);
+			implTitle = attr.getValue(
+				Attributes.Name.IMPLEMENTATION_TITLE);
+			implVersion = attr.getValue(
+				Attributes.Name.IMPLEMENTATION_VERSION);
+			implVendor = attr.getValue(
+				Attributes.Name.IMPLEMENTATION_VENDOR);
+			sealed = attr.getValue(Attributes.Name.SEALED);
+		}
+
+		attr = man.getMainAttributes();
+
+		if (attr != null)
+		{
+			if (specTitle == null)
+			{
+				specTitle = attr.getValue(
+					Attributes.Name.SPECIFICATION_TITLE);
+			}
+
+			if (specVersion == null)
+			{
+				specVersion = attr.getValue(
+					Attributes.Name.SPECIFICATION_VERSION);
+			}
+
+			if (specVendor == null)
+			{
+				specVendor = attr.getValue(
+					Attributes.Name.SPECIFICATION_VENDOR);
+			}
+
+			if (implTitle == null)
+			{
+				implTitle = attr.getValue(
+					Attributes.Name.IMPLEMENTATION_TITLE);
+			}
+
+			if (implVersion == null)
+			{
+				implVersion = attr.getValue(
+					Attributes.Name.IMPLEMENTATION_VERSION);
+			}
+
+			if (implVendor == null)
+			{
+				implVendor = attr.getValue(
+					Attributes.Name.IMPLEMENTATION_VENDOR);
+			}
+
+			if (sealed == null)
+			{
+				sealed = attr.getValue(Attributes.Name.SEALED);
+			}
+		}
+
+		//if("true".equalsIgnoreCase(sealed))
+		//	sealBase = url;
+
+		return super.definePackage(name, specTitle, specVersion, specVendor,
+			implTitle, implVersion, implVendor,
+			sealBase);
 	} //}}}
 
 	//}}}

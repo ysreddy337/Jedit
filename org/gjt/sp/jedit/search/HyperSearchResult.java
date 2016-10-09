@@ -26,9 +26,11 @@ package org.gjt.sp.jedit.search;
 import javax.swing.text.*;
 import org.gjt.sp.jedit.jEdit;
 import org.gjt.sp.jedit.Buffer;
-import org.gjt.sp.util.Log;
 //}}}
 
+/**
+ * An occurrence of the search string.
+ */
 public class HyperSearchResult
 {
 	public String path;
@@ -59,14 +61,16 @@ public class HyperSearchResult
 	public void bufferOpened(Buffer buffer)
 	{
 		this.buffer = buffer;
-		startPos = buffer.createPosition(start);
-		endPos = buffer.createPosition(end);
+		startPos = buffer.createPosition(Math.min(buffer.getLength(),start));
+		endPos = buffer.createPosition(Math.min(buffer.getLength(),end));
 	} //}}}
 
 	//{{{ bufferClosed() method
 	public void bufferClosed()
 	{
 		buffer = null;
+		start = startPos.getOffset();
+		end = endPos.getOffset();
 		startPos = endPos = null;
 	} //}}}
 

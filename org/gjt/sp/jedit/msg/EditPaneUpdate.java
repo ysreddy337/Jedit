@@ -19,17 +19,16 @@
 
 package org.gjt.sp.jedit.msg;
 
-import org.gjt.sp.jedit.textarea.JEditTextArea;
 import org.gjt.sp.jedit.*;
 
 /**
  * Message sent when an edit pane-related change occurs.
  * @author Slava Pestov
- * @version $Id: EditPaneUpdate.java,v 1.1.1.1 2001/09/02 05:37:34 spestov Exp $
+ * @version $Id: EditPaneUpdate.java,v 1.4 2003/01/12 03:08:24 spestov Exp $
  *
  * @since jEdit 2.5pre1
  */
-public class EditPaneUpdate extends EBMessage.NonVetoable
+public class EditPaneUpdate extends EBMessage
 {
 	/**
 	 * Edit pane created.
@@ -79,7 +78,7 @@ public class EditPaneUpdate extends EBMessage.NonVetoable
 
 	public String paramString()
 	{
-		return super.paramString() + ",what=" + what;
+		return "what=" + what + "," + super.paramString();
 	}
 
 	// private members

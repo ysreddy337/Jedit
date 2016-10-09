@@ -4,7 +4,7 @@
  * :folding=explicit:collapseFolds=1:
  *
  * Copyright (C) 1999 mike dillon
- * Portions copyright (C) 2001 Slava Pestov
+ * Portions copyright (C) 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,17 +23,30 @@
 
 package org.gjt.sp.jedit.syntax;
 
+//{{{ Imports
+import gnu.regexp.RE;
 import java.util.*;
 import org.gjt.sp.jedit.Mode;
-import javax.swing.text.Segment;
+//}}}
 
 /**
  * A set of parser rules.
  * @author mike dillon
- * @version $Id: ParserRuleSet.java,v 1.4 2001/12/02 07:34:52 spestov Exp $
+ * @version $Id: ParserRuleSet.java,v 1.20 2003/02/23 04:05:21 spestov Exp $
  */
 public class ParserRuleSet
 {
+	//{{{ getStandardRuleSet() method
+	/**
+	 * Returns a parser rule set that highlights everything with the
+	 * specified token type.
+	 * @param id The token type
+	 */
+	public static ParserRuleSet getStandardRuleSet(byte id)
+	{
+		return standard[id];
+	} //}}}
+
 	//{{{ ParserRuleSet constructor
 	public ParserRuleSet(String name, Mode mode)
 	{
@@ -41,6 +54,12 @@ public class ParserRuleSet
 		this.mode = mode;
 		ruleMapFirst = new ParserRule[RULE_BUCKET_COUNT];
 		ruleMapLast = new ParserRule[RULE_BUCKET_COUNT];
+	} //}}}
+
+	//{{{ getName() method
+	public String getName()
+	{
+		return name;
 	} //}}}
 
 	//{{{ getMode() method
@@ -59,12 +78,15 @@ public class ParserRuleSet
 	public void setProperties(Hashtable props)
 	{
 		this.props = props;
+		_noWordSep = null;
 	} //}}}
 
 	//{{{ addRule() method
 	public void addRule(ParserRule r)
 	{
-		int key = Character.toUpperCase(r.searchChars[0])
+		ruleCount++;
+
+		int key = Character.toUpperCase(r.hashChar)
 			% RULE_BUCKET_COUNT;
 		ParserRule last = ruleMapLast[key];
 		if(last == null)
@@ -81,6 +103,12 @@ public class ParserRuleSet
 	{
 		int key = Character.toUpperCase(ch) % RULE_BUCKET_COUNT;
 		return ruleMapFirst[key];
+	} //}}}
+
+	//{{{ getRuleCount() method
+	public int getRuleCount()
+	{
+		return ruleCount;
 	} //}}}
 
 	//{{{ getTerminateChar() method
@@ -117,6 +145,7 @@ public class ParserRuleSet
 	public void setKeywords(KeywordMap km)
 	{
 		keywords = km;
+		_noWordSep = null;
 	} //}}}
 
 	//{{{ getHighlightDigits() method
@@ -131,35 +160,29 @@ public class ParserRuleSet
 		this.highlightDigits = highlightDigits;
 	} //}}}
 
+	//{{{ getDigitRegexp() method
+	public RE getDigitRegexp()
+	{
+		return digitRE;
+	} //}}}
+
+	//{{{ setDigitRegexp() method
+	public void setDigitRegexp(RE digitRE)
+	{
+		this.digitRE = digitRE;
+	} //}}}
+
 	//{{{ getEscapeRule() method
 	public ParserRule getEscapeRule()
 	{
 		return escapeRule;
 	} //}}}
 
-	//{{{ getEscapePattern() method
-	public Segment getEscapePattern()
+	//{{{ setEscapeRule() method
+	public void setEscapeRule(ParserRule escapeRule)
 	{
-		if (escapePattern == null && escapeRule != null)
-		{
-			escapePattern = new Segment(escapeRule.searchChars, 0,
-				escapeRule.sequenceLengths[0]);
-		}
-		return escapePattern;
-	} //}}}
-
-	//{{{ setEscape() method
-	public void setEscape(String esc)
-	{
-		if (esc == null)
-		{
-			escapeRule = null;
-		}
-		else
-		{
-			escapeRule = ParserRuleFactory.createEscapeRule(esc);
-		}
-		escapePattern = null;
+		addRule(escapeRule);
+		this.escapeRule = escapeRule;
 	} //}}}
 
 	//{{{ getDefault() method
@@ -174,15 +197,49 @@ public class ParserRuleSet
 		defaultToken = def;
 	} //}}}
 
+	//{{{ getNoWordSep() method
+	public String getNoWordSep()
+	{
+		if(_noWordSep == null)
+		{
+			_noWordSep = noWordSep;
+			if(noWordSep == null)
+				noWordSep = "";
+			if(keywords != null)
+				noWordSep += keywords.getNonAlphaNumericChars();
+		}
+		return noWordSep;
+	} //}}}
+
+	//{{{ setNoWordSep() method
+	public void setNoWordSep(String noWordSep)
+	{
+		this.noWordSep = noWordSep;
+		_noWordSep = null;
+	} //}}}
+
 	//{{{ toString() method
 	public String toString()
 	{
-		return getClass().getName() + "[" + mode.getName() + "::"
+		return getClass().getName() + "[" + (mode == null ? ""
+			: mode.getName()) + "::"
 			+ name + "]";
 	} //}}}
 
 	//{{{ Private members
-	private static final int RULE_BUCKET_COUNT = 32;
+	private static ParserRuleSet[] standard;
+
+	static
+	{
+		standard = new ParserRuleSet[Token.ID_COUNT];
+		for(byte i = 0; i < standard.length; i++)
+		{
+			standard[i] = new ParserRuleSet(null,null);
+			standard[i].setDefault(i);
+		}
+	}
+
+	private static final int RULE_BUCKET_COUNT = 128;
 
 	private String name;
 	private Mode mode;
@@ -190,14 +247,20 @@ public class ParserRuleSet
 
 	private KeywordMap keywords;
 
+	private int ruleCount;
+
 	private ParserRule[] ruleMapFirst;
 	private ParserRule[] ruleMapLast;
 
-	private ParserRule escapeRule;
-	private Segment escapePattern;
 	private int terminateChar = -1;
 	private boolean ignoreCase = true;
-	private boolean highlightDigits;
 	private byte defaultToken;
+	private ParserRule escapeRule;
+
+	private boolean highlightDigits;
+	private RE digitRE;
+
+	private String _noWordSep;
+	private String noWordSep;
 	//}}}
 }

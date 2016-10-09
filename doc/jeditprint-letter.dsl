@@ -42,6 +42,8 @@ CDATA DSSSL> ]>
 
 (element (listitem abstract) (process-children))
 
+(element (ulink) ($mono-seq$))
+
 </style-specification-body>
 </style-specification>
 <external-specification id="print" document="dbstyle">

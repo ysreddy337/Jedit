@@ -29,15 +29,13 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.StringTokenizer;
 import org.gjt.sp.jedit.buffer.FoldHandler;
-import org.gjt.sp.jedit.msg.BufferUpdate;
-import org.gjt.sp.jedit.textarea.FoldVisibilityManager;
 import org.gjt.sp.jedit.*;
 //}}}
 
 /**
  * Buffer-specific options dialog.
  * @author Slava Pestov
- * @version $Id: BufferOptions.java,v 1.18 2002/03/19 05:41:42 spestov Exp $
+ * @version $Id: BufferOptions.java,v 1.25 2003/01/12 03:08:24 spestov Exp $
  */
 public class BufferOptions extends EnhancedDialog
 {
@@ -53,23 +51,10 @@ public class BufferOptions extends EnhancedDialog
 		setContentPane(content);
 
 		ActionHandler actionListener = new ActionHandler();
-		AbstractOptionPane panel = new AbstractOptionPane(null)
-		{
-			public void addComponent(Component comp)
-			{
-				super.addComponent(comp);
-			}
+		AbstractOptionPane panel = new AbstractOptionPane(null);
 
-			public void addComponent(String label, Component comp)
-			{
-				super.addComponent(label,comp);
-			}
-
-			public void addSeparator(String separator)
-			{
-				super.addSeparator(separator);
-			}
-		};
+		panel.addComponent(GUIUtilities.createMultilineLabel(
+			jEdit.getProperty("buffer-options.caption")));
 
 		panel.addSeparator("buffer-options.loading-saving");
 
@@ -111,13 +96,6 @@ public class BufferOptions extends EnhancedDialog
 			"buffer-options.gzipped"));
 		gzipped.setSelected(buffer.getBooleanProperty(Buffer.GZIPPED));
 		panel.addComponent(gzipped);
-		//}}}
-
-		//{{{ Trailing EOL setting
-		trailingEOL = new JCheckBox(jEdit.getProperty(
-			"buffer-options.trailingEOL"));
-		trailingEOL.setSelected(buffer.getBooleanProperty(Buffer.TRAILING_EOL));
-		panel.addComponent(trailingEOL);
 		//}}}
 
 		panel.addSeparator("buffer-options.editing");
@@ -195,20 +173,6 @@ public class BufferOptions extends EnhancedDialog
 		panel.addComponent(noTabs);
 		//}}}
 
-		//{{{ Indent on tab
-		indentOnTab = new JCheckBox(jEdit.getProperty(
-			"options.editing.indentOnTab"));
-		indentOnTab.setSelected(buffer.getBooleanProperty("indentOnTab"));
-		panel.addComponent(indentOnTab);
-		//}}}
-
-		//{{{ Indent on enter
-		indentOnEnter = new JCheckBox(jEdit.getProperty(
-			"options.editing.indentOnEnter"));
-		indentOnEnter.setSelected(buffer.getBooleanProperty("indentOnEnter"));
-		panel.addComponent(indentOnEnter);
-		//}}}
-
 		content.add(BorderLayout.NORTH,panel);
 
 		//{{{ Buttons
@@ -236,10 +200,7 @@ public class BufferOptions extends EnhancedDialog
 	//{{{ ok() method
 	public void ok()
 	{
-		int index = mode.getSelectedIndex();
-		buffer.setMode(modes[index]);
-
-		index = lineSeparator.getSelectedIndex();
+		int index = lineSeparator.getSelectedIndex();
 		String lineSep;
 		if(index == 0)
 			lineSep = "\n";
@@ -265,9 +226,6 @@ public class BufferOptions extends EnhancedDialog
 		{
 			buffer.setStringProperty(Buffer.ENCODING,encoding);
 			buffer.setDirty(true);
-
-			// XXX this should be moved elsewhere!!!
-			EditBus.send(new BufferUpdate(buffer,view,BufferUpdate.ENCODING_CHANGED));
 		}
 
 		boolean gzippedValue = gzipped.isSelected();
@@ -279,18 +237,7 @@ public class BufferOptions extends EnhancedDialog
 			buffer.setDirty(true);
 		}
 
-		boolean trailingEOLValue = trailingEOL.isSelected();
-		boolean oldTrailingEOL = buffer.getBooleanProperty(
-			Buffer.TRAILING_EOL);
-		if(trailingEOLValue != oldTrailingEOL)
-		{
-			buffer.setBooleanProperty(Buffer.TRAILING_EOL,trailingEOLValue);
-			buffer.setDirty(true);
-		}
-
-		String foldMode = (String)folding.getSelectedItem();
-		String oldFoldMode = buffer.getStringProperty("folding");
-		buffer.setStringProperty("folding",foldMode);
+		buffer.setStringProperty("folding",(String)folding.getSelectedItem());
 
 		buffer.setStringProperty("wrap",(String)wrap.getSelectedItem());
 
@@ -322,22 +269,9 @@ public class BufferOptions extends EnhancedDialog
 		}
 
 		buffer.setBooleanProperty("noTabs",noTabs.isSelected());
-		buffer.setBooleanProperty("indentOnTajb",indentOnTab.isSelected());
-		buffer.setBooleanProperty("indentOnEnter",indentOnEnter.isSelected());
 
-		buffer.propertiesChanged();
-
-		View[] views = jEdit.getViews();
-		for(int i = 0; i < views.length; i++)
-		{
-			EditPane[] panes = views[i].getEditPanes();
-			for(int j = 0; j < panes.length; j++)
-			{
-				EditPane pane = panes[j];
-				if(pane.getBuffer() == buffer)
-					pane.getTextArea().propertiesChanged();
-			}
-		}
+		index = mode.getSelectedIndex();
+		buffer.setMode(modes[index]);
 
 		dispose();
 	} //}}}
@@ -358,15 +292,12 @@ public class BufferOptions extends EnhancedDialog
 	private JComboBox lineSeparator;
 	private JComboBox encoding;
 	private JCheckBox gzipped;
-	private JCheckBox trailingEOL;
 	private JComboBox folding;
 	private JComboBox wrap;
 	private JComboBox maxLineLen;
 	private JComboBox tabSize;
 	private JComboBox indentSize;
 	private JCheckBox noTabs;
-	private JCheckBox indentOnTab;
-	private JCheckBox indentOnEnter;
 	private JButton ok;
 	private JButton cancel;
 	//}}}
@@ -396,10 +327,6 @@ public class BufferOptions extends EnhancedDialog
 					"tabSize"));
 				indentSize.setSelectedItem(_mode.getProperty(
 					"indentSize"));
-				indentOnTab.setSelected(_mode.getBooleanProperty(
-					"indentOnTab"));
-				indentOnEnter.setSelected(_mode.getBooleanProperty(
-					"indentOnEnter"));
 				noTabs.setSelected(_mode.getBooleanProperty(
 					"noTabs"));
 			}

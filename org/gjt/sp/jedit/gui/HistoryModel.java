@@ -1,5 +1,8 @@
 /*
  * HistoryModel.java - History list model
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
  * Copyright (C) 1999 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
@@ -19,21 +22,23 @@
 
 package org.gjt.sp.jedit.gui;
 
-import javax.swing.*;
+//{{{ Imports
 import java.io.*;
 import java.util.*;
 import org.gjt.sp.jedit.jEdit;
 import org.gjt.sp.jedit.MiscUtilities;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * A history list. One history list can be used by several history text
  * fields.
  * @author Slava Pestov
- * @version $Id: HistoryModel.java,v 1.4 2002/03/06 05:10:27 spestov Exp $
+ * @version $Id: HistoryModel.java,v 1.7 2003/01/31 04:49:30 spestov Exp $
  */
 public class HistoryModel
 {
+	//{{{ HistoryModel constructor
 	/**
 	 * Creates a new history list. Calling this is normally not
 	 * necessary.
@@ -44,8 +49,9 @@ public class HistoryModel
 
 		max = jEdit.getIntegerProperty("history",25);
 		data = new Vector(max);
-	}
+	} //}}}
 
+	//{{{ addItem() method
 	/**
 	 * Adds an item to the end of this history list, trimming the list
 	 * to the maximum number of items if necessary.
@@ -64,8 +70,9 @@ public class HistoryModel
 
 		while(getSize() > max)
 			data.removeElementAt(data.size() - 1);
-	}
+	} //}}}
 
+	//{{{ getItem() method
 	/**
 	 * Returns an item from the history list.
 	 * @param index The index
@@ -73,16 +80,18 @@ public class HistoryModel
 	public String getItem(int index)
 	{
 		return (String)data.elementAt(index);
-	}
+	} //}}}
 
+	//{{{ getSize() method
 	/**
 	 * Returns the number of elements in this history list.
 	 */
 	public int getSize()
 	{
 		return data.size();
-	}
+	} //}}}
 
+	//{{{ getName() method
 	/**
 	 * Returns the name of this history list. This can be passed
 	 * to the HistoryTextField constructor.
@@ -90,8 +99,9 @@ public class HistoryModel
 	public String getName()
 	{
 		return name;
-	}
+	} //}}}
 
+	//{{{ getModel() method
 	/**
 	 * Returns a named model. If the specified model does not
 	 * already exist, it will be created.
@@ -110,11 +120,13 @@ public class HistoryModel
 		}
 
 		return model;
-	}
+	} //}}}
 
+	//{{{ loadHistory() method
 	/**
-	 * Loads the history from the specified file. jEdit calls this
-	 * on startup.
+	 * Loads the history from the specified file.
+	 *
+	 * jEdit calls this method on startup.
 	 * @param The file
 	 */
 	public static void loadHistory(File file)
@@ -148,7 +160,7 @@ public class HistoryModel
 				}
 				else
 				{
-					currentModel.addItemToEnd(MiscUtilities
+					currentModel.data.addElement(MiscUtilities
 						.escapesToChars(line));
 				}
 			}
@@ -168,11 +180,13 @@ public class HistoryModel
 		{
 			Log.log(Log.ERROR,HistoryModel.class,io);
 		}
-	}
+	} //}}}
 
+	//{{{ saveHistory() method
 	/**
-	 * Saves the history to the specified file. jEdit calls this when
-	 * it is exiting.
+	 * Saves the history to the specified file.
+	 *
+	 * jEdit calls this method when it is exiting.
 	 * @param file The file
 	 */
 	public static void saveHistory(File file)
@@ -203,7 +217,8 @@ public class HistoryModel
 				for(int i = 0; i < model.getSize(); i++)
 				{
 					out.write(MiscUtilities.charsToEscapes(
-						model.getItem(i),true));
+						model.getItem(i),
+						TO_ESCAPE));
 					out.write(lineSep);
 				}
 			}
@@ -214,16 +229,13 @@ public class HistoryModel
 		{
 			Log.log(Log.ERROR,HistoryModel.class,io);
 		}
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
+	private static final String TO_ESCAPE = "\n\t\\\"'[]";
 	private String name;
 	private int max;
 	private Vector data;
 	private static Hashtable models;
-
-	private void addItemToEnd(String item)
-	{
-		data.addElement(item);
-	}
+	//}}}
 }

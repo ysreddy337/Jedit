@@ -3,7 +3,8 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2001 Slava Pestov
+ * Copyright (C) 2001, 2002 Slava Pestov
+ * Portions copyright (C) 2002 Thomas Dilts
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,23 +24,30 @@
 package org.gjt.sp.jedit.print;
 
 //{{{ Imports
-import javax.swing.text.*;
+import javax.swing.text.Segment;
+import javax.swing.text.TabExpander;
+import javax.swing.SwingUtilities;
 import java.awt.font.*;
 import java.awt.geom.*;
 import java.awt.print.*;
 import java.awt.*;
+import java.lang.reflect.Method;
 import java.util.*;
 import org.gjt.sp.jedit.syntax.*;
-import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.*;
 //}}}
 
-class BufferPrintable implements Printable
+class BufferPrintable extends WorkRequest implements Printable
 {
 	//{{{ BufferPrintable constructor
-	BufferPrintable(Buffer buffer, Font font, boolean header, boolean footer,
-		boolean lineNumbers, boolean color)
+	BufferPrintable(PrinterJob job, Object format,
+		View view, Buffer buffer, Font font, boolean header,
+		boolean footer, boolean lineNumbers, boolean color)
 	{
+		this.job = job;
+		this.format = format;
+		this.view = view;
 		this.buffer = buffer;
 		this.font = font;
 		this.header = header;
@@ -51,6 +59,49 @@ class BufferPrintable implements Printable
 		styles[Token.NULL] = new SyntaxStyle(textColor,null,font);
 
 		lineList = new ArrayList();
+
+		softWrap = new SoftWrapTokenHandler();
+	} //}}}
+
+	//{{{ run() method
+	public void run()
+	{
+		try
+		{
+			// can't use a read lock here since Buffer.markTokens()
+			// grabs a write lock
+			//buffer.readLock();
+
+			if(format == null)
+				job.print();
+			else
+			{
+				Method method = PrinterJob.class.getMethod(
+					"print",new Class[] { Class.forName(
+					"javax.print.attribute.PrintRequestAttributeSet") });
+				method.invoke(job,new Object[] { format });
+			}
+		}
+		catch(PrinterAbortException ae)
+		{
+			Log.log(Log.DEBUG,this,ae);
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,this,e);
+			final String[] args = { e.toString() };
+			SwingUtilities.invokeLater(new Runnable()
+			{
+				public void run()
+				{
+					GUIUtilities.error(view,"print-error",args);
+				}
+			});
+		}
+		finally
+		{
+			//buffer.readUnlock();
+		}
 	} //}}}
 
 	//{{{ print() method
@@ -70,7 +121,10 @@ class BufferPrintable implements Printable
 		if(pageIndex == currentPage + 1)
 		{
 			if(end)
+			{
+				view.getStatus().setMessage(null);
 				return NO_SUCH_PAGE;
+			}
 
 			currentPageStart = currentPhysicalLine;
 			currentPage = pageIndex;
@@ -78,6 +132,13 @@ class BufferPrintable implements Printable
 		else if(pageIndex == currentPage)
 		{
 			currentPhysicalLine = currentPageStart;
+
+			// show the message in both the view's status bar, and the
+			// I/O progress monitor
+			Object[] args = new Object[] { new Integer(pageIndex + 1) };
+			String message = jEdit.getProperty("view.status.print",args);
+			view.getStatus().setMessage(message);
+			setStatus(message);
 		}
 
 		printPage(_gfx,pageFormat,pageIndex,true);
@@ -97,6 +158,10 @@ class BufferPrintable implements Printable
 	//}}}
 
 	//{{{ Instance variables
+	private PrinterJob job;
+	private Object format;
+
+	private View view;
 	private Buffer buffer;
 	private Font font;
 	private SyntaxStyle[] styles;
@@ -111,6 +176,8 @@ class BufferPrintable implements Printable
 
 	private LineMetrics lm;
 	private ArrayList lineList;
+
+	private SoftWrapTokenHandler softWrap;
 	//}}}
 
 	//{{{ printPage() method
@@ -129,15 +196,15 @@ class BufferPrintable implements Printable
 		{
 			double headerHeight = paintHeader(gfx,pageX,pageY,pageWidth,
 				actuallyPaint);
-			pageY += headerHeight * 2;
-			pageHeight -= headerHeight * 2;
+			pageY += headerHeight;
+			pageHeight -= headerHeight;
 		}
 
 		if(footer)
 		{
 			double footerHeight = paintFooter(gfx,pageX,pageY,pageWidth,
 				pageHeight,pageIndex,actuallyPaint);
-			pageHeight -= footerHeight * 2;
+			pageHeight -= footerHeight;
 		}
 
 		FontRenderContext frc = gfx.getFontRenderContext();
@@ -189,11 +256,10 @@ print_loop:	for(;;)
 			lineList.clear();
 
 			buffer.getLineText(currentPhysicalLine,seg);
-			Token tokens = buffer.markTokens(currentPhysicalLine)
-				.getFirstToken();
-			ChunkCache.lineToChunkList(seg,tokens,styles,frc,
-				e,(float)(pageWidth - lineNumberWidth),
-				lineList);
+			softWrap.init(seg,styles,frc,e,lineList,
+				(float)(pageWidth - lineNumberWidth));
+
+			buffer.markTokens(currentPhysicalLine,softWrap);
 			if(lineList.size() == 0)
 				lineList.add(null);
 
@@ -205,20 +271,20 @@ print_loop:	for(;;)
 				gfx.setFont(font);
 				gfx.setColor(lineNumberColor);
 				gfx.drawString(String.valueOf(currentPhysicalLine + 1),
-					(float)pageX,(float)(pageY + y));
+					(float)pageX,(float)(pageY + y + lm.getHeight()));
 			}
 
 			for(int i = 0; i < lineList.size(); i++)
 			{
-				ChunkCache.Chunk chunks = (ChunkCache.Chunk)lineList.get(i);
+				y += lm.getHeight();
+				Chunk chunks = (Chunk)lineList.get(i);
 				if(chunks != null && actuallyPaint)
 				{
-					ChunkCache.paintChunkList(chunks,gfx,
+					Chunk.paintChunkList(seg,chunks,gfx,
 						(float)(pageX + lineNumberWidth),
 						(float)(pageY + y),
 						Color.white,false);
 				}
-				y += lm.getHeight();
 			}
 
 			currentPhysicalLine++;

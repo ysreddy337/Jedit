@@ -4,21 +4,24 @@
 
 <MODE>
 	<PROPS>
-		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
-		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
-		<PROPERTY NAME="indentPrevLine"
-			VALUE="\s*(((if|while)\s*\(|else\s*(\{|$)|else\s+if\s*\(|case\s+.+:|default:)[^;]*|for\s*\(.*)" />
-		<!-- set this to 'true' if you want to use GNU coding style -->
-		<PROPERTY NAME="doubleBracketIndent" VALUE="false" />
 		<PROPERTY NAME="commentStart" VALUE="/*" />
 		<PROPERTY NAME="commentEnd" VALUE="*/" />
 		<PROPERTY NAME="lineComment" VALUE="//" />
 		<PROPERTY NAME="wordBreakChars" VALUE=",+-=&lt;&gt;/?^&amp;*" />
+
+		<!-- Auto indent -->
+		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
+		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
+		<PROPERTY NAME="indentNextLine"
+			VALUE="\s*(((if|while)\s*\(|else\s*|else\s+if\s*\(|for\s*\(.*\))[^{;]*)" />
+		<!-- set this to 'true' if you want to use GNU coding style -->
+		<PROPERTY NAME="doubleBracketIndent" VALUE="false" />
+		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 	</PROPS>
-	<RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
+	<RULES ESCAPE="\"
+		IGNORE_CASE="FALSE"
+		HIGHLIGHT_DIGITS="TRUE"
+		DIGIT_RE="(0x[[:xdigit:]]+[lL]?|[[:digit:]]+(e[[:digit:]]*)?[lLdDfF]?)">
 
 		<!-- C style comment -->
 		<SPAN TYPE="COMMENT1">
@@ -39,7 +42,6 @@
 		<EOL_SPAN TYPE="KEYWORD2">#</EOL_SPAN>
 
 		<EOL_SPAN TYPE="COMMENT1">//</EOL_SPAN>
-		<SEQ TYPE="NULL">)</SEQ>
 		<SEQ TYPE="OPERATOR">=</SEQ>
 		<SEQ TYPE="OPERATOR">!</SEQ>
 		<SEQ TYPE="OPERATOR">&gt;=</SEQ>
@@ -58,20 +60,14 @@
 		<SEQ TYPE="OPERATOR">~</SEQ>
 		<SEQ TYPE="OPERATOR">}</SEQ>
 		<SEQ TYPE="OPERATOR">{</SEQ>
-		<SEQ TYPE="NULL">.</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">]</SEQ>
-		<SEQ TYPE="NULL">[</SEQ>
-		<SEQ TYPE="NULL">?</SEQ>
-		<MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE"
-			AT_LINE_START="TRUE">:</MARK_PREVIOUS>
-		<SEQ TYPE="NULL">:</SEQ>
+		<MARK_PREVIOUS AT_WHITESPACE_END="TRUE"
+			EXCLUDE_MATCH="TRUE"
+			TYPE="LABEL">:</MARK_PREVIOUS>
 
 		<!-- Function calls -->
 		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
 
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<KEYWORD3>char</KEYWORD3>
 			<KEYWORD3>double</KEYWORD3>
 			<KEYWORD3>enum</KEYWORD3>

@@ -25,13 +25,17 @@ package org.gjt.sp.jedit.syntax;
 
 //{{{ Imports
 import com.microstar.xml.*;
+import gnu.regexp.*;
 import java.io.*;
-import java.net.URL;
 import java.util.*;
+import org.gjt.sp.jedit.search.RESearchMatcher;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
-//}}
+//}}}
 
+/**
+ * XML handler for mode definition files.
+ */
 public class XModeHandler extends HandlerBase
 {
 	//{{{ XModeHandler constructor
@@ -41,6 +45,9 @@ public class XModeHandler extends HandlerBase
 		this.parser = parser;
 		this.path = path;
 		stateStack = new Stack();
+
+		// default value
+		lastNoWordSep = "_";
 	} //}}}
 
 	//{{{ resolveEntity() method
@@ -57,7 +64,7 @@ public class XModeHandler extends HandlerBase
 			{
 				return new BufferedReader(new InputStreamReader(
 					getClass().getResourceAsStream(
-					"/org/gjt/sp/jedit/xmode.dtd")));
+					"/org/gjt/sp/jedit/syntax/xmode.dtd")));
 			}
 			catch(Exception e)
 			{
@@ -71,9 +78,7 @@ public class XModeHandler extends HandlerBase
 	//{{{ attribute() method
 	public void attribute(String aname, String value, boolean isSpecified)
 	{
-		String tag = peekElement();
 		aname = (aname == null) ? null : aname.intern();
-		value = (value == null) ? null : value.intern();
 
 		if (aname == "NAME")
 		{
@@ -85,37 +90,58 @@ public class XModeHandler extends HandlerBase
 		}
 		else if (aname == "TYPE")
 		{
-			lastTokenID = stringToToken(value);
+			lastTokenID = Token.stringToToken(value);
+			if(lastTokenID == -1)
+				error("token-invalid",value);
 		}
 		else if (aname == "AT_LINE_START")
 		{
-			lastAtLineStart = (isSpecified) ? (value == "TRUE") :
+			lastAtLineStart = (isSpecified) ? (value.equals("TRUE")) :
+				false;
+		}
+		else if (aname == "AT_WHITESPACE_END")
+		{
+			lastAtWhitespaceEnd = (isSpecified) ? (value.equals("TRUE")) :
+				false;
+		}
+		else if (aname == "AT_WORD_START")
+		{
+			lastAtWordStart = (isSpecified) ? (value.equals("TRUE")) :
 				false;
 		}
 		else if (aname == "NO_LINE_BREAK")
 		{
-			lastNoLineBreak = (isSpecified) ? (value == "TRUE") :
+			lastNoLineBreak = (isSpecified) ? (value.equals("TRUE")) :
 				false;
 		}
 		else if (aname == "NO_WORD_BREAK")
 		{
-			lastNoWordBreak = (isSpecified) ? (value == "TRUE") :
+			lastNoWordBreak = (isSpecified) ? (value.equals("TRUE")) :
 				false;
 		}
 		else if (aname == "EXCLUDE_MATCH")
 		{
-			lastExcludeMatch = (isSpecified) ? (value == "TRUE") :
+			lastExcludeMatch = (isSpecified) ? (value.equals("TRUE")) :
 				false;
 		}
 		else if (aname == "IGNORE_CASE")
 		{
-			lastIgnoreCase = (isSpecified) ? (value != "FALSE") :
+			lastIgnoreCase = (isSpecified) ? (value.equals("TRUE")) :
 				true;
 		}
 		else if (aname == "HIGHLIGHT_DIGITS")
 		{
-			lastHighlightDigits = (isSpecified) ? (value != "FALSE") :
+			lastHighlightDigits = (isSpecified) ? (value.equals("TRUE")) :
 				false;
+		}
+		else if (aname == "DIGIT_RE")
+		{
+			lastDigitRE = value;
+		}
+		else if (aname == "NO_WORD_SEP")
+		{
+			if(isSpecified)
+				lastNoWordSep = value;
 		}
 		else if (aname == "AT_CHAR")
 		{
@@ -141,10 +167,30 @@ public class XModeHandler extends HandlerBase
 		else if (aname == "DELEGATE")
 		{
 			lastDelegateSet = value;
+			if (lastDelegateSet != null
+				&& lastDelegateSet.indexOf("::") == -1)
+			{
+				lastDelegateSet = modeName + "::" + lastDelegateSet;
+			}
 		}
 		else if (aname == "DEFAULT")
 		{
-			lastDefaultID = stringToToken(value);
+			lastDefaultID = Token.stringToToken(value);
+			if(lastDefaultID == -1)
+			{
+				error("token-invalid",value);
+				lastDefaultID = Token.NULL;
+			}
+		}
+		else if (aname == "HASH_CHAR")
+		{
+			if(value.length() != 1)
+			{
+				error("hash-char-invalid",value);
+				lastDefaultID = Token.NULL;
+			}
+			else
+				lastHashChar = value.charAt(0);
 		}
 	} //}}}
 
@@ -163,11 +209,12 @@ public class XModeHandler extends HandlerBase
 		String tag = peekElement();
 		String text = new String(c, off, len);
 
-		if (tag == "WHITESPACE" ||
-			tag == "EOL_SPAN" ||
+		if (tag == "EOL_SPAN" ||
+			tag == "EOL_SPAN_REGEXP" ||
 			tag == "MARK_PREVIOUS" ||
 			tag == "MARK_FOLLOWING" ||
 			tag == "SEQ" ||
+			tag == "SEQ_REGEXP" ||
 			tag == "BEGIN"
 		)
 		{
@@ -188,7 +235,12 @@ public class XModeHandler extends HandlerBase
 	{
 		tag = pushElement(tag);
 
-		if (tag == "MODE")
+		if (tag == "WHITESPACE")
+		{
+			Log.log(Log.WARNING,this,path + ": WHITESPACE rule "
+				+ "no longer needed");
+		}
+		else if (tag == "MODE")
 		{
 			mode = jEdit.getMode(modeName);
 			if (mode == null)
@@ -199,15 +251,32 @@ public class XModeHandler extends HandlerBase
 		}
 		else if (tag == "KEYWORDS")
 		{
-			keywords = new KeywordMap(true);
+			keywords = new KeywordMap(rules.getIgnoreCase());
 		}
 		else if (tag == "RULES")
 		{
 			rules = new ParserRuleSet(lastSetName,mode);
 			rules.setIgnoreCase(lastIgnoreCase);
 			rules.setHighlightDigits(lastHighlightDigits);
-			rules.setEscape(lastEscape);
+			if(lastDigitRE != null)
+			{
+				try
+				{
+					rules.setDigitRegexp(new RE(lastDigitRE,
+						lastIgnoreCase
+						? RE.REG_ICASE : 0,
+						RESearchMatcher.RE_SYNTAX_JEDIT));
+				}
+				catch(REException e)
+				{
+					error("regexp",e);
+				}
+			}
+
+			if(lastEscape != null)
+				rules.setEscapeRule(ParserRule.createEscapeRule(lastEscape));
 			rules.setDefault(lastDefaultID);
+			rules.setNoWordSep(lastNoWordSep);
 		}
 	} //}}}
 
@@ -223,7 +292,8 @@ public class XModeHandler extends HandlerBase
 			//{{{ MODE
 			if (tag == "MODE")
 			{
-				mode.init();
+				// no need for this anymore
+				//mode.init();
 				mode.setTokenMarker(marker);
 			} //}}}
 			//{{{ PROPERTY
@@ -241,12 +311,6 @@ public class XModeHandler extends HandlerBase
 
 				props = new Hashtable();
 			} //}}}
-			//{{{ KEYWORDS
-			else if (tag == "KEYWORDS")
-			{
-				keywords.setIgnoreCase(lastIgnoreCase);
-				lastIgnoreCase = true;
-			} //}}}
 			//{{{ RULES
 			else if (tag == "RULES")
 			{
@@ -257,7 +321,9 @@ public class XModeHandler extends HandlerBase
 				lastEscape = null;
 				lastIgnoreCase = true;
 				lastHighlightDigits = false;
+				lastDigitRE = null;
 				lastDefaultID = Token.NULL;
+				lastNoWordSep = "_";
 				rules = null;
 			} //}}}
 			//{{{ TERMINATE
@@ -266,19 +332,141 @@ public class XModeHandler extends HandlerBase
 				rules.setTerminateChar(termChar);
 				termChar = -1;
 			} //}}}
-			//{{{ WHITESPACE
-			else if (tag == "WHITESPACE")
+			//{{{ SEQ
+			else if (tag == "SEQ")
 			{
 				if(lastStart == null)
 				{
-					error("empty-tag","WHITESPACE");
+					error("empty-tag","SEQ");
 					return;
 				}
 
-				rules.addRule(ParserRuleFactory.createWhitespaceRule(
-					lastStart));
+				rules.addRule(ParserRule.createSequenceRule(
+					lastStart,lastDelegateSet,lastTokenID,
+					lastAtLineStart,lastAtWhitespaceEnd,
+					lastAtWordStart));
 				lastStart = null;
 				lastEnd = null;
+				lastDelegateSet = null;
+				lastTokenID = Token.NULL;
+				lastAtLineStart = false;
+				lastAtWordStart = false;
+				lastAtWhitespaceEnd = false;
+			} //}}}
+			//{{{ SEQ_REGEXP
+			else if (tag == "SEQ_REGEXP")
+			{
+				if(lastStart == null)
+				{
+					error("empty-tag","SEQ_REGEXP");
+					return;
+				}
+
+				try
+				{
+					rules.addRule(ParserRule.createRegexpSequenceRule(
+						lastHashChar,
+						lastStart,lastDelegateSet,lastTokenID,
+						lastAtLineStart,lastAtWhitespaceEnd,
+						lastAtWordStart,lastIgnoreCase));
+				}
+				catch(REException re)
+				{
+					error("regexp",re);
+				}
+
+				lastHashChar = '\0';
+				lastStart = null;
+				lastEnd = null;
+				lastDelegateSet = null;
+				lastTokenID = Token.NULL;
+				lastAtLineStart = false;
+				lastAtWordStart = false;
+				lastAtWhitespaceEnd = false;
+			} //}}}
+			//{{{ SPAN
+			else if (tag == "SPAN")
+			{
+				if(lastStart == null)
+				{
+					error("empty-tag","START");
+					return;
+				}
+
+				if(lastEnd == null)
+				{
+					error("empty-tag","END");
+					return;
+				}
+
+				rules.addRule(ParserRule
+					.createSpanRule(
+					lastStart,lastEnd,
+					lastDelegateSet,
+					lastTokenID,lastNoLineBreak,
+					lastAtLineStart,
+					lastAtWhitespaceEnd,
+					lastAtWordStart,
+					lastExcludeMatch,
+					lastNoWordBreak));
+
+				lastStart = null;
+				lastEnd = null;
+				lastTokenID = Token.NULL;
+				lastAtLineStart = false;
+				lastAtWordStart = false;
+				lastNoLineBreak = false;
+				lastAtWhitespaceEnd = false;
+				lastExcludeMatch = false;
+				lastNoWordBreak = false;
+				lastDelegateSet = null;
+			} //}}}
+			//{{{ SPAN_REGEXP
+			else if (tag == "SPAN_REGEXP")
+			{
+				if(lastStart == null)
+				{
+					error("empty-tag","START");
+					return;
+				}
+
+				if(lastEnd == null)
+				{
+					error("empty-tag","END");
+					return;
+				}
+
+				try
+				{
+					rules.addRule(ParserRule
+						.createRegexpSpanRule(
+						lastHashChar,
+						lastStart,lastEnd,
+						lastDelegateSet,
+						lastTokenID,lastNoLineBreak,
+						lastAtLineStart,
+						lastAtWhitespaceEnd,
+						lastAtWordStart,
+						lastExcludeMatch,
+						lastNoWordBreak,
+						lastIgnoreCase));
+				}
+				catch(REException re)
+				{
+					error("regexp",re);
+				}
+
+				lastHashChar = '\0';
+				lastStart = null;
+				lastEnd = null;
+				lastTokenID = Token.NULL;
+				lastAtLineStart = false;
+				lastAtWordStart = false;
+				lastNoLineBreak = false;
+				lastAtWhitespaceEnd = false;
+				lastExcludeMatch = false;
+				lastNoWordBreak = false;
+				lastDelegateSet = null;
 			} //}}}
 			//{{{ EOL_SPAN
 			else if (tag == "EOL_SPAN")
@@ -289,32 +477,50 @@ public class XModeHandler extends HandlerBase
 					return;
 				}
 
-				rules.addRule(ParserRuleFactory.createEOLSpanRule(
-					lastStart,lastTokenID,lastAtLineStart,
-					lastExcludeMatch));
+				rules.addRule(ParserRule.createEOLSpanRule(
+					lastStart,lastDelegateSet,lastTokenID,
+					lastAtLineStart,lastAtWhitespaceEnd,
+					lastAtWordStart,lastExcludeMatch));
+
 				lastStart = null;
 				lastEnd = null;
+				lastDelegateSet = null;
 				lastTokenID = Token.NULL;
 				lastAtLineStart = false;
+				lastAtWordStart = false;
+				lastAtWhitespaceEnd = false;
 				lastExcludeMatch = false;
 			} //}}}
-			//{{{ MARK_PREVIOUS
-			else if (tag == "MARK_PREVIOUS")
+			//{{{ EOL_SPAN_REGEXP
+			else if (tag == "EOL_SPAN_REGEXP")
 			{
 				if(lastStart == null)
 				{
-					error("empty-tag","MARK_PREVIOUS");
+					error("empty-tag","EOL_SPAN_REGEXP");
 					return;
 				}
 
-				rules.addRule(ParserRuleFactory
-					.createMarkPreviousRule(lastStart,
-					lastTokenID,lastAtLineStart,
-					lastExcludeMatch));
+				try
+				{
+					rules.addRule(ParserRule.createRegexpEOLSpanRule(
+						lastHashChar,lastStart,lastDelegateSet,
+						lastTokenID,lastAtLineStart,
+						lastAtWhitespaceEnd,lastAtWordStart,
+						lastExcludeMatch,lastIgnoreCase));
+				}
+				catch(REException re)
+				{
+					error("regexp",re);
+				}
+
+				lastHashChar = '\0';
 				lastStart = null;
 				lastEnd = null;
+				lastDelegateSet = null;
 				lastTokenID = Token.NULL;
 				lastAtLineStart = false;
+				lastAtWordStart = false;
+				lastAtWhitespaceEnd = false;
 				lastExcludeMatch = false;
 			} //}}}
 			//{{{ MARK_FOLLOWING
@@ -326,130 +532,47 @@ public class XModeHandler extends HandlerBase
 					return;
 				}
 
-				rules.addRule(ParserRuleFactory
+				rules.addRule(ParserRule
 					.createMarkFollowingRule(lastStart,
 					lastTokenID,lastAtLineStart,
+					lastAtWhitespaceEnd,lastAtWordStart,
 					lastExcludeMatch));
 				lastStart = null;
 				lastEnd = null;
 				lastTokenID = Token.NULL;
 				lastAtLineStart = false;
+				lastAtWordStart = false;
+				lastAtWhitespaceEnd = false;
 				lastExcludeMatch = false;
 			} //}}}
-			//{{{ SEQ
-			else if (tag == "SEQ")
+			//{{{ MARK_PREVIOUS
+			else if (tag == "MARK_PREVIOUS")
 			{
 				if(lastStart == null)
 				{
-					error("empty-tag","SEQ");
+					error("empty-tag","MARK_PREVIOUS");
 					return;
 				}
 
-				rules.addRule(ParserRuleFactory.createSequenceRule(
-					lastStart,lastTokenID,lastAtLineStart));
+				rules.addRule(ParserRule
+					.createMarkPreviousRule(lastStart,
+					lastTokenID,lastAtLineStart,
+					lastAtWhitespaceEnd,lastAtWordStart,
+					lastExcludeMatch));
 				lastStart = null;
 				lastEnd = null;
 				lastTokenID = Token.NULL;
 				lastAtLineStart = false;
-			} //}}}
-			//{{{ END
-			else if (tag == "END")
-			{
-				// empty END tags should be supported; see
-				// asp.xml, for example
-				/* if(lastEnd == null)
-				{
-					error("empty-tag","END");
-					return;
-				} */
-
-				if (lastDelegateSet == null)
-				{
-					rules.addRule(ParserRuleFactory
-						.createSpanRule(lastStart,
-						lastEnd,lastTokenID,
-						lastNoLineBreak,
-						lastAtLineStart,
-						lastExcludeMatch,
-						lastNoWordBreak));
-				}
-				else
-				{
-					if (lastDelegateSet.indexOf("::") == -1)
-					{
-						lastDelegateSet = modeName + "::" + lastDelegateSet;
-					}
-
-					rules.addRule(ParserRuleFactory
-						.createDelegateSpanRule(
-						lastStart,lastEnd,
-						lastDelegateSet,
-						lastTokenID,lastNoLineBreak,
-						lastAtLineStart,
-						lastExcludeMatch,
-						lastNoWordBreak));
-				}
-				lastStart = null;
-				lastEnd = null;
-				lastTokenID = Token.NULL;
-				lastAtLineStart = false;
-				lastNoLineBreak = false;
+				lastAtWordStart = false;
+				lastAtWhitespaceEnd = false;
 				lastExcludeMatch = false;
-				lastNoWordBreak = false;
-				lastDelegateSet = null;
 			} //}}}
 			//{{{ Keywords
-			else if (tag == "NULL")
+			else
 			{
-				addKeyword(lastKeyword,Token.NULL);
-			}
-			else if (tag == "COMMENT1")
-			{
-				addKeyword(lastKeyword,Token.COMMENT1);
-			}
-			else if (tag == "COMMENT2")
-			{
-				addKeyword(lastKeyword,Token.COMMENT2);
-			}
-			else if (tag == "LITERAL1")
-			{
-				addKeyword(lastKeyword,Token.LITERAL1);
-			}
-			else if (tag == "LITERAL2")
-			{
-				addKeyword(lastKeyword,Token.LITERAL2);
-			}
-			else if (tag == "LABEL")
-			{
-				addKeyword(lastKeyword,Token.LABEL);
-			}
-			else if (tag == "KEYWORD1")
-			{
-				addKeyword(lastKeyword,Token.KEYWORD1);
-			}
-			else if (tag == "KEYWORD2")
-			{
-				addKeyword(lastKeyword,Token.KEYWORD2);
-			}
-			else if (tag == "KEYWORD3")
-			{
-				addKeyword(lastKeyword,Token.KEYWORD3);
-			}
-			else if (tag == "FUNCTION")
-			{
-				addKeyword(lastKeyword,Token.FUNCTION);
-			}
-			else if (tag == "MARKUP")
-			{
-				addKeyword(lastKeyword,Token.MARKUP);
-			}
-			else if (tag == "OPERATOR")
-			{
-				addKeyword(lastKeyword,Token.OPERATOR);
-			}
-			else if (tag == "DIGIT")
-			{
-				addKeyword(lastKeyword,Token.DIGIT);
+				byte token = Token.stringToToken(tag);
+				if(token != -1)
+					addKeyword(lastKeyword,token);
 			} //}}}
 		}
 		else
@@ -489,6 +612,7 @@ public class XModeHandler extends HandlerBase
 	private String lastSetName;
 	private String lastEscape;
 	private String lastDelegateSet;
+	private String lastNoWordSep;
 	private ParserRuleSet rules;
 	private byte lastDefaultID = Token.NULL;
 	private byte lastTokenID;
@@ -496,76 +620,14 @@ public class XModeHandler extends HandlerBase
 	private boolean lastNoLineBreak;
 	private boolean lastNoWordBreak;
 	private boolean lastAtLineStart;
+	private boolean lastAtWhitespaceEnd;
+	private boolean lastAtWordStart;
 	private boolean lastExcludeMatch;
 	private boolean lastIgnoreCase = true;
 	private boolean lastHighlightDigits;
+	private String lastDigitRE;
+	private char lastHashChar;
 	//}}}
-
-	//{{{ stringToToken() method
-	private byte stringToToken(String value)
-	{
-		if (value == "NULL")
-		{
-			return Token.NULL;
-		}
-		else if (value == "COMMENT1")
-		{
-			return Token.COMMENT1;
-		}
-		else if (value == "COMMENT2")
-		{
-			return Token.COMMENT2;
-		}
-		else if (value == "LITERAL1")
-		{
-			return Token.LITERAL1;
-		}
-		else if (value == "LITERAL2")
-		{
-			return Token.LITERAL2;
-		}
-		else if (value == "LABEL")
-		{
-			return Token.LABEL;
-		}
-		else if (value == "KEYWORD1")
-		{
-			return Token.KEYWORD1;
-		}
-		else if (value == "KEYWORD2")
-		{
-			return Token.KEYWORD2;
-		}
-		else if (value == "KEYWORD3")
-		{
-			return Token.KEYWORD3;
-		}
-		else if (value == "FUNCTION")
-		{
-			return Token.FUNCTION;
-		}
-		else if (value == "MARKUP")
-		{
-			return Token.MARKUP;
-		}
-		else if (value == "OPERATOR")
-		{
-			return Token.OPERATOR;
-		}
-		else if (value == "DIGIT")
-		{
-			return Token.DIGIT;
-		}
-		else if (value == "INVALID")
-		{
-			return Token.INVALID;
-		}
-		else
-		{
-			error("token-invalid",value);
-			return Token.NULL;
-		}
-	} //}}}
 
 	//{{{ addKeyword() method
 	private void addKeyword(String k, byte id)
@@ -629,4 +691,6 @@ public class XModeHandler extends HandlerBase
 
 		GUIUtilities.error(null,"xmode-error",args);
 	} //}}}
+
+	//}}}
 }

@@ -10,10 +10,6 @@
 		<PROPERTY NAME="wordBreakChars" VALUE="@:|.[]{},+=&lt;&gt;/?^&amp;*" />
 	</PROPS>
 	<RULES IGNORE_CASE="TRUE">
-		<!-- WHITE SPACE ( SPACE, TAB ) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-		
 		<!-- JavaScript -->
 		<SPAN TYPE="MARKUP" DELEGATE="javascript::MAIN">
 			<BEGIN>&lt;xsl:script</BEGIN>
@@ -61,14 +57,14 @@
 		</SPAN>
 
 		<!-- JavaScript -->
-		<SPAN TYPE="LABEL" DELEGATE="javascript::MAIN">
-			<BEGIN>&lt;SCRIPT&gt;</BEGIN>
+		<SPAN TYPE="MARKUP" DELEGATE="html::JAVASCRIPT">
+			<BEGIN>&lt;SCRIPT</BEGIN>
 			<END>&lt;/SCRIPT&gt;</END>
 		</SPAN>
 
 		<!-- stylesheet -->
-		<SPAN TYPE="LABEL" DELEGATE="css::MAIN">
-			<BEGIN>&lt;STYLE&gt;</BEGIN>
+		<SPAN TYPE="MARKUP" DELEGATE="html::CSS">
+			<BEGIN>&lt;STYLE</BEGIN>
 			<END>&lt;/STYLE&gt;</END>
 		</SPAN>
 
@@ -88,9 +84,6 @@
 	
 	<!-- HTML TAGS -->
 	<RULES SET="HTMLTAGS" DEFAULT="MARKUP">
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-		
 		<SPAN TYPE="LITERAL1">
 			<BEGIN>"</BEGIN>
 			<END>"</END>
@@ -101,16 +94,12 @@
 			<END>'</END>
 		</SPAN>
 		
-		<SEQ TYPE="NULL">=</SEQ>
 		<MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE">:</MARK_PREVIOUS>
 		<SEQ TYPE="OPERATOR">:</SEQ>
 	</RULES>
 	
 	<!-- XSL TAGS -->
 	<RULES SET="XSLTAGS" DEFAULT="KEYWORD2">
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-		
 		<SPAN TYPE="LITERAL1" DELEGATE="XPATH">
 			<BEGIN>"</BEGIN>
 			<END>"</END>
@@ -121,14 +110,10 @@
 			<END>'</END>
 		</SPAN>
 		
-		<SEQ TYPE="NULL">=</SEQ>
 		<SEQ TYPE="OPERATOR">:</SEQ>
 	</RULES>
 
-	<RULES SET="XPATH" DEFAULT="LITERAL1">
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
+	<RULES SET="XPATH" DEFAULT="LITERAL1" NO_WORD_SEP="-_">
 		<!-- entity refs -->
 		<SPAN TYPE="LITERAL2" NO_WORD_BREAK="TRUE">
 			<BEGIN>&amp;</BEGIN>

@@ -23,22 +23,37 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import javax.swing.event.*;
 import javax.swing.*;
+import java.awt.event.*;
 import java.awt.*;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.msg.*;
-import org.gjt.sp.jedit.syntax.*;
+import org.gjt.sp.jedit.options.GlobalOptions;
 import org.gjt.sp.jedit.textarea.*;
-import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * A panel containing a text area. Each edit pane can edit one buffer at
- * a time.
+ * A panel containing a text area.<p>
+ *
+ * In a BeanShell script, you can obtain the current edit pane from the
+ * <code>editPane</code> variable.<p>
+ *
+ * This class does not have a public constructor.
+ * Edit panes can be created and destroyed using methods in the
+ * {@link View} class.<p>
+ *
+ * Each edit pane can edit one buffer at a time.
+ *
+ * @see View#splitHorizontally()
+ * @see View#splitVertically()
+ * @see View#unsplitCurrent()
+ * @see View#unsplit()
+ * @see View#getEditPane()
+ * @see View#getEditPanes()
+ *
  * @author Slava Pestov
- * @version $Id: EditPane.java,v 1.22 2002/03/17 03:05:24 spestov Exp $
+ * @version $Id: EditPane.java,v 1.34 2003/02/07 21:57:28 spestov Exp $
  */
 public class EditPane extends JPanel implements EBComponent
 {
@@ -73,8 +88,8 @@ public class EditPane extends JPanel implements EBComponent
 		if(this.buffer == buffer)
 			return;
 
-		if(buffer.insideCompoundEdit())
-			buffer.endCompoundEdit();
+		//if(buffer.insideCompoundEdit())
+		//	buffer.endCompoundEdit();
 
 		recentBuffer = this.buffer;
 		if(recentBuffer != null)
@@ -117,7 +132,7 @@ public class EditPane extends JPanel implements EBComponent
 			public void run()
 			{
 				loadCaretInfo();
-				buffer.checkModTime(view);
+				buffer.checkModTime(EditPane.this);
 			}
 		};
 
@@ -193,6 +208,32 @@ public class EditPane extends JPanel implements EBComponent
 	public JEditTextArea getTextArea()
 	{
 		return textArea;
+	} //}}}
+
+	//{{{ getBufferSwitcher() method
+	/**
+	 * Returns the buffer switcher combo box instance.
+	 * @since jEdit 4.1pre8
+	 */
+	public BufferSwitcher getBufferSwitcher()
+	{
+		return bufferSwitcher;
+	} //}}}
+
+	//{{{ showBufferSwitcher() method
+	/**
+	 * Shows the buffer switcher combo box.
+	 * @since jEdit 4.1pre8
+	 */
+	public void showBufferSwitcher()
+	{
+		if(bufferSwitcher == null)
+			getToolkit().beep();
+		else
+		{
+			bufferSwitcher.requestFocus();
+			bufferSwitcher.showPopup();
+		}
 	} //}}}
 
 	//{{{ saveCaretInfo() method
@@ -356,8 +397,6 @@ public class EditPane extends JPanel implements EBComponent
 			jEdit.getColorProperty("view.fgColor"));
 		painter.setBlockCaretEnabled(jEdit.getBooleanProperty(
 			"view.blockCaret"));
-		painter.setFoldedLineColor(
-			jEdit.getColorProperty("view.foldedLineColor"));
 		painter.setLineHighlightEnabled(jEdit.getBooleanProperty(
 			"view.lineHighlight"));
 		painter.setLineHighlightColor(
@@ -370,6 +409,10 @@ public class EditPane extends JPanel implements EBComponent
 			jEdit.getProperty("view.font"),
 			jEdit.getIntegerProperty("view.fontsize",12)));
 
+		painter.setFoldLineStyle(GUIUtilities.parseStyle(
+			jEdit.getProperty("view.style.foldLine"),
+			jEdit.getProperty("view.font"),
+			jEdit.getIntegerProperty("view.fontsize",12)));
 		Gutter gutter = textArea.getGutter();
 		gutter.setExpanded(jEdit.getBooleanProperty(
 			"view.gutter.lineNumbers"));
@@ -427,8 +470,19 @@ public class EditPane extends JPanel implements EBComponent
 			"view.electricBorders",0));
 
 		// Set up the right-click popup menu
-		textArea.setRightClickPopup(GUIUtilities
-			.loadPopupMenu("view.context"));
+		JPopupMenu popup = GUIUtilities.loadPopupMenu("view.context");
+		JMenuItem customize = new JMenuItem(jEdit.getProperty(
+			"view.context.customize"));
+		customize.addActionListener(new ActionListener()
+		{
+			public void actionPerformed(ActionEvent evt)
+			{
+				new GlobalOptions(view,"context");
+			}
+		});
+		popup.addSeparator();
+		popup.add(customize);
+		textArea.setRightClickPopup(popup);
 
 		// use old property name for backwards compatibility
 		textArea.setQuickCopyEnabled(jEdit.getBooleanProperty(
@@ -506,6 +560,27 @@ public class EditPane extends JPanel implements EBComponent
 				textArea.getPainter().repaint();
 			}
 		}
+		else if(msg.getWhat() == BufferUpdate.LOADED)
+		{
+			if(_buffer == buffer)
+			{
+				textArea.repaint();
+				textArea.updateScrollBars();
+				if(bufferSwitcher != null)
+					bufferSwitcher.updateBufferList();
+
+				if(view.getEditPane() == this)
+				{
+					StatusBar status = view.getStatus();
+					status.updateCaretStatus();
+					status.updateBufferStatus();
+					status.updateMiscStatus();
+				}
+
+				loadCaretInfo();
+			}
+
+		}
 		else if(msg.getWhat() == BufferUpdate.DIRTY_CHANGED)
 		{
 			if(_buffer == buffer)
@@ -519,60 +594,22 @@ public class EditPane extends JPanel implements EBComponent
 				}
 			}
 		}
-		else if(msg.getWhat() == BufferUpdate.LOADED)
-		{
-			if(_buffer == buffer)
-			{
-				textArea.repaint();
-				textArea.updateScrollBars();
-				if(bufferSwitcher != null)
-					bufferSwitcher.updateBufferList();
-
-				if(view.getEditPane() == this)
-				{
-					StatusBar status = view.getStatus();
-					status.repaintCaretStatus();
-					status.updateBufferStatus();
-					status.updateMiscStatus();
-				}
-
-				loadCaretInfo();
-			}
-
-		}
 		else if(msg.getWhat() == BufferUpdate.MARKERS_CHANGED)
 		{
 			if(_buffer == buffer)
 				textArea.getGutter().repaint();
 		}
-		else if(msg.getWhat() == BufferUpdate.MODE_CHANGED)
-		{
-			if(_buffer == buffer)
-			{
-				textArea.propertiesChanged();
-
-				if(view.getEditPane() == this)
-					view.getStatus().updateBufferStatus();
-			}
-		}
-		else if(msg.getWhat() == BufferUpdate.ENCODING_CHANGED)
-		{
-			if(_buffer == buffer)
-			{
-				if(view.getEditPane() == this)
-					view.getStatus().updateBufferStatus();
-			}
-		}
-		else if(msg.getWhat() == BufferUpdate.FOLD_HANDLER_CHANGED)
+		else if(msg.getWhat() == BufferUpdate.PROPERTIES_CHANGED)
 		{
 			if(_buffer == buffer)
 			{
 				textArea.getFoldVisibilityManager()
 					.foldStructureChanged();
+				textArea.propertiesChanged();
 				textArea.repaint();
 
 				if(view.getEditPane() == this)
-					view.getStatus().updateMiscStatus();
+					view.getStatus().updateBufferStatus();
 			}
 		}
 		else if(msg.getWhat() == BufferUpdate.SAVED)

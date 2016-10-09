@@ -26,12 +26,30 @@ package org.gjt.sp.jedit.search;
 import java.io.Serializable;
 import javax.swing.text.Segment;
 import gnu.regexp.*;
- //}}}
+//}}}
 
+/**
+ * Lets <code>gnu.regexp</code> search within <code>Segment</code> objects.
+ */
 public class CharIndexedSegment implements CharIndexed, Serializable
 {
 	//{{{ CharIndexedSegment constructor
-	CharIndexedSegment(Segment seg, boolean reverse)
+	/**
+	 * Creates a new <code>CharIndexedSegment</code>.
+	 * @since jEdit 4.1pre3
+	 */
+	public CharIndexedSegment(Segment seg, int index)
+	{
+		this.seg = seg;
+		m_index = index;
+	} //}}}
+
+	//{{{ CharIndexedSegment constructor
+	/**
+	 * Creates a new <code>CharIndexedSegment</code>.
+	 * @since jEdit 4.1pre1
+	 */
+	public CharIndexedSegment(Segment seg, boolean reverse)
 	{
 		this.seg = seg;
 		m_index = (reverse ? seg.count - 1 : 0);
@@ -53,6 +71,12 @@ public class CharIndexedSegment implements CharIndexed, Serializable
 	public boolean isValid()
 	{
 		return (m_index >=0 && m_index < seg.count);
+	} //}}}
+
+	//{{{ reset() method
+	public void reset()
+	{
+		m_index = (reverse ? seg.count - 1 : 0);
 	} //}}}
 
 	//{{{ move() method

@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000 Slava Pestov
+ * Copyright (C) 2000, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,6 @@ package org.gjt.sp.jedit.options;
 
 //{{{ Imports
 import javax.swing.*;
-import java.awt.*;
 import org.gjt.sp.jedit.gui.FontSelector;
 import org.gjt.sp.jedit.*;
 //}}}

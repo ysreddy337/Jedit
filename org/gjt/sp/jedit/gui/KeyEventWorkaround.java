@@ -24,17 +24,15 @@ package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
 import java.awt.event.*;
-import java.awt.*;
 import org.gjt.sp.jedit.OperatingSystem;
 //}}}
 
 /**
- * This class contains various hacks to get keyboard event handling to behave in
- * a consistent manner across Java implementations, many of which are
- * hopelessly broken in this regard.
+ * Various hacks to get keyboard event handling to behave in a consistent manner
+ * across Java implementations.
  *
  * @author Slava Pestov
- * @version $Id: KeyEventWorkaround.java,v 1.13 2002/03/28 04:08:42 spestov Exp $
+ * @version $Id: KeyEventWorkaround.java,v 1.15 2003/01/31 04:49:30 spestov Exp $
  */
 public class KeyEventWorkaround
 {

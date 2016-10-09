@@ -17,9 +17,6 @@
     </PROPS>
 
     <RULES IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE">
-        <WHITESPACE> </WHITESPACE>
-        <WHITESPACE>	</WHITESPACE>
-
         <!-- Compiler directives. -->
         <SPAN TYPE="COMMENT2">
             <BEGIN>{$</BEGIN>
@@ -70,7 +67,7 @@
         <SEQ TYPE="OPERATOR">/</SEQ>
         <SEQ TYPE="OPERATOR">*</SEQ>
 
-        <KEYWORDS IGNORE_CASE="TRUE">
+        <KEYWORDS>
             <!-- Reserved words. Standard directives are not included, except
                  private, protected, public, published, and automated. -->
             <KEYWORD1>and</KEYWORD1>

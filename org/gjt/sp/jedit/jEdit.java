@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1998, 1999, 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 1998, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,21 +25,16 @@ package org.gjt.sp.jedit;
 //{{{ Imports
 import com.microstar.xml.*;
 import javax.swing.plaf.metal.*;
-import javax.swing.plaf.FontUIResource;
-import javax.swing.text.DefaultEditorKit;
-import javax.swing.text.Element;
-import javax.swing.text.JTextComponent;
-import javax.swing.text.Keymap;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 import java.text.MessageFormat;
 import java.util.*;
-import org.gjt.sp.jedit.browser.VFSBrowser;
+import org.gjt.sp.jedit.buffer.BufferIORequest;
 import org.gjt.sp.jedit.msg.*;
 import org.gjt.sp.jedit.gui.*;
+import org.gjt.sp.jedit.help.HelpViewer;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.search.SearchAndReplace;
 import org.gjt.sp.jedit.syntax.*;
@@ -50,7 +45,7 @@ import org.gjt.sp.util.Log;
 /**
  * The main class of the jEdit text editor.
  * @author Slava Pestov
- * @version $Id: jEdit.java,v 1.62 2002/04/04 05:53:05 spestov Exp $
+ * @version $Id: jEdit.java,v 1.111 2003/02/23 04:05:21 spestov Exp $
  */
 public class jEdit
 {
@@ -71,7 +66,7 @@ public class jEdit
 	public static String getBuild()
 	{
 		// (major).(minor).(<99 = preX, 99 = final).(bug fix)
-		return "04.00.99.03";
+		return "04.01.99.00";
 	} //}}}
 
 	//{{{ main() method
@@ -248,6 +243,22 @@ public class jEdit
 			try
 			{
 				stream = new BufferedWriter(new FileWriter(logPath));
+
+				// Write a warning message:
+				String lineSep = System.getProperty("line.separator");
+				stream.write("Log file created on " + new Date());
+				stream.write(lineSep);
+				stream.write("IMPORTANT:");
+				stream.write(lineSep);
+				stream.write("Because updating this file after "
+					+ "every log message would kill");
+				stream.write(lineSep);
+				stream.write("performance, it will be *incomplete* "
+					+ "unless you invoke the");
+				stream.write(lineSep);
+				stream.write("Utilities->Troubleshooting->Update "
+					+ "Activity Log on Disk command!");
+				stream.write(lineSep);
 			}
 			catch(Exception e)
 			{
@@ -278,7 +289,7 @@ public class jEdit
 			if(background)
 			{
 				background = false;
-				System.err.println("You cannot specify both the"
+				Log.log(Log.WARNING,jEdit.class,"You cannot specify both the"
 					+ " -background and -noserver switches");
 			}
 		} //}}}
@@ -286,8 +297,6 @@ public class jEdit
 		//{{{ Get things rolling
 		initMisc();
 		initSystemProperties();
-		if(jEditHome != null)
-			initSiteProperties();
 		GUIUtilities.advanceSplashProgress();
 
 		BeanShell.init();
@@ -295,8 +304,7 @@ public class jEdit
 		initUserProperties();
 		initPLAF();
 
-		if(OperatingSystem.hasJava14()
-			&& System.getProperty("jedit.nojava14") == null)
+		if(OperatingSystem.hasJava14())
 		{
 			try
 			{
@@ -326,6 +334,9 @@ public class jEdit
 
 		if(!noPlugins)
 			initPlugins();
+
+		if(jEditHome != null)
+			initSiteProperties();
 
 		if(settingsDirectory != null)
 		{
@@ -397,83 +408,8 @@ public class jEdit
 
 		GUIUtilities.advanceSplashProgress();
 
-		//{{{ Open files
-		Buffer buffer = openFiles(null,userDir,args);
-		if(buffer != null)
-		{
-			// files specified on command line; force initial view
-			// to open
-			gui = true;
-		}
-
-		String splitConfig = null;
-
-		if(restore && settingsDirectory != null
-			&& jEdit.getBooleanProperty("restore")
-			&& (bufferCount == 0 || jEdit.getBooleanProperty("restore.cli")))
-		{
-			splitConfig = restoreOpenFiles();
-		}
-
-		if(bufferCount == 0 && gui)
-			newFile(null);
-		//}}}
-
-		//{{{ Create the view and hide the splash screen.
-		final Buffer _buffer = buffer;
-		final String _splitConfig = splitConfig;
-		final boolean _gui = gui;
-
-		GUIUtilities.advanceSplashProgress();
-
-		SwingUtilities.invokeLater(new Runnable() {
-			public void run()
-			{
-				EditBus.send(new EditorStarted(null));
-
-				if(_gui)
-				{
-					View view;
-					if(_buffer != null)
-						view = newView(null,_buffer);
-					else
-						view = newView(null,_splitConfig);
-				}
-
-				// Start I/O threads
-				VFSManager.start();
-
-				// Start edit server
-				if(server != null)
-					server.start();
-
-				GUIUtilities.hideSplashScreen();
-
-				Log.log(Log.MESSAGE,jEdit.class,"Startup "
-					+ "complete");
-
-				//{{{ Report any plugin errors
-				if(pluginErrors != null)
-				{
-					String caption = jEdit.getProperty(
-						"plugin-error.caption" + (pluginErrors.size() == 1
-						? "-1" : ""),new Integer[] {
-						new Integer(pluginErrors.size()) });
-
-					new ErrorListDialog(
-						jEdit.getFirstView(),
-						jEdit.getProperty("plugin-error.title"),
-						caption,pluginErrors,true);
-					pluginErrors.removeAllElements();
-				} //}}}
-
-				// in one case not a single AWT class will
-				// have been touched (splash screen off +
-				// -nogui -nobackground switches on command
-				// line)
-				Toolkit.getDefaultToolkit();
-			}
-		}); //}}}
+		// Open files, create the view and hide the splash screen.
+		finishStartup(gui,restore,userDir,args);
 	} //}}}
 
 	//{{{ Property methods
@@ -513,8 +449,17 @@ public class jEdit
 
 	//{{{ getProperty() method
 	/**
-	 * Returns the property with the specified name, formatting it with
-	 * the <code>java.text.MessageFormat.format()</code> method.
+	 * Returns the property with the specified name.<p>
+	 *
+	 * The elements of the <code>args</code> array are substituted
+	 * into the value of the property in place of strings of the
+	 * form <code>{<i>n</i>}</code>, where <code><i>n</i></code> is an index
+	 * in the array.<p>
+	 *
+	 * You can find out more about this feature by reading the
+	 * documentation for the <code>format</code> method of the
+	 * <code>java.text.MessageFormat</code> class.
+	 *
 	 * @param name The property
 	 * @param args The positional parameters
 	 */
@@ -581,7 +526,7 @@ public class jEdit
 		{
 			try
 			{
-				return Integer.parseInt(value);
+				return Integer.parseInt(value.trim());
 			}
 			catch(NumberFormatException nf)
 			{
@@ -589,6 +534,26 @@ public class jEdit
 			}
 		}
 	} //}}}
+
+	//{{{ getDoubleProperty() method
+	public static double getDoubleProperty(String name, double def)
+	{
+		String value = getProperty(name);
+		if(value == null)
+			return def;
+		else
+		{
+			try
+			{
+				return Double.parseDouble(value.trim());
+			}
+			catch(NumberFormatException nf)
+			{
+				return def;
+			}
+		}
+	}
+	//}}}
 
 	//{{{ getFontProperty() method
 	/**
@@ -712,7 +677,7 @@ public class jEdit
 		 * - if default equals value, ignore
 		 * - if default doesn't equal value, set user
 		 */
-		if(value == null || value.length() == 0)
+		if(value == null)
 		{
 			String prop = (String)defaultProps.get(name);
 			if(prop == null || prop.length() == 0)
@@ -766,6 +731,13 @@ public class jEdit
 	{
 		setProperty(name,String.valueOf(value));
 	} //}}}
+
+	//{{{ setDoubleProperty() method
+	public static final void setDoubleProperty(String name, double value)
+	{
+		setProperty(name,String.valueOf(value));
+	}
+	//}}}
 
 	//{{{ setFontProperty() method
 	/**
@@ -838,6 +810,10 @@ public class jEdit
 		//defaults.put("TextField.font",font);
 		defaults.put("TextArea.font",font);
 		defaults.put("TextPane.font",font);
+
+		// Enable/Disable tooltips
+		ToolTipManager.sharedInstance().setEnabled(
+			jEdit.getBooleanProperty("showTooltips"));
 
 		initProxy();
 
@@ -1132,77 +1108,6 @@ public class jEdit
 
 	//{{{ Buffer creation methods
 
-	//{{{ showOpenFileDialog() method
-	/**
-	 * Displays the open file dialog box, and opens any selected files.
-	 *
-	 * @param view The view
-	 * @since jEdit 2.7pre2
-	 */
-	public static void showOpenFileDialog(View view)
-	{
-		showOpenFileDialog(view,null);
-	} //}}}
-
-	//{{{ showOpenFileWithOtherEncodingDialog() method
-	/**
-	 * Displays the open file dialog box, and opens any selected files,
-	 * but first prompts for a character encoding to use.
-	 *
-	 * @param view The view
-	 * @since jEdit 2.7pre2
-	 */
-	public static void showOpenFileWithOtherEncodingDialog(View view)
-	{
-		String encoding = GUIUtilities.input(view,"encoding-prompt",null,
-			jEdit.getProperty("buffer.encoding",
-			System.getProperty("file.encoding")));
-		if(encoding == null)
-			return;
-
-		Macros.Recorder recorder = view.getMacroRecorder();
-		if(recorder != null)
-		{
-			recorder.record("props = new Hashtable();");
-			recorder.record("props.put(\"encoding\",\"" + encoding + "\");");
-			recorder.record("jEdit.showOpenFileDialog(view,props);");
-		}
-
-		Hashtable props = new Hashtable();
-		props.put(Buffer.ENCODING,encoding);
-		showOpenFileDialog(view,props);
-	} //}}}
-
-	//{{{ showOpenFileDialog() method
-	/**
-	 * Displays the open file dialog box, and opens any selected files,
-	 * setting the properties specified in the hash table in the buffers.
-	 *
-	 * @param view The view
-	 * @param props The properties to set in the buffer
-	 * @since jEdit 3.2pre2
-	 */
-	public static void showOpenFileDialog(View view, Hashtable props)
-	{
-		String[] files = GUIUtilities.showVFSFileDialog(view,null,
-			VFSBrowser.OPEN_DIALOG,true);
-
-		Buffer buffer = null;
-		if(files != null)
-		{
-			for(int i = 0; i < files.length; i++)
-			{
-				Buffer newBuffer = openFile(null,null,files[i],
-					false,props);
-				if(newBuffer != null)
-					buffer = newBuffer;
-			}
-		}
-
-		if(buffer != null)
-			view.setBuffer(buffer);
-	} //}}}
-
 	//{{{ restoreOpenFiles() method
 	/**
 	 * Opens files that were open last time.
@@ -1257,7 +1162,6 @@ public class jEdit
 			return;
 
 		view.getEditPane().saveCaretInfo();
-		Buffer current = view.getBuffer();
 
 		File session = new File(MiscUtilities.constructPath(
 			settingsDirectory,"session"));
@@ -1388,7 +1292,7 @@ public class jEdit
 		String path, boolean newFile, Hashtable props)
 	{
 		if(view != null && parent == null)
-			parent = MiscUtilities.getParentOfPath(view.getBuffer().getPath());
+			parent = view.getBuffer().getDirectory();
 
 		if(MiscUtilities.isURL(path))
 		{
@@ -1419,14 +1323,13 @@ public class jEdit
 
 			if(entry != null && saveCaret && props.get(Buffer.CARET) == null)
 			{
-				int caret = entry.caret;
 				props.put(Buffer.CARET,new Integer(entry.caret));
-				if(entry.selection != null)
+				/* if(entry.selection != null)
 				{
 					// getSelection() converts from string to
 					// Selection[]
 					props.put(Buffer.SELECTION,entry.getSelection());
-				}
+				} */
 			}
 
 			if(entry != null && props.get(Buffer.ENCODING) == null)
@@ -1460,7 +1363,6 @@ public class jEdit
 	 * @param view The view to open the file in
 	 * @param parent The parent directory of the file
 	 * @param path The path name of the file
-	 * @param readOnly True if the file should be read only
 	 * @param newFile True if the file should not be loaded from disk
 	 *
 	 * @since jEdit 3.2pre10
@@ -1469,7 +1371,7 @@ public class jEdit
 		String path, boolean newFile)
 	{
 		if(view != null && parent == null)
-			parent = MiscUtilities.getParentOfPath(view.getBuffer().getPath());
+			parent = view.getBuffer().getDirectory();
 
 		if(MiscUtilities.isURL(path))
 		{
@@ -1508,7 +1410,10 @@ public class jEdit
 		addBufferToList(buffer);
 		buffer.commitTemporary();
 
+		// send full range of events to avoid breaking plugins
 		EditBus.send(new BufferUpdate(buffer,null,BufferUpdate.CREATED));
+		EditBus.send(new BufferUpdate(buffer,null,BufferUpdate.LOAD_STARTED));
+		EditBus.send(new BufferUpdate(buffer,null,BufferUpdate.LOADED));
 	} //}}}
 
 	//{{{ newFile() method
@@ -1522,8 +1427,7 @@ public class jEdit
 
 		if(view != null && view.getBuffer() != null)
 		{
-			path = MiscUtilities.getParentOfPath(view.getBuffer()
-				.getPath());
+			path = view.getBuffer().getDirectory();
 			VFS vfs = VFSManager.getVFSForPath(path);
 			// don't want 'New File' to create a read only buffer
 			// if current file is on SQL VFS or something
@@ -1613,6 +1517,13 @@ public class jEdit
 			{
 				if(!buffer.save(view,null,true))
 					return false;
+
+				VFSManager.waitForRequests();
+				if(buffer.getBooleanProperty(BufferIORequest
+					.ERROR_OCCURRED))
+				{
+					return false;
+				}
 			}
 			else if(result != JOptionPane.NO_OPTION)
 				return false;
@@ -1856,14 +1767,17 @@ public class jEdit
 	 */
 	public static Buffer[] getBuffers()
 	{
-		Buffer[] buffers = new Buffer[bufferCount];
-		Buffer buffer = buffersFirst;
-		for(int i = 0; i < bufferCount; i++)
+		synchronized(bufferListLock)
 		{
-			buffers[i] = buffer;
-			buffer = buffer.next;
+			Buffer[] buffers = new Buffer[bufferCount];
+			Buffer buffer = buffersFirst;
+			for(int i = 0; i < bufferCount; i++)
+			{
+				buffers[i] = buffer;
+				buffer = buffer.next;
+			}
+			return buffers;
 		}
-		return buffers;
 	} //}}}
 
 	//{{{ getBufferCount() method
@@ -1907,6 +1821,18 @@ public class jEdit
 		return inputHandler;
 	} //}}}
 
+	/* public static void newViewTest()
+	{
+		long time = System.currentTimeMillis();
+		for(int i = 0; i < 30; i++)
+		{
+			Buffer b = newFile(null);
+			b.insert(0,"x");
+			new View(b,null,false);
+		}
+		System.err.println(System.currentTimeMillis() - time);
+	} */
+
 	//{{{ newView() method
 	/**
 	 * Creates a new view of a buffer.
@@ -1915,13 +1841,28 @@ public class jEdit
 	 */
 	public static View newView(View view, Buffer buffer)
 	{
+		return newView(view,buffer,false);
+	} //}}}
+
+	//{{{ newView() method
+	/**
+	 * Creates a new view of a buffer.
+	 * @param view An existing view
+	 * @param buffer The buffer
+	 * @param plainView If true, the view will not have dockable windows or
+	 * tool bars.
+	 *
+	 * @since 4.1pre2
+	 */
+	public static View newView(View view, Buffer buffer, boolean plainView)
+	{
 		if(view != null)
 		{
 			view.showWaitCursor();
 			view.getEditPane().saveCaretInfo();
 		}
 
-		View newView = new View(buffer,null);
+		View newView = new View(buffer,null,plainView);
 
 		// Do this crap here so that the view is created
 		// and added to the list before it is shown
@@ -1932,11 +1873,13 @@ public class jEdit
 		// sized views, for some reason...
 		if(view != null)
 		{
-			GUIUtilities.saveGeometry(view,"view");
+			GUIUtilities.saveGeometry(view,(view.isPlainView()
+				? "plain-view" : "view"));
 			view.hideWaitCursor();
 		}
 
-		GUIUtilities.loadGeometry(newView,"view");
+		GUIUtilities.loadGeometry(newView,(plainView
+				? "plain-view" : "view"));
 
 		addViewToList(newView);
 		EditBus.send(new ViewUpdate(newView,ViewUpdate.CREATED));
@@ -1946,6 +1889,8 @@ public class jEdit
 		// show tip of the day
 		if(newView == viewsFirst)
 		{
+			newView.getTextArea().requestFocus();
+
 			// Don't show the welcome message if jEdit was started
 			// with the -nosettings switch
 			if(settingsDirectory != null && getBooleanProperty("firstTime"))
@@ -1969,7 +1914,7 @@ public class jEdit
 	 */
 	public static View newView(View view)
 	{
-		return newView(view,view.getSplitConfig());
+		return newView(view,view.getSplitConfig(),false);
 	} //}}}
 
 	//{{{ newView() method
@@ -1981,13 +1926,27 @@ public class jEdit
 	 */
 	public static View newView(View view, String splitConfig)
 	{
+		return newView(view,splitConfig,false);
+	} //}}}
+
+	//{{{ newView() method
+	/**
+	 * Creates a new view.
+	 * @param view An existing view
+	 * @param splitConfig The split configuration
+	 * @param plainView If true, the view will not have dockable windows or
+	 * tool bars.
+	 * @since jEdit 4.1pre2
+	 */
+	public static View newView(View view, String splitConfig, boolean plainView)
+	{
 		if(view != null)
 		{
 			view.showWaitCursor();
 			view.getEditPane().saveCaretInfo();
 		}
 
-		View newView = new View(null,splitConfig);
+		View newView = new View(null,splitConfig,plainView);
 
 		// Do this crap here so that the view is created
 		// and added to the list before it is shown
@@ -1998,11 +1957,13 @@ public class jEdit
 		// sized views, for some reason...
 		if(view != null)
 		{
-			GUIUtilities.saveGeometry(view,"view");
+			GUIUtilities.saveGeometry(view,(view.isPlainView()
+				? "plain-view" : "view"));
 			view.hideWaitCursor();
 		}
 
-		GUIUtilities.loadGeometry(newView,"view");
+		GUIUtilities.loadGeometry(newView,(plainView ? "plain-view"
+				: "view"));
 
 		addViewToList(newView);
 		EditBus.send(new ViewUpdate(newView,ViewUpdate.CREATED));
@@ -2012,6 +1973,8 @@ public class jEdit
 		// show tip of the day
 		if(newView == viewsFirst)
 		{
+			newView.getTextArea().requestFocus();
+
 			// Don't show the welcome message if jEdit was started
 			// with the -nosettings switch
 			if(settingsDirectory != null && getBooleanProperty("firstTime"))
@@ -2024,13 +1987,14 @@ public class jEdit
 		else
 			GUIUtilities.requestFocus(newView,newView.getTextArea());
 
-
 		return newView;
 	} //}}}
 
 	//{{{ closeView() method
 	/**
-	 * Closes a view. jEdit will exit if this was the last open view.
+	 * Closes a view.
+	 *
+	 * jEdit will exit if this was the last open view.
 	 */
 	public static void closeView(View view)
 	{
@@ -2078,6 +2042,16 @@ public class jEdit
 	public static View getLastView()
 	{
 		return viewsLast;
+	} //}}}
+
+	//{{{ getActiveView() method
+	/**
+	 * Returns the currently focused view.
+	 * @since jEdit 4.1pre1
+	 */
+	public static View getActiveView()
+	{
+		return activeView;
 	} //}}}
 
 	//}}}
@@ -2140,7 +2114,11 @@ public class jEdit
 
 	//{{{ getSettingsDirectory() method
 	/**
-	 * Returns the user settings directory.
+	 * Returns the path of the directory where user-specific settings
+	 * are stored. This will be <code>null</code> if jEdit was
+	 * started with the <code>-nosettings</code> command-line switch; do not
+	 * blindly use this method without checking for a <code>null</code>
+	 * return value first.
 	 */
 	public static String getSettingsDirectory()
 	{
@@ -2273,7 +2251,8 @@ public class jEdit
 		// if background mode is off
 		reallyExit |= !background;
 
-		saveOpenFiles(view);
+		if (view != null)
+			saveOpenFiles(view);
 
 		// Close all buffers
 		if(!closeAllBuffers(view,reallyExit))
@@ -2303,7 +2282,8 @@ public class jEdit
 		// Save view properties here - it unregisters
 		// listeners, and we would have problems if the user
 		// closed a view but cancelled an unsaved buffer close
-		view.close();
+		if (view != null)
+			view.close();
 
 		// Stop autosave timer
 		Autosave.stop();
@@ -2413,8 +2393,9 @@ public class jEdit
 				int line = xe.getLine();
 				String message = xe.getMessage();
 
-				Object[] args = { fileName, new Integer(line), message };
-				GUIUtilities.error(null,"xmode-parse",args);
+				Object[] args = { fileName, new Integer(line), null,
+					message };
+				GUIUtilities.error(null,"xmode-error",args);
 			}
 
 			// give it an empty token marker to avoid problems
@@ -2453,7 +2434,7 @@ public class jEdit
 	{
 		try
 		{
-			Log.log(Log.DEBUG,jEdit.class,"Loading actions from " + path);
+			//Log.log(Log.DEBUG,jEdit.class,"Loading actions from " + path);
 
 			ActionListHandler ah = new ActionListHandler(path,actionSet);
 			XmlParser parser = new XmlParser();
@@ -2486,6 +2467,12 @@ public class jEdit
 			path,messageProp,args));
 	} //}}}
 
+	//{{{ setActiveView() method
+	static void setActiveView(View view)
+	{
+		jEdit.activeView = view;
+	} //}}}
+
 	//}}}
 
 	//{{{ Private members
@@ -2503,7 +2490,6 @@ public class jEdit
 	private static Vector pluginErrors;
 	private static Vector jars;
 	private static Vector modes;
-	private static Vector recent;
 	private static boolean saveCaret;
 	private static InputHandler inputHandler;
 	private static JEditMetalTheme theme;
@@ -2522,6 +2508,7 @@ public class jEdit
 	private static int viewCount;
 	private static View viewsFirst;
 	private static View viewsLast;
+	private static View activeView;
 	//}}}
 
 	private jEdit() {}
@@ -2930,14 +2917,14 @@ public class jEdit
 
 	//{{{ runStartupScripts() method
 	/**
-	 * Runs scripts in the site startup directory, and user startup directory.
+	 * Runs scripts in a directory.
 	 */
 	private static void runStartupScripts(File directory)
 	{
 		if (!directory.isDirectory())
 			return;
 
-		String[] snippets = directory.list();
+		File[] snippets = directory.listFiles();
 		if (snippets == null)
 			return;
 
@@ -2946,21 +2933,55 @@ public class jEdit
 
 		for(int i = 0; i < snippets.length; ++i)
 		{
-			String snippet = snippets[i];
-			if(!snippet.toLowerCase().endsWith(".bsh"))
+			File snippet = snippets[i];
+
+			Macros.Handler handler = Macros.getHandlerForPathName(
+				snippet.getPath());
+			if(handler == null)
 				continue;
 
-			String path = new File(directory,snippet).getPath();
-
-			BeanShell.runScript(null,path,null,false);
+			try
+			{
+				Macros.Macro newMacro = handler.createMacro(
+					snippet.getName(),
+					snippet.getPath());
+				handler.runMacro(null,newMacro,false);
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,jEdit.class,e);
+			}
 		}
 	} //}}}
 
 	//{{{ initProxy() method
 	private static void initProxy()
 	{
-		boolean enabled = jEdit.getBooleanProperty("firewall.enabled");
-		if (!enabled) {
+		boolean socksEnabled = jEdit.getBooleanProperty("socks.enabled");
+		if(!socksEnabled)
+		{
+			Log.log(Log.DEBUG,jEdit.class,"SOCKS proxy disabled");
+                        System.getProperties().remove("socksProxyHost");
+                        System.getProperties().remove("socksProxyPort");
+		}
+		else
+		{
+			String socksHost = jEdit.getProperty("firewall.socks.host");
+			if( socksHost != null )
+			{
+				System.setProperty("socksProxyHost", socksHost);
+				Log.log(Log.DEBUG, jEdit.class,
+					"SOCKS proxy enabled: " + socksHost);
+                        }
+
+			String socksPort =  jEdit.getProperty("firewall.socks.port");
+			if(socksPort != null)
+				System.setProperty("socksProxyPort", socksPort);
+		}
+
+		boolean httpEnabled = jEdit.getBooleanProperty("firewall.enabled");
+		if (!httpEnabled)
+		{
 			Log.log(Log.DEBUG, jEdit.class, "HTTP proxy disabled");
 			System.getProperties().remove("proxySet");
 			System.getProperties().remove("proxyHost");
@@ -2969,7 +2990,9 @@ public class jEdit
 			System.getProperties().remove("http.proxyPort");
 			System.getProperties().remove("http.nonProxyHosts");
 			Authenticator.setDefault(null);
-		} else {
+		}
+		else
+		{
 			// set proxy host
 			String host = jEdit.getProperty("firewall.host");
 			if (host == null)
@@ -3025,6 +3048,73 @@ public class jEdit
 		{
 			return pw;
 		}
+	} //}}}
+
+	//{{{ finishStartup() method
+	private static void finishStartup(final boolean gui, final boolean restore,
+		final String userDir, final String[] args)
+	{
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run()
+			{
+				Buffer buffer = openFiles(null,userDir,args);
+
+				String splitConfig = null;
+
+				if(restore && settingsDirectory != null
+					&& jEdit.getBooleanProperty("restore")
+					&& (bufferCount == 0 || jEdit.getBooleanProperty("restore.cli")))
+				{
+					splitConfig = restoreOpenFiles();
+				}
+
+				if(bufferCount == 0 && gui)
+					newFile(null);
+
+				EditBus.send(new EditorStarted(null));
+
+				if(gui || buffer != null)
+				{
+					if(buffer != null)
+						newView(null,buffer);
+					else
+						newView(null,splitConfig);
+				}
+
+				// Start I/O threads
+				VFSManager.start();
+
+				// Start edit server
+				if(server != null)
+					server.start();
+
+				GUIUtilities.hideSplashScreen();
+
+				Log.log(Log.MESSAGE,jEdit.class,"Startup "
+					+ "complete");
+
+				//{{{ Report any plugin errors
+				if(pluginErrors != null)
+				{
+					String caption = jEdit.getProperty(
+						"plugin-error.caption" + (pluginErrors.size() == 1
+						? "-1" : ""),new Integer[] {
+						new Integer(pluginErrors.size()) });
+
+					new ErrorListDialog(
+						jEdit.getFirstView(),
+						jEdit.getProperty("plugin-error.title"),
+						caption,pluginErrors,true);
+					pluginErrors.removeAllElements();
+				} //}}}
+
+				// in one case not a single AWT class will
+				// have been touched (splash screen off +
+				// -nogui -nobackground switches on command
+				// line)
+				Toolkit.getDefaultToolkit();
+			}
+		});
 	} //}}}
 
 	//{{{ getNotLoadedPluginJARs() method
@@ -3128,25 +3218,37 @@ loop:		for(int i = 0; i < list.length; i++)
 			return;
 		}
 		//{{{ Sort buffer list
-
-		/**
-		 * Note that we use either buffer.getPath() or buffer.toString().
-		 * If the former, then the list is sorted first by directory,
-		 * then by file name; if the latter, it's the opposite.
-		 *
-		 * (Buffer.toString() returns "NAME (DIR)")
-		 */
 		else if(sortBuffers)
 		{
-			String name1 = (sortByName ? buffer.toString()
-				: buffer.getPath());
+			String str11, str12;
+			if(sortByName)
+			{
+				str11 = buffer.getName();
+				str12 = buffer.getDirectory();
+			}
+			else
+			{
+				str11 = buffer.getDirectory();
+				str12 = buffer.getName();
+			}
 
 			Buffer _buffer = buffersFirst;
 			while(_buffer != null)
 			{
-				String name2 = (sortByName ? _buffer.toString()
-					: _buffer.getPath());
-				if(MiscUtilities.compareStrings(name1,name2,true) <= 0)
+				String str21, str22;
+				if(sortByName)
+				{
+					str21 = _buffer.getName();
+					str22 = _buffer.getDirectory();
+				}
+				else
+				{
+					str21 = _buffer.getDirectory();
+					str22 = _buffer.getName();
+				}
+
+				int comp = MiscUtilities.compareStrings(str11,str21,true);
+				if(comp <= 0 || (comp == 0 && MiscUtilities.compareStrings(str12,str22,true) <= 0))
 				{
 					buffer.next = _buffer;
 					buffer.prev = _buffer.prev;
@@ -3267,6 +3369,9 @@ loop:		for(int i = 0; i < list.length; i++)
 
 			view.close();
 			removeViewFromList(view);
+
+			if(view == activeView)
+				activeView = null;
 		}
 	} //}}}
 

@@ -129,7 +129,8 @@ class XThis extends This
 				return invokeImpl( proxy, method, args );
 			} catch ( EvalError ee ) {
 				// Ease debugging...
-				Interpreter.debug( "EvalError in scripted interface: "
+				if ( Interpreter.DEBUG ) 
+					Interpreter.debug( "EvalError in scripted interface: "
 					+ XThis.this.toString() + ": "+ ee );
 				throw ee;
 			}
@@ -138,6 +139,8 @@ class XThis extends This
 		public Object invokeImpl( Object proxy, Method method, Object[] args ) 
 			throws EvalError 
 		{
+			CallStack callstack = newCallStack();
+
 			Class [] sig = Reflect.getTypes( args );
 			BshMethod bmethod = 
 				namespace.getMethod( method.getName(), sig );

@@ -9,10 +9,6 @@
 		<PROPERTY NAME="lineComment" VALUE="--" />
 	</PROPS>
 	<RULES ESCAPE="\" IGNORE_CASE="TRUE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- Comment -->
 		<EOL_SPAN TYPE="COMMENT1">--</EOL_SPAN>
 
@@ -27,7 +23,7 @@
 		</SPAN>
 
 		<!-- some of these should be marked OPERATOR -->
-		<SEQ TYPE="NULL">)</SEQ>
+		<!-- <SEQ TYPE="NULL">)</SEQ>
 		<SEQ TYPE="NULL">(</SEQ>
 		<SEQ TYPE="NULL">=</SEQ>
 		<SEQ TYPE="NULL">!</SEQ>
@@ -52,9 +48,9 @@
 		<SEQ TYPE="NULL">]</SEQ>
 		<SEQ TYPE="NULL">[</SEQ>
 		<SEQ TYPE="NULL">?</SEQ>
-		<SEQ TYPE="NULL">:</SEQ>
+		<SEQ TYPE="NULL">:</SEQ> -->
 
-		<KEYWORDS IGNORE_CASE="TRUE">
+		<KEYWORDS>
 			<KEYWORD1>alias</KEYWORD1>
 			<KEYWORD1>all</KEYWORD1>
 			<KEYWORD1>and</KEYWORD1>

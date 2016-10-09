@@ -23,17 +23,17 @@
 package org.gjt.sp.jedit.search;
 
 //{{{ Imports
+import bsh.BshMethod;
 import bsh.NameSpace;
 import gnu.regexp.*;
-import javax.swing.text.Segment;
 import org.gjt.sp.jedit.BeanShell;
 import org.gjt.sp.jedit.MiscUtilities;
 //}}}
 
 /**
- * A regular expression string matcher.
+ * A regular expression string matcher using {@link gnu.regexp}.
  * @author Slava Pestov
- * @version $Id: RESearchMatcher.java,v 1.13 2002/04/12 03:49:45 spestov Exp $
+ * @version $Id: RESearchMatcher.java,v 1.19 2003/02/07 21:57:41 spestov Exp $
  */
 public class RESearchMatcher implements SearchMatcher
 {
@@ -52,9 +52,9 @@ public class RESearchMatcher implements SearchMatcher
 	 */
 	public RESearchMatcher(String search, String replace,
 		boolean ignoreCase, boolean beanshell,
-		String replaceMethod) throws Exception
+		BshMethod replaceMethod) throws Exception
 	{
-		if(beanshell && replace != null && replace.length() != 0)
+		if(beanshell && replaceMethod != null && replace.length() != 0)
 		{
 			this.beanshell = true;
 			this.replaceMethod = replaceMethod;
@@ -70,6 +70,8 @@ public class RESearchMatcher implements SearchMatcher
 
 		re = new RE(search,(ignoreCase ? RE.REG_ICASE : 0)
 			| RE.REG_MULTILINE,RE_SYNTAX_JEDIT);
+
+		returnValue = new int[2];
 	} //}}}
 
 	//{{{ nextMatch() method
@@ -82,13 +84,15 @@ public class RESearchMatcher implements SearchMatcher
 	 * @param end True if the end of the segment is the end of the buffer
 	 * @param firstTime If false and the search string matched at the start
 	 * offset with length zero, automatically find next match
+	 * @param reverse If true, searching will be performed in a backward
+	 * direction.
 	 * @return an array where the first element is the start offset
 	 * of the match, and the second element is the end offset of
 	 * the match
-	 * @since jEdit 4.0pre7
+	 * @since jEdit 4.1pre7
 	 */
 	public int[] nextMatch(CharIndexed text, boolean start, boolean end,
-		boolean firstTime)
+		boolean firstTime, boolean reverse)
 	{
 		int flags = 0;
 
@@ -131,8 +135,9 @@ public class RESearchMatcher implements SearchMatcher
 			}
 		}
 
-		int[] result = { _start, _end };
-		return result;
+		returnValue[0] = _start;
+		returnValue[1] = _end;
+		return returnValue;
 	} //}}}
 
 	//{{{ substitute() method
@@ -168,7 +173,8 @@ public class RESearchMatcher implements SearchMatcher
 	private String replace;
 	private RE re;
 	private boolean beanshell;
-	private String replaceMethod;
+	private BshMethod replaceMethod;
 	private NameSpace replaceNS;
+	private int[] returnValue;
 	//}}}
 }

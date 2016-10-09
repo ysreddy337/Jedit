@@ -1,6 +1,9 @@
 /*
  * PluginManager.java - Plugin manager window
- * Copyright (C) 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,6 +22,7 @@
 
 package org.gjt.sp.jedit.pluginmgr;
 
+//{{{ Imports
 import javax.swing.border.*;
 import javax.swing.event.*;
 import javax.swing.tree.*;
@@ -29,10 +33,16 @@ import java.io.File;
 import java.util.*;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
+//}}}
 
-public class PluginManager extends JDialog
+/**
+ * The plugin manager dialog box.
+ * @author Slava Pestov
+ * @version $Id: PluginManager.java,v 1.14 2003/01/31 04:49:31 spestov Exp $
+ */
+public class PluginManager extends EnhancedDialog
 {
+	//{{{ PluginManager constructor
 	public PluginManager(Frame frame)
 	{
 		super(frame,jEdit.getProperty("plugin-manager.title"),true);
@@ -113,9 +123,23 @@ public class PluginManager extends JDialog
 		setLocationRelativeTo(frame);
 
 		show();
-	}
+	} //}}}
 
-	// private members
+	//{{{ ok() method
+	public void ok()
+	{
+		// do nothing when Enter is pressed.
+	} //}}}
+
+	//{{{ cancel() method
+	public void cancel()
+	{
+		dispose();
+	} //}}}
+
+	//{{{ Private members
+
+	//{{{ Instance variables
 	private JTree tree;
 	private JLabel name;
 	private JLabel author;
@@ -124,7 +148,21 @@ public class PluginManager extends JDialog
 	private JButton update;
 	private JButton install;
 	private JButton close;
+	private PluginList pluginList;
+	//}}}
 
+	//{{{ getPluginList() method
+	private PluginList getPluginList()
+	{
+		if(pluginList == null)
+		{
+			pluginList = new PluginListDownloadProgress(PluginManager.this)
+				.getPluginList();
+		}
+
+		return pluginList;
+	}
+	//{{{ updateTree() method
 	private void updateTree()
 	{
 		DefaultMutableTreeNode treeRoot = new DefaultMutableTreeNode();
@@ -185,8 +223,13 @@ public class PluginManager extends JDialog
 		name.setText(null);
 		author.setText(null);
 		version.setText(null);
-	}
+	} //}}}
 
+	//}}}
+
+	//}}}
+
+	//{{{ Entry class
 	class Entry
 	{
 		String clazz;
@@ -237,8 +280,9 @@ public class PluginManager extends JDialog
 		{
 			return Entry.this.name;
 		}
-	}
+	} //}}}
 
+	//{{{ ActionHandler class
 	class ActionHandler implements ActionListener
 	{
 		public void actionPerformed(ActionEvent evt)
@@ -286,11 +330,6 @@ public class PluginManager extends JDialog
 			}
 			else if(source == update)
 			{
-				PluginList list = new PluginListDownloadProgress(PluginManager.this)
-					.getPluginList();
-				if(list == null)
-					return;
-
 				if(jEdit.getSettingsDirectory() == null)
 				{
 					GUIUtilities.error(PluginManager.this,
@@ -298,19 +337,39 @@ public class PluginManager extends JDialog
 					return;
 				}
 
-				Vector plugins = new Vector();
-				for(int i = 0; i < list.plugins.size(); i++)
-				{
-					PluginList.Plugin plugin = (PluginList.Plugin)list
-						.plugins.elementAt(i);
-					PluginList.Branch branch = plugin.getCompatibleBranch();
+				PluginList list = getPluginList();
+				if(list == null)
+					return;
 
-					if(branch != null
-						&& branch.canSatisfyDependencies()
-						&& plugin.installedVersion != null
-						&& MiscUtilities.compareStrings(branch.version,
-						plugin.installedVersion,false) > 0)
-						plugins.addElement(plugin);
+				Vector plugins = new Vector();
+				for(int i = 0; i < list.pluginSets.size(); i++)
+				{
+					PluginList.PluginSet set = (PluginList.PluginSet)
+						list.pluginSets.get(i);
+					boolean addedSetLabel = false;
+					for(int j = 0; j < set.plugins.size(); j++)
+					{
+						PluginList.Plugin plugin = (PluginList.Plugin)
+							list.pluginHash.get(set.plugins.get(j));
+						PluginList.Branch branch = plugin.getCompatibleBranch();
+
+						if(branch != null
+							&& branch.canSatisfyDependencies()
+							&& plugin.installedVersion != null
+							&& MiscUtilities.compareStrings(branch.version,
+							plugin.installedVersion,false) > 0)
+						{
+							// this ensures set name is only added if
+							// > 0 elements in set
+							if(!addedSetLabel)
+							{
+								plugins.add(new JCheckBoxList.Entry(set.name + ":"));
+								addedSetLabel = true;
+							}
+
+							plugins.addElement(plugin);
+						}
+					}
 				}
 
 				if(plugins.size() == 0)
@@ -335,11 +394,6 @@ public class PluginManager extends JDialog
 			}
 			else if(source == install)
 			{
-				PluginList list = new PluginListDownloadProgress(PluginManager.this)
-					.getPluginList();
-				if(list == null)
-					return;
-
 				if(jEdit.getSettingsDirectory() == null
 					&& jEdit.getJEditHome() == null)
 				{
@@ -347,14 +401,34 @@ public class PluginManager extends JDialog
 					return;
 				}
 
+				PluginList list = getPluginList();
+				if(list == null)
+					return;
+
 				Vector plugins = new Vector();
-				for(int i = 0; i < list.plugins.size(); i++)
+				for(int i = 0; i < list.pluginSets.size(); i++)
 				{
-					PluginList.Plugin plugin = (PluginList.Plugin)list
-						.plugins.elementAt(i);
-					if(plugin.installed == null
-						&& plugin.canBeInstalled())
-						plugins.addElement(plugin);
+					PluginList.PluginSet set = (PluginList.PluginSet)
+						list.pluginSets.get(i);
+					boolean addedSetLabel = false;
+					for(int j = 0; j < set.plugins.size(); j++)
+					{
+						PluginList.Plugin plugin = (PluginList.Plugin)
+							list.pluginHash.get(set.plugins.get(j));
+						if(plugin.installed == null
+							&& plugin.canBeInstalled())
+						{
+							// this ensures set name is only added if
+							// > 0 elements in set
+							if(!addedSetLabel)
+							{
+								plugins.add(new JCheckBoxList.Entry(set.name + ":"));
+								addedSetLabel = true;
+							}
+
+							plugins.addElement(plugin);
+						}
+					}
 				}
 
 				Roster roster = new Roster();
@@ -371,8 +445,9 @@ public class PluginManager extends JDialog
 				updateTree();
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ TreeHandler class
 	class TreeHandler implements TreeSelectionListener
 	{
 		public void valueChanged(TreeSelectionEvent evt)
@@ -410,8 +485,9 @@ public class PluginManager extends JDialog
 			else
 				remove.setEnabled(false);
 		}
-	}
+	} //}}}
 
+	//{{{ Renderer class
 	class Renderer extends DefaultTreeCellRenderer
 	{
 		public Component getTreeCellRendererComponent(JTree tree,
@@ -425,5 +501,5 @@ public class PluginManager extends JDialog
 
 			return this;
 		}
-	}
+	} //}}}
 }

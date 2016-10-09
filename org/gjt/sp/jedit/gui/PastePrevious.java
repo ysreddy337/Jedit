@@ -28,7 +28,6 @@ import javax.swing.border.*;
 import javax.swing.event.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.Vector;
 import org.gjt.sp.jedit.*;
 //}}}
 
@@ -57,6 +56,10 @@ implements ActionListener, ListSelectionListener, MouseListener
 			{
 				StringBuffer buf = new StringBuffer();
 				String item = clipHistory.getItem(index);
+				// workaround for Swing rendering labels starting
+				// with <html> using the HTML engine
+				if(item.toLowerCase().startsWith("<html>"))
+					buf.append(' ');
 				boolean ws = true;
 				for(int i = 0; i < item.length(); i++)
 				{
@@ -168,7 +171,8 @@ implements ActionListener, ListSelectionListener, MouseListener
 	public void mouseEntered(MouseEvent evt) {}
 	public void mouseExited(MouseEvent evt) {}
 	public void mousePressed(MouseEvent evt) {}
-	public void mouseReleased(MouseEvent evt) {} //}}}
+	public void mouseReleased(MouseEvent evt) {}
+	//}}}
 
 	//{{{ valueChanged() method
 	public void valueChanged(ListSelectionEvent evt)

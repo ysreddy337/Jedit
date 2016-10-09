@@ -25,19 +25,21 @@ package org.gjt.sp.jedit.search;
 //{{{ Imports
 import java.awt.event.*;
 import java.awt.*;
-import javax.swing.border.*;
 import javax.swing.event.*;
 import javax.swing.*;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.jedit.gui.HistoryTextField;
+import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
 //}}}
 
+/**
+ * Incremental search tool bar.
+ */
 public class SearchBar extends JPanel
 {
 	//{{{ SearchBar constructor
-	public SearchBar(final View view)
+	public SearchBar(final View view, boolean temp)
 	{
 		setLayout(new BoxLayout(this,BoxLayout.X_AXIS));
 
@@ -65,16 +67,30 @@ public class SearchBar extends JPanel
 			"search.case")));
 		ignoreCase.addActionListener(actionHandler);
 		ignoreCase.setMargin(margin);
+		ignoreCase.setRequestFocusEnabled(false);
 		add(Box.createHorizontalStrut(2));
 		add(regexp = new JCheckBox(jEdit.getProperty(
 			"search.regexp")));
 		regexp.addActionListener(actionHandler);
 		regexp.setMargin(margin);
+		regexp.setRequestFocusEnabled(false);
 		add(Box.createHorizontalStrut(2));
 		add(hyperSearch = new JCheckBox(jEdit.getProperty(
 			"search.hypersearch")));
 		hyperSearch.addActionListener(actionHandler);
 		hyperSearch.setMargin(margin);
+		hyperSearch.setRequestFocusEnabled(false);
+
+		if(temp)
+		{
+			close = new RolloverButton(new ImageIcon(
+				getClass().getResource(
+				"/org/gjt/sp/jedit/icons/closebox.gif")));
+			close.addActionListener(actionHandler);
+			close.setToolTipText(jEdit.getProperty(
+				"view.search.close-tooltip"));
+			add(close);
+		}
 
 		update();
 
@@ -98,6 +114,9 @@ public class SearchBar extends JPanel
 				}
 			}
 		}); //}}}
+
+		// if 'temp' is true, hide search bar after user is done with it
+		this.temp = temp;
 	} //}}}
 
 	//{{{ getField() method
@@ -129,8 +148,13 @@ public class SearchBar extends JPanel
 	private HistoryTextField find;
 	private JCheckBox ignoreCase, regexp, hyperSearch;
 	private Timer timer;
+
+	// close button only there if 'temp' is true
+	private RolloverButton close;
+
 	private int searchStart;
 	private boolean searchReverse;
+	private boolean temp;
 	//}}}
 
 	//{{{ find() method
@@ -149,7 +173,13 @@ public class SearchBar extends JPanel
 		//{{{ HyperSearch
 		else if(hyperSearch.isSelected())
 		{
-			find.setText(null);
+			if(temp)
+			{
+				view.removeToolBar(SearchBar.this);
+			}
+                        else
+				find.setText(null);
+
 			SearchAndReplace.setSearchString(text);
 			SearchAndReplace.setSearchFileSet(new CurrentBufferSet());
 			SearchAndReplace.hyperSearch(view);
@@ -212,7 +242,7 @@ public class SearchBar extends JPanel
 
 		try
 		{
-			if(SearchAndReplace.find(view,view.getBuffer(),start))
+			if(SearchAndReplace.find(view,view.getBuffer(),start,false,reverse))
 				return true;
 		}
 		catch(Exception e)
@@ -251,23 +281,34 @@ public class SearchBar extends JPanel
 		public void actionPerformed(ActionEvent evt)
 		{
 			Object source = evt.getSource();
-			if(evt.getSource() == find)
+			if(source == find)
 				find(false);
-			else if(evt.getSource() == hyperSearch)
+			else if(source == hyperSearch)
 			{
 				jEdit.setBooleanProperty("view.search.hypersearch.toggle",
 					hyperSearch.isSelected());
 				update();
 			}
-			else if(evt.getSource() == ignoreCase)
+			else if(source == ignoreCase)
 			{
 				SearchAndReplace.setIgnoreCase(ignoreCase
 					.isSelected());
 			}
-			else if(evt.getSource() == regexp)
+			else if(source == regexp)
 			{
 				SearchAndReplace.setRegexp(regexp
 					.isSelected());
+			}
+			else if(source == close)
+			{
+				view.removeToolBar(SearchBar.this);
+				SwingUtilities.invokeLater(new Runnable()
+				{
+					public void run()
+					{
+						view.getEditPane().focusOnTextArea();
+					}
+				});
 			}
 		} //}}}
 	} //}}}
@@ -348,15 +389,36 @@ public class SearchBar extends JPanel
 			case KeyEvent.VK_RIGHT:
 				if(!hyperSearch.isSelected())
 				{
+					if(temp)
+					{
+						view.removeToolBar(SearchBar.this);
+					}
+
 					evt.consume();
-					view.getEditPane().focusOnTextArea();
+					SwingUtilities.invokeLater(new Runnable()
+					{
+						public void run()
+						{
+							view.getEditPane().focusOnTextArea();
+						}
+					});
 					view.getEditPane().getTextArea()
 						.processKeyEvent(evt);
 				}
 				break;
 			case KeyEvent.VK_ESCAPE:
+				if(temp)
+				{
+					view.removeToolBar(SearchBar.this);
+				}
 				evt.consume();
-				view.getEditPane().focusOnTextArea();
+				SwingUtilities.invokeLater(new Runnable()
+				{
+					public void run()
+					{
+						view.getEditPane().focusOnTextArea();
+					}
+				});
 				break;
 			case KeyEvent.VK_ENTER:
 				if(evt.isShiftDown())

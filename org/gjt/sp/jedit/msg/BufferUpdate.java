@@ -27,11 +27,11 @@ import org.gjt.sp.jedit.*;
 /**
  * Message sent when a buffer-related change occurs.
  * @author Slava Pestov
- * @version $Id: BufferUpdate.java,v 1.3 2001/12/25 08:07:14 spestov Exp $
+ * @version $Id: BufferUpdate.java,v 1.8 2002/12/24 17:35:23 spestov Exp $
  *
  * @since jEdit 2.2pre6
  */
-public class BufferUpdate extends EBMessage.NonVetoable
+public class BufferUpdate extends EBMessage
 {
 	//{{{ Message types
 	/**
@@ -66,23 +66,6 @@ public class BufferUpdate extends EBMessage.NonVetoable
 	public static final Object MARKERS_CHANGED = "MARKERS_CHANGED";
 
 	/**
-	 * Buffer mode changed.
-	 */
-	public static final Object MODE_CHANGED = "MODE_CHANGED";
-
-	/**
-	 * Character encoding changed.
-	 * @since jEdit 3.2pre4
-	 */
-	public static final Object ENCODING_CHANGED = "ENCODING_CHANGED";
-
-	/**
-	 * Fold handler changed.
-	 * @since jEdit 4.0pre1
-	 */
-	public static final Object FOLD_HANDLER_CHANGED = "FOLD_HANDLER_CHANGED";
-
-	/**
 	 * Buffer saving.
 	 */
 	public static final Object SAVING = "SAVING";
@@ -92,6 +75,17 @@ public class BufferUpdate extends EBMessage.NonVetoable
 	 * @since jEdit 4.0pre4
 	 */
 	public static final Object SAVED = "SAVED";
+
+	/**
+	 * Properties changed.
+	 * @since jEdit 4.1pre1
+	 */
+	public static final Object PROPERTIES_CHANGED = "PROPERTIES_CHANGED";
+
+	/**
+	 * @deprecated No longer sent. Listen for PROPERTIES_CHANGED instead.
+	 */
+	public static final Object MODE_CHANGED = "MODE_CHANGED";
 	//}}}
 
 	//{{{ BufferUpdate constructor
@@ -142,8 +136,8 @@ public class BufferUpdate extends EBMessage.NonVetoable
 	//{{{ paramString() method
 	public String paramString()
 	{
-		return super.paramString() + ",what=" + what
-			+ ",view=" + view;
+		return "what=" + what + ",view=" + view + ","
+			+ super.paramString();
 	} //}}}
 
 	//{{{ Private members

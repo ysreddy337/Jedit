@@ -29,12 +29,38 @@ import java.awt.*;
 //}}}
 
 /**
- * The default implementation of the option pane interface. It lays out
- * components in a vertical fashion.
+ * The default implementation of the option pane interface.<p>
  *
- * @see org.gjt.sp.jedit.OptionPane
+ * Most option panes extend this implementation of {@link OptionPane}, instead
+ * of implementing {@link OptionPane} directly. This class provides a convenient
+ * default framework for laying out configuration options.<p>
+ *
+ * It is derived from Java's <code>JPanel</code> class and uses a
+ * <code>GridBagLayout</code> object for component management. Since
+ * <code>GridBagLayout</code> can be a bit cumbersome to use, this class
+ * contains shortcut methods to simplify layout:
+ *
+ * <ul>
+ * <li>{@link #addComponent(Component)}</li>
+ * <li>{@link #addComponent(String,Component)}</li>
+ * <li>{@link #addComponent(String,Component,int)}</li>
+ * <li>{@link #addComponent(Component,Component)}</li>
+ * <li>{@link #addComponent(Component,Component,int)}</li>
+ * <li>{@link #addSeparator()}</li>
+ * <li>{@link #addSeparator(String)}</li>
+ * </ul>
+ *
+ * @see OptionGroup
+ * @see org.gjt.sp.jedit.gui.OptionsDialog#addOptionPane(OptionPane)
+ *
+ * @author Slava Pestov
+ * @author John Gellene (API documentation)
+ * @version $Id: AbstractOptionPane.java,v 1.14 2003/02/18 22:03:19 spestov Exp $
  */
-public abstract class AbstractOptionPane extends JPanel implements OptionPane
+// even though this class is called AbstractOptionPane, it is not really
+// abstract, since BufferOptions uses an instance of it to lay out its
+// components.
+public class AbstractOptionPane extends JPanel implements OptionPane
 {
 	//{{{ AbstractOptionPane constructor
 	/**
@@ -70,6 +96,10 @@ public abstract class AbstractOptionPane extends JPanel implements OptionPane
 	} //}}}
 
 	//{{{ init() method
+	/**
+	 * Do not override this method, override {@link #_init()} instead.
+	 */
+	// final in 4.2
 	public void init()
 	{
 		if(!initialized)
@@ -80,42 +110,15 @@ public abstract class AbstractOptionPane extends JPanel implements OptionPane
 	} //}}}
 
 	//{{{ save() method
+	/**
+	 * Do not override this method, override {@link #_save()} instead.
+	 */
+	// final in 4.2
 	public void save()
 	{
 		if(initialized)
 			_save();
 	} //}}}
-
-	//{{{ Protected members
-
-	//{{{ Instance variables
-	/**
-	 * Has the option pane been initialized?
-	 */
-	protected boolean initialized;
-
-	/**
-	 * The layout manager.
-	 */
-	protected GridBagLayout gridBag;
-
-	/**
-	 * The number of components already added to the layout manager.
-	 */
-	protected int y;
-	//}}}
-
-	/**
-	 * This method should create the option pane's GUI.
-	 */
-	protected void _init() {}
-
-	/**
-	 * Called when the options dialog's "ok" button is clicked.
-	 * This should save any properties being edited in this option
-	 * pane.
-	 */
-	protected void _save() {}
 
 	//{{{ addComponent() method
 	/**
@@ -127,6 +130,57 @@ public abstract class AbstractOptionPane extends JPanel implements OptionPane
 	 */
 	public void addComponent(String label, Component comp)
 	{
+		JLabel l = new JLabel(label);
+		l.setBorder(new EmptyBorder(0,0,0,12));
+		addComponent(l,comp,GridBagConstraints.BOTH);
+	} //}}}
+
+	//{{{ addComponent() method
+	/**
+	 * Adds a labeled component to the option pane. Components are
+	 * added in a vertical fashion, one per row. The label is
+	 * displayed to the left of the component.
+	 * @param label The label
+	 * @param comp The component
+	 * @param fill Fill parameter to GridBagConstraints for the right
+	 * component
+	 */
+	public void addComponent(String label, Component comp, int fill)
+	{
+		JLabel l = new JLabel(label);
+		l.setBorder(new EmptyBorder(0,0,0,12));
+		addComponent(l,comp,fill);
+	} //}}}
+
+	//{{{ addComponent() method
+	/**
+	 * Adds a labeled component to the option pane. Components are
+	 * added in a vertical fashion, one per row. The label is
+	 * displayed to the left of the component.
+	 * @param comp1 The label
+	 * @param comp2 The component
+	 *
+	 * @since jEdit 4.1pre3
+	 */
+	public void addComponent(Component comp1, Component comp2)
+	{
+		addComponent(comp1,comp2,GridBagConstraints.BOTH);
+	} //}}}
+
+	//{{{ addComponent() method
+	/**
+	 * Adds a labeled component to the option pane. Components are
+	 * added in a vertical fashion, one per row. The label is
+	 * displayed to the left of the component.
+	 * @param comp1 The label
+	 * @param comp2 The component
+	 * @param fill Fill parameter to GridBagConstraints for the right
+	 * component
+	 *
+	 * @since jEdit 4.1pre3
+	 */
+	public void addComponent(Component comp1, Component comp2, int fill)
+	{
 		GridBagConstraints cons = new GridBagConstraints();
 		cons.gridy = y++;
 		cons.gridheight = 1;
@@ -135,15 +189,14 @@ public abstract class AbstractOptionPane extends JPanel implements OptionPane
 		cons.insets = new Insets(1,0,1,0);
 		cons.fill = GridBagConstraints.BOTH;
 
-		JLabel l = new JLabel(label,SwingConstants.RIGHT);
-		l.setBorder(new EmptyBorder(0,0,0,12));
-		gridBag.setConstraints(l,cons);
-		add(l);
+		gridBag.setConstraints(comp1,cons);
+		add(comp1);
 
+		cons.fill = fill;
 		cons.gridx = 1;
 		cons.weightx = 1.0f;
-		gridBag.setConstraints(comp,cons);
-		add(comp);
+		gridBag.setConstraints(comp2,cons);
+		add(comp2);
 	} //}}}
 
 	//{{{ addComponent() method
@@ -171,10 +224,39 @@ public abstract class AbstractOptionPane extends JPanel implements OptionPane
 	/**
 	 * Adds a separator component.
 	 * @param label The separator label property
+	 * @since jEdit 4.1pre7
+	 */
+	public void addSeparator()
+	{
+		if(y != 0)
+			addComponent(Box.createVerticalStrut(6));
+
+		JSeparator sep = new JSeparator(JSeparator.HORIZONTAL);
+
+		GridBagConstraints cons = new GridBagConstraints();
+		cons.gridy = y++;
+		cons.gridheight = 1;
+		cons.gridwidth = cons.REMAINDER;
+		cons.fill = GridBagConstraints.BOTH;
+		cons.anchor = GridBagConstraints.WEST;
+		cons.weightx = 1.0f;
+		cons.insets = new Insets(1,0,1,0);
+
+		gridBag.setConstraints(sep,cons);
+		add(sep);
+	} //}}}
+
+	//{{{ addSeparator() method
+	/**
+	 * Adds a separator component.
+	 * @param label The separator label property
 	 * @since jEdit 2.6pre2
 	 */
 	public void addSeparator(String label)
 	{
+		if(y != 0)
+			addComponent(Box.createVerticalStrut(6));
+
 		Box box = new Box(BoxLayout.X_AXIS);
 		Box box2 = new Box(BoxLayout.Y_AXIS);
 		box2.add(Box.createGlue());
@@ -203,6 +285,36 @@ public abstract class AbstractOptionPane extends JPanel implements OptionPane
 		add(box);
 	} //}}}
 
+	//{{{ Protected members
+	/**
+	 * Has the option pane been initialized?
+	 */
+	protected boolean initialized;
+
+	/**
+	 * The layout manager.
+	 */
+	protected GridBagLayout gridBag;
+
+	/**
+	 * The number of components already added to the layout manager.
+	 */
+	protected int y;
+
+	/**
+	 * This method should create and arrange the components of the option pane
+	 * and initialize the option data displayed to the user. This method
+	 * is called when the option pane is first displayed, and is not
+	 * called again for the lifetime of the object.
+	 */
+	protected void _init() {}
+
+	/**
+	 * Called when the options dialog's "ok" button is clicked.
+	 * This should save any properties being edited in this option
+	 * pane.
+	 */
+	protected void _save() {}
 	//}}}
 
 	//{{{ Private members

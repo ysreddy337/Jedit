@@ -36,7 +36,7 @@ import org.gjt.sp.util.Log;
  * The default input handler. It maps sequences of keystrokes into actions
  * and inserts key typed events into the text area.
  * @author Slava Pestov
- * @version $Id: DefaultInputHandler.java,v 1.13 2002/03/17 01:28:43 spestov Exp $
+ * @version $Id: DefaultInputHandler.java,v 1.15 2003/01/14 20:05:18 spestov Exp $
  */
 public class DefaultInputHandler extends InputHandler
 {
@@ -85,7 +85,8 @@ public class DefaultInputHandler extends InputHandler
 		StringTokenizer st = new StringTokenizer(keyBinding);
 		while(st.hasMoreTokens())
 		{
-			KeyStroke keyStroke = parseKeyStroke(st.nextToken());
+			String keyCodeStr = st.nextToken();
+			KeyStroke keyStroke = parseKeyStroke(keyCodeStr);
 			if(keyStroke == null)
 				return;
 
@@ -96,7 +97,9 @@ public class DefaultInputHandler extends InputHandler
 					current = (Hashtable)o;
 				else
 				{
-					o = new Hashtable();
+					Hashtable hash = new Hashtable();
+					hash.put(PREFIX_STR,keyCodeStr);
+					o = hash;
 					current.put(keyStroke,o);
 					current = (Hashtable)o;
 				}
@@ -231,7 +234,7 @@ public class DefaultInputHandler extends InputHandler
 				repeatCount = 0;
 				repeat = false;
 				evt.consume();
-				currentBindings = bindings;
+				setCurrentBindings(bindings);
 			}
 			else if(modifiers == 0 && (keyCode == KeyEvent.VK_ENTER
 				|| keyCode == KeyEvent.VK_TAB))
@@ -249,13 +252,13 @@ public class DefaultInputHandler extends InputHandler
 
 		if(o instanceof EditAction)
 		{
-			currentBindings = bindings;
+			setCurrentBindings(bindings);
 			invokeAction((EditAction)o);
 			evt.consume();
 		}
 		else if(o instanceof Hashtable)
 		{
-			currentBindings = (Hashtable)o;
+			setCurrentBindings((Hashtable)o);
 			evt.consume();
 		}
 
@@ -317,17 +320,17 @@ public class DefaultInputHandler extends InputHandler
 
 		if(o instanceof Hashtable)
 		{
-			currentBindings = (Hashtable)o;
+			setCurrentBindings((Hashtable)o);
 		}
 		else if(o instanceof EditAction)
 		{
-			currentBindings = bindings;
+			setCurrentBindings(bindings);
 			invokeAction((EditAction)o);
 		}
 		else
 		{
 			// otherwise, reset to default map and do user input
-			currentBindings = bindings;
+			setCurrentBindings(bindings);
 
 			if(repeat && Character.isDigit(c))
 			{
@@ -338,6 +341,75 @@ public class DefaultInputHandler extends InputHandler
 			else
 				userInput(c);
 		}
+	} //}}}
+
+	//{{{ setModifierMapping() method
+	/**
+	 * Changes the mapping between symbolic modifier key names
+	 * (<code>C</code>, <code>A</code>, <code>M</code>, <code>S</code>) and
+	 * Java modifier flags.
+	 *
+	 * @param c The modifier to map the <code>C</code> modifier to
+	 * @param a The modifier to map the <code>A</code> modifier to
+	 * @param m The modifier to map the <code>M</code> modifier to
+	 * @param s The modifier to map the <code>S</code> modifier to
+	 *
+	 * @since jEdit 4.1pre3
+	 */
+	public static void setModifierMapping(int c, int a, int m, int s)
+	{
+		DefaultInputHandler.c = c;
+		DefaultInputHandler.a = a;
+		DefaultInputHandler.m = m;
+		DefaultInputHandler.s = s;
+	} //}}}
+
+	//{{{ getSymbolicModifierName() method
+	/**
+	 * Returns a the symbolic modifier name for the specified Java modifier
+	 * flag.
+	 *
+	 * @param mod A modifier constant from <code>InputEvent</code>
+	 *
+	 * @since jEdit 4.1pre3
+	 */
+	public static char getSymbolicModifierName(int mod)
+	{
+		// this relies on the fact that if C is mapped to M, then
+		// M will be mapped to C.
+		if(mod == c)
+			return 'C';
+		else if(mod == a)
+			return 'A';
+		else if(mod == m)
+			return 'M';
+		else if(mod == s)
+			return 'S';
+		else
+			return '\0';
+	} //}}}
+
+	//{{{ getModifierString() method
+	/**
+	 * Returns a string containing symbolic modifier names set in the
+	 * specified event.
+	 *
+	 * @param evt The event
+	 *
+	 * @since jEdit 4.1pre3
+	 */
+	public static String getModifierString(InputEvent evt)
+	{
+		StringBuffer buf = new StringBuffer();
+		if(evt.isControlDown())
+			buf.append(getSymbolicModifierName(InputEvent.CTRL_MASK));
+		if(evt.isAltDown())
+			buf.append(getSymbolicModifierName(InputEvent.ALT_MASK));
+		if(evt.isMetaDown())
+			buf.append(getSymbolicModifierName(InputEvent.META_MASK));
+		if(evt.isShiftDown())
+			buf.append(getSymbolicModifierName(InputEvent.SHIFT_MASK));
+		return buf.toString();
 	} //}}}
 
 	//{{{ parseKeyStroke() method
@@ -364,22 +436,16 @@ public class DefaultInputHandler extends InputHandler
 					.charAt(i)))
 				{
 				case 'A':
-					modifiers |= InputEvent.ALT_MASK;
+					modifiers |= a;
 					break;
 				case 'C':
-					if(OperatingSystem.isMacOS())
-						modifiers |= InputEvent.META_MASK;
-					else
-						modifiers |= InputEvent.CTRL_MASK;
+					modifiers |= c;
 					break;
 				case 'M':
-					if(OperatingSystem.isMacOS())
-						modifiers |= InputEvent.CTRL_MASK;
-					else
-						modifiers |= InputEvent.META_MASK;
+					modifiers |= m;
 					break;
 				case 'S':
-					modifiers |= InputEvent.SHIFT_MASK;
+					modifiers |= s;
 					break;
 				}
 			}
@@ -424,7 +490,56 @@ public class DefaultInputHandler extends InputHandler
 	} //}}}
 
 	//{{{ Private members
+
+	//{{{ Class initializer
+	static
+	{
+		if(OperatingSystem.isMacOS())
+		{
+			setModifierMapping(
+				InputEvent.META_MASK,
+				InputEvent.ALT_MASK,
+				InputEvent.CTRL_MASK,
+				InputEvent.SHIFT_MASK);
+		}
+		else
+		{
+			setModifierMapping(
+				InputEvent.CTRL_MASK,
+				InputEvent.ALT_MASK,
+				InputEvent.META_MASK,
+				InputEvent.SHIFT_MASK);
+		}
+	} //}}}
+
+	private static int c, a, m, s;
+
+	// Stores prefix name in bindings hashtable
+	private static Object PREFIX_STR = "PREFIX_STR";
+
 	private Hashtable bindings;
 	private Hashtable currentBindings;
+
+	//{{{ setCurrentBindings() method
+	private void setCurrentBindings(Hashtable bindings)
+	{
+		String prefixStr = (String)bindings.get(PREFIX_STR);
+		if(prefixStr != null)
+		{
+			if(currentBindings != this.bindings)
+			{
+				//XXX this won't work past 2 levels of prefixing
+				prefixStr = currentBindings.get(PREFIX_STR)
+					+ " " + prefixStr;
+			}
+
+			view.getStatus().setMessage(prefixStr);
+		}
+		else
+			view.getStatus().setMessage(null);
+
+		currentBindings = bindings;
+	} //}}}
+
 	//}}}
 }

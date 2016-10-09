@@ -24,7 +24,8 @@ package org.gjt.sp.jedit.search;
 
 //{{{ Imports
 import gnu.regexp.*;
-import java.util.Vector;
+import java.awt.Component;
+import java.util.ArrayList;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 //}}}
@@ -32,7 +33,7 @@ import org.gjt.sp.util.Log;
 /**
  * A file set for searching all open buffers.
  * @author Slava Pestov
- * @version $Id: AllBufferSet.java,v 1.2 2001/12/02 11:40:51 spestov Exp $
+ * @version $Id: AllBufferSet.java,v 1.4 2002/06/18 02:44:52 spestov Exp $
  */
 public class AllBufferSet extends BufferListSet
 {
@@ -73,10 +74,10 @@ public class AllBufferSet extends BufferListSet
 	//}}}
 
 	//{{{ _getFiles() method
-	protected String[] _getFiles()
+	protected String[] _getFiles(Component comp)
 	{
 		Buffer[] buffers = jEdit.getBuffers();
-		Vector vector = new Vector(buffers.length);
+		ArrayList returnValue = new ArrayList(buffers.length);
 
 		RE filter;
 		try
@@ -85,7 +86,7 @@ public class AllBufferSet extends BufferListSet
 		}
 		catch(Exception e)
 		{
-			Log.log(Log.ERROR,DirectoryListSet.class,e);
+			Log.log(Log.ERROR,this,e);
 			return null;
 		}
 
@@ -93,11 +94,9 @@ public class AllBufferSet extends BufferListSet
 		{
 			Buffer buffer = buffers[i];
 			if(filter.isMatch(buffer.getName()))
-				vector.addElement(buffer.getPath());
+				returnValue.add(buffer.getPath());
 		}
 
-		String[] retVal = new String[vector.size()];
-		vector.copyInto(retVal);
-		return retVal;
+		return (String[])returnValue.toArray(new String[returnValue.size()]);
 	} //}}}
 }

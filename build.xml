@@ -16,7 +16,7 @@
 		<echo file="doc/docbook-wrapper.xsl" append="true"
 			message=" xmlns:xsl='http://www.w3.org/1999/XSL/Transform'"/>
 		<echo file="doc/docbook-wrapper.xsl" append="true"
-			message=" xsl:version='1.0'&gt;"/>
+			message=" version='1.0'&gt;"/>
 		<echo file="doc/docbook-wrapper.xsl" append="true"
 			message="&lt;xsl:import href='${docbook.xsl}/html/chunk.xsl'/&gt;"/>
 		<echo file="doc/docbook-wrapper.xsl" append="true"
@@ -36,6 +36,7 @@
 			<include name="installer/*.java"/>
 			<include name="org/gjt/sp/jedit/**/*.java"/>
 			<exclude name="org/gjt/sp/jedit/Java14.java"/>
+			<exclude name="org/gjt/sp/jedit/print/BufferPrinter1_4.java"/>
 			<include name="org/gjt/sp/util/*.java"/>
 		</javac>
 	</target>
@@ -48,6 +49,7 @@
 			includeJavaRuntime="yes"
 		>
 			<include name="org/gjt/sp/jedit/Java14.java"/>
+			<include name="org/gjt/sp/jedit/print/BufferPrinter1_4.java"/>
 		</javac>
 	</target>
 
@@ -55,6 +57,7 @@
 		<jar
 			jarfile="jedit.jar"
 			manifest="org/gjt/sp/jedit/jedit.manifest"
+			compress="false"
 		>
 			<fileset dir=".">
 				<include name="bsh/**/*.class"/>
@@ -70,7 +73,6 @@
 				<include name="org/gjt/sp/jedit/icons/*.gif"/>
 				<include name="org/gjt/sp/jedit/icons/*.jpg"/>
 				<include name="org/gjt/sp/jedit/icons/*.png"/>
-				<include name="org/gjt/sp/jedit/options/overview.html"/>
 				<include name="org/gjt/sp/jedit/*.props"/>
 
 				<include name="org/gjt/sp/jedit/actions.xml"/>
@@ -112,9 +114,17 @@
 		<exec executable="openjade" dir="doc/users-guide">
 			<arg value="-d"/>
 			<arg value="../jeditprint-letter.dsl"/>
+			<arg value="-c"/>
+			<arg value="/usr/share/xml/docbook/xml-dtd-4.1.2/catalog"/>
+			<arg value="-c"/>
+			<arg value="/usr/local/share/dsssl/docbook-dsssl-1.77/catalog"/>
+			<arg value="-c"/>
+			<arg value="/usr/local/share/dsssl/docbook-dsssl-1.77/catalog"/>
+			<arg value="-c"/>
+			<arg value="/usr/local/share/dsssl/catalog"/>
 			<arg value="-t"/>
 			<arg value="tex"/>
-			<arg value="/usr/share/sgml/xml.dcl"/>
+			<arg value="/usr/local/share/OpenSP/xml.dcl"/>
 			<arg value="users-guide.xml"/>
 		</exec>
 		<exec executable="pdfjadetex" dir="doc/users-guide">
@@ -134,9 +144,17 @@
 		<exec executable="openjade" dir="doc/users-guide">
 			<arg value="-d"/>
 			<arg value="../jeditprint-a4.dsl"/>
+			<arg value="-c"/>
+			<arg value="/usr/share/xml/docbook/xml-dtd-4.1.2/catalog"/>
+			<arg value="-c"/>
+			<arg value="/usr/local/share/dsssl/docbook-dsssl-1.77/catalog"/>
+			<arg value="-c"/>
+			<arg value="/usr/local/share/dsssl/docbook-dsssl-1.77/catalog"/>
+			<arg value="-c"/>
+			<arg value="/usr/local/share/dsssl/catalog"/>
 			<arg value="-t"/>
 			<arg value="tex"/>
-			<arg value="/usr/share/sgml/xml.dcl"/>
+			<arg value="/usr/local/share/OpenSP/xml.dcl"/>
 			<arg value="users-guide.xml"/>
 		</exec>
 		<exec executable="pdfjadetex" dir="doc/users-guide">
@@ -152,18 +170,36 @@
 			tofile="doc/users-guide/users-guide-a4.pdf" />
 	</target>
 
+	<path id="doclet.class.path">
+		<pathelement location="${tools.jar}"/>
+		<pathelement location="."/>
+	</path>
+
 	<target name="javadoc">
 		<delete dir="doc/api"/>
 		<mkdir dir="doc/api"/>
+
+		<javac
+			srcdir="."
+			destdir="."
+			deprecation="on"
+			includeJavaRuntime="yes"
+		>
+			<classpath refid="doclet.class.path"/>
+			<include name="doclet/GenerateTocXML.java"/>
+		</javac>
 
 		<javadoc packagenames="bsh.*, com.*, gnu.*, org.*"
 			sourcepath="."
 			classpath="."
 			destdir="doc/api"
-			author="true"
-			version="true"
-			windowtitle="jEdit API"
 			doctitle="jEdit API" />
+
+		<javadoc classpath="."
+			doclet="doclet.GenerateTocXML"
+			docletpath="."
+			packagenames="bsh.*, com.*, gnu.*, org.*"
+			sourcepath="."/>
 	</target>
 
 	<target name="clean">

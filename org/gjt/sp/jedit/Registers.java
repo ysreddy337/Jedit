@@ -23,28 +23,46 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import javax.swing.text.*;
 import java.awt.datatransfer.*;
 import java.awt.Toolkit;
 import java.io.*;
-import java.util.Vector;
 import org.gjt.sp.jedit.gui.*;
-import org.gjt.sp.jedit.textarea.JEditTextArea;
+import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * jEdit's registers are an extension of the clipboard metaphor.
+ * jEdit's registers are an extension of the clipboard metaphor.<p>
+ *
+ * A {@link Registers.Register} is string of text indexed by a
+ * single character. Typically the text is taken from selected buffer text
+ * and the index character is a keyboard character selected by the user.<p>
+ *
+ * This class defines a number of static methods
+ * that give each register the properties of a virtual clipboard.<p>
+ *
+ * Two classes implement the {@link Registers.Register} interface. A
+ * {@link Registers.ClipboardRegister} is tied to the contents of the
+ * system clipboard. jEdit assigns a
+ * {@link Registers.ClipboardRegister} to the register indexed under
+ * the character <code>$</code>. A
+ * {@link Registers.StringRegister} is created for registers assigned
+ * by the user. In addition, jEdit assigns <code>%</code> to
+ * the last text segment selected in the text area. On Windows this is a
+ * {@link Registers.StringRegister}, on Unix under Java 2 version 1.4, a
+ * {@link Registers.ClipboardRegister}.
  *
  * @author Slava Pestov
- * @version $Id: Registers.java,v 1.4 2002/03/10 04:12:49 spestov Exp $
+ * @author John Gellene (API documentation)
+ * @version $Id: Registers.java,v 1.10 2003/02/08 18:53:02 spestov Exp $
  */
 public class Registers
 {
 	//{{{ copy() method
 	/**
-	 * Convenience method that copies the text selected in the specified
-	 * text area into the specified register.
+	 * Copies the text selected in the text area into the specified register.
+	 * This will replace the existing contents of the designated register.
+	 *
 	 * @param textArea The text area
 	 * @param register The register
 	 * @since jEdit 2.7pre2
@@ -59,79 +77,11 @@ public class Registers
 		HistoryModel.getModel("clipboard").addItem(selection);
 	} //}}}
 
-	//{{{ append() method
-	/**
-	 * Convinience method that appends the text selected in the specified
-	 * text area to the specified register, with a newline between the old
-	 * and new text.
-	 * @param textArea The text area
-	 * @param register The register
-	 */
-	public static void append(JEditTextArea textArea, char register)
-	{
-		append(textArea,register,"\n",false);
-	} //}}}
-
-	//{{{ append() method
-	/**
-	 * Convinience method that appends the text selected in the specified
-	 * text area to the specified register.
-	 * @param textArea The text area
-	 * @param register The register
-	 * @param separator The text to insert between the old and new text
-	 */
-	public static void append(JEditTextArea textArea, char register,
-		String separator)
-	{
-		append(textArea,register,separator,false);
-	} //}}}
-
-	//{{{ append() method
-	/**
-	 * Convinience method that appends the text selected in the specified
-	 * text area to the specified register.
-	 * @param textArea The text area
-	 * @param register The register
-	 * @param separator The text to insert between the old and new text
-	 * @param cut Should the current selection be removed?
-	 * @since jEdit 3.2pre1
-	 */
-	public static void append(JEditTextArea textArea, char register,
-		String separator, boolean cut)
-	{
-		if(cut && !textArea.isEditable())
-		{
-			textArea.getToolkit().beep();
-			return;
-		}
-
-		String selection = textArea.getSelectedText();
-		if(selection == null)
-			return;
-
-		Register reg = getRegister(register);
-
-		String registerContents = reg.toString();
-		if(reg != null && registerContents != null)
-		{
-			if(registerContents.endsWith(separator))
-				selection = registerContents + selection;
-			else
-				selection = registerContents + separator + selection;
-		}
-
-		setRegister(register,selection);
-		HistoryModel.getModel("clipboard").addItem(selection);
-
-		if(cut)
-			textArea.setSelectedText("");
-	} //}}}
-
 	//{{{ cut() method
 	/**
-	 * Convinience method that copies the text selected in the specified
-	 * text area into the specified register, and then removes it from the
-	 * text area.
+	 * Copies the text selected in the text area into the specified
+	 * register, and then removes it from the buffer.
+	 *
 	 * @param textArea The text area
 	 * @param register The register
 	 * @since jEdit 2.7pre2
@@ -153,15 +103,96 @@ public class Registers
 			textArea.getToolkit().beep();
 	} //}}}
 
+	//{{{ append() method
+	/**
+	 * Appends the text selected in the text area to the specified register,
+	 * with a newline between the old and new text.
+	 * @param textArea The text area
+	 * @param register The register
+	 */
+	public static void append(JEditTextArea textArea, char register)
+	{
+		append(textArea,register,"\n",false);
+	} //}}}
+
+	//{{{ append() method
+	/**
+	 * Appends the text selected in the text area to the specified register.
+	 * @param textArea The text area
+	 * @param register The register
+	 * @param separator The separator to insert between the old and new text
+	 */
+	public static void append(JEditTextArea textArea, char register,
+		String separator)
+	{
+		append(textArea,register,separator,false);
+	} //}}}
+
+	//{{{ append() method
+	/**
+	 * Appends the text selected in the  text area to the specified register.
+	 * @param textArea The text area
+	 * @param register The register
+	 * @param separator The text to insert between the old and new text
+	 * @param cut Should the current selection be removed?
+	 * @since jEdit 3.2pre1
+	 */
+	public static void append(JEditTextArea textArea, char register,
+		String separator, boolean cut)
+	{
+		if(cut && !textArea.isEditable())
+		{
+			textArea.getToolkit().beep();
+			return;
+		}
+
+		String selection = textArea.getSelectedText();
+		if(selection == null)
+			return;
+
+		Register reg = getRegister(register);
+
+		if(reg != null)
+		{
+			String registerContents = reg.toString();
+			if(registerContents != null)
+			{
+				if(registerContents.endsWith(separator))
+					selection = registerContents + selection;
+				else
+					selection = registerContents + separator + selection;
+			}
+		}
+
+		setRegister(register,selection);
+		HistoryModel.getModel("clipboard").addItem(selection);
+
+		if(cut)
+			textArea.setSelectedText("");
+	} //}}}
+
 	//{{{ paste() method
 	/**
-	 * Convinience method that pastes the contents of the specified
-	 * register into the text area.
+	 * Insets the contents of the specified register into the text area.
 	 * @param textArea The text area
 	 * @param register The register
 	 * @since jEdit 2.7pre2
 	 */
 	public static void paste(JEditTextArea textArea, char register)
+	{
+		paste(textArea,register,false);
+	} //}}}
+
+	//{{{ paste() method
+	/**
+	 * Inserts the contents of the specified register into the text area.
+	 * @param textArea The text area
+	 * @param register The register
+	 * @param vertical Vertical (columnar) paste
+	 * @since jEdit 4.1pre1
+	 */
+	public static void paste(JEditTextArea textArea, char register,
+		boolean vertical)
 	{
 		if(!textArea.isEditable())
 		{
@@ -185,24 +216,16 @@ public class Registers
 				return;
 			}
 
-			// preserve magic pos for easy insertion of the
-			// same string at the start of multiple lines
-
-			// XXX: getMagicCaretPosition() is deprecated
-			int magic = textArea.getMagicCaretPosition();
-			textArea.setSelectedText(selection);
-
-			if(textArea.getCaretPosition()
-				!= textArea.getLineEndOffset(textArea.getCaretLine()) - 1)
+			if(vertical && textArea.getSelectionCount() == 0)
 			{
-				textArea.setMagicCaretPosition(magic);
+				int caret = textArea.getCaretPosition();
+				int caretLine = textArea.getCaretLine();
+				Selection.Rect rect = new Selection.Rect(
+					caretLine,caret,caretLine,caret);
+				textArea.setSelectedText(rect,selection);
 			}
 			else
-			{
-				// if user is pasting at end of line, chances are
-				// they want the caret to go the the end of the
-				// line again when they move it up or down
-			}
+				textArea.setSelectedText(selection);
 
 			HistoryModel.getModel("clipboard").addItem(selection);
 		}
@@ -286,10 +309,10 @@ public class Registers
 			registers[name] = null;
 	} //}}}
 
-	//{{{ getRegister() method
+	//{{{ getRegisters() method
 	/**
 	 * Returns an array of all available registers. Some of the elements
-	 * of this array might be null.
+	 * of this array might be <code>null</code>.
 	 */
 	public static Register[] getRegisters()
 	{

@@ -26,7 +26,6 @@ package org.gjt.sp.jedit.gui;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
-import org.gjt.sp.jedit.textarea.JEditTextArea;
 import org.gjt.sp.jedit.*;
 //}}}
 
@@ -94,7 +93,8 @@ public class EnhancedMenuItem extends JMenuItem
 			Insets insets = getInsets();
 			g.drawString(shortcut,getWidth() - (fm.stringWidth(
 				shortcut) + insets.right + insets.left + 5),
-				getFont().getSize() + (insets.top - 1)
+				getFont().getSize() + (insets.top - 
+				(OperatingSystem.isMacOSLF() ? 0 : 1))
 				/* XXX magic number */);
 		}
 	} //}}}
@@ -140,8 +140,14 @@ public class EnhancedMenuItem extends JMenuItem
 	//{{{ Class initializer
 	static
 	{
+		String shortcutFont;
+		if (OperatingSystem.isMacOSLF())
+			shortcutFont = "Lucida Grande";
+		else
+			shortcutFont = "Monospaced";
+		
 		acceleratorFont = UIManager.getFont("MenuItem.acceleratorFont");
-		acceleratorFont = new Font("Monospaced",
+		acceleratorFont = new Font(shortcutFont,
 			acceleratorFont.getStyle(),
 			acceleratorFont.getSize());
 		acceleratorForeground = UIManager

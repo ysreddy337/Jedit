@@ -22,14 +22,15 @@ package org.gjt.sp.util;
 /**
  * Services work requests in the background.
  * @author Slava Pestov
- * @version $Id: WorkThread.java,v 1.4 2001/11/23 09:08:49 spestov Exp $
+ * @version $Id: WorkThread.java,v 1.6 2002/05/28 03:53:21 spestov Exp $
  */
 public class WorkThread extends Thread
 {
 	public WorkThread(WorkThreadPool pool, ThreadGroup group, String name)
 	{
 		super(group, name);
-		setDaemon(true);
+		// so that jEdit doesn't exit with no views open automatically
+		//setDaemon(true);
 		setPriority(4);
 
 		this.pool = pool;
@@ -186,7 +187,7 @@ public class WorkThread extends Thread
 
 	private void doRequest(WorkThreadPool.Request request)
 	{
-//		Log.log(Log.DEBUG,WorkThread.class,"Running in work thread: " + request);
+		Log.log(Log.DEBUG,WorkThread.class,"Running in work thread: " + request);
 
 		try
 		{

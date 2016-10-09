@@ -24,24 +24,23 @@ package org.gjt.sp.jedit.search;
 
 //{{{ Imports
 import javax.swing.border.*;
-import javax.swing.event.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.util.HashMap;
+import org.gjt.sp.jedit.browser.VFSBrowser;
 import org.gjt.sp.jedit.gui.*;
-import org.gjt.sp.jedit.io.FileVFS;
+import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.msg.SearchSettingsChanged;
 import org.gjt.sp.jedit.msg.ViewUpdate;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
 //}}}
 
 /**
  * Search and replace dialog.
  * @author Slava Pestov
- * @version $Id: SearchDialog.java,v 1.21 2002/04/07 11:44:14 spestov Exp $
+ * @version $Id: SearchDialog.java,v 1.34 2003/02/18 22:03:20 spestov Exp $
  */
 public class SearchDialog extends EnhancedDialog implements EBComponent
 {
@@ -54,6 +53,12 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 	public static final int ALL_BUFFERS = 1;
 	public static final int DIRECTORY = 2;
 	//}}}
+
+	//{{{ getSearchDialog() method
+	public static SearchDialog getSearchDialog(View view)
+	{
+		return (SearchDialog)viewHash.get(view);
+	} //}}}
 
 	//{{{ showSearchDialog() method
 	/**
@@ -159,14 +164,11 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 		}
 		else
 		{
-			String path;
-			if(view.getBuffer().getVFS() instanceof FileVFS)
-			{
-				path = MiscUtilities.getParentOfPath(
-					view.getBuffer().getPath());
-			}
-			else
-				path = System.getProperty("user.dir");
+			String path = view.getBuffer().getDirectory();
+
+			if(path.endsWith("/") || path.endsWith(File.separator))
+				path = path.substring(0,path.length() - 1);
+
 			directory.setText(path);
 
 			if(fileset instanceof AllBufferSet)
@@ -262,19 +264,25 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 		{
 			setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-			if(!save())
+			if(!save(false))
 				return;
 
 			if(hyperSearch.isSelected() || searchSelection.isSelected())
 			{
 				if(SearchAndReplace.hyperSearch(view,
-					searchSelection.isSelected()));
+					searchSelection.isSelected()))
 					closeOrKeepDialog();
 			}
 			else
 			{
 				if(SearchAndReplace.find(view))
 					closeOrKeepDialog();
+				else
+				{
+					toFront();
+					requestFocus();
+					find.requestFocus();
+				}
 			}
 		}
 		finally
@@ -286,7 +294,7 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 	//{{{ cancel() method
 	public void cancel()
 	{
-		save();
+		save(true);
 		GUIUtilities.saveGeometry(this,"search");
 		dispose();
 	} //}}}
@@ -360,12 +368,7 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 		label.setDisplayedMnemonic(jEdit.getProperty("search.find.mnemonic")
 			.charAt(0));
 		find = new HistoryTextField("find");
-
-		// don't want it to be too wide due to long strings
-		Dimension size = find.getPreferredSize();
-		size.width = find.getFontMetrics(find.getFont())
-			.charWidth('a') * 25;
-		find.setPreferredSize(size);
+		find.setColumns(25);
 
 		find.addActionListener(actionHandler);
 		label.setLabelFor(find);
@@ -542,6 +545,7 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 		cons.gridy++;
 
 		directory = new HistoryTextField("search.directory");
+		directory.setColumns(25);
 		directory.addActionListener(actionListener);
 
 		label = new JLabel(jEdit.getProperty("search.directoryField"),
@@ -639,8 +643,9 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 			&& !searchSelection.isSelected());
 
 		boolean reverseEnabled = !hyperSearch.isSelected()
-			&& searchCurrentBuffer.isSelected();
-		searchBack.setEnabled(reverseEnabled && !regexp.isSelected());
+			&& searchCurrentBuffer.isSelected()
+			&& !regexp.isSelected();
+		searchBack.setEnabled(reverseEnabled);
 		searchForward.setEnabled(reverseEnabled);
 		if(!reverseEnabled)
 			searchForward.setSelected(true);
@@ -661,7 +666,10 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 	} //}}}
 
 	//{{{ save() method
-	private boolean save()
+	/**
+	 * @param cancel If true, we don't bother the user with warning messages
+	 */
+	private boolean save(boolean cancel)
 	{
 		String filter = this.filter.getText();
 		this.filter.addCurrentToHistory();
@@ -685,6 +693,21 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 		{
 			String directory = this.directory.getText();
 			this.directory.addCurrentToHistory();
+
+			if((VFSManager.getVFSForPath(directory).getCapabilities()
+				& VFS.LOW_LATENCY_CAP) == 0)
+			{
+				if(cancel)
+					return false;
+
+				int retVal = GUIUtilities.confirm(
+					SearchDialog.this,"remote-dir-search",
+					null,JOptionPane.YES_NO_OPTION,
+					JOptionPane.WARNING_MESSAGE);
+				if(retVal != JOptionPane.YES_OPTION)
+					return false;
+			}
+
 			boolean recurse = searchSubDirectories.isSelected();
 
 			if(fileset instanceof DirectoryListSet)
@@ -709,14 +732,7 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 
 		boolean ok = true;
 
-		if(fileset.getFileCount() == 0)
-		{
-			// oops
-			GUIUtilities.error(this,"empty-fileset",null);
-			ok = false;
-		}
-		else
-			SearchAndReplace.setSearchFileSet(fileset);
+		SearchAndReplace.setSearchFileSet(fileset);
 
 		if(find.getText().length() != 0)
 		{
@@ -825,14 +841,12 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 		{
 			if(evt.getSource() == choose)
 			{
-				File dir = new File(directory.getText());
-				JFileChooser chooser = new JFileChooser(dir.getParent());
-				chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-				chooser.setSelectedFile(dir);
-
-				if(chooser.showOpenDialog(SearchDialog.this)
-					== JFileChooser.APPROVE_OPTION)
-					directory.setText(chooser.getSelectedFile().getPath());
+				String[] dirs = GUIUtilities.showVFSFileDialog(
+					view,directory.getText(),
+					VFSBrowser.CHOOSE_DIRECTORY_DIALOG,
+					false);
+				if(dirs != null)
+					directory.setText(dirs[0]);
 			}
 			else // source is directory or filter field
 			{
@@ -859,7 +873,7 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 			}
 			else if(source == replaceAndFindBtn)
 			{
-				save();
+				save(false);
 				if(SearchAndReplace.replace(view))
 					ok();
 				else
@@ -869,7 +883,7 @@ public class SearchDialog extends EnhancedDialog implements EBComponent
 			{
 				setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-				save();
+				save(false);
 
 				if(searchSelection.isSelected())
 				{

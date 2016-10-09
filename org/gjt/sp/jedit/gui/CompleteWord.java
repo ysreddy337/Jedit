@@ -24,7 +24,6 @@ package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
 import javax.swing.*;
-import javax.swing.event.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.Vector;
@@ -84,14 +83,37 @@ public class CompleteWord extends JWindow
 
 			SwingUtilities.convertPointToScreen(location,
 				textArea.getPainter());
-			new CompleteWord(view,word,completions,location);
+			new CompleteWord(view,word,completions,location,noWordSep);
 		} //}}}
 	} //}}}
 
 	//{{{ CompleteWord constructor
-	public CompleteWord(View view, String word, Vector completions, Point location)
+	public CompleteWord(View view, String word, Vector completions, Point location,
+		String noWordSep)
 	{
 		super(view);
+
+		this.noWordSep = noWordSep;
+
+		setContentPane(new JPanel(new BorderLayout())
+		{
+			/**
+			 * Returns if this component can be traversed by pressing the
+			 * Tab key. This returns false.
+			 */
+			public boolean isManagingFocus()
+			{
+				return false;
+			}
+
+			/**
+			 * Makes the tab key work in Java 1.4.
+			 */
+			public boolean getFocusTraversalKeysEnabled()
+			{
+				return false;
+			}
+		});
 
 		this.view = view;
 		this.textArea = view.getTextArea();
@@ -272,6 +294,7 @@ public class CompleteWord extends JWindow
 	private Buffer buffer;
 	private String word;
 	private JList words;
+	private String noWordSep;
 	//}}}
 
 	//{{{ insertSelected() method
@@ -337,8 +360,7 @@ public class CompleteWord extends JWindow
 		{
 			switch(evt.getKeyCode())
 			{
-			// doesn't work in 1.4?
-			//case KeyEvent.VK_TAB:
+			case KeyEvent.VK_TAB:
 			case KeyEvent.VK_ENTER:
 				insertSelected();
 				evt.consume();
@@ -390,7 +412,6 @@ public class CompleteWord extends JWindow
 					textArea.backspace();
 					int caret = textArea.getCaretPosition();
 					KeywordMap keywordMap = buffer.getKeywordMapAtOffset(caret);
-					String noWordSep = getNonAlphaNumericWordChars(buffer,keywordMap,caret);
 
 					Vector completions = getCompletions(buffer,word,
 						keywordMap,noWordSep,caret);
@@ -400,6 +421,9 @@ public class CompleteWord extends JWindow
 
 					words.setListData(completions);
 					words.setSelectedIndex(0);
+					words.setVisibleRowCount(Math.min(completions.size(),8));
+
+					pack();
 
 					evt.consume();
 				}
@@ -423,17 +447,26 @@ public class CompleteWord extends JWindow
 				return;
 			else if(ch != '\b')
 			{
-				word = word + ch;
 				textArea.userInput(ch);
+
+				if(!Character.isLetterOrDigit(ch) && noWordSep.indexOf(ch) == -1)
+				{
+					dispose();
+					return;
+				}
+
+				word = word + ch;
 				int caret = textArea.getCaretPosition();
 				KeywordMap keywordMap = buffer.getKeywordMapAtOffset(caret);
-				String noWordSep = getNonAlphaNumericWordChars(buffer,keywordMap,caret);
 
 				Vector completions = getCompletions(buffer,word,keywordMap,
 					noWordSep,caret);
 
 				if(completions.size() == 0)
+				{
 					dispose();
+					return;
+				}
 
 				words.setListData(completions);
 				words.setSelectedIndex(0);

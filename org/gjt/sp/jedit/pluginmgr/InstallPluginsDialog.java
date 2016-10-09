@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Vector;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
 //}}}
 
 class InstallPluginsDialog extends EnhancedDialog
@@ -43,7 +42,7 @@ class InstallPluginsDialog extends EnhancedDialog
 	//{{{ InstallPluginsDialog constructor
 	InstallPluginsDialog(JDialog dialog, Vector model, int mode)
 	{
-		super(JOptionPane.getFrameForComponent(dialog),
+		super(dialog,
 			(mode == INSTALL
 			? jEdit.getProperty("install-plugins.title")
 			: jEdit.getProperty("update-plugins.title")),true);
@@ -178,6 +177,11 @@ class InstallPluginsDialog extends EnhancedDialog
 		Box box = new Box(BoxLayout.X_AXIS);
 
 		box.add(Box.createGlue());
+		selectAll = new JButton(jEdit.getProperty("install-plugins.select-all"));
+		selectAll.addActionListener(new ActionHandler());
+		box.add(selectAll);
+		box.add(Box.createHorizontalStrut(6));
+
 		install = new JButton(jEdit.getProperty("install-plugins.install"));
 		install.setEnabled(false);
 		getRootPane().setDefaultButton(install);
@@ -260,6 +264,7 @@ class InstallPluginsDialog extends EnhancedDialog
 	private JRadioButton installUser;
 	private JRadioButton installSystem;
 
+	private JButton selectAll;
 	private JButton install;
 	private JButton cancel;
 
@@ -311,6 +316,7 @@ class InstallPluginsDialog extends EnhancedDialog
 		{
 			name.setText(null);
 			author.setText(null);
+			size.setText(null);
 			latestVersion.setText(null);
 			if(installedVersion != null)
 				installedVersion.setText(null);
@@ -380,6 +386,8 @@ class InstallPluginsDialog extends EnhancedDialog
 		public void actionPerformed(ActionEvent evt)
 		{
 			Object source = evt.getSource();
+			if(source == selectAll)
+				plugins.selectAll();
 			if(source == install)
 				ok();
 			else if(source == cancel)

@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2001 Slava Pestov
+ * Copyright (C) 2001, 2002 Slava Pestov
  * Portions copyright (C) 2001 mike dillon
  *
  * This program is free software; you can redistribute it and/or
@@ -31,7 +31,6 @@ import java.awt.event.*;
 import java.awt.font.*;
 import java.awt.geom.*;
 import java.awt.*;
-import org.gjt.sp.jedit.buffer.FoldHandler;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.jedit.*;
@@ -39,17 +38,19 @@ import org.gjt.sp.util.*;
 //}}}
 
 /**
- * The status bar, used for the following:
+ * The status bar used to display various information to the user.<p>
+ *
+ * Currently, it is used for the following:
  * <ul>
  * <li>Displaying caret position information
- * <li>Displaying readNextChar() prompts
- * <li>Displaying the status of the overwrite, multi select flags
- * <li>I/O progress
- * <li>Memory status
- * <li>And so on
+ * <li>Displaying {@link InputHandler#readNextChar(String,String)} prompts
+ * <li>Displaying {@link #setMessage(String)} messages
+ * <li>Displaying I/O progress
+ * <li>Displaying various editor settings
+ * <li>Displaying memory status
  * </ul>
  *
- * @version $Id: StatusBar.java,v 1.23 2002/03/17 03:05:24 spestov Exp $
+ * @version $Id: StatusBar.java,v 1.51 2003/02/08 18:53:02 spestov Exp $
  * @author Slava Pestov
  * @since jEdit 3.2pre2
  */
@@ -58,109 +59,176 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 	//{{{ StatusBar constructor
 	public StatusBar(View view)
 	{
-		super(new BorderLayout(3,3));
-		setBorder(BorderFactory.createEmptyBorder(3,0,0,0));
+		super(new BorderLayout());
+		setBorder(new CompoundBorder(new EmptyBorder(4,0,0,
+			(OperatingSystem.isMacOS() ? 18 : 0)),
+			UIManager.getBorder("TextField.border")));
 
 		this.view = view;
 
-		Border border = BorderFactory.createLoweredBevelBorder();
+		panel = new JPanel(new BorderLayout());
+		box = new Box(BoxLayout.X_AXIS);
+		panel.add(BorderLayout.EAST,box);
+		add(BorderLayout.CENTER,panel);
 
 		MouseHandler mouseHandler = new MouseHandler();
 
-		caretStatus = new VICaretStatus();
-		caretStatus.setBorder(border);
+		caretStatus = new ToolTipLabel();
 		caretStatus.setToolTipText(jEdit.getProperty("view.status.caret-tooltip"));
 		caretStatus.addMouseListener(mouseHandler);
-		add(BorderLayout.WEST,caretStatus);
 
-		messagePanel = new JPanel();
-		messagePanel.setLayout(new BorderLayout(0,0));
-		messagePanel.setBorder(border);
-		messagePanel.setPreferredSize(caretStatus.getPreferredSize());
-		add(BorderLayout.CENTER,messagePanel);
-
-		message = new JLabel();
-		message.setBorder(BorderFactory.createEmptyBorder(0,0,0,0));
+		message = new JLabel(" ");
 		setMessageComponent(message);
 
-		Box box = new Box(BoxLayout.X_AXIS);
-		mode = new JLabel();
-		mode.setBorder(border);
+		mode = new ToolTipLabel();
 		mode.setToolTipText(jEdit.getProperty("view.status.mode-tooltip"));
 		mode.addMouseListener(mouseHandler);
-		box.add(mode);
-		box.add(Box.createHorizontalStrut(3));
 
-		encoding = new JLabel();
-		encoding.setBorder(border);
-		encoding.setToolTipText(jEdit.getProperty("view.status.encoding-tooltip"));
-		encoding.addMouseListener(mouseHandler);
-		box.add(encoding);
-		box.add(Box.createHorizontalStrut(3));
+		wrap = new ToolTipLabel();
+		wrap.setHorizontalAlignment(SwingConstants.CENTER);
+		wrap.setToolTipText(jEdit.getProperty("view.status.wrap-tooltip"));
+		wrap.addMouseListener(mouseHandler);
 
-		FontMetrics fm = getFontMetrics(UIManager.getFont("Label.font"));
-
-		foldMode = new JLabel();
-		foldMode.setHorizontalAlignment(SwingConstants.CENTER);
-		foldMode.setBorder(border);
-		foldMode.setToolTipText(jEdit.getProperty("view.status.fold-tooltip"));
-		foldMode.addMouseListener(mouseHandler);
-
-		int inc = 0;
-		String[] foldModes = FoldHandler.getFoldModes();
-		for (int i = 0; i < foldModes.length; i++)
-		{
-			inc = Math.max(inc, fm.stringWidth(foldModes[i]));
-		}
-
-		Dimension dim = foldMode.getPreferredSize();
-		dim.width += inc;
-		foldMode.setPreferredSize(dim);
-
-		box.add(foldMode);
-		box.add(Box.createHorizontalStrut(3));
-
-		multiSelect = new JLabel();
+		multiSelect = new ToolTipLabel();
 		multiSelect.setHorizontalAlignment(SwingConstants.CENTER);
-		multiSelect.setBorder(border);
 		multiSelect.setToolTipText(jEdit.getProperty("view.status.multi-tooltip"));
 		multiSelect.addMouseListener(mouseHandler);
 
-		dim = multiSelect.getPreferredSize();
-		dim.width += Math.max(fm.stringWidth("single"),
-			fm.stringWidth("multi"));
-		multiSelect.setPreferredSize(dim);
-
-		box.add(multiSelect);
-		box.add(Box.createHorizontalStrut(3));
-
-		overwrite = new JLabel();
+		overwrite = new ToolTipLabel();
 		overwrite.setHorizontalAlignment(SwingConstants.CENTER);
-		overwrite.setBorder(border);
 		overwrite.setToolTipText(jEdit.getProperty("view.status.overwrite-tooltip"));
 		overwrite.addMouseListener(mouseHandler);
 
-		dim = overwrite.getPreferredSize();
-		dim.width += Math.max(fm.stringWidth("ovr"),
-			fm.stringWidth("ins"));
-		overwrite.setPreferredSize(dim);
+		lineSep = new ToolTipLabel();
+		lineSep.setHorizontalAlignment(SwingConstants.CENTER);
+		lineSep.setToolTipText(jEdit.getProperty("view.status.linesep-tooltip"));
+		lineSep.addMouseListener(mouseHandler);
 
-		box.add(overwrite);
-
-		box.add(Box.createHorizontalStrut(3));
 		memory = new MemoryStatus();
-		memory.setBorder(border);
 		memory.addMouseListener(mouseHandler);
-		box.add(memory);
+	} //}}}
 
-		// UI hack because BoxLayout does not give all components the
-		// same height
-		dim = memory.getPreferredSize();
-		dim.width += fm.stringWidth("999Mb/999Mb");
-		dim.height = multiSelect.getPreferredSize().height;
-		memory.setPreferredSize(dim);
+	//{{{ propertiesChanged() method
+	public void propertiesChanged()
+	{
+		showCaretStatus = jEdit.getBooleanProperty("view.status.show-caret-status");
+		showEditMode = jEdit.getBooleanProperty("view.status.show-edit-mode");
+		showFoldMode = jEdit.getBooleanProperty("view.status.show-fold-mode");
+		showEncoding = jEdit.getBooleanProperty("view.status.show-encoding");
+		showWrap = jEdit.getBooleanProperty("view.status.show-wrap");
+		showMultiSelect = jEdit.getBooleanProperty("view.status.show-multi-select");
+		showOverwrite = jEdit.getBooleanProperty("view.status.show-overwrite");
+		showLineSeperator = jEdit.getBooleanProperty("view.status.show-line-seperator");
+		showMemory = jEdit.getBooleanProperty("view.status.show-memory");
 
-		add(BorderLayout.EAST,box);
+		TextAreaPainter painter = view.getTextArea().getPainter();
+		panel.setBackground(painter.getBackground());
+		panel.setForeground(painter.getForeground());
+		caretStatus.setBackground(painter.getBackground());
+		caretStatus.setForeground(painter.getForeground());
+		message.setBackground(painter.getBackground());
+		message.setForeground(painter.getForeground());
+		mode.setBackground(painter.getBackground());
+		mode.setForeground(painter.getForeground());
+		wrap.setBackground(painter.getBackground());
+		wrap.setForeground(painter.getForeground());
+		multiSelect.setBackground(painter.getBackground());
+		multiSelect.setForeground(painter.getForeground());
+		overwrite.setBackground(painter.getBackground());
+		overwrite.setForeground(painter.getForeground());
+		lineSep.setBackground(painter.getBackground());
+		lineSep.setForeground(painter.getForeground());
+		memory.setBackground(painter.getBackground());
+		memory.setForeground(painter.getForeground());
+
+		Font font = UIManager.getFont("Label.font");
+		FontMetrics fm = getFontMetrics(font);
+		Dimension dim = null;
+
+		if (showCaretStatus)
+		{
+			panel.add(BorderLayout.WEST,caretStatus);
+
+			caretStatus.setFont(font);
+
+			dim = new Dimension(fm.stringWidth(caretTestStr),
+				fm.getHeight());
+                        caretStatus.setPreferredSize(dim);
+		}
+		else
+			panel.remove(caretStatus);
+
+		box.removeAll();
+
+		if (showEncoding || showEditMode || showFoldMode)
+			box.add(mode);
+
+		if (showWrap)
+		{
+			dim = new Dimension(Math.max(
+				Math.max(fm.charWidth('-'),fm.charWidth('H')),
+				fm.charWidth('S')) + 1,fm.getHeight());
+			wrap.setPreferredSize(dim);
+			wrap.setMaximumSize(dim);
+			box.add(wrap);
+		}
+
+		if (showMultiSelect)
+		{
+			dim = new Dimension(
+				Math.max(fm.charWidth('-'),fm.charWidth('M')) + 1,
+				fm.getHeight());
+			multiSelect.setPreferredSize(dim);
+			multiSelect.setMaximumSize(dim);
+			box.add(multiSelect);
+		}
+
+		if (showOverwrite)
+		{
+			dim = new Dimension(
+				Math.max(fm.charWidth('-'),fm.charWidth('O')) + 1,
+				fm.getHeight());
+			overwrite.setPreferredSize(dim);
+			overwrite.setMaximumSize(dim);
+			box.add(overwrite);
+		}
+
+		if (showLineSeperator)
+		{
+			dim = new Dimension(Math.max(
+				Math.max(fm.charWidth('U'),
+				fm.charWidth('W')),
+				fm.charWidth('M')) + 1,
+				fm.getHeight());
+			lineSep.setPreferredSize(dim);
+			lineSep.setMaximumSize(dim);
+			box.add(lineSep);
+		}
+
+		if (showMemory)
+		{
+			box.add(memory);
+
+			// UI hack because BoxLayout does not give all
+			// components the same height
+
+			memory.setFont(font);
+			FontRenderContext frc = new FontRenderContext(null,false,false);
+			Rectangle2D bounds = font.getStringBounds(memoryTestStr,frc);
+			dim = new Dimension((int)bounds.getWidth(),
+				(int)bounds.getHeight());
+			memory.setPreferredSize(dim);
+			memory.setMaximumSize(dim);
+			memory.lm = font.getLineMetrics(memoryTestStr,frc);
+
+			memory.progressForeground = jEdit.getColorProperty(
+				"view.status.memory.foreground");
+			memory.progressBackground = jEdit.getColorProperty(
+				"view.status.memory.background");
+		}
+
+		updateBufferStatus();
+		updateMiscStatus();
 	} //}}}
 
 	//{{{ addNotify() method
@@ -186,22 +254,30 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 		{
 			public void run()
 			{
+				// don't obscure existing message
+				if(message != null && !"".equals(message.getText().trim())
+					&& !currentMessageIsIO)
+					return;
+
 				int requestCount = threadPool.getRequestCount();
 				if(requestCount == 0)
 				{
 					setMessageAndClear(jEdit.getProperty(
 						"view.status.io.done"));
+					currentMessageIsIO = true;
 				}
 				else if(requestCount == 1)
 				{
 					setMessage(jEdit.getProperty(
 						"view.status.io-1"));
+					currentMessageIsIO = true;
 				}
 				else
 				{
 					Object[] args = { new Integer(requestCount) };
 					setMessage(jEdit.getProperty(
 						"view.status.io",args));
+					currentMessageIsIO = true;
 				}
 			}
 		});
@@ -240,6 +316,9 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 	} //}}}
 
 	//{{{ setMessage() method
+	/**
+	 * Displays a status message.
+	 */
 	public void setMessage(String message)
 	{
 		if(tempTimer != null)
@@ -263,7 +342,7 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 			else if(view.getMacroRecorder() != null)
 				this.message.setText(jEdit.getProperty("view.status.recording"));
 			else
-				this.message.setText(null);
+				this.message.setText(" ");
 		}
 		else
 			this.message.setText(message);
@@ -272,145 +351,52 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 	//{{{ setMessageComponent() method
 	public void setMessageComponent(Component comp)
 	{
+		currentMessageIsIO = false;
+
 		if (comp == null || messageComp == comp)
 		{
 			return;
 		}
 
 		messageComp = comp;
-		messagePanel.add(BorderLayout.CENTER, messageComp);
+		panel.add(BorderLayout.CENTER, messageComp);
 	} //}}}
 
-	//{{{ repaintCaretStatus() method
-	public void repaintCaretStatus()
+	//{{{ updateCaretStatus() method
+	public void updateCaretStatus()
 	{
-		caretStatus.repaint();
-	} //}}}
+		//if(!isShowing())
+		//	return;
 
-	//{{{ updateBufferStatus() method
-	public void updateBufferStatus()
-	{
-		Buffer buffer = view.getBuffer();
-		mode.setText(buffer.getMode().getName());
-		encoding.setText(buffer.getStringProperty("encoding"));
-	} //}}}
-
-	//{{{ updateMiscStatus() method
-	public void updateMiscStatus()
-	{
-		JEditTextArea textArea = view.getTextArea();
-
-		multiSelect.setText(textArea.isMultipleSelectionEnabled()
-			? "multi" : "single");
-		overwrite.setText(textArea.isOverwriteEnabled()
-			? "ovr" : "ins");
-		foldMode.setText((String)textArea.getBuffer().getProperty("folding"));
-	} //}}}
-
-	//{{{ Private members
-	private View view;
-	private VICaretStatus caretStatus;
-	private JPanel messagePanel;
-	private Component messageComp;
-	private JLabel message;
-	private JLabel mode;
-	private JLabel encoding;
-	private JLabel foldMode;
-	private JLabel multiSelect;
-	private JLabel overwrite;
-	private MemoryStatus memory;
-	/* package-private for speed */ StringBuffer buf = new StringBuffer();
-	private Timer tempTimer;
-	//}}}
-
-	static final String testStr = "9999,999-999 99%";
-
-	//{{{ MouseHandler class
-	class MouseHandler extends MouseAdapter
-	{
-		public void mouseClicked(MouseEvent evt)
-		{
-			Object source = evt.getSource();
-			if(source == caretStatus)
-			{
-				if(evt.getClickCount() == 2)
-					view.getTextArea().showGoToLineDialog();
-			}
-			else if(source == mode || source == encoding)
-			{
-				if(evt.getClickCount() == 2)
-					new BufferOptions(view,view.getBuffer());
-			}
-			else if(source == foldMode)
-			{
-				String text = foldMode.getText();
-				String[] foldModes = FoldHandler.getFoldModes();
-
-				for (int i = 0; i < foldModes.length; i++)
-				{
-					if (text.equals(foldModes[i]))
-					{
-						i = (i + 1) % foldModes.length;
-						text = foldModes[i];
-						break;
-					}
-				}
-
-				JEditTextArea textArea = view.getTextArea();
-				Buffer buffer = view.getBuffer();
-				buffer.setStringProperty("folding",text);
-				buffer.propertiesChanged();
-			}
-			else if(source == multiSelect)
-				view.getTextArea().toggleMultipleSelectionEnabled();
-			else if(source == overwrite)
-				view.getTextArea().toggleOverwriteEnabled();
-			else if(source == memory)
-			{
-				if(evt.getClickCount() == 2)
-				{
-					jEdit.showMemoryDialog(view);
-					memory.repaint();
-				}
-			}
-		}
-	} //}}}
-
-	//{{{ VICaretStatus class
-	class VICaretStatus extends JComponent
-	{
-		//{{{ VICaretStatus constructor
-		public VICaretStatus()
-		{
-			VICaretStatus.this.setForeground(UIManager.getColor("Label.foreground"));
-			VICaretStatus.this.setBackground(UIManager.getColor("Label.background"));
-			VICaretStatus.this.setFont(UIManager.getFont("Label.font"));
-
-			Font font = VICaretStatus.this.getFont();
-			FontRenderContext frc = new FontRenderContext(null,false,false);
-
-			Rectangle2D bounds = font.getStringBounds(testStr,frc);
-			lm = font.getLineMetrics(testStr,frc);
-
-			Dimension size = new Dimension((int)bounds.getWidth(),
-				(int)bounds.getHeight());
-			VICaretStatus.this.setPreferredSize(size);
-		} //}}}
-
-		//{{{ paintComponent() method
-		public void paintComponent(Graphics g)
+		if (showCaretStatus)
 		{
 			Buffer buffer = view.getBuffer();
 
-			if(!buffer.isLoaded())
+			if(!buffer.isLoaded() ||
+				/* can happen when switching buffers sometimes */
+				buffer != view.getTextArea().getBuffer())
+			{
+				caretStatus.setText(" ");
 				return;
+			}
 
 			JEditTextArea textArea = view.getTextArea();
 
 			int currLine = textArea.getCaretLine();
-			int dot = textArea.getCaretPosition()
-				- textArea.getLineStartOffset(currLine);
-			int virtualPosition = getVirtualPosition(dot,buffer,textArea);
+
+			// there must be a better way of fixing this...
+			// the problem is that this method can sometimes
+			// be called as a result of a text area scroll
+			// event, in which case the caret position has
+			// not been updated yet.
+			if(currLine >= buffer.getLineCount())
+				return; // hopefully another caret update will come?
+
+			int start = textArea.getLineStartOffset(currLine);
+			int dot = textArea.getCaretPosition() - start;
+			buffer.getText(start,dot,seg);
+			int virtualPosition = MiscUtilities.getVirtualWidth(seg,
+				buffer.getTabSize());
 
 			buf.setLength(0);
 			buf.append(Integer.toString(currLine + 1));
@@ -449,45 +435,160 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 				buf.append('%');
 			}
 
-			g.drawString(buf.toString(),
-				VICaretStatus.this.getBorder().getBorderInsets(this).left + 1,
-				(int)((VICaretStatus.this.getHeight() - lm.getHeight()) / 2
-				+ lm.getAscent()));
-		} //}}}
+			caretStatus.setText(buf.toString());
+		}
+	} //}}}
 
-		//{{{ Private members
-		private Segment seg = new Segment();
-		private LineMetrics lm;
+	//{{{ updateBufferStatus() method
+	public void updateBufferStatus()
+	{
+		//if(!isShowing())
+		//	return;
 
-		//{{{ getVirtualPosition() method
-		private int getVirtualPosition(int dot, Buffer buffer, JEditTextArea textArea)
+		Buffer buffer = view.getBuffer();
+
+		if (showWrap)
 		{
-			int line = textArea.getCaretLine();
+			String wrap = buffer.getStringProperty("wrap");
+			if(wrap.equals("none"))
+				this.wrap.setText("-");
+			else if(wrap.equals("hard"))
+				this.wrap.setText("H");
+			else if(wrap.equals("soft"))
+				this.wrap.setText("S");
+		}
 
-			textArea.getLineText(line, seg);
+		if (showLineSeperator)
+		{
+			String lineSep = buffer.getStringProperty("lineSeparator");
+			if("\n".equals(lineSep))
+				this.lineSep.setText("U");
+			else if("\r\n".equals(lineSep))
+				this.lineSep.setText("W");
+			else if("\r".equals(lineSep))
+				this.lineSep.setText("M");
+		}
 
-			int virtualPosition = 0;
-			int tabSize = buffer.getTabSize();
-
-			for (int i = 0; i < seg.count && i < dot; ++i)
+		if (showEditMode || showFoldMode || showEncoding)
+		{
+			/* This doesn't look pretty and mode line should
+			 * probably be split up into seperate
+			 * components/strings
+			 */
+			buf.setLength(0);
+			if (showEditMode)
+				buf.append(buffer.getMode().getName());
+			if (showFoldMode)
 			{
-				char ch = seg.array[seg.offset + i];
-
-				if (ch == '\t')
-				{
-					virtualPosition += tabSize
-						- (virtualPosition % tabSize);
-				}
-				else
-				{
-					++virtualPosition;
-				}
+				if (showEditMode)
+					buf.append(",");
+				buf.append((String)view.getBuffer().getProperty("folding"));
+			}
+			if (showEncoding)
+			{
+				if (showEditMode || showFoldMode)
+					buf.append(",");
+				buf.append(buffer.getStringProperty("encoding"));
 			}
 
-			return virtualPosition;
-		} //}}}
+			mode.setText("(" + buf.toString() + ")");
+		}
+	} //}}}
 
-		//}}}
+	//{{{ updateMiscStatus() method
+	public void updateMiscStatus()
+	{
+		//if(!isShowing())
+		//	return;
+
+		JEditTextArea textArea = view.getTextArea();
+
+		if (showMultiSelect)
+			multiSelect.setText(textArea.isMultipleSelectionEnabled()
+				? "M" : "-");
+		if (showOverwrite)
+			overwrite.setText(textArea.isOverwriteEnabled()
+				? "O" : "-");
+	} //}}}
+
+	//{{{ Private members
+	private View view;
+	private JPanel panel;
+	private Box box;
+	private ToolTipLabel caretStatus;
+	private Component messageComp;
+	private JLabel message;
+	private JLabel mode;
+	private JLabel wrap;
+	private JLabel multiSelect;
+	private JLabel overwrite;
+	private JLabel lineSep;
+	private MemoryStatus memory;
+	/* package-private for speed */ StringBuffer buf = new StringBuffer();
+	private Timer tempTimer;
+	private boolean currentMessageIsIO;
+
+	private Segment seg = new Segment();
+
+	private boolean showCaretStatus = jEdit.getBooleanProperty("view.status.show-caret-status");
+	private boolean showEditMode = jEdit.getBooleanProperty("view.status.show-edit-mode");
+	private boolean showFoldMode = jEdit.getBooleanProperty("view.status.show-fold-mode");
+	private boolean showEncoding = jEdit.getBooleanProperty("view.status.show-encoding");
+	private boolean showWrap = jEdit.getBooleanProperty("view.status.show-wrap");
+	private boolean showMultiSelect = jEdit.getBooleanProperty("view.status.show-multi-select");
+	private boolean showOverwrite = jEdit.getBooleanProperty("view.status.show-overwrite");
+	private boolean showLineSeperator = jEdit.getBooleanProperty("view.status.show-line-seperator");
+	private boolean showMemory = jEdit.getBooleanProperty("view.status.show-memory");
+	//}}}
+
+	static final String caretTestStr = "9999,999-999 99%";
+	static final String memoryTestStr = "999/999Mb";
+
+	//{{{ MouseHandler class
+	class MouseHandler extends MouseAdapter
+	{
+		public void mouseClicked(MouseEvent evt)
+		{
+			Buffer buffer = view.getBuffer();
+
+			Object source = evt.getSource();
+			if(source == caretStatus)
+			{
+				if(evt.getClickCount() == 2)
+					view.getTextArea().showGoToLineDialog();
+			}
+			else if(source == mode)
+			{
+				if(evt.getClickCount() == 2)
+					new BufferOptions(view,view.getBuffer());
+			}
+			else if(source == wrap)
+				buffer.toggleWordWrap(view);
+			else if(source == multiSelect)
+				view.getTextArea().toggleMultipleSelectionEnabled();
+			else if(source == overwrite)
+				view.getTextArea().toggleOverwriteEnabled();
+			else if(source == lineSep)
+				buffer.toggleLineSeparator(view);
+			else if(source == memory)
+			{
+				if(evt.getClickCount() == 2)
+				{
+					jEdit.showMemoryDialog(view);
+					memory.repaint();
+				}
+			}
+		}
+	} //}}}
+
+	//{{{ ToolTipLabel class
+	class ToolTipLabel extends JLabel
+	{
+		//{{{ getToolTipLocation() method
+		public Point getToolTipLocation(MouseEvent event)
+		{
+			return new Point(event.getX(),-20);
+		} //}}}
 	} //}}}
 
 	//{{{ MemoryStatus class
@@ -514,9 +615,9 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 		//{{{ removeNotify() method
 		public void removeNotify()
 		{
-			super.removeNotify();
 			timer.stop();
 			ToolTipManager.sharedInstance().unregisterComponent(this);
+			super.removeNotify();
 		} //}}}
 
 		//{{{ getToolTipText() method
@@ -531,16 +632,26 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 			return jEdit.getProperty("view.status.memory-tooltip",args);
 		} //}}}
 
+		//{{{ getToolTipLocation() method
+		public Point getToolTipLocation(MouseEvent event)
+		{
+			return new Point(event.getX(),-20);
+		} //}}}
+
 		//{{{ actionPerformed() method
 		public void actionPerformed(ActionEvent evt)
 		{
 			MemoryStatus.this.repaint();
 		} //}}}
 
+		/* package-private */ LineMetrics lm;
+		/* package-private */ Color progressForeground;
+		/* package-private */ Color progressBackground;
+
 		//{{{ paintComponent() method
 		public void paintComponent(Graphics g)
 		{
-			Insets insets = MemoryStatus.this.getBorder().getBorderInsets(this);
+			Insets insets = new Insets(0,0,0,0);//MemoryStatus.this.getBorder().getBorderInsets(this);
 
 			Runtime runtime = Runtime.getRuntime();
 			int freeMemory = (int)(runtime.freeMemory() / 1024);
@@ -549,31 +660,34 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 
 			int width = MemoryStatus.this.getWidth()
 				- insets.left - insets.right;
+			int height = MemoryStatus.this.getHeight()
+				- insets.top - insets.bottom - 1;
 
 			float fraction = ((float)usedMemory) / totalMemory;
 
-			g.setColor(UIManager.getColor("ProgressBar.selectionBackground"));
+			g.setColor(progressBackground);
 
 			g.fillRect(insets.left,insets.top,
 				(int)(width * fraction),
-				MemoryStatus.this.getHeight()
-				- insets.top - insets.bottom);
+				height);
 
-			String str = (usedMemory / 1024) + "Mb/"
+			String str = (usedMemory / 1024) + "/"
 				+ (totalMemory / 1024) + "Mb";
-			FontMetrics fm = g.getFontMetrics();
 
+			FontRenderContext frc = new FontRenderContext(null,false,false);
+
+			Rectangle2D bounds = g.getFont().getStringBounds(str,frc);
+		
 			Graphics g2 = g.create();
 			g2.setClip(insets.left,insets.top,
 				(int)(width * fraction),
-				MemoryStatus.this.getHeight()
-				- insets.top - insets.bottom);
+				height);
 
-			g2.setColor(UIManager.getColor("ProgressBar.selectionForeground"));
+			g2.setColor(progressForeground);
 
 			g2.drawString(str,
-				insets.left + (width - fm.stringWidth(str)) / 2,
-				insets.top + fm.getAscent());
+				insets.left + (int)(width - bounds.getWidth()) / 2,
+				(int)(insets.top + lm.getAscent()));
 
 			g2.dispose();
 
@@ -582,14 +696,13 @@ public class StatusBar extends JPanel implements WorkThreadProgressListener
 			g2.setClip(insets.left + (int)(width * fraction),
 				insets.top,MemoryStatus.this.getWidth()
 				- insets.left - (int)(width * fraction),
-				MemoryStatus.this.getHeight()
-				- insets.top - insets.bottom);
+				height);
 
 			g2.setColor(MemoryStatus.this.getForeground());
 
 			g2.drawString(str,
-				insets.left + (width - fm.stringWidth(str)) / 2,
-				insets.top + fm.getAscent());
+				insets.left + (int)(width - bounds.getWidth()) / 2,
+				(int)(insets.top + lm.getAscent()));
 
 			g2.dispose();
 		} //}}}

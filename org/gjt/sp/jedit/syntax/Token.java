@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
+ * Copyright (C) 1998, 1999, 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,10 +25,52 @@ package org.gjt.sp.jedit.syntax;
  * A linked list of syntax tokens.
  *
  * @author Slava Pestov
- * @version $Id: Token.java,v 1.5 2001/12/01 05:48:48 spestov Exp $
+ * @version $Id: Token.java,v 1.9 2002/05/26 07:38:43 spestov Exp $
  */
 public class Token
 {
+	//{{{ stringToToken() method
+	/**
+	 * Converts a token type string to a token type constant.
+	 * @param value The token type
+	 * @since jEdit 4.1pre1
+	 */
+	public static byte stringToToken(String value)
+	{
+		value = value.intern();
+
+		if (value == "NULL")
+			return Token.NULL;
+		else if (value == "COMMENT1")
+			return Token.COMMENT1;
+		else if (value == "COMMENT2")
+			return Token.COMMENT2;
+		else if (value == "LITERAL1")
+			return Token.LITERAL1;
+		else if (value == "LITERAL2")
+			return Token.LITERAL2;
+		else if (value == "LABEL")
+			return Token.LABEL;
+		else if (value == "KEYWORD1")
+			return Token.KEYWORD1;
+		else if (value == "KEYWORD2")
+			return Token.KEYWORD2;
+		else if (value == "KEYWORD3")
+			return Token.KEYWORD3;
+		else if (value == "FUNCTION")
+			return Token.FUNCTION;
+		else if (value == "MARKUP")
+			return Token.MARKUP;
+		else if (value == "OPERATOR")
+			return Token.OPERATOR;
+		else if (value == "DIGIT")
+			return Token.DIGIT;
+		else if (value == "INVALID")
+			return Token.INVALID;
+		else
+			return -1;
+	} //}}}
+
 	//{{{ Token types
 	public static final byte NULL = 0;
 	public static final byte COMMENT1 = 1;
@@ -47,29 +89,31 @@ public class Token
 
 	public static final byte ID_COUNT = 14;
 
+	// Special:
+	public static final byte WHITESPACE = 125;
+	public static final byte TAB = 126;
 	public static final byte END = 127;
 
 	//{{{ Instance variables
-	/**
-	 * The length of this token.
-	 */
-	public int length;
-
 	/**
 	 * The id of this token.
 	 */
 	public byte id;
 
 	/**
+	 * The start offset of this token.
+	 */
+	public int offset;
+
+	/**
+	 * The length of this token.
+	 */
+	public int length;
+
+	/**
 	 * The rule set of this token.
 	 */
 	public ParserRuleSet rules;
-
-	/**
-	 * The previous token in the linked list.
-	 * @since jEdit 2.6pre1
-	 */
-	public Token prev;
 
 	/**
 	 * The next token in the linked list.
@@ -80,14 +124,16 @@ public class Token
 	//{{{ Token constructor
 	/**
 	 * Creates a new token.
-	 * @param length The length of the token
 	 * @param id The id of the token
+	 * @param offset The start offset of the token
+	 * @param length The length of the token
 	 * @param rules The parser rule set that generated this token
 	 */
-	public Token(int length, byte id, ParserRuleSet rules)
+	public Token(byte id, int offset, int length, ParserRuleSet rules)
 	{
-		this.length = length;
 		this.id = id;
+		this.offset = offset;
+		this.length = length;
 		this.rules = rules;
 	} //}}}
 
@@ -97,6 +143,6 @@ public class Token
 	 */
 	public String toString()
 	{
-		return "[id=" + id + ",length=" + length + "]";
+		return "[id=" + id + ",offset=" + offset + ",length=" + length + "]";
 	} //}}}
 }

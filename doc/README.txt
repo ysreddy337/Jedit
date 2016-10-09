@@ -1,11 +1,4 @@
-JEDIT 4.0 README
-
-* Contents
-
-- About jEdit
-- License
-- jEdit on the Internet
-- Libraries
+JEDIT 4.1 README
 
 * About jEdit
 
@@ -16,7 +9,7 @@ earlier versions.
 
 jEdit comes with full online help; to read it, select 'jEdit Help' from
 jEdit's 'Help' menu or point your web browser to the file named
-`index.html' in the `doc/users-guide/' directory of the jEdit
+'index.html' in the 'doc/users-guide/' directory of the jEdit
 distribution.
 
 A PDF (Adobe Acrobat) version of the user's guide be downloaded from
@@ -28,9 +21,12 @@ edit modes to the core, or writing plugins can be viewed by selecting
 
 * License
 
-jEdit is free software, and you are welcome to redistribute it under the
-terms of the GNU General Public License (either version 2 or any later
-version, at the user's election). See the file COPYING.txt for details.
+jEdit is free software, and you are welcome to redistribute and modify
+it under the terms of the GNU General Public License (either version 2
+or any later version). See the file COPYING.txt for details.
+
+The jEdit installer is released under a public domain license and may be
+used for any purpose.
 
 A number of plugins are available for jEdit. Unless otherwise stated in
 the plugin's documentation, each of the plugins is licensed for use and
@@ -55,7 +51,7 @@ user-oriented site, <http://community.jedit.org>. Check it out.
 If you would like to report a bug, first take a look at the 'jEdit
 Frequently Asked Questions' document, accessible from either jEdit's
 online help or by pointing your web browser to the file named
-`index.html' in the `doc/FAQ/' directory of the jEdit distribution.
+'index.html' in the 'doc/FAQ/' directory of the jEdit distribution.
 
 If the FAQ doesn't answer your question, report a bug with our bug
 tracker, located at <http://www.jedit.org/?page=feedback>.
@@ -86,7 +82,7 @@ You may also e-mail me directly by e-mailing <slava@jedit.org>.
 
 * Libraries
 
-jEdit depends on, and comes bundled with the following libraries:
+jEdit bundles the following libraries:
 
 - gnu.regexp by the Free Software Foundation. jEdit bundles the
   gnu.regexp 1.1.5 CVS snapshot.
@@ -103,15 +99,26 @@ jEdit depends on, and comes bundled with the following libraries:
   to redistribute AElfred with your modifications, provided that the
   modifications are clearly documented."
 
-  The AElfred home page is located at <http://www.microstar.com>.
+  The AElfred web site is <http://www.microstar.com>.
 
 - BeanShell scripting language, by Pat Niemeyer. jEdit bundles BeanShell
-  version 1.2b5 with the bsh.util and bsh.classpath packages removed.
+  version 1.2b7 with the bsh.util and bsh.classpath packages removed.
 
   BeanShell is released under a dual Sun Public License/GNU LGPL
   license. See the BeanShell homepage for details.
 
-  The BeanShell homepage is located at <http://www.beanshell.org>.
+  The BeanShell web site is <http://www.beanshell.org>.
 
-- The Sun Java look and Feel icon collection. The license may be found
-  in the ICONS.LICENSE.txt file.
+The jEdit installer bundles the following libraries:
+
+- org.apache.excalibur.bzip2 compression library. This library is
+  released under the Apache license, which can be found in
+  doc/Apache.LICENSE.txt.
+
+  The org.apache.excalibur.bzip2 web site is
+  <http://jakarta.apache.org/avalon/excalibur/bzip2/>.
+
+- com.ice.tar, by Tim Endres. This code is in the public domain.
+
+  The com.ice.tar web site is <http://www.trustice.com/java/tar/>.
+

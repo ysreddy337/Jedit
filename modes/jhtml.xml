@@ -11,16 +11,12 @@
 		<PROPERTY NAME="commentStart" VALUE="&lt;!--" />
 		<PROPERTY NAME="commentEnd" VALUE="--&gt;" />
 				<!-- Indent droplets and oparams -->
-				<PROPERTY NAME="indentPrevLine"
+				<PROPERTY NAME="indentNextLines"
 				 VALUE="\s*(&lt;\s*(droplet|oparam))\s+.*" />
 				<!-- Sadly, there doesn't seem to be a way to
 					 undent when we see a /oparam> tag... -->
 	</PROPS>
 	<RULES IGNORE_CASE="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 				<!-- Allow for Dynamo SSI -->
 				<SPAN TYPE="NULL">
 			<BEGIN>&lt;!--#</BEGIN>
@@ -53,14 +49,14 @@
 				-->
 
 		<!-- JavaScript -->
-		<SPAN TYPE="MARKUP" DELEGATE="javascript::MAIN">
-			<BEGIN>&lt;SCRIPT&gt;</BEGIN>
+		<SPAN TYPE="MARKUP" DELEGATE="html::JAVASCRIPT">
+			<BEGIN>&lt;SCRIPT</BEGIN>
 			<END>&lt;/SCRIPT&gt;</END>
 		</SPAN>
 
 		<!-- stylesheet -->
-		<SPAN TYPE="MARKUP" DELEGATE="css::MAIN">
-			<BEGIN>&lt;STYLE&gt;</BEGIN>
+		<SPAN TYPE="MARKUP" DELEGATE="html::CSS">
+			<BEGIN>&lt;STYLE</BEGIN>
 			<END>&lt;/STYLE&gt;</END>
 		</SPAN>
 
@@ -84,10 +80,6 @@
 	</RULES>
 
 	<RULES SET="JHTML" DEFAULT="MARKUP">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- SGML comment -->
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>&lt;!--</BEGIN>
@@ -105,9 +97,8 @@
 		</SPAN>
 
 		<SEQ TYPE="MARKUP">/</SEQ>
-		<SEQ TYPE="NULL">=</SEQ>
 
-		<KEYWORDS IGNORE_CASE="TRUE">
+		<KEYWORDS>
 			<KEYWORD1>importbean</KEYWORD1>
 			<KEYWORD1>droplet</KEYWORD1>
 			<KEYWORD1>param</KEYWORD1>
@@ -139,9 +130,6 @@
 	</RULES>
 
 	<RULES SET="ATTRVALUE" DEFAULT="LITERAL1" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
 		<!-- backticks are java -->
 		<SPAN TYPE="MARKUP" DELEGATE="java::MAIN">
 			<BEGIN>`</BEGIN>

@@ -7,15 +7,12 @@
 	<PROPS>
 		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
 		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
+		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 		<PROPERTY NAME="commentStart" VALUE="=begin" />
 		<PROPERTY NAME="commentEnd" VALUE="=end" />
 		<PROPERTY NAME="lineComment" VALUE="#" />
 	</PROPS>
 	<RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- Ruby comment (Inline Documetation ) -->
 		<SPAN TYPE="COMMENT2">
 			<BEGIN>=begin</BEGIN>
@@ -69,19 +66,15 @@
 		<SEQ TYPE="OPERATOR">...</SEQ>
 		<SEQ TYPE="OPERATOR">..</SEQ>
 
-		<!-- Null Exclusions -->
-		<SEQ TYPE="NULL">.</SEQ>
-
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
 		<SEQ TYPE="OPERATOR">]</SEQ>
 		<SEQ TYPE="OPERATOR">[</SEQ>
 		<SEQ TYPE="OPERATOR">?</SEQ>
-		<MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE"
-			AT_LINE_START="TRUE">:</MARK_PREVIOUS>
+		<MARK_PREVIOUS AT_WHITESPACE_END="TRUE"
+			EXCLUDE_MATCH="TRUE"
+			TYPE="LABEL">:</MARK_PREVIOUS>
 		<SEQ TYPE="OPERATOR">:</SEQ>
 
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<KEYWORD1>BEGIN</KEYWORD1>
 			<KEYWORD1>END</KEYWORD1>
 			<KEYWORD1>alias</KEYWORD1>

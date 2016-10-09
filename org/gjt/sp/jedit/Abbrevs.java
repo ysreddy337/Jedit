@@ -23,8 +23,6 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import javax.swing.text.Element;
-import javax.swing.*;
 import java.io.*;
 import java.util.*;
 import org.gjt.sp.jedit.gui.AddAbbrevDialog;
@@ -35,7 +33,7 @@ import org.gjt.sp.util.Log;
 /**
  * Abbreviation manager.
  * @author Slava Pestov
- * @version $Id: Abbrevs.java,v 1.5 2002/01/16 09:21:51 spestov Exp $
+ * @version $Id: Abbrevs.java,v 1.10 2003/01/12 03:08:23 spestov Exp $
  */
 public class Abbrevs
 {
@@ -133,6 +131,7 @@ public class Abbrevs
 
 			// the first element of pp is the abbrev itself
 			abbrev = (String)pp.elementAt(0);
+			pp.removeElementAt(0);
 		} //}}}
 		//{{{ Handle ordinary abbrevs
 		else
@@ -189,6 +188,15 @@ public class Abbrevs
 			finally
 			{
 				buffer.endCompoundEdit();
+			}
+
+			if(expand.posParamCount != pp.size())
+			{
+				view.getStatus().setMessageAndClear(
+					jEdit.getProperty(
+					"view.status.incomplete-abbrev",
+					new Integer[] { new Integer(pp.size()),
+					new Integer(expand.posParamCount) }));
 			}
 
 			return true;
@@ -497,6 +505,9 @@ public class Abbrevs
 		int caretPosition = -1;
 		int lineCount;
 
+		// number of positional parameters in abbreviation expansion
+		int posParamCount;
+
 		//{{{ Expansion constructor
 		Expansion(String text, int softTabSize, Vector pp)
 		{
@@ -545,16 +556,11 @@ public class Abbrevs
 							i++;
 
 							int pos = ch - '0';
-							if(pos < pp.size())
-								buf.append(pp.elementAt(pos));
-							else
-							{
-								// so the user knows
-								// a positional is
-								// expected
-								buf.append('$');
-								buf.append(ch);
-							}
+							posParamCount = Math.max(pos,posParamCount);
+							// $n is 1-indexed, but vector
+							// contents is zero indexed
+							if(pos <= pp.size())
+								buf.append(pp.elementAt(pos - 1));
 						}
 						else
 						{
@@ -563,6 +569,8 @@ public class Abbrevs
 							buf.append('$');
 						}
 					}
+					else
+						buf.append('$'); // $ at end is literal
 				} //}}}
 				else
 					buf.append(ch);

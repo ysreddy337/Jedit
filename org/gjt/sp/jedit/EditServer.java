@@ -32,6 +32,8 @@ import org.gjt.sp.util.Log;
 //}}}
 
 /**
+ * Inter-process communication.<p>
+ *
  * The edit server protocol is very simple. <code>$HOME/.jedit/server</code>
  * is an ASCII file containing two lines, the first being the port number,
  * the second being the authorization key.<p>
@@ -47,11 +49,11 @@ import org.gjt.sp.util.Log;
  * figure things out by itself.<p>
  *
  * In most cases, the script will call the static
- * <code>EditServer.handleClient()</code> method, but of course more
+ * {@link #handleClient(boolean,String,String[])} method, but of course more
  * complicated stuff can be done too.
  *
  * @author Slava Pestov
- * @version $Id: EditServer.java,v 1.7 2002/03/14 10:20:19 spestov Exp $
+ * @version $Id: EditServer.java,v 1.12 2003/02/28 17:53:41 spestov Exp $
  */
 public class EditServer extends Thread
 {
@@ -108,17 +110,9 @@ public class EditServer extends Thread
 		}
 	} //}}}
 
-	//{{{ isOK() method
-	public boolean isOK()
-	{
-		return ok;
-	} //}}}
-
 	//{{{ run() method
 	public void run()
 	{
-		boolean abort = false;
-
 		for(;;)
 		{
 			if(abort)
@@ -144,7 +138,8 @@ public class EditServer extends Thread
 			}
 			catch(Exception e)
 			{
-				Log.log(Log.ERROR,this,e);
+				if(!abort)
+					Log.log(Log.ERROR,this,e);
 				abort = true;
 			}
 			finally
@@ -221,6 +216,13 @@ public class EditServer extends Thread
 
 			jEdit.openFiles(view,parent,args);
 
+			// Hack done to fix bringing the window to the front.
+			// At least on windows, Frame.toFront() doesn't cut it.
+			// Remove the isWindows check if it's broken under other
+			// OSes too.
+			if (OperatingSystem.isWindows())
+				view.setState(java.awt.Frame.ICONIFIED);
+			
 			// un-iconify using JDK 1.3 API
 			view.setState(java.awt.Frame.NORMAL);
 			view.requestFocus();
@@ -231,10 +233,24 @@ public class EditServer extends Thread
 		}
 	} //}}}
 
+	//{{{ isOK() method
+	boolean isOK()
+	{
+		return ok;
+	} //}}}
+
 	// stopServer() method
 	void stopServer()
 	{
-		stop();
+		abort = true;
+		try
+		{
+			socket.close();
+		}
+		catch(IOException io)
+		{
+		}
+
 		new File(portFile).delete();
 	} //}}}
 
@@ -245,6 +261,7 @@ public class EditServer extends Thread
 	private ServerSocket socket;
 	private int authKey;
 	private boolean ok;
+	private boolean abort;
 	//}}}
 
 	//{{{ handleClient() method

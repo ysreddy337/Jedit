@@ -29,7 +29,6 @@ import javax.swing.*;
 import java.awt.event.*;
 import java.awt.font.*;
 import java.awt.geom.AffineTransform;
-import java.awt.image.*;
 import java.awt.*;
 import java.util.Vector;
 import org.gjt.sp.jedit.*;
@@ -39,7 +38,7 @@ import org.gjt.sp.jedit.*;
  * A container for dockable windows. This class should never be used
  * directly.
  * @author Slava Pestov
- * @version $Id: PanelWindowContainer.java,v 1.31 2002/03/27 10:35:43 spestov Exp $
+ * @version $Id: PanelWindowContainer.java,v 1.49 2003/02/05 00:40:22 spestov Exp $
  * @since jEdit 4.0pre1
  */
 public class PanelWindowContainer implements DockableWindowContainer
@@ -52,6 +51,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 		//{{{ Button box setup
 		buttons = new JPanel(new ButtonLayout());
+		buttons.setBorder(new EmptyBorder(1,1,1,1));
 
 		// the close box must be the same size as the other buttons to look good.
 		// there are two ways to achieve this:
@@ -62,6 +62,8 @@ public class PanelWindowContainer implements DockableWindowContainer
 		closeBox = new JButton(GUIUtilities.loadIcon("closebox.gif"));
 		closeBox.setRequestFocusEnabled(false);
 		closeBox.setToolTipText(jEdit.getProperty("view.docking.close-tooltip"));
+		if(OperatingSystem.isMacOSLF())
+			closeBox.putClientProperty("JButton.buttonType","toolbar");
 
 		// makes it look a bit better
 		int left;
@@ -75,14 +77,16 @@ public class PanelWindowContainer implements DockableWindowContainer
 		buttons.add(closeBox);
 
 		closeBox.addActionListener(new ActionHandler());
+		closeBox.addMouseListener(new MouseHandler());
 
 		popupButton = new JButton(GUIUtilities.loadIcon("ToolbarMenu.gif"));
 		popupButton.setRequestFocusEnabled(false);
 		popupButton.setToolTipText(jEdit.getProperty("view.docking.menu-tooltip"));
+		if(OperatingSystem.isMacOSLF())
+			popupButton.putClientProperty("JButton.buttonType","toolbar");
 		buttons.add(popupButton);
 
 		popupButton.addMouseListener(new MouseHandler());
-		popup = new JPopupMenu();
 
 		buttonGroup = new ButtonGroup();
 		// JDK 1.4 workaround
@@ -120,8 +124,10 @@ public class PanelWindowContainer implements DockableWindowContainer
 		button.setRequestFocusEnabled(false);
 		button.setIcon(new RotatedTextIcon(rotation,button.getFont(),
 			entry.title));
-		button.setActionCommand(entry.name);
+		button.setActionCommand(entry.factory.name);
 		button.addActionListener(new ActionHandler());
+		if(OperatingSystem.isMacOSLF())
+			button.putClientProperty("JButton.buttonType","toolbar");
 		//}}}
 
 		buttonGroup.add(button);
@@ -129,31 +135,21 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 		button.addMouseListener(new MouseHandler());
 
-		//{{{ Create menu item
-		JMenuItem menuItem = new JMenuItem(entry.title);
-
-		menuItem.addActionListener(new ActionListener()
-		{
-			public void actionPerformed(ActionEvent evt)
-			{
-				wm.showDockableWindow(entry.name);
-			}
-		}); //}}}
-
-		popup.add(menuItem);
-
 		wm.revalidate();
 	} //}}}
 
 	//{{{ add() method
 	public void add(DockableWindowManager.Entry entry)
 	{
-		dockablePanel.add(entry.name,entry.win);
+		dockablePanel.add(entry.factory.name,entry.win);
 	} //}}}
 
 	//{{{ remove() method
 	public void remove(DockableWindowManager.Entry entry)
 	{
+		if(entry.factory.name.equals(mostRecent))
+			mostRecent = null;
+
 		int index = dockables.indexOf(entry);
 		buttons.remove(index + 2);
 
@@ -174,13 +170,34 @@ public class PanelWindowContainer implements DockableWindowContainer
 	public void save(DockableWindowManager.Entry entry) {}
 	//}}}
 
+	//{{{ showMostRecent() method
+	public void showMostRecent()
+	{
+		if(dockables.size() == 0)
+		{
+			Toolkit.getDefaultToolkit().beep();
+			return;
+		}
+
+		if(mostRecent == null)
+		{
+			mostRecent = ((DockableWindowManager.Entry)
+				dockables.get(0)).factory.name;
+		}
+
+		wm.showDockableWindow(mostRecent);
+	} //}}}
+
 	//{{{ show() method
 	public void show(final DockableWindowManager.Entry entry)
 	{
 		if(current == entry)
 		{
 			if(entry != null)
+			{
+				entry.win.requestFocus();
 				entry.win.requestDefaultFocus();
+			}
 			return;
 		}
 
@@ -192,20 +209,16 @@ public class PanelWindowContainer implements DockableWindowContainer
 
 		if(entry != null)
 		{
+			mostRecent = entry.factory.name;
 			this.current = entry;
 
-			dockablePanel.showDockable(entry.name);
+			dockablePanel.showDockable(entry.factory.name);
 
 			int index = dockables.indexOf(entry);
 			((JToggleButton)buttons.getComponent(index + 2)).setSelected(true);
 
-			SwingUtilities.invokeLater(new Runnable()
-			{
-				public void run()
-				{
-					entry.win.requestDefaultFocus();
-				}
-			});
+			entry.win.requestFocus();
+			entry.win.requestDefaultFocus();
 		}
 		else
 		{
@@ -233,7 +246,22 @@ public class PanelWindowContainer implements DockableWindowContainer
 		return current;
 	} //}}}
 
+	//{{{ getDockables() method
+	public String[] getDockables()
+	{
+		String[] retVal = new String[dockables.size()];
+		for(int i = 0; i < dockables.size(); i++)
+		{
+			DockableWindowManager.Entry entry =
+				(DockableWindowManager.Entry) dockables.elementAt(i);
+			retVal[i] = entry.factory.name;
+		}
+		return retVal;
+	} //}}}
+
 	//{{{ Package-private members
+	static final int SPLITTER_WIDTH = 10;
+	DockablePanel dockablePanel;
 
 	//{{{ save() method
 	void save()
@@ -245,7 +273,7 @@ public class PanelWindowContainer implements DockableWindowContainer
 		else
 		{
 			jEdit.setProperty("view.dock." + position + ".last",
-				current.name);
+				current.factory.name);
 		}
 	} //}}}
 
@@ -271,8 +299,6 @@ public class PanelWindowContainer implements DockableWindowContainer
 	//}}}
 
 	//{{{ Private members
-	private static final int SPLITTER_WIDTH = 10;
-
 	private DockableWindowManager wm;
 	private String position;
 	private JPanel buttons;
@@ -282,9 +308,10 @@ public class PanelWindowContainer implements DockableWindowContainer
 	private JToggleButton nullButton;
 	private int dimension;
 	private Vector dockables;
-	private DockablePanel dockablePanel;
 	private DockableWindowManager.Entry current;
-	private JPopupMenu popup;
+
+	// remember the most recent dockable
+	private String mostRecent;
 	//}}}
 
 	//{{{ Inner classes
@@ -309,20 +336,74 @@ public class PanelWindowContainer implements DockableWindowContainer
 	//{{{ MouseHandler class
 	class MouseHandler extends MouseAdapter
 	{
+		JPopupMenu popup;
+
 		public void mousePressed(MouseEvent evt)
 		{
 			if(evt.getSource() == popupButton
 				|| GUIUtilities.isPopupTrigger(evt))
 			{
-				if(popup.isVisible())
+				if(popup != null && popup.isVisible())
 					popup.setVisible(false);
 				else
 				{
+					popup = createPopupMenu();
 					GUIUtilities.showPopupMenu(popup,
 						(Component)evt.getSource(),
 						evt.getX(),evt.getY());
 				}
 			}
+		}
+
+		private JPopupMenu createPopupMenu()
+		{
+			JPopupMenu popup = new JPopupMenu();
+			JMenu floatMenu = new JMenu(jEdit.getProperty("view.docking.menu-float"));
+
+			String[] dockables = getDockables();
+			for(int i = 0; i < dockables.length; i++)
+			{
+				final String entry = dockables[i];
+				JMenuItem selectMenuItem = new JMenuItem(wm.getDockableTitle(entry));
+
+				selectMenuItem.addActionListener(new ActionListener()
+				{
+					public void actionPerformed(ActionEvent evt)
+					{
+						wm.showDockableWindow(entry);
+					}
+				});
+
+				JMenuItem floatMenuItem = new JMenuItem(wm.getDockableTitle(entry));
+
+				floatMenuItem.addActionListener(new ActionListener()
+				{
+					public void actionPerformed(ActionEvent evt)
+					{
+						wm.floatDockableWindow(entry);
+					}
+				});
+
+				popup.add(selectMenuItem);
+				floatMenu.add(floatMenuItem);
+			}
+
+			popup.addSeparator();
+			popup.add(floatMenu);
+
+			popup.addSeparator();
+			JMenuItem config = new JMenuItem(jEdit.getProperty("view.docking.menu-config"));
+			config.addActionListener(new ActionListener()
+			{
+				public void actionPerformed(ActionEvent evt)
+				{
+					new org.gjt.sp.jedit.options.GlobalOptions(
+						wm.getView(),"docking");
+				}
+			});
+			popup.add(config);
+
+			return popup;
 		}
 	} //}}}
 
@@ -450,28 +531,21 @@ public class PanelWindowContainer implements DockableWindowContainer
 	} //}}}
 
 	//{{{ RotatedTextIcon class
-	class RotatedTextIcon implements Icon
+	public static class RotatedTextIcon implements Icon
 	{
-		static final int NONE = 0;
-		static final int CW = 1;
-		static final int CCW = 2;
-
-		int rotate;
-		Font font;
-		GlyphVector glyphs;
-		float width;
-		float height;
-		float ascent;
-		RenderingHints renderHints;
+		public static final int NONE = 0;
+		public static final int CW = 1;
+		public static final int CCW = 2;
 
 		//{{{ RotatedTextIcon constructor
-		RotatedTextIcon(int rotate, Font font, String text)
+		public RotatedTextIcon(int rotate, Font font, String text)
 		{
 			this.rotate = rotate;
 			this.font = font;
 
 			FontRenderContext fontRenderContext
 				= new FontRenderContext(null,true,true);
+			this.text = text;
 			glyphs = font.createGlyphVector(fontRenderContext,text);
 			width = (int)glyphs.getLogicalBounds().getWidth() + 4;
 			//height = (int)glyphs.getLogicalBounds().getHeight();
@@ -551,6 +625,17 @@ public class PanelWindowContainer implements DockableWindowContainer
 			g2d.setTransform(oldTransform);
 			g2d.setRenderingHints(oldHints);
 		} //}}}
+
+		//{{{ Private members
+		private int rotate;
+		private Font font;
+		private String text;
+		private GlyphVector glyphs;
+		private float width;
+		private float height;
+		private float ascent;
+		private RenderingHints renderHints;
+		//}}}
 	} //}}}
 
 	//{{{ ButtonLayout class
@@ -565,6 +650,9 @@ public class PanelWindowContainer implements DockableWindowContainer
 		//{{{ preferredLayoutSize() method
 		public Dimension preferredLayoutSize(Container parent)
 		{
+			Insets insets = ((JComponent)parent).getBorder()
+				.getBorderInsets((JComponent)parent);
+
 			Component[] comp = parent.getComponents();
 			if(comp.length == 2)
 			{
@@ -576,11 +664,16 @@ public class PanelWindowContainer implements DockableWindowContainer
 				if(position.equals(DockableWindowManager.TOP)
 					|| position.equals(DockableWindowManager.BOTTOM))
 				{
-					return new Dimension(0,comp[2].getPreferredSize().height);
+					return new Dimension(0,
+						comp[2].getPreferredSize().height
+						+ insets.top
+						+ insets.bottom);
 				}
 				else
 				{
-					return new Dimension(comp[2].getPreferredSize().width,0);
+					return new Dimension(
+						comp[2].getPreferredSize().width
+						+ insets.left + insets.right,0);
 				}
 			}
 		} //}}}
@@ -588,29 +681,15 @@ public class PanelWindowContainer implements DockableWindowContainer
 		//{{{ minimumLayoutSize() method
 		public Dimension minimumLayoutSize(Container parent)
 		{
-			Component[] comp = parent.getComponents();
-			if(comp.length == 2)
-			{
-				// nothing 'cept close box and popup button
-				return new Dimension(0,0);
-			}
-			else
-			{
-				if(position.equals(DockableWindowManager.TOP)
-					|| position.equals(DockableWindowManager.BOTTOM))
-				{
-					return new Dimension(0,comp[2].getMinimumSize().height);
-				}
-				else
-				{
-					return new Dimension(comp[2].getMinimumSize().width,0);
-				}
-			}
+			return preferredLayoutSize(parent);
 		} //}}}
 
 		//{{{ layoutContainer() method
 		public void layoutContainer(Container parent)
 		{
+			Insets insets = ((JComponent)parent).getBorder()
+				.getBorderInsets((JComponent)parent);
+
 			Component[] comp = parent.getComponents();
 			if(comp.length != 2)
 			{
@@ -619,7 +698,10 @@ public class PanelWindowContainer implements DockableWindowContainer
 				popupButton.setVisible(false);
 
 				Dimension parentSize = parent.getSize();
-				int pos = 0;
+				int pos = (position.equals(DockableWindowManager.TOP)
+					|| position.equals(DockableWindowManager.BOTTOM)
+					) ? 0 : insets.left;
+
 				for(int i = 2; i < comp.length; i++)
 				{
 					Dimension size = comp[i].getPreferredSize();
@@ -628,7 +710,9 @@ public class PanelWindowContainer implements DockableWindowContainer
 					{
 						if(!closeBoxSizeSet)
 						{
-							closeBox.setBounds(0,0,size.height,size.height);
+							closeBox.setBounds(pos,
+								insets.top,
+								size.height,size.height);
 							pos += size.height;
 							closeBoxSizeSet = true;
 						}
@@ -638,15 +722,18 @@ public class PanelWindowContainer implements DockableWindowContainer
 							? 0 : closeBox.getWidth()))
 						{
 							popupButton.setBounds(
-								parentSize.width - size.height,
-								0,size.height,size.height);
+								parentSize.width - size.height
+								- insets.right,
+								insets.top,size.height,
+								size.height);
 							popupButton.setVisible(true);
 							comp[i].setVisible(false);
 							noMore = true;
 						}
 						else
 						{
-							comp[i].setBounds(pos,0,size.width,size.height);
+							comp[i].setBounds(pos,insets.top,
+								size.width,size.height);
 							comp[i].setVisible(true);
 							pos += size.width;
 						}
@@ -655,7 +742,8 @@ public class PanelWindowContainer implements DockableWindowContainer
 					{
 						if(!closeBoxSizeSet)
 						{
-							closeBox.setBounds(0,0,size.width,size.width);
+							closeBox.setBounds(insets.left,
+								insets.top,size.width,size.width);
 							pos += size.width;
 							closeBoxSizeSet = true;
 						}
@@ -665,7 +753,8 @@ public class PanelWindowContainer implements DockableWindowContainer
 							? 0 : closeBox.getHeight()))
 						{
 							popupButton.setBounds(
-								0,parentSize.height - size.width,
+								insets.top,
+								parentSize.height - size.width,
 								size.width,size.width);
 							popupButton.setVisible(true);
 							comp[i].setVisible(false);
@@ -673,7 +762,8 @@ public class PanelWindowContainer implements DockableWindowContainer
 						}
 						else
 						{
-							comp[i].setBounds(0,pos,size.width,size.height);
+							comp[i].setBounds(insets.left,
+								pos,size.width,size.height);
 							comp[i].setVisible(true);
 							pos += size.height;
 						}
@@ -694,6 +784,12 @@ public class PanelWindowContainer implements DockableWindowContainer
 			ResizeMouseHandler resizeMouseHandler = new ResizeMouseHandler();
 			addMouseListener(resizeMouseHandler);
 			addMouseMotionListener(resizeMouseHandler);
+		} //}}}
+
+		//{{{ getWindowContainer() method
+		PanelWindowContainer getWindowContainer()
+		{
+			return PanelWindowContainer.this;
 		} //}}}
 
 		//{{{ showDockable() method

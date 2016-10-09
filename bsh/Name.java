@@ -245,7 +245,8 @@ class Name implements java.io.Serializable
 			&& !forceClass ) 
 		{
 			String varName = prefix(evalName, 1);
-			Interpreter.debug("trying to resolve variable: " + varName);
+			if ( Interpreter.DEBUG ) 
+				Interpreter.debug("trying to resolve variable: " + varName);
 			Object obj;
 			if ( evalBaseObject == null ) {
 				obj = resolveThisFieldReference( 
@@ -260,7 +261,8 @@ class Name implements java.io.Serializable
 			if ( obj != Primitive.VOID ) 
 			{
 				// Resolved the variable
-				Interpreter.debug( "resolved variable: " + varName + 
+				if ( Interpreter.DEBUG ) 
+					Interpreter.debug( "resolved variable: " + varName + 
 					" in namespace: "+namespace);
 				evalName = suffix(evalName);
 				return evalBaseObject = obj;
@@ -272,7 +274,8 @@ class Name implements java.io.Serializable
 			If we're just starting eval of name try to make it, else fail.
 		*/
 		if ( evalBaseObject == null ) {
-			Interpreter.debug( "trying class: " + evalName);
+			if ( Interpreter.DEBUG ) 
+				Interpreter.debug( "trying class: " + evalName);
 			
 			/*
 				Keep adding parts until we have a class 
@@ -288,7 +291,8 @@ class Name implements java.io.Serializable
 				return ( evalBaseObject = new ClassIdentifier(clas) );
 			}
 			// not a class (or variable per above)
-			Interpreter.debug( "not a class, trying var prefix "+evalName );
+			if ( Interpreter.DEBUG ) 
+				Interpreter.debug( "not a class, trying var prefix "+evalName );
 		}
 
 
@@ -344,10 +348,14 @@ class Name implements java.io.Serializable
 			Object obj = null;
 			// static field?
 			try {
-//System.err.println("Name call to getStaticField, class: "
-	//+clas+", field:"+field);
+				if ( Interpreter.DEBUG ) 
+					Interpreter.debug("Name call to getStaticField, class: " 
+						+clas+", field:"+field);
 				obj = Reflect.getStaticField(clas, field);
-			} catch(ReflectError e) { }
+			} catch( ReflectError e ) { 
+				if ( Interpreter.DEBUG ) 
+					Interpreter.debug("field reflect error: "+e);
+			}
 
 			// inner class?
 			if ( obj == null ) {
@@ -543,12 +551,15 @@ class Name implements java.io.Serializable
 	{
 		reset();
 
-		//Interpreter.debug("Name toLHS: "+evalName+ " isCompound = "
-			//+isCompound(evalName));
+		/* if ( Interpreter.DEBUG ) 
+			Interpreter.debug("Name toLHS: "+evalName+ " isCompound = "
+			+ isCompound(evalName));
+		*/
 
 		// variable
 		if(!isCompound(evalName)) {
-			//Interpreter.debug("returning simple var LHS...");
+			//if ( Interpreter.DEBUG ) 
+				//Interpreter.debug("returning simple var LHS...");
 			return new LHS(namespace,evalName);
 		}
 
@@ -614,7 +625,7 @@ class Name implements java.io.Serializable
 		}
 		catch(ReflectError e)
 		{
-			Interpreter.debug("reflect error:" + e);
+			if ( Interpreter.DEBUG ) Interpreter.debug("reflect error:" + e);
 			return null;
 		}
 	*/
@@ -689,7 +700,8 @@ class Name implements java.io.Serializable
         }
 
         // try static method
-        Interpreter.debug("invokeMethod: trying static - " + targetName);
+        if ( Interpreter.DEBUG ) 
+			Interpreter.debug("invokeMethod: trying static - " + targetName);
 
         Class clas = ((Name.ClassIdentifier)obj).getTargetClass();
         if (clas != null)
@@ -720,14 +732,16 @@ class Name implements java.io.Serializable
 	)
         throws EvalError, ReflectError, InvocationTargetException
     {
-        Interpreter.debug("invoke local method: " + value);
+        if ( Interpreter.DEBUG ) 
+			Interpreter.debug("invoke local method: " + value);
 
         // Check for locally declared method
         BshMethod meth = toLocalMethod( args );
         if ( meth != null )
             return meth.invokeDeclaredMethod( args, interpreter, callstack, callerInfo );
         else
-            Interpreter.debug("no locally declared method: " + value);
+            if ( Interpreter.DEBUG ) 
+				Interpreter.debug("no locally declared method: " + value);
 
         /*
 			Look for scripted command as resource
@@ -737,7 +751,8 @@ class Name implements java.io.Serializable
         InputStream in = Interpreter.class.getResourceAsStream(commandName);
         if (in != null)
         {
-            Interpreter.debug("loading resource: " + commandName);
+            if ( Interpreter.DEBUG ) 
+				Interpreter.debug("loading resource: " + commandName);
 
 			if ( interpreter == null )
 				throw new InterpreterError("2234432 interpreter = null");
@@ -773,7 +788,8 @@ class Name implements java.io.Serializable
         }
         catch(ReflectError e)
         {
-            Interpreter.debug("invoke command args error:" + e);
+            if ( Interpreter.DEBUG ) 
+				Interpreter.debug("invoke command args error:" + e);
             // bad args
         }
         // try to print help
@@ -785,7 +801,7 @@ class Name implements java.io.Serializable
         }
         catch(ReflectError e)
         {
-            Interpreter.debug("usage threw: " + e);
+            if ( Interpreter.DEBUG ) Interpreter.debug("usage threw: " + e);
             throw new EvalError("Wrong number or type of args for command");
         }
     }

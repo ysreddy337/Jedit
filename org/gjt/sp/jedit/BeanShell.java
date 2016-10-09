@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2001 Slava Pestov
+ * Copyright (C) 2000, 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,8 +24,6 @@ package org.gjt.sp.jedit;
 
 //{{{ Imports
 import bsh.*;
-import javax.swing.text.Segment;
-import javax.swing.JFileChooser;
 import java.lang.reflect.InvocationTargetException;
 import java.io.*;
 import org.gjt.sp.jedit.io.*;
@@ -34,6 +32,24 @@ import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
 //}}}
 
+/**
+ * BeanShell is jEdit's extension language.<p>
+ *
+ * When run from jEdit, BeanShell code has access to the following predefined
+ * variables:
+ *
+ * <ul>
+ * <li><code>view</code> - the currently active {@link View}.</li>
+ * <li><code>editPane</code> - the currently active {@link EditPane}.</li>
+ * <li><code>textArea</code> - the edit pane's {@link JEditTextArea}.</li>
+ * <li><code>buffer</code> - the edit pane's {@link Buffer}.</li>
+ * <li><code>scriptPath</code> - the path name of the currently executing
+ * BeanShell script.</li>
+ * </ul>
+ *
+ * @author Slava Pestov
+ * @version $Id: BeanShell.java,v 1.31 2003/02/15 22:17:55 spestov Exp $
+ */
 public class BeanShell
 {
 	//{{{ evalSelection() method
@@ -109,8 +125,11 @@ public class BeanShell
 		JEditTextArea textArea = view.getTextArea();
 		Buffer buffer = view.getBuffer();
 
+		if(command == null || command.length() == 0)
+			return;
+
 		Selection[] selection = textArea.getSelection();
-		if(selection.length == 0 || command == null || command.length() == 0)
+		if(selection.length == 0)
 		{
 			view.getToolkit().beep();
 			return;
@@ -169,25 +188,29 @@ public class BeanShell
 		textArea.selectNone();
 	} //}}}
 
-	//{{{ showRunScriptDialog() method
-	/**
-	 * Prompts for a BeanShell script to run.
-	 * @since jEdit 2.7pre2
-	 */
-	public static void showRunScriptDialog(View view)
-	{
-		Macros.showRunScriptDialog(view);
-	} //}}}
-
 	//{{{ runScript() method
 	/**
-	 * Runs a BeanShell script. Errors are shown in a dialog box.
-	 * @param view The view
-	 * @param path For error reporting only
-	 * @param in The reader to read the script from. If null, script will
-	 * be read from the VFS corresponding to its path.
-	 * @param ownNamespace Macros are run in their own namespace, startup
-	 * scripts are run on the global namespace
+	 * Runs a BeanShell script. Errors are shown in a dialog box.<p>
+	 *
+	 * If the <code>in</code> parameter is non-null, the script is
+	 * read from that stream; otherwise it is read from the file identified
+	 * by <code>path</code>.<p>
+	 *
+	 * The <code>scriptPath</code> BeanShell variable is set to the path
+	 * name of the script.
+	 *
+	 * @param view The view. Within the script, references to
+	 * <code>buffer</code>, <code>textArea</code> and <code>editPane</code>
+	 * are determined with reference to this parameter.
+	 * @param path The script file's VFS path.
+	 * @param in The reader to read the script from, or <code>null</code>.
+	 * @param ownNamespace If set to <code>false</code>, methods and
+	 * variables defined in the script will be available to all future
+	 * uses of BeanShell; if set to <code>true</code>, they will be lost as
+	 * soon as the script finishes executing. jEdit uses a value of
+	 * <code>false</code> when running startup scripts, and a value of
+	 * <code>true</code> when running all other macros.
+	 *
 	 * @since jEdit 4.0pre7
 	 */
 	public static void runScript(View view, String path, Reader in,
@@ -207,13 +230,26 @@ public class BeanShell
 
 	//{{{ _runScript() method
 	/**
-	 * Runs a BeanShell script. Errors are passed to the caller.
-	 * @param view The view
-	 * @param path For error reporting only
-	 * @param in The reader to read the script from. If null, script will
-	 * be read from the VFS corresponding to its path.
-	 * @param ownNamespace Macros are run in their own namespace, startup
-	 * scripts are run on the global namespace
+	 * Runs a BeanShell script. Errors are passed to the caller.<p>
+	 *
+	 * If the <code>in</code> parameter is non-null, the script is
+	 * read from that stream; otherwise it is read from the file identified
+	 * by <code>path</code>.<p>
+	 *
+	 * The <code>scriptPath</code> BeanShell variable is set to the path
+	 * name of the script.
+	 *
+	 * @param view The view. Within the script, references to
+	 * <code>buffer</code>, <code>textArea</code> and <code>editPane</code>
+	 * are determined with reference to this parameter.
+	 * @param path The script file's VFS path.
+	 * @param in The reader to read the script from, or <code>null</code>.
+	 * @param ownNamespace If set to <code>false</code>, methods and
+	 * variables defined in the script will be available to all future
+	 * uses of BeanShell; if set to <code>true</code>, they will be lost as
+	 * soon as the script finishes executing. jEdit uses a value of
+	 * <code>false</code> when running startup scripts, and a value of
+	 * <code>true</code> when running all other macros.
 	 * @exception Exception instances are thrown when various BeanShell errors
 	 * occur
 	 * @since jEdit 4.0pre7
@@ -266,12 +302,14 @@ public class BeanShell
 
 			if(view != null)
 			{
-				EditPane editPane = view.getEditPane();
 				interp.set("view",view);
+				EditPane editPane = view.getEditPane();
 				interp.set("editPane",editPane);
 				interp.set("buffer",editPane.getBuffer());
 				interp.set("textArea",editPane.getTextArea());
 			}
+
+			interp.set("scriptPath",path);
 
 			running = true;
 
@@ -298,6 +336,27 @@ public class BeanShell
 						new String[] { path, io.toString() });
 				}
 			}
+
+			try
+			{
+				// no need to do this for macros!
+				if(!ownNamespace)
+				{
+					if(view != null)
+					{
+						interp.unset("view");
+						interp.unset("editPane");
+						interp.unset("buffer");
+						interp.unset("textArea");
+					}
+
+					interp.unset("scriptPath");
+				}
+			}
+			catch(EvalError e)
+			{
+				// do nothing
+			}
 		}
 	} //}}}
 
@@ -305,7 +364,9 @@ public class BeanShell
 	/**
 	 * Evaluates the specified BeanShell expression. Errors are reported in
 	 * a dialog box.
-	 * @param view The view (may be null)
+	 * @param view The view. Within the script, references to
+	 * <code>buffer</code>, <code>textArea</code> and <code>editPane</code>
+	 * are determined with reference to this parameter.
 	 * @param namespace The namespace
 	 * @param command The expression
 	 * @since jEdit 4.0pre8
@@ -331,7 +392,9 @@ public class BeanShell
 	 * Evaluates the specified BeanShell expression. Unlike
 	 * <code>eval()</code>, this method passes any exceptions to the caller.
 	 *
-	 * @param view The view (may be null)
+	 * @param view The view. Within the script, references to
+	 * <code>buffer</code>, <code>textArea</code> and <code>editPane</code>
+	 * are determined with reference to this parameter.
 	 * @param namespace The namespace
 	 * @param command The expression
 	 * @exception Exception instances are thrown when various BeanShell
@@ -362,6 +425,23 @@ public class BeanShell
 			// never called
 			return null;
 		}
+		finally
+		{
+			try
+			{
+				if(view != null)
+				{
+					interp.unset("view");
+					interp.unset("editPane");
+					interp.unset("buffer");
+					interp.unset("textArea");
+				}
+			}
+			catch(EvalError e)
+			{
+				// do nothing
+			}
+		}
 	} //}}}
 
 	//{{{ cacheBlock() method
@@ -370,53 +450,51 @@ public class BeanShell
 	 * runCachedBlock().
 	 * @param id An identifier. If null, a unique identifier is generated
 	 * @param code The code
-	 * @param childNamespace If the method body should be run in a new
-	 * namespace (slightly faster). Note that you must pass a null namespace
-	 * to the runCachedBlock() method if you do this
+	 * @param namespace If true, the namespace will be set
 	 * @exception Exception instances are thrown when various BeanShell errors
 	 * occur
-	 * @since jEdit 3.2pre5
+	 * @since jEdit 4.1pre1
 	 */
-	public static String cacheBlock(String id, String code,
-		boolean childNamespace) throws Exception
+	public static BshMethod cacheBlock(String id, String code, boolean namespace)
+		throws Exception
 	{
-		String name;
-		if(id == null)
-			name = "b_" + (cachedBlockCounter++);
+		String name = "__internal_" + id;
+
+		// evaluate a method declaration
+		if(namespace)
+		{
+			_eval(null,global,name + "(ns) {\nthis.callstack.set(0,ns);\n" + code + "\n}");
+			return global.getMethod(name,new Class[] { NameSpace.class });
+		}
 		else
-			name = "b_" + id;
-
-		code = "setNameSpace(__cruft.namespace);\n"
-			+ name
-			+ "(ns) {\n"
-			+ "setNameSpace(ns);"
-			+ code
-			+ "\n}";
-
-		_eval(null,global,code);
-
-		return name;
+		{
+			_eval(null,global,name + "() {\n" + code + "\n}");
+			return global.getMethod(name,new Class[0]);
+		}
 	} //}}}
 
 	//{{{ runCachedBlock() method
 	/**
 	 * Runs a cached block of code in the specified namespace. Faster than
 	 * evaluating the block each time.
-	 * @param id The identifier returned by cacheBlock()
+	 * @param method The method instance returned by cacheBlock()
 	 * @param view The view
-	 * @param namespace The namespace to run the code in. Can only be null if
-	 * childNamespace parameter was true in cacheBlock() call
-	 * @exception Exception instances are thrown when various BeanShell errors
-	 * occur
-	 * @since jEdit 3.2pre5
+	 * @param namespace The namespace to run the code in
+	 * @exception Exception instances are thrown when various BeanShell
+	 * errors occur
+	 * @since jEdit 4.1pre1
 	 */
-	public static Object runCachedBlock(String id, View view, NameSpace namespace)
-		throws Exception
+	public static Object runCachedBlock(BshMethod method, View view,
+		NameSpace namespace) throws Exception
 	{
+		boolean useNamespace;
 		if(namespace == null)
+		{
+			useNamespace = false;
 			namespace = global;
-
-		Object[] args = { namespace };
+		}
+		else
+			useNamespace = true;
 
 		try
 		{
@@ -429,7 +507,10 @@ public class BeanShell
 				namespace.setVariable("textArea",editPane.getTextArea());
 			}
 
-			Object retVal = internal.invokeMethod(id,args,interpForMethods);
+			Object retVal = method.invoke(useNamespace
+				? new Object[] { namespace }
+				: NO_ARGS,
+				interpForMethods,new CallStack());
 			if(retVal instanceof Primitive)
 			{
 				if(retVal == Primitive.VOID)
@@ -448,16 +529,19 @@ public class BeanShell
 		}
 		finally
 		{
-			try
+			if(view != null)
 			{
-				namespace.setVariable("view",null);
-				namespace.setVariable("editPane",null);
-				namespace.setVariable("buffer",null);
-				namespace.setVariable("textArea",null);
-			}
-			catch(EvalError e)
-			{
-				// can't do much
+				try
+				{
+					namespace.setVariable("view",null);
+					namespace.setVariable("editPane",null);
+					namespace.setVariable("buffer",null);
+					namespace.setVariable("textArea",null);
+				}
+				catch(EvalError e)
+				{
+					// can't do much
+				}
 			}
 		}
 	} //}}}
@@ -542,7 +626,9 @@ public class BeanShell
 		global = new NameSpace("jEdit embedded BeanShell interpreter");
 		global.importPackage("org.gjt.sp.jedit");
 		global.importPackage("org.gjt.sp.jedit.browser");
+		global.importPackage("org.gjt.sp.jedit.buffer");
 		global.importPackage("org.gjt.sp.jedit.gui");
+		global.importPackage("org.gjt.sp.jedit.help");
 		global.importPackage("org.gjt.sp.jedit.io");
 		global.importPackage("org.gjt.sp.jedit.msg");
 		global.importPackage("org.gjt.sp.jedit.options");
@@ -555,8 +641,6 @@ public class BeanShell
 
 		interpForMethods = createInterpreter(global);
 
-		internal = (NameSpace)eval(null,"__cruft = object();__cruft.namespace;",false);
-
 		Log.log(Log.DEBUG,BeanShell.class,"BeanShell interpreter version "
 			+ Interpreter.VERSION);
 	} //}}}
@@ -565,12 +649,11 @@ public class BeanShell
 
 	//{{{ Private members
 
-	//{{{ Instance variables
+	//{{{ Static variables
+	private static final Object[] NO_ARGS = new Object[0];
 	private static Interpreter interpForMethods;
 	private static NameSpace global;
-	private static NameSpace internal;
 	private static boolean running;
-	private static int cachedBlockCounter;
 	//}}}
 
 	//{{{ unwrapException() method
@@ -610,7 +693,7 @@ public class BeanShell
 				new String[] { t.toString() });
 		}
 		else
-			new BeanShellErrorDialog(view,t.toString());
+			new BeanShellErrorDialog(view,t);
 	} //}}}
 
 	//{{{ createInterpreter() method

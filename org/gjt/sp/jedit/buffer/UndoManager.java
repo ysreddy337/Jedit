@@ -29,6 +29,17 @@ import org.gjt.sp.jedit.Buffer;
 import org.gjt.sp.util.Log;
 //}}}
 
+/**
+ * A class internal to jEdit's document model. You should not use it
+ * directly. To improve performance, none of the methods in this class
+ * check for out of bounds access, nor are they thread-safe. The
+ * <code>Buffer</code> class, through which these methods must be
+ * called through, implements such protection.
+ *
+ * @author Slava Pestov
+ * @version $Id: UndoManager.java,v 1.13 2003/01/31 18:28:51 spestov Exp $
+ * @since jEdit 4.0pre1
+ */
 public class UndoManager
 {
 	//{{{ UndoManager constructor
@@ -229,10 +240,18 @@ public class UndoManager
 	//{{{ addEdit() method
 	private void addEdit(Edit edit)
 	{
+		//System.err.println("adding undo with position " + undoPos);
 		undos.add(undoPos++,edit);
 
-		if(undos.size() > limit)
+		for(int i = undoCount - 1; i >= undoPos; i--)
 		{
+			//System.err.println("removing undo with position " + i);
+			undos.remove(i);
+		}
+
+		if(undoPos > limit)
+		{
+			//System.err.println("removing undo 0");
 			undos.remove(0);
 			undoPos--;
 		}
@@ -271,7 +290,7 @@ public class UndoManager
 
 	//{{{ Inner classes
 
-	//{{{ Edit interface
+	//{{{ Edit class
 	abstract class Edit
 	{
 		//{{{ undo() method

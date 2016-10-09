@@ -22,7 +22,6 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import java.awt.*;
 import java.util.*;
 import javax.swing.text.Segment;
 import org.gjt.sp.jedit.syntax.*;
@@ -41,7 +40,7 @@ import org.gjt.sp.jedit.syntax.*;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: TextUtilities.java,v 1.27 2002/04/12 03:49:45 spestov Exp $
+ * @version $Id: TextUtilities.java,v 1.40 2003/01/30 02:58:40 spestov Exp $
  */
 public class TextUtilities
 {
@@ -57,19 +56,15 @@ public class TextUtilities
 		if(offset == 0 && tokens.id == Token.END)
 			return tokens;
 
-		int tokenListOffset = 0;
 		for(;;)
 		{
 			if(tokens.id == Token.END)
 				throw new ArrayIndexOutOfBoundsException("offset > line length");
 
-			if(tokenListOffset + tokens.length > offset)
+			if(tokens.offset + tokens.length > offset)
 				return tokens;
 			else
-			{
-				tokenListOffset += tokens.length;
 				tokens = tokens.next;
-			}
 		}
 	} //}}}
 
@@ -84,29 +79,6 @@ public class TextUtilities
 	 * @since jEdit 2.6pre1
 	 */
 	public static int findMatchingBracket(Buffer buffer, int line, int offset)
-	{
-		return findMatchingBracket(buffer,line,offset,0,
-			buffer.getLineCount() - 1);
-	} //}}}
-
-	//{{{ findMatchingBracket() method
-	/**
-	 * Returns the offset of the bracket matching the one at the
-	 * specified offset of the buffer, or -1 if the bracket is
-	 * unmatched (or if the character is not a bracket).
-	 * @param buffer The buffer
-	 * @param line The line
-	 * @param offset The offset within that line
-	 * @param startLine The first line to scan. This is used to speed up
-	 * on-screen bracket matching because only visible lines need to be
-	 * scanned
-	 * @param endLine The last line to scan. This is used to speed up
-	 * on-screen bracket matching because only visible lines need to be
-	 * scanned
-	 * @since jEdit 2.7pre3
-	 */
-	public static int findMatchingBracket(Buffer buffer, int line, int offset,
-		int startLine, int endLine)
 	{
 		if(offset < 0 || offset >= buffer.getLineLength(line))
 		{
@@ -135,12 +107,13 @@ public class TextUtilities
 		// 1 because we've already 'seen' the first bracket
 		int count = 1;
 
-		Buffer.TokenList tokenList = buffer.markTokens(line);
+		DefaultTokenHandler tokenHandler = new DefaultTokenHandler();
+		buffer.markTokens(line,tokenHandler);
 
 		// Get the syntax token at 'offset'
 		// only tokens with the same type will be checked for
 		// the corresponding bracket
-		byte idOfBracket = getTokenAtOffset(tokenList.getFirstToken(),offset).id;
+		byte idOfBracket = getTokenAtOffset(tokenHandler.getTokens(),offset).id;
 
 		boolean haveTokens = true;
 
@@ -158,20 +131,22 @@ public class TextUtilities
 					{
 						if(!haveTokens)
 						{
-							tokenList = buffer.markTokens(line);
+							tokenHandler.init();
+							buffer.markTokens(line,tokenHandler);
 							haveTokens = true;
 						}
-						if(getTokenAtOffset(tokenList.getFirstToken(),i).id == idOfBracket)
+						if(getTokenAtOffset(tokenHandler.getTokens(),i).id == idOfBracket)
 							count++;
 					}
 					else if(ch == cprime)
 					{
 						if(!haveTokens)
 						{
-							tokenList = buffer.markTokens(line);
+							tokenHandler.init();
+							buffer.markTokens(line,tokenHandler);
 							haveTokens = true;
 						}
-						if(getTokenAtOffset(tokenList.getFirstToken(),i).id == idOfBracket)
+						if(getTokenAtOffset(tokenHandler.getTokens(),i).id == idOfBracket)
 						{
 							count--;
 							if(count == 0)
@@ -182,7 +157,7 @@ public class TextUtilities
 
 				//{{{ Go on to next line
 				line++;
-				if(line > endLine)
+				if(line >= buffer.getLineCount())
 					break;
 				buffer.getLineText(line,lineText);
 				offset = 0;
@@ -204,20 +179,22 @@ public class TextUtilities
 					{
 						if(!haveTokens)
 						{
-							tokenList = buffer.markTokens(line);
+							tokenHandler.init();
+							buffer.markTokens(line,tokenHandler);
 							haveTokens = true;
 						}
-						if(getTokenAtOffset(tokenList.getFirstToken(),i).id == idOfBracket)
+						if(getTokenAtOffset(tokenHandler.getTokens(),i).id == idOfBracket)
 							count++;
 					}
 					else if(ch == cprime)
 					{
 						if(!haveTokens)
 						{
-							tokenList = buffer.markTokens(line);
+							tokenHandler.init();
+							buffer.markTokens(line,tokenHandler);
 							haveTokens = true;
 						}
-						if(getTokenAtOffset(tokenList.getFirstToken(),i).id == idOfBracket)
+						if(getTokenAtOffset(tokenHandler.getTokens(),i).id == idOfBracket)
 						{
 							count--;
 							if(count == 0)
@@ -228,7 +205,7 @@ public class TextUtilities
 
 				//{{{ Go on to next line
 				line--;
-				if(line < startLine)
+				if(line < 0)
 					break;
 				buffer.getLineText(line,lineText);
 				offset = lineText.count - 1;
@@ -241,6 +218,29 @@ public class TextUtilities
 		return -1;
 	} //}}}
 
+	//{{{ findMatchingBracketFuzzy() method
+	/**
+	 * Works exactly like the findMatchingBracket(Bufferm int, int) method,
+	 * but if there is no (matching) bracket at the specified offset, it
+	 * looks at the next character too. The caller only needs to make sure
+	 * that the given offset is valid.
+	 * @param buffer The buffer
+	 * @param line The line
+	 * @param offset The offset within that line
+	 * @since 4.1pre1
+	 */
+	public static int findMatchingBracketFuzzy(Buffer buffer, int line, int offset)
+	{
+		int result = findMatchingBracket(buffer,line,offset);
+		if((result == -1)&&(offset + 1 < buffer.getLineLength(line)))
+		{
+			return findMatchingBracket(buffer,line,offset + 1);
+		}
+		else{
+			return result;	
+		}
+	} //}}}
+
 	//{{{ findWordStart() method
 	/**
 	 * Locates the start of the word at the specified position.
@@ -250,6 +250,23 @@ public class TextUtilities
 	 * should be treated as word characters anyway
 	 */
 	public static int findWordStart(String line, int pos, String noWordSep)
+	{
+		return findWordStart(line, pos, noWordSep, true);
+	} //}}}
+
+	//{{{ findWordStart() method
+	/**
+	 * Locates the start of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @param joinNonWordChars Treat consecutive non-alphanumeric
+	 * characters as one word
+	 * @since jEdit 4.1pre2
+	 */
+	public static int findWordStart(String line, int pos, String noWordSep,
+					boolean joinNonWordChars)
 	{
 		char ch = line.charAt(pos);
 
@@ -291,6 +308,7 @@ loop:		for(int i = pos; i >= 0; i--)
 					return i + 1; //}}}
 			//{{{ Symbol...
 			case SYMBOL:
+				if(!joinNonWordChars && pos!=i) return i + 1;
 				// if we see whitespace, set flag.
 				if(Character.isWhitespace(ch))
 				{
@@ -321,6 +339,23 @@ loop:		for(int i = pos; i >= 0; i--)
 	 */
 	public static int findWordEnd(String line, int pos, String noWordSep)
 	{
+		return findWordEnd(line, pos, noWordSep, true);
+	} //}}}
+
+	//{{{ findWordEnd() method
+	/**
+	 * Locates the end of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @param joinNonWordChars Treat consecutive non-alphanumeric
+	 * characters as one word
+	 * @since jEdit 4.1pre2
+	 */
+	public static int findWordEnd(String line, int pos, String noWordSep,
+					boolean joinNonWordChars)
+	{
 		if(pos != 0)
 			pos--;
 
@@ -340,7 +375,6 @@ loop:		for(int i = pos; i >= 0; i--)
 			type = SYMBOL;
 		//}}}
 
-		boolean seenWhiteSpace = false;
 loop:		for(int i = pos; i < line.length(); i++)
 		{
 			ch = line.charAt(i);
@@ -364,6 +398,7 @@ loop:		for(int i = pos; i < line.length(); i++)
 					return i; //}}}
 			//{{{ Symbol...
 			case SYMBOL:
+				if(!joinNonWordChars && i!=pos) return i;
 				// if we see whitespace, set flag.
 				if(Character.isWhitespace(ch))
 				{
@@ -393,12 +428,12 @@ loop:		for(int i = pos; i < line.length(); i++)
 	 * @since jEdit 2.7pre1
 	 */
 	public static boolean regionMatches(boolean ignoreCase, Segment text,
-					    int offset, char[] match)
+		int offset, char[] match)
 	{
 		int length = offset + match.length;
-		char[] textArray = text.array;
 		if(length > text.offset + text.count)
 			return false;
+		char[] textArray = text.array;
 		for(int i = offset, j = 0; i < length; i++, j++)
 		{
 			char c1 = textArray[i];
@@ -509,82 +544,30 @@ loop:		for(int i = pos; i < line.length(); i++)
 	 * @param text The text
 	 * @param maxLineLen The maximum line length
 	 */
-	public static String format(String text, int maxLineLength)
+	public static String format(String text, int maxLineLength, int tabSize)
 	{
 		StringBuffer buf = new StringBuffer();
-		StringBuffer word = new StringBuffer();
-		int lineLength = 0;
-		boolean newline = true;
-		boolean space = false;
-		char[] chars = text.toCharArray();
-		for(int i = 0; i < chars.length; i++)
+
+		int index = 0;
+
+		for(;;)
 		{
-			char c = chars[i];
-			switch(c)
-			{
-			case '\n':
-				if(i == 0 || chars.length - i <= 2)
-				{
-					if(lineLength + word.length() >= maxLineLength)
-						buf.append('\n');
-					else if(space && word.length() != 0)
-						buf.append(' ');
-					buf.append(word);
-					word.setLength(0);
-					buf.append('\n');
-					newline = true;
-					space = false;
-					break;
-				}
-				else if(newline)
-				{
-					if(lineLength + word.length() >= maxLineLength)
-						buf.append('\n');
-					else if(space && word.length() != 0)
-						buf.append(' ');
-					buf.append(word);
-					word.setLength(0);
-					buf.append("\n\n");
-					newline = space = false;
-					lineLength = 0;
-					break;
-				}
-				else
-					newline = true;
-			case ' ':
-				if(lineLength + word.length() >= maxLineLength)
-				{
-					buf.append('\n');
-					lineLength = 0;
-					newline = true;
-				}
-				else if(space && lineLength != 0 && word.length() != 0)
-				{
-					buf.append(' ');
-					lineLength++;
-					space = false;
-				}
-				else
-					space = true;
-				buf.append(word);
-				lineLength += word.length();
-				word.setLength(0);
+			int newIndex = text.indexOf("\n\n",index);
+			if(newIndex == -1)
 				break;
-			default:
-				newline = false;
-				// without this test, we would have spaces
-				// at the start of lines
-				if(lineLength != 0)
-					space = true;
-				word.append(c);
-				break;
-			}
+
+			formatParagraph(text.substring(index,newIndex),
+				maxLineLength,tabSize,buf);
+			buf.append("\n\n");
+			index = newIndex + 2;
 		}
-		if(lineLength + word.length() >= maxLineLength)
-			buf.append('\n');
-		else if(space && word.length() != 0)
-			buf.append(' ');
-		buf.append(word);
+
+		if(index != text.length())
+		{
+			formatParagraph(text.substring(index),
+				maxLineLength,tabSize,buf);
+		}
+
 		return buf.toString();
 	} //}}}
 
@@ -666,5 +649,42 @@ loop:		for(int i = pos; i < line.length(); i++)
 	private static final int WHITESPACE = 0;
 	private static final int WORD_CHAR = 1;
 	private static final int SYMBOL = 2;
+
+	//{{{ formatParagraph() method
+	private static void formatParagraph(String text, int maxLineLength,
+		int tabSize, StringBuffer buf)
+	{
+		// align everything to paragraph's leading indent
+		int leadingWhitespaceCount = MiscUtilities.getLeadingWhiteSpace(text);
+		String leadingWhitespace = text.substring(0,leadingWhitespaceCount);
+		int leadingWhitespaceWidth = MiscUtilities.getLeadingWhiteSpaceWidth(text,tabSize);
+
+		buf.append(leadingWhitespace);
+
+		int lineLength = leadingWhitespaceWidth;
+		StringTokenizer st = new StringTokenizer(text);
+		while(st.hasMoreTokens())
+		{
+			String word = st.nextToken();
+			if(lineLength == leadingWhitespaceWidth)
+			{
+				// do nothing
+			}
+			else if(lineLength + word.length() + 1 > maxLineLength)
+			{
+				buf.append('\n');
+				buf.append(leadingWhitespace);
+				lineLength = leadingWhitespaceWidth;
+			}
+			else
+			{
+				buf.append(' ');
+				lineLength++;
+			}
+			buf.append(word);
+			lineLength += word.length();
+		}
+	} //}}}
+
 	//}}}
 }

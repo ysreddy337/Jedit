@@ -25,7 +25,7 @@ package org.gjt.sp.jedit.options;
 //{{{ Imports
 import javax.swing.*;
 import java.awt.*;
-import org.gjt.sp.jedit.gui.FontSelector;
+import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.*;
 //}}}
 
@@ -45,42 +45,76 @@ public class TextAreaOptionPane extends AbstractOptionPane
 
 		addComponent(jEdit.getProperty("options.textarea.font"),font);
 
+		/* Text color */
+		addComponent(jEdit.getProperty("options.textarea.foreground"),
+			foregroundColor = new ColorWellButton(
+			jEdit.getColorProperty("view.fgColor")),
+			GridBagConstraints.VERTICAL);
+
+		/* Background color */
+		addComponent(jEdit.getProperty("options.textarea.background"),
+			backgroundColor = new ColorWellButton(
+			jEdit.getColorProperty("view.bgColor")),
+			GridBagConstraints.VERTICAL);
+
+		/* Caret color, caret blink, block caret */
+		blinkCaret = new JCheckBox(jEdit.getProperty("options.textarea"
+			+ ".blinkCaret"));
+		blinkCaret.setSelected(jEdit.getBooleanProperty("view.caretBlink"));
+
+		blockCaret = new JCheckBox(jEdit.getProperty("options.textarea"
+			+ ".blockCaret"));
+		blockCaret.setSelected(jEdit.getBooleanProperty("view.blockCaret"));
+
+		Box caretSettings = new Box(BoxLayout.X_AXIS);
+		caretSettings.add(new JLabel(jEdit.getProperty(
+			"options.textarea.caret")));
+		caretSettings.add(Box.createHorizontalStrut(6));
+		caretSettings.add(blinkCaret);
+		caretSettings.add(blockCaret);
+
+		addComponent(caretSettings,caretColor = new ColorWellButton(
+			jEdit.getColorProperty("view.caretColor")),
+			GridBagConstraints.VERTICAL);
+
+		/* Selection color */
+		addComponent(jEdit.getProperty("options.textarea.selection"),
+			selectionColor = new ColorWellButton(
+			jEdit.getColorProperty("view.selectionColor")),
+			GridBagConstraints.VERTICAL);
+
 		/* Line highlight */
 		lineHighlight = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".lineHighlight"));
 		lineHighlight.setSelected(jEdit.getBooleanProperty("view.lineHighlight"));
-		addComponent(lineHighlight);
+		addComponent(lineHighlight,lineHighlightColor = new ColorWellButton(
+			jEdit.getColorProperty("view.lineHighlightColor")),
+			GridBagConstraints.VERTICAL);
 
 		/* Bracket highlight */
 		bracketHighlight = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".bracketHighlight"));
 		bracketHighlight.setSelected(jEdit.getBooleanProperty(
 			"view.bracketHighlight"));
-		addComponent(bracketHighlight);
+		addComponent(bracketHighlight,bracketHighlightColor = new ColorWellButton(
+			jEdit.getColorProperty("view.bracketHighlightColor")),
+			GridBagConstraints.VERTICAL);
 
 		/* EOL markers */
 		eolMarkers = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".eolMarkers"));
 		eolMarkers.setSelected(jEdit.getBooleanProperty("view.eolMarkers"));
-		addComponent(eolMarkers);
+		addComponent(eolMarkers,eolMarkerColor =new ColorWellButton(
+			jEdit.getColorProperty("view.eolMarkerColor")),
+			GridBagConstraints.VERTICAL);
 
 		/* Wrap guide */
 		wrapGuide = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".wrapGuide"));
 		wrapGuide.setSelected(jEdit.getBooleanProperty("view.wrapGuide"));
-		addComponent(wrapGuide);
-
-		/* Blinking caret */
-		blinkCaret = new JCheckBox(jEdit.getProperty("options.textarea"
-			+ ".blinkCaret"));
-		blinkCaret.setSelected(jEdit.getBooleanProperty("view.caretBlink"));
-		addComponent(blinkCaret);
-
-		/* Block caret */
-		blockCaret = new JCheckBox(jEdit.getProperty("options.textarea"
-			+ ".blockCaret"));
-		blockCaret.setSelected(jEdit.getBooleanProperty("view.blockCaret"));
-		addComponent(blockCaret);
+		addComponent(wrapGuide,wrapGuideColor = new ColorWellButton(
+			jEdit.getColorProperty("view.wrapGuideColor")),
+			GridBagConstraints.VERTICAL);
 
 		/* Electric borders */
 		electricBorders = new JCheckBox(jEdit.getProperty("options.textarea"
@@ -89,11 +123,12 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			"view.electricBorders")));
 		addComponent(electricBorders);
 
-		/* Smart home/end */
-		homeEnd = new JCheckBox(jEdit.getProperty("options.textarea"
-			+ ".homeEnd"));
-		homeEnd.setSelected(jEdit.getBooleanProperty("view.homeEnd"));
-		addComponent(homeEnd);
+		/* Non word character selection behavior */
+		joinNonWordChars = new JCheckBox(jEdit.getProperty(
+			"options.textarea.joinNonWordChars"));
+		joinNonWordChars.setSelected(jEdit.getBooleanProperty(
+			"view.joinNonWordChars"));
+		addComponent(joinNonWordChars);
 
 		/* Middle mouse button click pastes % register */
 		middleMousePaste = new JCheckBox(jEdit.getProperty("options.textarea"
@@ -114,12 +149,6 @@ public class TextAreaOptionPane extends AbstractOptionPane
 		fracFontMetrics.setSelected(jEdit.getBooleanProperty(
 			"view.fracFontMetrics"));
 		addComponent(fracFontMetrics);
-
-		/* Parse fully */
-		parseFully = new JCheckBox(jEdit.getProperty(
-			"options.textarea.parseFully"));
-		parseFully.setSelected(jEdit.getBooleanProperty("parseFully"));
-		addComponent(parseFully);
 	} //}}}
 
 	//{{{ _save() method
@@ -127,39 +156,61 @@ public class TextAreaOptionPane extends AbstractOptionPane
 	{
 		jEdit.setFontProperty("view.font",font.getFont());
 
-		jEdit.setBooleanProperty("view.lineHighlight",lineHighlight
-			.isSelected());
-		jEdit.setBooleanProperty("view.bracketHighlight",bracketHighlight
-			.isSelected());
-		jEdit.setBooleanProperty("view.eolMarkers",eolMarkers
-			.isSelected());
-		jEdit.setBooleanProperty("view.wrapGuide",wrapGuide
-			.isSelected());
+		jEdit.setColorProperty("view.fgColor",foregroundColor
+			.getSelectedColor());
+		jEdit.setColorProperty("view.bgColor",backgroundColor
+			.getSelectedColor());
 		jEdit.setBooleanProperty("view.caretBlink",blinkCaret.isSelected());
 		jEdit.setBooleanProperty("view.blockCaret",blockCaret.isSelected());
+		jEdit.setColorProperty("view.caretColor",caretColor
+			.getSelectedColor());
+		jEdit.setColorProperty("view.selectionColor",selectionColor
+			.getSelectedColor());
+		jEdit.setBooleanProperty("view.lineHighlight",lineHighlight
+			.isSelected());
+		jEdit.setColorProperty("view.lineHighlightColor",
+			lineHighlightColor.getSelectedColor());
+		jEdit.setBooleanProperty("view.bracketHighlight",bracketHighlight
+			.isSelected());
+		jEdit.setColorProperty("view.bracketHighlightColor",
+			bracketHighlightColor.getSelectedColor());
+		jEdit.setBooleanProperty("view.eolMarkers",eolMarkers
+			.isSelected());
+		jEdit.setColorProperty("view.eolMarkerColor",
+			eolMarkerColor.getSelectedColor());
+		jEdit.setBooleanProperty("view.wrapGuide",wrapGuide
+			.isSelected());
+		jEdit.setColorProperty("view.wrapGuideColor",
+			wrapGuideColor.getSelectedColor());
 		jEdit.setIntegerProperty("view.electricBorders",electricBorders
 			.isSelected() ? 3 : 0);
-		jEdit.setBooleanProperty("view.homeEnd",homeEnd.isSelected());
+		jEdit.setBooleanProperty("view.joinNonWordChars",joinNonWordChars.isSelected());
 		jEdit.setBooleanProperty("view.middleMousePaste",
 			middleMousePaste.isSelected());
 		jEdit.setBooleanProperty("view.antiAlias",antiAlias.isSelected());
 		jEdit.setBooleanProperty("view.fracFontMetrics",fracFontMetrics.isSelected());
-		jEdit.setBooleanProperty("parseFully",parseFully.isSelected());
 	} //}}}
 
 	//{{{ Private members
 	private FontSelector font;
-	private JCheckBox lineHighlight;
-	private JCheckBox bracketHighlight;
-	private JCheckBox eolMarkers;
-	private JCheckBox wrapGuide;
+	private ColorWellButton foregroundColor;
+	private ColorWellButton backgroundColor;
 	private JCheckBox blinkCaret;
 	private JCheckBox blockCaret;
+	private ColorWellButton caretColor;
+	private ColorWellButton selectionColor;
+	private JCheckBox lineHighlight;
+	private ColorWellButton lineHighlightColor;
+	private JCheckBox bracketHighlight;
+	private ColorWellButton bracketHighlightColor;
+	private JCheckBox eolMarkers;
+	private ColorWellButton eolMarkerColor;
+	private JCheckBox wrapGuide;
+	private ColorWellButton wrapGuideColor;
 	private JCheckBox electricBorders;
-	private JCheckBox homeEnd;
 	private JCheckBox middleMousePaste;
 	private JCheckBox antiAlias;
 	private JCheckBox fracFontMetrics;
-	private JCheckBox parseFully;
+	private JCheckBox joinNonWordChars;
 	//}}}
 }

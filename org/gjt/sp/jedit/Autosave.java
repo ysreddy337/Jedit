@@ -22,10 +22,11 @@ package org.gjt.sp.jedit;
 import javax.swing.Timer;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import org.gjt.sp.util.Log;
 
 /**
  * @author Slava Pestov
- * @version $Id: Autosave.java,v 1.3 2001/12/02 07:34:51 spestov Exp $
+ * @version $Id: Autosave.java,v 1.7 2003/01/31 04:49:30 spestov Exp $
  */
 class Autosave implements ActionListener
 {
@@ -61,6 +62,16 @@ class Autosave implements ActionListener
 
 	public void actionPerformed(ActionEvent evt)
 	{
+		// might come in handy useful some time
+		/* Runtime runtime = Runtime.getRuntime();
+		int freeMemory = (int)(runtime.freeMemory() / 1024);
+		int totalMemory = (int)(runtime.totalMemory() / 1024);
+		int usedMemory = (totalMemory - freeMemory);
+
+		Log.log(Log.DEBUG,this,"Java heap: " + usedMemory + "Kb / "
+			+ totalMemory + "Kb, " + (usedMemory * 100 / totalMemory)
+			+ "%"); */
+
 		// save list of open files
 		if(jEdit.getFirstView() != null)
 			jEdit.saveOpenFiles(jEdit.getFirstView());

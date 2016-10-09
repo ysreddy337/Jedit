@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000 Slava Pestov
+ * Copyright (C) 2000, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -28,7 +28,7 @@ import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import java.io.File;
-import java.util.Vector;
+import java.util.*;
 import org.gjt.sp.jedit.gui.EnhancedDialog;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.*;
@@ -38,10 +38,9 @@ import org.gjt.sp.util.*;
 /**
  * Wraps the VFS browser in a modal dialog.
  * @author Slava Pestov
- * @version $Id: VFSFileChooserDialog.java,v 1.10 2002/02/12 04:13:52 spestov Exp $
+ * @version $Id: VFSFileChooserDialog.java,v 1.28 2003/02/28 17:49:55 spestov Exp $
  */
 public class VFSFileChooserDialog extends EnhancedDialog
-implements WorkThreadProgressListener
 {
 	//{{{ VFSFileChooserDialog constructor
 	public VFSFileChooserDialog(View view, String path,
@@ -54,8 +53,13 @@ implements WorkThreadProgressListener
 		setContentPane(content);
 
 		String name;
-		if(path == null || path.endsWith(File.separator) || path.endsWith("/"))
+		if(mode == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
 			name = null;
+		else if(path == null || path.endsWith(File.separator)
+			|| path.endsWith("/"))
+		{
+			name = null;
+		}
 		else
 		{
 			VFS vfs = VFSManager.getVFSForPath(path);
@@ -67,23 +71,14 @@ implements WorkThreadProgressListener
 		browser.addBrowserListener(new BrowserHandler());
 		content.add(BorderLayout.CENTER,browser);
 
-		JPanel bottomPanel = new JPanel(new BorderLayout());
-
 		JPanel panel = new JPanel();
 		panel.setLayout(new BoxLayout(panel,BoxLayout.X_AXIS));
 		panel.setBorder(new EmptyBorder(12,0,0,0));
-
-		JLabel label = new JLabel(jEdit.getProperty("vfs.browser.dialog.filename"));
-		panel.add(label);
-		panel.add(Box.createHorizontalStrut(12));
 
 		filenameField = new JTextField();
 		filenameField.setText(name);
 		filenameField.addKeyListener(new KeyHandler());
 		filenameField.selectAll();
-		label.setDisplayedMnemonic(jEdit.getProperty(
-			"vfs.browser.dialog.filename.mnemonic").charAt(0));
-		label.setLabelFor(filenameField);
 		Dimension dim = filenameField.getPreferredSize();
 		dim.width = Integer.MAX_VALUE;
 		filenameField.setMaximumSize(dim);
@@ -91,11 +86,25 @@ implements WorkThreadProgressListener
 		box.add(Box.createGlue());
 		box.add(filenameField);
 		box.add(Box.createGlue());
-		panel.add(box);
 
-		panel.add(Box.createHorizontalStrut(12));
+		if(mode != VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+		{
+			JLabel label = new JLabel(jEdit.getProperty("vfs.browser.dialog.filename"));
+			label.setDisplayedMnemonic(jEdit.getProperty(
+				"vfs.browser.dialog.filename.mnemonic").charAt(0));
+			label.setLabelFor(filenameField);
+			panel.add(label);
+			panel.add(Box.createHorizontalStrut(12));
 
-		if(mode == VFSBrowser.BROWSER || mode == VFSBrowser.OPEN_DIALOG)
+			panel.add(box);
+
+			panel.add(Box.createHorizontalStrut(12));
+		}
+		else
+			panel.add(Box.createGlue());
+
+		if(mode == VFSBrowser.BROWSER || mode == VFSBrowser.OPEN_DIALOG
+			|| mode == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
 		{
 			GUIUtilities.requestFocus(this,browser.getBrowserView()
 				.getDefaultFocusComponent());
@@ -105,24 +114,37 @@ implements WorkThreadProgressListener
 			GUIUtilities.requestFocus(this,filenameField);
 		}
 
-		ok = new JButton(jEdit.getProperty("vfs.browser.dialog."
-			+ (mode == VFSBrowser.OPEN_DIALOG ? "open" : "save")));
-		ok.addActionListener(new ActionHandler());
+		ok = new JButton();
 		getRootPane().setDefaultButton(ok);
+
+		switch(mode)
+		{
+		case VFSBrowser.OPEN_DIALOG:
+		case VFSBrowser.BROWSER_DIALOG:
+			ok.setText(jEdit.getProperty("vfs.browser.dialog.open"));
+			break;
+		case VFSBrowser.CHOOSE_DIRECTORY_DIALOG:
+			ok.setText(jEdit.getProperty("vfs.browser.dialog.choose-dir"));
+			// so that it doesn't resize...
+			dim = ok.getPreferredSize();
+			ok.setPreferredSize(dim);
+			break;
+		case VFSBrowser.SAVE_DIALOG:
+			ok.setText(jEdit.getProperty("vfs.browser.dialog.save"));
+			break;
+		}
+
+		ok.addActionListener(new ActionHandler());
 		panel.add(ok);
 		panel.add(Box.createHorizontalStrut(6));
 		cancel = new JButton(jEdit.getProperty("common.cancel"));
 		cancel.addActionListener(new ActionHandler());
 		panel.add(cancel);
 
-		bottomPanel.add(BorderLayout.NORTH,panel);
+		content.add(BorderLayout.SOUTH,panel);
 
-		status = new JLabel(" ");
-		status.setBorder(new EmptyBorder(12,0,0,0));
-		bottomPanel.add(BorderLayout.SOUTH,status);
-		content.add(BorderLayout.SOUTH,bottomPanel);
-
-		VFSManager.getIOThreadPool().addProgressListener(this);
+		VFSManager.getIOThreadPool().addProgressListener(
+			workThreadHandler = new WorkThreadHandler());
 
 		pack();
 		GUIUtilities.loadGeometry(this,"vfs.browser.dialog");
@@ -133,7 +155,7 @@ implements WorkThreadProgressListener
 	public void dispose()
 	{
 		GUIUtilities.saveGeometry(this,"vfs.browser.dialog");
-		VFSManager.getIOThreadPool().removeProgressListener(this);
+		VFSManager.getIOThreadPool().removeProgressListener(workThreadHandler);
 		super.dispose();
 	} //}}}
 
@@ -143,15 +165,31 @@ implements WorkThreadProgressListener
 		VFS.DirectoryEntry[] files = browser.getSelectedFiles();
 
 		String directory = browser.getDirectory();
+		filename = filenameField.getText();
 
 		if(files.length == 0)
 		{
-			filename = filenameField.getText();
-
-			if(filename.length() == 0)
+			if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
 			{
-				getToolkit().beep();
-				return;
+				filename = browser.getDirectory();
+			}
+			else
+			{
+				if(filename.length() == 0)
+				{
+					getToolkit().beep();
+					return;
+				}
+				else if(browser.getMode() == VFSBrowser.BROWSER_DIALOG)
+				{
+					Hashtable props = new Hashtable();
+					props.put(Buffer.ENCODING,browser.currentEncoding);
+					jEdit.openFile(browser.getView(),
+						browser.getDirectory(),
+						filename,false,props);
+					dispose();
+					return;
+				}
 			}
 		}
 		else
@@ -163,9 +201,12 @@ implements WorkThreadProgressListener
 					|| file.type == VFS.DirectoryEntry.DIRECTORY)
 				{
 					browser.setDirectory(file.path);
+					if(file.name.equals(filename))
+						filenameField.setText(null);
 					return;
 				}
-				else if(browser.getMode() == VFSBrowser.SAVE_DIALOG)
+				else if(browser.getMode() == VFSBrowser.SAVE_DIALOG
+					&& (filename == null || filename.length() == 0))
 					filename = file.path;
 			}
 		}
@@ -181,6 +222,10 @@ implements WorkThreadProgressListener
 				if(doFileExistsWarning(filename))
 					return;
 			}
+		}
+		else if(browser.getMode() == VFSBrowser.BROWSER_DIALOG)
+		{
+			browser.filesActivated(VFSBrowser.M_OPEN,false);
 		}
 
 		isOK = true;
@@ -199,7 +244,7 @@ implements WorkThreadProgressListener
 		if(!isOK)
 			return null;
 
-		if(filename != null)
+		if(filename != null && filename.length() != 0)
 		{
 			String path = browser.getDirectory();
 			return new String[] { MiscUtilities.constructPath(
@@ -212,8 +257,16 @@ implements WorkThreadProgressListener
 			for(int i = 0; i < selectedFiles.length; i++)
 			{
 				VFS.DirectoryEntry file =  selectedFiles[i];
-				if(file.type == VFS.DirectoryEntry.FILE)
-					vector.addElement(file.path);
+				if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+				{
+					if(file.type != VFS.DirectoryEntry.FILE)
+						vector.addElement(file.path);
+				}
+				else
+				{
+					if(file.type == VFS.DirectoryEntry.FILE)
+						vector.addElement(file.path);
+				}
 			}
 			String[] retVal = new String[vector.size()];
 			vector.copyInto(retVal);
@@ -221,53 +274,16 @@ implements WorkThreadProgressListener
 		}
 	} //}}}
 
-	//{{{ WorkThreadListener implementation
-
-	//{{{ statusUpdate() method
-	public void statusUpdate(final WorkThreadPool threadPool, int threadIndex)
-	{
-		SwingUtilities.invokeLater(new Runnable()
-		{
-			public void run()
-			{
-				int requestCount = threadPool.getRequestCount();
-				if(requestCount == 0)
-				{
-					status.setText(jEdit.getProperty(
-						"view.status.io.done"));
-				}
-				else if(requestCount == 1)
-				{
-					status.setText(jEdit.getProperty(
-						"view.status.io-1"));
-				}
-				else
-				{
-					Object[] args = { new Integer(requestCount) };
-					status.setText(jEdit.getProperty(
-						"view.status.io",args));
-				}
-			}
-		});
-	} //}}}
-
-	//{{{ progressUpdate() method
-	public void progressUpdate(WorkThreadPool threadPool, int threadIndex)
-	{
-	} //}}}
-
-	//}}}
-
 	//{{{ Private members
 
 	//{{{ Instance variables
 	private VFSBrowser browser;
 	private JTextField filenameField;
-	private JLabel status;
 	private String filename;
 	private JButton ok;
 	private JButton cancel;
 	private boolean isOK;
+	private WorkThreadHandler workThreadHandler;
 	//}}}
 
 	//{{{ doFileExistsWarning() method
@@ -302,10 +318,9 @@ implements WorkThreadProgressListener
 					browser.getDirectoryField().getText()))
 				{
 					browser.setDirectory(browser.getDirectoryField().getText());
-					return;
 				}
-
-				ok();
+				else
+					ok();
 			}
 			else if(evt.getSource() == cancel)
 				cancel();
@@ -319,9 +334,22 @@ implements WorkThreadProgressListener
 		public void filesSelected(VFSBrowser browser, VFS.DirectoryEntry[] files)
 		{
 			if(files.length == 0)
+			{
+				if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+				{
+					ok.setText(jEdit.getProperty(
+						"vfs.browser.dialog.choose-dir"));
+				}
 				return;
+			}
 			else if(files.length == 1)
 			{
+				if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+				{
+					ok.setText(jEdit.getProperty(
+						"vfs.browser.dialog.open"));
+				}
+
 				VFS.DirectoryEntry file = files[0];
 				if(file.type == VFS.DirectoryEntry.FILE)
 				{
@@ -335,10 +363,17 @@ implements WorkThreadProgressListener
 						path = file.name;
 
 					filenameField.setText(path);
+					filenameField.selectAll();
 				}
 			}
 			else
 			{
+				if(browser.getMode() == VFSBrowser.CHOOSE_DIRECTORY_DIALOG)
+				{
+					ok.setText(jEdit.getProperty(
+						"vfs.browser.dialog.open"));
+				}
+
 				filenameField.setText(null);
 			}
 		} //}}}
@@ -352,13 +387,19 @@ implements WorkThreadProgressListener
 				if(file.type == VFS.DirectoryEntry.FILESYSTEM
 					|| file.type == VFS.DirectoryEntry.DIRECTORY)
 				{
+					if(file.name.equals(filenameField.getText()))
+						filenameField.setText(null);
+
 					// the browser will list the directory
 					// in question, so just return
 					return;
 				}
 			}
 
-			ok();
+			if(browser.getMode() == VFSBrowser.BROWSER_DIALOG)
+				dispose();
+			else
+				ok();
 		} //}}}
 	} //}}}
 
@@ -368,7 +409,105 @@ implements WorkThreadProgressListener
 		//{{{ keyPressed() method
 		public void keyPressed(KeyEvent evt)
 		{
-			browser.getBrowserView().selectNone();
+			switch(evt.getKeyCode())
+			{
+			case KeyEvent.VK_LEFT:
+				if(filenameField.getCaretPosition() == 0)
+					browser.getBrowserView().getTree().processKeyEvent(evt);
+				break;
+			case KeyEvent.VK_UP:
+			case KeyEvent.VK_DOWN:
+				browser.getBrowserView().getTree().processKeyEvent(evt);
+				break;
+			}
+		} //}}}
+
+		//{{{ keyTyped() method
+		public void keyTyped(KeyEvent evt)
+		{
+			char ch = evt.getKeyChar();
+			if(ch < 0x20 || ch == 0x7f || ch == 0xff)
+				return;
+
+			SwingUtilities.invokeLater(new Runnable()
+			{
+				public void run()
+				{
+					String currentText = filenameField.getText();
+					int caret = filenameField.getCaretPosition();
+
+					BrowserView view = browser.getBrowserView();
+					view.selectNone();
+					view.getTree().doTypeSelect(
+						currentText,
+						false);
+					VFS.DirectoryEntry[] files =
+						view.getSelectedFiles();
+					if(files.length != 0)
+					{
+						String path = files[0].path;
+						String name = files[0].name;
+						String parent = MiscUtilities.getParentOfPath(path);
+						if(parent.endsWith("/") || parent.endsWith(File.separator))
+							parent = parent.substring(0,parent.length() - 1);
+
+						String newText;
+						if(MiscUtilities.isAbsolutePath(currentText)
+							&& !currentText.startsWith(browser.getDirectory()))
+						{
+							newText = path;
+						}
+						else
+						{
+							if(MiscUtilities.isAbsolutePath(currentText))
+								caret -= MiscUtilities.getParentOfPath(currentText).length();
+							if(parent.equals(browser.getDirectory()))
+								newText = name;
+							else
+							{
+								caret += parent.length() + 1;
+								newText = path;
+							}
+						}
+
+						filenameField.setText(newText);
+						filenameField.setCaretPosition(
+							newText.length());
+						filenameField.moveCaretPosition(
+							caret);
+					}
+				}
+			});
+		} //}}}
+	} //}}}
+
+	//{{{ WorkThreadListener implementation
+	class WorkThreadHandler implements WorkThreadProgressListener
+	{
+		//{{{ statusUpdate() method
+		public void statusUpdate(WorkThreadPool threadPool, int threadIndex)
+		{
+			// synchronize with hide/showWaitCursor()
+			synchronized(VFSFileChooserDialog.this)
+			{
+				int requestCount = threadPool.getRequestCount();
+				if(requestCount == 0)
+				{
+					getContentPane().setCursor(
+						Cursor.getDefaultCursor());
+				}
+				else if(requestCount >= 1)
+				{
+					getContentPane().setCursor(
+						Cursor.getPredefinedCursor(
+						Cursor.WAIT_CURSOR));
+				}
+			}
+		} //}}}
+
+		//{{{ progressUpdate() method
+		public void progressUpdate(WorkThreadPool threadPool, int threadIndex)
+		{
 		} //}}}
 	} //}}}
 

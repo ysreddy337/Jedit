@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 1999, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,39 +23,37 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import gnu.regexp.REException;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.File;
 import java.net.*;
 import java.util.*;
 import org.gjt.sp.jedit.browser.*;
 import org.gjt.sp.jedit.gui.*;
-import org.gjt.sp.jedit.io.VFS;
-import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.jedit.syntax.SyntaxStyle;
 import org.gjt.sp.jedit.syntax.Token;
 import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * Class with several useful GUI functions.<p>
+ * Various GUI functions.<p>
  *
- * It provides methods for:
+ * The most frequently used members of this class are:
+ *
  * <ul>
- * <li>Loading menu bars, menus and menu items from the properties
- * <li>Loading popup menus from the properties
- * <li>Loading tool bars and tool bar buttons from the properties
- * <li>Displaying various common dialog boxes
- * <li>Converting string representations of colors to color objects
- * <li>Loading and saving window geometry from the properties
- * <li>Displaying file open and save dialog boxes
- * <li>Loading images and caching them
+ * <li>{@link #loadMenu(String)}</li>
+ * <li>{@link #loadMenuItem(String)}</li>
+ * <li>{@link #loadIcon(String)}</li>
+ * <li>{@link #confirm(Component,String,Object[],int,int)}</li>
+ * <li>{@link #error(Component,String,Object[])}</li>
+ * <li>{@link #message(Component,String,Object[])}</li>
+ * <li>{@link #showVFSFileDialog(View,String,int,boolean)}</li>
+ * <li>{@link #loadGeometry(Window,String)}</li>
+ * <li>{@link #saveGeometry(Window,String)}</li>
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: GUIUtilities.java,v 1.28 2002/04/06 06:00:48 spestov Exp $
+ * @version $Id: GUIUtilities.java,v 1.58 2003/02/17 19:48:54 spestov Exp $
  */
 public class GUIUtilities
 {
@@ -166,24 +164,35 @@ public class GUIUtilities
 
 	//{{{ loadMenu() method
 	/**
-	 * Creates a menu. This form of loadMenu() does not need to be used
-	 * by plugins; use the other form instead.
+	 * Creates a menu. The menu label is set from the
+	 * <code><i>name</i>.label</code> property. The menu contents is taken
+	 * from the <code><i>name</i></code> property, which is a whitespace
+	 * separated list of action names. An action name of <code>-</code>
+	 * inserts a separator in the menu.
 	 * @param view The view to load the menu for
 	 * @param name The menu name
+	 * @see #loadMenuItem(String)
 	 * @since jEdit 2.6pre2
 	 */
 	public static JMenu loadMenu(String name)
 	{
-		if(name.equals("open-encoding"))
-			return new OpenWithEncodingMenu();
-		else if(name.equals("recent-files"))
+		if(name.equals("recent-files"))
 			return new RecentFilesMenu();
 		else if(name.equals("recent-directories"))
 			return new RecentDirectoriesMenu();
 		else if(name.equals("current-directory"))
-			return new CurrentDirectoryMenu();
+			return new DirectoryMenu("current-directory",null);
 		else if(name.equals("markers"))
 			return new MarkersMenu();
+		else if(name.equals("jedit-directory"))
+			return new DirectoryMenu("jedit-directory",jEdit.getJEditHome());
+		else if(name.equals("settings-directory"))
+		{
+			String settings = jEdit.getSettingsDirectory();
+			if(settings == null)
+				settings = jEdit.getJEditHome();
+			return new DirectoryMenu("settings-directory",settings);
+		}
 		else if(name.equals("macros"))
 			return new MacrosMenu();
 		else
@@ -224,8 +233,12 @@ public class GUIUtilities
 
 	//{{{ loadMenuItem() method
 	/**
-	 * Creates a menu item.
+	 * Creates a menu item. The menu item is bound to the action named by
+	 * <code>name</code> with label taken from the return value of the
+	 * {@link EditAction#getLabel()} method.
+	 *
 	 * @param name The menu item name
+	 * @see #loadMenu(String)
 	 * @since jEdit 2.6pre1
 	 */
 	public static JMenuItem loadMenuItem(String name)
@@ -280,7 +293,6 @@ public class GUIUtilities
 	{
 		JToolBar toolBar = new JToolBar();
 		toolBar.setFloatable(false);
-		toolBar.putClientProperty("JToolBar.isRollover",Boolean.TRUE);
 
 		String buttons = jEdit.getProperty(name);
 		if(buttons != null)
@@ -325,12 +337,12 @@ public class GUIUtilities
 		Icon icon;
 		String iconName = jEdit.getProperty(name + ".icon");
 		if(iconName == null)
-			return null;
+			icon = loadIcon("BrokenImage.png");
 		else
 		{
 			icon = loadIcon(iconName);
 			if(icon == null)
-				return null;
+				icon = loadIcon("BrokenImage.png");
 		}
 
 		String toolTip = prettifyMenuLabel(label);
@@ -533,7 +545,10 @@ public class GUIUtilities
 	 * Displays a VFS file selection dialog box.
 	 * @param view The view
 	 * @param path The initial directory to display. May be null
-	 * @param type The dialog type
+	 * @param type The dialog type. One of
+	 * {@link org.gjt.sp.jedit.browser.VFSBrowser#OPEN_DIALOG},
+	 * {@link org.gjt.sp.jedit.browser.VFSBrowser#SAVE_DIALOG}, or
+	 * {@link org.gjt.sp.jedit.browser.VFSBrowser#CHOOSE_DIRECTORY_DIALOG}.
 	 * @param multipleSelection True if multiple selection should be allowed
 	 * @return The selected file(s)
 	 * @since jEdit 2.6pre2
@@ -816,13 +831,10 @@ public class GUIUtilities
 	 */
 	public static void loadGeometry(Window win, String name)
 	{
-		// all this adjust_* crap is there to work around buggy
-		// Unix Java versions which don't put windows where you
-		// tell them to
-		int x, y, width, height, adjust_x, adjust_y, adjust_width,
-			adjust_height;
+		int x, y, width, height;
 
 		Dimension size = win.getSize();
+		Dimension screen = win.getToolkit().getScreenSize();
 
 		width = jEdit.getIntegerProperty(name + ".width",size.width);
 		height = jEdit.getIntegerProperty(name + ".height",size.height);
@@ -830,7 +842,6 @@ public class GUIUtilities
 		Component parent = win.getParent();
 		if(parent == null)
 		{
-			Dimension screen = win.getToolkit().getScreenSize();
 			x = (screen.width - width) / 2;
 			y = (screen.height - height) / 2;
 		}
@@ -844,132 +855,45 @@ public class GUIUtilities
 		x = jEdit.getIntegerProperty(name + ".x",x);
 		y = jEdit.getIntegerProperty(name + ".y",y);
 
-		adjust_x = jEdit.getIntegerProperty(name + ".dx",0);
-		adjust_y = jEdit.getIntegerProperty(name + ".dy",0);
-		adjust_width = jEdit.getIntegerProperty(name + ".d-width",0);
-		adjust_height = jEdit.getIntegerProperty(name + ".d-height",0);
+		// Make sure the window is displayed in visible region
+		Rectangle osbounds = OperatingSystem.getScreenBounds();
+		
+		if(x < osbounds.x || x+width > osbounds.width)
+		{
+			if (width > osbounds.width)
+				width = osbounds.width;
+			x = (osbounds.width - width) / 2;
+		}
+		if(y < osbounds.y || y+height > osbounds.height)
+		{
+			if (height >= osbounds.height)
+				height = osbounds.height;
+			y = (osbounds.height - height) / 2;
+		}
 
 		Rectangle desired = new Rectangle(x,y,width,height);
-		Rectangle required = new Rectangle(x - adjust_x,
-			y - adjust_y,width - adjust_width,
-			height - adjust_height);
-// 		Log.log(Log.DEBUG,GUIUtilities.class,"Window " + name
-// 			+ ": desired geometry is " + desired);
-// 		Log.log(Log.DEBUG,GUIUtilities.class,"Window " + name
-// 			+ ": setting geometry to " + required);
-		win.setBounds(required);
+		win.setBounds(desired);
 
-		// if(File.separatorChar == '/'
-			// && MiscUtilities.compareStrings(
-			// System.getProperty("java.version"),
-			// "1.2",false) < 0)
-		// {
-			// win.setBounds(required);
-			// new UnixWorkaround(win,name,desired,required);
-		// }
-		// else
-			win.setBounds(desired);
+		if((win instanceof Frame) && OperatingSystem.hasJava14())
+		{
+			int extState = jEdit.getIntegerProperty(name +
+				".extendedState", Frame.NORMAL);
+
+			try
+			{
+				java.lang.reflect.Method meth =
+					Frame.class.getMethod("setExtendedState",
+					new Class[] {int.class});
+
+				meth.invoke(win, new Object[] {
+					new Integer(extState)});
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,GUIUtilities.class,e);
+			}
+		}
 	} //}}}
-
-	//{{{ UnixWorkaround class
-	/* static class UnixWorkaround
-	{
-		Window win;
-		String name;
-		Rectangle desired;
-		Rectangle required;
-		long start;
-		boolean windowOpened;
-
-		//{{{ UnixWorkaround constructor
-		UnixWorkaround(Window win, String name, Rectangle desired,
-			Rectangle required)
-		{
-			this.win = win;
-			this.name = name;
-			this.desired = desired;
-			this.required = required;
-
-			start = System.currentTimeMillis();
-
-			win.addComponentListener(new ComponentHandler());
-			win.addWindowListener(new WindowHandler());
-		} //}}}
-
-		//{{{ ComponentHandler class
-		class ComponentHandler extends ComponentAdapter
-		{
-			//{{{ componentMoved() method
-			public void componentMoved(ComponentEvent evt)
-			{
-				if(System.currentTimeMillis() - start < 1000)
-				{
-					Rectangle r = win.getBounds();
-					if(!windowOpened && r.equals(required))
-						return;
-
-					if(!r.equals(desired))
-					{
-//						Log.log(Log.DEBUG,GUIUtilities.class,
-//							"Window resize blocked: " + win.getBounds());
-						win.setBounds(desired);
-					}
-				}
-				else
-					win.removeComponentListener(this);
-			} //}}}
-
-			//{{{ componentResized() method
-			public void componentResized(ComponentEvent evt)
-			{
-				if(System.currentTimeMillis() - start < 1000)
-				{
-					Rectangle r = win.getBounds();
-					if(!windowOpened && r.equals(required))
-						return;
-
-					if(!r.equals(desired))
-					{
-// 						Log.log(Log.DEBUG,GUIUtilities.class,
-// 							"Window resize blocked: " + win.getBounds());
-						win.setBounds(desired);
-					}
-				}
-				else
-					win.removeComponentListener(this);
-			} //}}}
-		} //}}}
-
-		//{{{ WindowHandler class
-		class WindowHandler extends WindowAdapter
-		{
-			//{{{ windowOpened() method
-			public void windowOpened(WindowEvent evt)
-			{
-				windowOpened = true;
-
-				Rectangle r = win.getBounds();
-// 				Log.log(Log.DEBUG,GUIUtilities.class,"Window "
-// 					+ name + ": bounds after opening: " + r);
-
-				if(r.x != desired.x || r.y != desired.y
-					|| r.width != desired.width
-					|| r.height != desired.height)
-				{
-					jEdit.setIntegerProperty(name + ".dx",
-						r.x - required.x);
-					jEdit.setIntegerProperty(name + ".dy",
-						r.y - required.y);
-					jEdit.setIntegerProperty(name + ".d-width",
-						r.width - required.width);
-					jEdit.setIntegerProperty(name + ".d-height",
-						r.height - required.height);
-				}
-
-				win.removeWindowListener(this);
-			} //}}}
-		} //}}}
-	} */ //}}}
 
 	//{{{ saveGeometry() method
 	/**
@@ -982,6 +906,29 @@ public class GUIUtilities
 	 */
 	public static void saveGeometry(Window win, String name)
 	{
+		if((win instanceof Frame) && OperatingSystem.hasJava14())
+		{
+			try
+			{
+				java.lang.reflect.Method meth =
+					Frame.class.getMethod("getExtendedState",
+					new Class[0]);
+
+				Integer extState = (Integer)meth.invoke(win,
+					new Object[0]);
+
+				jEdit.setIntegerProperty(name + ".extendedState",
+					extState.intValue());
+
+				if(extState.intValue() != Frame.NORMAL)
+					return;
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,GUIUtilities.class,e);
+			}
+		}
+
 		Rectangle bounds = win.getBounds();
 		jEdit.setIntegerProperty(name + ".x",bounds.x);
 		jEdit.setIntegerProperty(name + ".y",bounds.y);
@@ -1004,6 +951,38 @@ public class GUIUtilities
 			splash.dispose();
 			splash = null;
 		}
+	} //}}}
+
+	//{{{ createMultilineLabel() method
+	/**
+	 * Creates a component that displays a multiple line message. This
+	 * is implemented by assembling a number of <code>JLabels</code> in
+	 * a <code>JPanel</code>.
+	 * @param str The string, with lines delimited by newline
+	 * (<code>\n</code>) characters.
+	 * @since jEdit 4.1pre3
+	 */
+	public static JComponent createMultilineLabel(String str)
+	{
+		JPanel panel = new JPanel(new VariableGridLayout(
+			VariableGridLayout.FIXED_NUM_COLUMNS,1,1,1));
+		int lastOffset = 0;
+		for(;;)
+		{
+			int index = str.indexOf('\n',lastOffset);
+			if(index == -1)
+				break;
+			else
+			{
+				panel.add(new JLabel(str.substring(lastOffset,index)));
+				lastOffset = index + 1;
+			}
+		}
+
+		if(lastOffset != str.length())
+			panel.add(new JLabel(str.substring(lastOffset)));
+
+		return panel;
 	} //}}}
 
 	//{{{ requestFocus() method
@@ -1035,10 +1014,47 @@ public class GUIUtilities
 	 */
 	public static boolean isPopupTrigger(MouseEvent evt)
 	{
-		if(OperatingSystem.isMacOS())
-			return evt.isControlDown();
+		return isRightButton(evt.getModifiers());
+	} //}}}
+
+	//{{{ isMiddleButton() method
+	/**
+	 * @param modifiers The modifiers flag from a mouse event
+	 * @since jEdit 4.1pre9
+	 */
+	public static boolean isMiddleButton(int modifiers)
+	{
+		if (OperatingSystem.isMacOS())
+		{
+			if((modifiers & MouseEvent.BUTTON1_MASK) != 0)
+				return ((modifiers & MouseEvent.META_MASK) != 0);
+			if(!OperatingSystem.hasJava14())
+				return ((modifiers & MouseEvent.BUTTON3_MASK) != 0);
+			else
+				return ((modifiers & MouseEvent.BUTTON2_MASK) != 0);
+		}
 		else
-			return ((evt.getModifiers() & InputEvent.BUTTON3_MASK) != 0);
+			return ((modifiers & MouseEvent.BUTTON2_MASK) != 0);
+	} //}}}
+
+	//{{{ isRightButton() method
+	/**
+	 * @param modifiers The modifiers flag from a mouse event
+	 * @since jEdit 4.1pre9
+	 */
+	public static boolean isRightButton(int modifiers)
+	{
+		if (OperatingSystem.isMacOS())
+		{
+			if((modifiers & MouseEvent.BUTTON1_MASK) != 0)
+				return ((modifiers & MouseEvent.CTRL_MASK) != 0);
+			if(!OperatingSystem.hasJava14())
+				return ((modifiers & MouseEvent.BUTTON2_MASK) != 0);
+			else
+				return ((modifiers & MouseEvent.BUTTON3_MASK) != 0);
+		}
+		else
+			return ((modifiers & MouseEvent.BUTTON3_MASK) != 0);
 	} //}}}
 
 	//{{{ showPopupMenu() method
@@ -1054,44 +1070,119 @@ public class GUIUtilities
 	public static void showPopupMenu(JPopupMenu popup, Component comp,
 		int x, int y)
 	{
-		Point p = new Point(x,y);
-		SwingUtilities.convertPointToScreen(p,comp);
+		showPopupMenu(popup,comp,x,y,true);
+	} //}}}
 
-		Dimension size = popup.getPreferredSize();
+	//{{{ showPopupMenu() method
+	/**
+	 * Shows the specified popup menu, ensuring it is displayed within
+	 * the bounds of the screen.
+	 * @param popup The popup menu
+	 * @param comp The component to show it for
+	 * @param x The x co-ordinate
+	 * @param y The y co-ordinate
+	 * @param point If true, then the popup originates from a single point;
+	 * otherwise it will originate from the component itself. This affects
+	 * positioning in the case where the popup does not fit onscreen.
+	 *
+	 * @since jEdit 4.1pre1
+	 */
+	public static void showPopupMenu(JPopupMenu popup, Component comp,
+		int x, int y, boolean point)
+	{
+		int offsetX = 0;
+		int offsetY = 0;
 
-		Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+		int extraOffset = (point ? 1 : 0);
 
-		boolean horiz = false;
-		boolean vert = false;
-
-		// might need later
-		int origX = x;
-
-		if(p.x + size.width > screen.width
-			&& size.width < screen.width)
+		Component win = comp;
+		while(!(win instanceof Window || win == null))
 		{
-			x += (screen.width - p.x - size.width);
-			horiz = true;
+			offsetX += win.getX();
+			offsetY += win.getY();
+			win = win.getParent();
 		}
 
-		if(p.y + size.height > screen.height
-			&& size.height < screen.height)
+		if(win != null)
 		{
-			y += (screen.height - p.y - size.height);
-			vert = true;
+			Dimension size = popup.getPreferredSize();
+
+			Rectangle screenSize = win.getGraphicsConfiguration()
+				.getBounds();
+
+			if(x + offsetX + size.width + win.getX() > screenSize.width
+				&& x + offsetX + win.getX() >= size.width)
+			{
+				//System.err.println("x overflow");
+				if(point)
+					x -= (size.width + extraOffset);
+				else
+					x = (win.getWidth() - size.width - offsetX + extraOffset);
+			}
+			else
+			{
+				x += extraOffset;
+			}
+
+			//System.err.println("y=" + y + ",offsetY=" + offsetY
+			//	+ ",size.height=" + size.height
+			//	+ ",win.height=" + win.getHeight());
+			if(y + offsetY + size.height + win.getY() > screenSize.height
+				&& y + offsetY + win.getY() >= size.height)
+			{
+				//System.err.println("y overflow");
+				if(point)
+					y = (win.getHeight() - size.height - offsetY + extraOffset);
+				else
+					y = comp.getY() - size.height - 1;
+			}
+			else
+			{
+				y += extraOffset;
+			}
+
+			popup.show(comp,x,y);
+		}
+		else
+			popup.show(comp,x + extraOffset,y + extraOffset);
+
+	} //}}}
+
+	//{{{ isAncestorOf() method
+	/**
+	 * Returns if the first component is an ancestor of the
+	 * second by traversing up the component hierarchy.
+	 *
+	 * @param comp1 The ancestor
+	 * @param comp2 The component to check
+	 * @since jEdit 4.1pre5
+	 */
+	public static boolean isAncestorOf(Component comp1, Component comp2)
+	{
+		while(comp2 != null)
+		{
+			if(comp1 == comp2)
+				return true;
+			else
+				comp2 = comp2.getParent();
 		}
 
-		// If popup needed to be moved both horizontally and
-		// vertically, the mouse pointer might end up over a
-		// menu item, which will be invoked when the mouse is
-		// released. This is bad, so move popup to a different
-		// location.
-		if(horiz && vert)
-		{
-			x = origX - size.width - 2;
-		}
+		return false;
+	} //}}}
 
-		popup.show(comp,x,y);
+	//{{{ getParentDialog() method
+	/**
+	 * Traverses the given component's parent tree looking for an
+	 * instance of JDialog, and return it. If not found, return null.
+	 * @param c The component
+	 */
+	public static JDialog getParentDialog(Component c)
+	{
+		Component p = c.getParent();
+		while (p != null && !(p instanceof JDialog))
+			p = p.getParent();
+
+		return (p instanceof JDialog) ? (JDialog) p : null;
 	} //}}}
 
 	//{{{ getView() method
@@ -1170,6 +1261,7 @@ public class GUIUtilities
 		}
 
 		JMenu menu = new EnhancedMenu("plugins");
+		((EnhancedMenu)menu).init();
 
 		if(pluginMenuItems.isEmpty())
 		{
@@ -1178,11 +1270,13 @@ public class GUIUtilities
 			return;
 		}
 
+		int maxItems = jEdit.getIntegerProperty("menu.spillover",20);
+
 		// Sort them
 		MiscUtilities.quicksort(pluginMenuItems,
 			new MiscUtilities.MenuItemCompare());
 
-		if(pluginMenuItems.size() < 20)
+		if(pluginMenuItems.size() < maxItems)
 		{
 			for(int i = 0; i < pluginMenuItems.size(); i++)
 			{
@@ -1199,7 +1293,7 @@ public class GUIUtilities
 			for(int i = 0; i < pluginMenuItems.size(); i++)
 			{
 				menu.add((JMenuItem)pluginMenuItems.get(i));
-				if(menu.getMenuComponentCount() == 20)
+				if(menu.getMenuComponentCount() == maxItems)
 				{
 					mbar.add(menu);
 					menu = new JMenu(String.valueOf(

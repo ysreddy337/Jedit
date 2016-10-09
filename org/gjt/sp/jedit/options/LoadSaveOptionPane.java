@@ -25,7 +25,6 @@ package org.gjt.sp.jedit.options;
 //{{{ Imports
 import javax.swing.*;
 import java.awt.event.*;
-import java.awt.*;
 import java.util.StringTokenizer;
 import org.gjt.sp.jedit.*;
 //}}}
@@ -96,11 +95,6 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 			System.getProperty("file.encoding")));
 		addComponent(jEdit.getProperty("options.loadsave.encoding"),encoding);
 
-		/* Number of I/O threads to start */
-		ioThreadCount = new JTextField(jEdit.getProperty("ioThreadCount"));
-		addComponent(jEdit.getProperty("options.loadsave.ioThreadCount"),
-			ioThreadCount);
-
 		/* Session management */
 		restore = new JCheckBox(jEdit.getProperty(
 			"options.loadsave.restore"));
@@ -146,6 +140,12 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 		backupEverySave.setSelected(jEdit.getBooleanProperty("backupEverySave"));
 		addComponent(backupEverySave);
 
+		/* Backup on every save */
+		stripTrailingEOL = new JCheckBox(jEdit.getProperty(
+			"options.loadsave.stripTrailingEOL"));
+		stripTrailingEOL.setSelected(jEdit.getBooleanProperty("stripTrailingEOL"));
+		addComponent(stripTrailingEOL);
+
 	} //}}}
 
 	//{{{ _save() method
@@ -172,7 +172,6 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 		jEdit.setProperty("buffer.lineSeparator",lineSep);
 		jEdit.setProperty("buffer.encoding",(String)
 			encoding.getSelectedItem());
-		jEdit.setProperty("ioThreadCount",ioThreadCount.getText());
 		jEdit.setBooleanProperty("restore",restore.isSelected());
 		jEdit.setBooleanProperty("restore.cli",restoreCLI.isSelected());
 		jEdit.setBooleanProperty("client.newView",newView.isSelected());
@@ -180,6 +179,7 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 			persistentMarkers.isSelected());
 		jEdit.setBooleanProperty("twoStageSave",twoStageSave.isSelected());
 		jEdit.setBooleanProperty("backupEverySave", backupEverySave.isSelected());
+		jEdit.setBooleanProperty("stripTrailingEOL", stripTrailingEOL.isSelected());
 	} //}}}
 
 	//{{{ Private members
@@ -190,12 +190,12 @@ public class LoadSaveOptionPane extends AbstractOptionPane
 	private JTextField backupSuffix;
 	private JComboBox lineSeparator;
 	private JComboBox encoding;
-	private JTextField ioThreadCount;
 	private JCheckBox restore;
 	private JCheckBox restoreCLI;
 	private JCheckBox newView;
 	private JCheckBox persistentMarkers;
 	private JCheckBox twoStageSave;
 	private JCheckBox backupEverySave;
+	private JCheckBox stripTrailingEOL;
 	//}}}
 }

@@ -26,27 +26,20 @@ package org.gjt.sp.jedit.io;
 import java.awt.Component;
 import java.io.*;
 import java.net.*;
-import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 //}}}
 
 /**
  * URL VFS.
  * @author Slava Pestov
- * @version $Id: UrlVFS.java,v 1.4 2002/02/05 22:14:05 spestov Exp $
+ * @version $Id: UrlVFS.java,v 1.6 2003/01/12 03:08:24 spestov Exp $
  */
 public class UrlVFS extends VFS
 {
 	//{{{ UrlVFS constructor
 	public UrlVFS()
 	{
-		super("url");
-	} //}}}
-
-	//{{{ getCapabilities() method
-	public int getCapabilities()
-	{
-		return READ_CAP | WRITE_CAP;
+		super("url",READ_CAP | WRITE_CAP);
 	} //}}}
 
 	//{{{ constructPath() method

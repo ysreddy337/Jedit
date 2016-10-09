@@ -4,21 +4,24 @@
 
 <MODE>
 	<PROPS>
-		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
-		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
-		<PROPERTY NAME="indentPrevLine"
-			VALUE="\s*(((if|while)\s*\(|else\s*(\{|$)|else\s+if\s*\(|case\s+.+:|default:)[^;]*|for\s*\(.*)" />
-		<!-- set this to 'true' if you want to use GNU coding style -->
-		<PROPERTY NAME="doubleBracketIndent" VALUE="false" />
 		<PROPERTY NAME="commentStart" VALUE="/*" />
 		<PROPERTY NAME="commentEnd" VALUE="*/" />
 		<PROPERTY NAME="lineComment" VALUE="//" />
 		<PROPERTY NAME="wordBreakChars" VALUE=",+-=&lt;&gt;/?^&amp;*" />
+
+		<!-- Auto indent -->
+		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
+		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
+		<PROPERTY NAME="indentNextLine"
+			VALUE="\s*(((if|while)\s*\(|else\s*|else\s+if\s*\(|for\s*\(.*\))[^{;]*)" />
+		<!-- set this to 'true' if you want to use GNU coding style -->
+		<PROPERTY NAME="doubleBracketIndent" VALUE="false" />
+		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 	</PROPS>
-	<RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
+	<RULES ESCAPE="\"
+		IGNORE_CASE="FALSE"
+		HIGHLIGHT_DIGITS="TRUE"
+		DIGIT_RE="(0x[[:xdigit:]]+[lL]?|[[:digit:]]+(e[[:digit:]]*)?[lLdDfF]?)">
 
 		<!-- Silly comment -->
 		<SEQ TYPE="COMMENT1">/**/</SEQ>
@@ -46,7 +49,6 @@
 
 		<EOL_SPAN TYPE="COMMENT1">//</EOL_SPAN>
 
-		<SEQ TYPE="NULL">)</SEQ>
 		<SEQ TYPE="OPERATOR">=</SEQ>
 		<SEQ TYPE="OPERATOR">!</SEQ>
 		<SEQ TYPE="OPERATOR">&gt;=</SEQ>
@@ -69,20 +71,13 @@
 		<SEQ TYPE="OPERATOR">~</SEQ>
 		<SEQ TYPE="OPERATOR">}</SEQ>
 		<SEQ TYPE="OPERATOR">{</SEQ>
-		<SEQ TYPE="NULL">.</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">]</SEQ>
-		<SEQ TYPE="NULL">[</SEQ>
-		<SEQ TYPE="NULL">?</SEQ>
 		<MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE"
-			AT_LINE_START="TRUE">:</MARK_PREVIOUS>
-		<SEQ TYPE="NULL">:</SEQ>
+			AT_WHITESPACE_END="TRUE">:</MARK_PREVIOUS>
 
 		<!-- Function calls -->
 		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
 
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<KEYWORD1>abstract</KEYWORD1>
 			<KEYWORD1>break</KEYWORD1>
 			<KEYWORD1>case</KEYWORD1>
@@ -129,6 +124,9 @@
 			<KEYWORD3>short</KEYWORD3>
 			<KEYWORD3>void</KEYWORD3>
 
+			<FUNCTION>assert</FUNCTION>
+			<KEYWORD1>strictfp</KEYWORD1>
+
 			<LITERAL2>false</LITERAL2>
 			<LITERAL2>null</LITERAL2>
 			<LITERAL2>super</LITERAL2>
@@ -141,10 +139,6 @@
 	</RULES>
 
 	<RULES SET="JAVADOC" DEFAULT="COMMENT2" IGNORE_CASE="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- so that @link{...} is highlighted -->
 		<SEQ TYPE="COMMENT2">{</SEQ>
 
@@ -152,10 +146,11 @@
 		<SEQ TYPE="COMMENT2">*</SEQ>
 
 		<!-- Javadoc ignores tags inside <pre> -->
-		<SPAN TYPE="MARKUP" DELEGATE="JAVADOC_PRE">
+		<!-- XXX no it doesn't -->
+		<!-- SPAN TYPE="MARKUP" DELEGATE="JAVADOC_PRE">
 			<BEGIN>&lt;pre&gt;</BEGIN>
 			<END>&lt;/pre&gt;</END>
-		</SPAN>
+		</SPAN -->
 
 		<!-- HTML comments -->
 		<SPAN TYPE="COMMENT1">
@@ -219,5 +214,5 @@
 		</KEYWORDS>
 	</RULES>
 
-	<RULES SET="JAVADOC_PRE" DEFAULT="COMMENT2" />
+	<!-- RULES SET="JAVADOC_PRE" DEFAULT="COMMENT2" / -->
 </MODE>

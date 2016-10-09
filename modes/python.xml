@@ -19,14 +19,10 @@
 
 <MODE>
 	<PROPS>
-		<PROPERTY NAME="indentPrevLine" VALUE="\s*.{3,}:\s*(#.*)?" />
+		<PROPERTY NAME="indentNextLines" VALUE="\s*[^#]{3,}:\s*(#.*)?" />
 		<PROPERTY NAME="lineComment" VALUE="#" />
 	</PROPS>
 	<RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- Comment -->
 		<EOL_SPAN TYPE="COMMENT1">#</EOL_SPAN>
 
@@ -51,7 +47,6 @@
 			<END>'</END>
 		</SPAN>
 
-		<SEQ TYPE="NULL">)</SEQ>
 		<SEQ TYPE="OPERATOR">=</SEQ>
 		<SEQ TYPE="OPERATOR">!</SEQ>
 		<SEQ TYPE="OPERATOR">&gt;=</SEQ>
@@ -67,19 +62,11 @@
 		<SEQ TYPE="OPERATOR">|</SEQ>
 		<SEQ TYPE="OPERATOR">^</SEQ>
 		<SEQ TYPE="OPERATOR">~</SEQ>
-		<SEQ TYPE="NULL">}</SEQ>
-		<SEQ TYPE="NULL">{</SEQ>
-		<SEQ TYPE="NULL">.</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">]</SEQ>
-		<SEQ TYPE="NULL">[</SEQ>
-		<SEQ TYPE="NULL">:</SEQ>
 
 		<MARK_PREVIOUS TYPE="FUNCTION"
 			EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
 
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<!--  Reserved Words  -->
 			<KEYWORD1>and</KEYWORD1>
 			<KEYWORD1>as</KEYWORD1>
@@ -137,7 +124,6 @@
 			<KEYWORD2>globals</KEYWORD2>
 			<KEYWORD2>hasattr</KEYWORD2>
 			<KEYWORD2>hash</KEYWORD2>
-			<KEYWORD2>help</KEYWORD2>
 			<KEYWORD2>hex</KEYWORD2>
 			<KEYWORD2>id</KEYWORD2>
 			<KEYWORD2>input</KEYWORD2>

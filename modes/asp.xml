@@ -10,29 +10,10 @@
 	</PROPS>
 
 	<RULES IGNORE_CASE="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
-		<SPAN TYPE="MARKUP" DELEGATE="ASPVB">
-			<BEGIN>&lt;%@LANGUAGE="VBSCRIPT"%&gt;</BEGIN>
-			<END></END>
-		</SPAN>
-
-		<SPAN TYPE="MARKUP" DELEGATE="ASPJS">
-			<BEGIN>&lt;%@LANGUAGE="JSCRIPT"%&gt;</BEGIN>
-			<END></END>
-		</SPAN>
-
-		<SPAN TYPE="MARKUP" DELEGATE="ASPJS">
-			<BEGIN>&lt;%@LANGUAGE="JAVASCRIPT"%&gt;</BEGIN>
-			<END></END>
-		</SPAN>
-
-		<SPAN TYPE="MARKUP" DELEGATE="ASPPL">
-			<BEGIN>&lt;%@LANGUAGE="PERLSCRIPT"%&gt;</BEGIN>
-			<END></END>
-		</SPAN>
+		<SEQ TYPE="MARKUP" DELEGATE="ASPVB">&lt;%@LANGUAGE="VBSCRIPT"%&gt;</SEQ>
+		<SEQ TYPE="MARKUP" DELEGATE="ASPJS">&lt;%@LANGUAGE="JSCRIPT"%&gt;</SEQ>
+		<SEQ TYPE="MARKUP" DELEGATE="ASPJS">&lt;%@LANGUAGE="JAVASCRIPT"%&gt;</SEQ>
+		<SEQ TYPE="MARKUP" DELEGATE="ASPPL">&lt;%@LANGUAGE="PERLSCRIPT"%&gt;</SEQ>
 
 		<!-- Inlined server-side VBScript -->
 		<SPAN TYPE="MARKUP" DELEGATE="vbscript::MAIN">
@@ -114,10 +95,6 @@
 	     ASP with VBScript as default script engine
 	     ****************************************************************** -->
 	<RULES SET="ASPVB" IGNORE_CASE="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- Inlined server-side VBScript -->
 		<SPAN TYPE="MARKUP" DELEGATE="vbscript::MAIN">
 			<BEGIN>&lt;%</BEGIN>
@@ -203,10 +180,6 @@
 	     ASP with JScript as default script engine
 	     ****************************************************************** -->
 	<RULES SET="ASPJS" IGNORE_CASE="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- Inlined server-side Javascript -->
 		<SPAN TYPE="MARKUP" DELEGATE="javascript::MAIN">
 			<BEGIN>&lt;%</BEGIN>
@@ -292,10 +265,6 @@
 	     ASP with PerlScript as default script engine
 	     ****************************************************************** -->
 	<RULES SET="ASPPL" IGNORE_CASE="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- Inlined server-side Perlscript -->
 		<SPAN TYPE="MARKUP" DELEGATE="perl::MAIN">
 			<BEGIN>&lt;%</BEGIN>

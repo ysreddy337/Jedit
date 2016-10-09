@@ -26,7 +26,6 @@ package org.gjt.sp.jedit.io;
 //{{{ Imports
 import java.awt.Component;
 import java.io.*;
-import java.util.Vector;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 //}}}
@@ -34,7 +33,7 @@ import org.gjt.sp.util.Log;
 /**
  * Local filesystem VFS.
  * @author Slava Pestov
- * @version $Id: FileVFS.java,v 1.21 2002/03/10 06:26:51 spestov Exp $
+ * @version $Id: FileVFS.java,v 1.29 2003/02/19 01:36:50 spestov Exp $
  */
 public class FileVFS extends VFS
 {
@@ -43,14 +42,8 @@ public class FileVFS extends VFS
 	//{{{ FileVFS method
 	public FileVFS()
 	{
-		super("file");
-	} //}}}
-
-	//{{{ getCapabilities() method
-	public int getCapabilities()
-	{
-		return READ_CAP | WRITE_CAP | BROWSE_CAP | DELETE_CAP
-			| RENAME_CAP | MKDIR_CAP;
+		super("file",READ_CAP | WRITE_CAP | BROWSE_CAP | DELETE_CAP
+			| RENAME_CAP | MKDIR_CAP | LOW_LATENCY_CAP);
 	} //}}}
 
 	//{{{ getParentOfPath() method
@@ -234,7 +227,7 @@ public class FileVFS extends VFS
 			return null;
 		}
 
-		Vector list2 = new Vector();
+		VFS.DirectoryEntry[] list2 = new VFS.DirectoryEntry[list.length];
 		for(int i = 0; i < list.length; i++)
 		{
 			File file = list[i];
@@ -245,20 +238,24 @@ public class FileVFS extends VFS
 			else
 				type = VFS.DirectoryEntry.FILE;
 
-			list2.add(new VFS.DirectoryEntry(file.getName(),
+			list2[i] = new VFS.DirectoryEntry(file.getName(),
 				file.getPath(),file.getPath(),type,
-				file.length(),file.isHidden()));
+				file.length(),file.isHidden());
 		}
 
-		VFS.DirectoryEntry[] retVal = new VFS.DirectoryEntry[list2.size()];
-		list2.copyInto(retVal);
-		return retVal;
+		return list2;
 	} //}}}
 
 	//{{{ _getDirectoryEntry() method
 	public DirectoryEntry _getDirectoryEntry(Object session, String path,
 		Component comp)
 	{
+		if(path.equals("/") && OperatingSystem.isUnix())
+		{
+			return new VFS.DirectoryEntry(path,path,path,
+				VFS.DirectoryEntry.DIRECTORY,0L,false);
+		}
+
 		// workaround for Java bug where paths with trailing / return
 		// null getName()
 		if(path.endsWith("/") || path.endsWith(File.separator))
@@ -306,7 +303,14 @@ public class FileVFS extends VFS
 	//{{{ _mkdir() method
 	public boolean _mkdir(Object session, String directory, Component comp)
 	{
-		boolean retVal = new File(directory).mkdirs();
+		String parent = getParentOfPath(directory);
+		if(!new File(parent).exists())
+		{
+			if(!_mkdir(session,parent,comp))
+				return false;
+		}
+
+		boolean retVal = new File(directory).mkdir();
 		VFSManager.sendVFSUpdate(this,directory,true);
 		return retVal;
 	} //}}}
@@ -383,10 +387,11 @@ public class FileVFS extends VFS
 	} //}}}
 
 	//{{{ _saveComplete() method
-	public void _saveComplete(Object session, Buffer buffer, Component comp)
+	public void _saveComplete(Object session, Buffer buffer, String path,
+		Component comp)
 	{
 		int permissions = buffer.getIntegerProperty(PERMISSIONS_PROPERTY,0);
-		setPermissions(buffer.getPath(),permissions);
+		setPermissions(path,permissions);
 	} //}}}
 
 	//{{{ Permission preservation code
@@ -420,39 +425,8 @@ public class FileVFS extends VFS
 				{
 					String s = output.substring(1, 10);
 
-					if(s.length() == 9)
-					{
-						if(s.charAt(0) == 'r')
-							permissions += 0400;
-						if(s.charAt(1) == 'w')
-							permissions += 0200;
-						if(s.charAt(2) == 'x')
-							permissions += 0100;
-						else if(s.charAt(2) == 's')
-							permissions += 04100;
-						else if(s.charAt(2) == 'S')
-							permissions += 04000;
-						if(s.charAt(3) == 'r')
-							permissions += 040;
-						if(s.charAt(4) == 'w')
-							permissions += 020;
-						if(s.charAt(5) == 'x')
-							permissions += 010;
-						else if(s.charAt(5) == 's')
-							permissions += 02010;
-						else if(s.charAt(5) == 'S')
-							permissions += 02000;
-						if(s.charAt(6) == 'r')
-							permissions += 04;
-						if(s.charAt(7) == 'w')
-							permissions += 02;
-						if(s.charAt(8) == 'x')
-							permissions += 01;
-						else if(s.charAt(8) == 't')
-							permissions += 01001;
-						else if(s.charAt(8) == 'T')
-							permissions += 01000;
-					}
+					permissions = MiscUtilities
+						.parsePermissions(s);
 				}
 			}
 

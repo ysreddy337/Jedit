@@ -19,11 +19,15 @@
 
 package org.gjt.sp.jedit;
 
-import java.awt.event.ActionEvent;
-import java.awt.*;
+import bsh.BshMethod;
 import org.gjt.sp.jedit.gui.BeanShellErrorDialog;
 import org.gjt.sp.util.Log;
 
+/**
+ * An action that evaluates BeanShell code when invoked.
+ * @author Slava Pestov
+ * @version $Id: BeanShellAction.java,v 1.10 2003/02/17 01:04:27 spestov Exp $
+ */
 public class BeanShellAction extends EditAction
 {
 	public BeanShellAction(String name, String code, String isSelected,
@@ -48,13 +52,13 @@ public class BeanShellAction extends EditAction
 			try
 			{
 				cachedIsSelected = BeanShell.cacheBlock(cachedIsSelectedName,
-					isSelected,true);
+					isSelected,false);
 			}
 			catch(Exception e)
 			{
 				Log.log(Log.ERROR,this,e);
 
-				new BeanShellErrorDialog(null,e.toString());
+				new BeanShellErrorDialog(null,e);
 			}
 		}
 	}
@@ -66,7 +70,7 @@ public class BeanShellAction extends EditAction
 			if(cachedCode == null)
 			{
 				String cachedCodeName = "action_" + sanitizedName;
-				cachedCode = BeanShell.cacheBlock(cachedCodeName,code,true);
+				cachedCode = BeanShell.cacheBlock(cachedCodeName,code,false);
 			}
 
 			BeanShell.runCachedBlock(cachedCode,view,null);
@@ -75,7 +79,7 @@ public class BeanShellAction extends EditAction
 		{
 			Log.log(Log.ERROR,this,e);
 
-			new BeanShellErrorDialog(view,e.toString());
+			new BeanShellErrorDialog(view,e);
 		}
 	}
 
@@ -98,7 +102,7 @@ public class BeanShellAction extends EditAction
 		{
 			Log.log(Log.ERROR,this,e);
 
-			new BeanShellErrorDialog(view,e.toString());
+			new BeanShellErrorDialog(view,e);
 
 			return false;
 		}
@@ -124,7 +128,7 @@ public class BeanShellAction extends EditAction
 	private boolean noRecord;
 	private String code;
 	private String isSelected;
-	private String cachedCode;
-	private String cachedIsSelected;
+	private BshMethod cachedCode;
+	private BshMethod cachedIsSelected;
 	private String sanitizedName;
 }

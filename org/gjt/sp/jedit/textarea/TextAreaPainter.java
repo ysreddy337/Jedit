@@ -27,9 +27,7 @@ import javax.swing.text.*;
 import javax.swing.JComponent;
 import java.awt.event.MouseEvent;
 import java.awt.font.*;
-import java.awt.geom.*;
 import java.awt.*;
-import java.util.ArrayList;
 import java.util.HashMap;
 import org.gjt.sp.jedit.syntax.*;
 import org.gjt.sp.jedit.Buffer;
@@ -49,7 +47,7 @@ import org.gjt.sp.util.Log;
  * @see JEditTextArea
  *
  * @author Slava Pestov
- * @version $Id: TextAreaPainter.java,v 1.52 2002/03/10 02:02:29 spestov Exp $
+ * @version $Id: TextAreaPainter.java,v 1.61 2003/02/15 01:09:21 spestov Exp $
  */
 public class TextAreaPainter extends JComponent implements TabExpander
 {
@@ -305,26 +303,6 @@ public class TextAreaPainter extends JComponent implements TabExpander
 			textArea.invalidateSelectedLines();
 	} //}}}
 
-	//{{{ getFoldedLineColor() method
-	/**
-	 * Returns the background color of a collapsed fold line.
-	 */
-	public final Color getFoldedLineColor()
-	{
-		return foldedLineColor;
-	} //}}}
-
-	//{{{ setFoldedLineColor() method
-	/**
-	 * Sets the background color of a collapsed fold line.
-	 * @param foldedLineColor The folded line color
-	 */
-	public final void setFoldedLineColor(Color foldedLineColor)
-	{
-		this.foldedLineColor = foldedLineColor;
-		repaint();
-	} //}}}
-
 	//{{{ getBracketHighlightColor() method
 	/**
 	 * Returns the bracket highlight color.
@@ -475,6 +453,26 @@ public class TextAreaPainter extends JComponent implements TabExpander
 		repaint();
 	} //}}}
 
+	//{{{ getFoldLineStyle() method
+	/**
+	 * Returns the fold line style.
+	 */
+	public final SyntaxStyle getFoldLineStyle()
+	{
+		return foldLineStyle;
+	} //}}}
+
+	//{{{ setFoldLineStyle() method
+	/**
+	 * Sets the fold line style.
+	 * @param foldLineStyle The fold line style
+	 */
+	public final void setFoldLineStyle(SyntaxStyle foldLineStyle)
+	{
+		this.foldLineStyle = foldLineStyle;
+		repaint();
+	} //}}}
+
 	//{{{ setAntiAliasEnabled() method
 	/**
 	 * Sets if anti-aliasing should be enabled. Has no effect when
@@ -531,26 +529,6 @@ public class TextAreaPainter extends JComponent implements TabExpander
 
 	//}}}
 
-	//{{{ addCustomHighlight() method
-	/**
-	 * @deprecated Write a <code>TextAreaExtension</code> instead.
-	 */
-	public void addCustomHighlight(TextAreaHighlight highlight)
-	{
-		Log.log(Log.WARNING,this,"Old highlighter API not supported: "
-			+ highlight);
-	} //}}}
-
-	//{{{ removeCustomHighlight() method
-	/**
-	 * @deprecated Write a <code>TextAreaExtension</code> instead.
-	 */
-	public void removeCustomHighlight(TextAreaHighlight highlight)
-	{
-		Log.log(Log.WARNING,this,"Old highlighter API not supported: "
-			+ highlight);
-	} //}}}
-
 	//{{{ addExtension() method
 	/**
 	 * Adds a text area extension, which can perform custom painting and
@@ -590,6 +568,17 @@ public class TextAreaPainter extends JComponent implements TabExpander
 	{
 		extensionMgr.removeExtension(extension);
 		repaint();
+	} //}}}
+
+	//{{{ getExtensions() method
+	/**
+	 * Returns an array of registered text area extensions. Useful for
+	 * debugging purposes.
+	 * @since jEdit 4.1pre5
+	 */
+	public TextAreaExtension[] getExtensions()
+	{
+		return extensionMgr.getExtensions();
 	} //}}}
 
 	//{{{ getToolTipText() method
@@ -634,8 +623,6 @@ public class TextAreaPainter extends JComponent implements TabExpander
 	 */
 	public void paintComponent(Graphics _gfx)
 	{
-		long start = System.currentTimeMillis();
-
 		Graphics2D gfx = (Graphics2D)_gfx;
 		gfx.setRenderingHints(renderingHints);
 		fontRenderContext = gfx.getFontRenderContext();
@@ -658,9 +645,9 @@ public class TextAreaPainter extends JComponent implements TabExpander
 		// too many lines will always be painted.
 		int lastInvalid = (clipRect.y + clipRect.height - 1) / height;
 
+		//if(lastInvalid - firstInvalid > 1)
+		//	System.err.println("repainting " + (lastInvalid - firstInvalid) + " lines");
 		textArea.chunkCache.updateChunksUpTo(lastInvalid);
-
-		int lineCount = textArea.getVirtualLineCount();
 
 		int y = (clipRect.y - clipRect.y % height);
 
@@ -684,6 +671,7 @@ public class TextAreaPainter extends JComponent implements TabExpander
 
 			if(buffer.isNextLineRequested())
 			{
+				//System.err.println("next line requested");
 				int h = clipRect.y + clipRect.height;
 				textArea.chunkCache.invalidateChunksFrom(lastInvalid + 1);
 				repaint(0,h,getWidth(),getHeight() - h);
@@ -700,8 +688,11 @@ public class TextAreaPainter extends JComponent implements TabExpander
 			Log.log(Log.ERROR,this,e);
 		}
 
-		//System.err.println((System.currentTimeMillis() - start)
-		//	+ ": " + (lastInvalid - firstInvalid + 1));
+		if(textArea.timing)
+		{
+			textArea.timing = false;
+			System.err.println(System.currentTimeMillis() - textArea.time);
+		}
 	} //}}}
 
 	//{{{ nextTabStop() method
@@ -753,10 +744,11 @@ public class TextAreaPainter extends JComponent implements TabExpander
 	private Color caretColor;
 	private Color selectionColor;
 	private Color lineHighlightColor;
-	private Color foldedLineColor;
 	private Color bracketHighlightColor;
 	private Color eolMarkerColor;
 	private Color wrapGuideColor;
+
+	private SyntaxStyle foldLineStyle;
 
 	private boolean blockCaret;
 	private boolean lineHighlight;
@@ -834,16 +826,17 @@ public class TextAreaPainter extends JComponent implements TabExpander
 
 			if(lineInfo.chunks != null)
 			{
-				x += ChunkCache.paintChunkList(
+				buffer.getLineText(physicalLine,textArea.lineSegment);
+				x += Chunk.paintChunkList(textArea.lineSegment,
 					lineInfo.chunks,gfx,x,baseLine,
 					lineBackground.bgColor,true);
 			}
 
-			gfx.setFont(defaultFont);
-			gfx.setColor(eolMarkerColor);
 
 			if(!lineInfo.lastSubregion)
 			{
+				gfx.setFont(defaultFont);
+				gfx.setColor(eolMarkerColor);
 				gfx.drawString(":",Math.max(x,
 					textArea.getHorizontalOffset()
 					+ textArea.wrapMargin + textArea.charWidth),
@@ -852,6 +845,10 @@ public class TextAreaPainter extends JComponent implements TabExpander
 			}
 			else if(lineBackground.collapsedFold)
 			{
+				Font font = foldLineStyle.getFont();
+				gfx.setFont(font);
+				gfx.setColor(foldLineStyle.getForegroundColor());
+
 				int nextLine = textArea.getFoldVisibilityManager()
 					.getNextVisibleLine(physicalLine);
 				if(nextLine == -1)
@@ -859,13 +856,17 @@ public class TextAreaPainter extends JComponent implements TabExpander
 
 				int count = nextLine - physicalLine - 1;
 				String str = " [" + count + " lines]";
+
+				float width = (float)font.getStringBounds(
+					str,fontRenderContext).getWidth();
+
 				gfx.drawString(str,x,baseLine);
-				x += (int)(getFont().getStringBounds(
-					str,fontRenderContext)
-					.getWidth());
+				x += width;
 			}
 			else if(eolMarkers)
 			{
+				gfx.setFont(defaultFont);
+				gfx.setColor(eolMarkerColor);
 				gfx.drawString(".",x,baseLine);
 				x += textArea.charWidth;
 			}
@@ -953,7 +954,11 @@ public class TextAreaPainter extends JComponent implements TabExpander
 			if(paintLineHighlight)
 				bgColor = lineHighlightColor;
 			else if(collapsedFold)
-				bgColor = foldedLineColor;
+			{
+				bgColor = foldLineStyle.getBackgroundColor();
+				if(bgColor == null)
+					bgColor = getBackground();
+			}
 			else
 				bgColor = getBackground();
 
@@ -996,37 +1001,52 @@ public class TextAreaPainter extends JComponent implements TabExpander
 			int selStartScreenLine = textArea.getScreenLineOfOffset(s.start);
 			int selEndScreenLine = textArea.getScreenLineOfOffset(s.end);
 
-			int lineStart = textArea.getLineStartOffset(physicalLine);
-			start -= lineStart;
-			end -= lineStart;
+			Buffer buffer = textArea.getBuffer();
+
+			int lineStart = buffer.getLineStartOffset(physicalLine);
 
 			int x1, x2;
 
 			if(s instanceof Selection.Rect)
 			{
-				int lineLen = textArea.getLineLength(physicalLine);
+				start -= lineStart;
+				end -= lineStart;
 
-				int startOffset = Math.min(lineLen,
-					s.start - textArea.getLineStartOffset(
-					s.startLine));
-				int endOffset = Math.min(lineLen,
-					s.end - textArea.getLineStartOffset(
-					s.endLine));
+				Selection.Rect rect = (Selection.Rect)s;
+				int _start = rect.getStartColumn(buffer);
+				int _end = rect.getEndColumn(buffer);
 
-				if(end <= startOffset || start > endOffset)
+				int lineLen = buffer.getLineLength(physicalLine);
+
+				int[] total = new int[1];
+
+				int rectStart = buffer.getOffsetOfVirtualColumn(
+					physicalLine,_start,total);
+				if(rectStart == -1)
+				{
+					x1 = (_start - total[0]) * textArea.charWidth;
+					rectStart = lineLen;
+				}
+				else
+					x1 = 0;
+
+				int rectEnd = buffer.getOffsetOfVirtualColumn(
+					physicalLine,_end,total);
+				if(rectEnd == -1)
+				{
+					x2 = (_end - total[0]) * textArea.charWidth;
+					rectEnd = lineLen;
+				}
+				else
+					x2 = 0;
+
+				if(end <= rectStart || start > rectEnd)
 					return;
 
-				x1 = (startOffset < start ? 0
-					: textArea.offsetToXY(physicalLine,startOffset,textArea.returnValue).x);
-				x2 = (endOffset > end ? getWidth()
-					: textArea.offsetToXY(physicalLine,endOffset,textArea.returnValue).x);
-
-				if(x1 > x2)
-				{
-					int tmp = x2;
-					x2 = x1;
-					x1 = tmp;
-				}
+				x1 = (rectStart < start ? 0
+					: x1 + textArea.offsetToXY(physicalLine,rectStart,textArea.returnValue).x);
+				x2 = (rectEnd > end ? getWidth()
+					: x2 + textArea.offsetToXY(physicalLine,rectEnd,textArea.returnValue).x);
 			}
 			else if(selStartScreenLine == selEndScreenLine
 				&& selStartScreenLine != -1)
@@ -1053,6 +1073,11 @@ public class TextAreaPainter extends JComponent implements TabExpander
 				x1 = 0;
 				x2 = getWidth();
 			}
+
+			if(x1 < 0)
+				x1 = 0;
+			if(x2 < 0)
+				x2 = 0;
 
 			if(x1 == x2)
 				x2++;

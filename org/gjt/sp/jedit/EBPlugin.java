@@ -19,21 +19,33 @@
 
 package org.gjt.sp.jedit;
 
-import java.util.Vector;
-import org.gjt.sp.jedit.gui.OptionsDialog;
+import org.gjt.sp.util.Log;
 
 /**
  * Plugins extending this class are automatically added to the EditBus.
+ * Otherwise, this class is identical to the {@link EditPlugin}
+ * class.
+ *
+ * @see org.gjt.sp.jedit.EditBus
+ * @see org.gjt.sp.jedit.EBComponent
+ * @see org.gjt.sp.jedit.EBMessage
+ *
  * @author Slava Pestov
- * @version $Id: EBPlugin.java,v 1.2 2001/09/29 09:20:15 spestov Exp $
+ * @version $Id: EBPlugin.java,v 1.6 2003/02/07 23:23:38 spestov Exp $
  */
 public abstract class EBPlugin extends EditPlugin implements EBComponent
 {
 	/**
-	 * Handles a message sent on the EditBus. The default
-	 * implementation ignores the message.
+	 * Handles a message sent on the EditBus.
 	 */
-	public void handleMessage(EBMessage message) {}
+	// next version: remove this
+	public void handleMessage(EBMessage message)
+	{
+		Log.log(Log.WARNING,this,getClassName() + " should extend"
+			+ " EditPlugin not EBPlugin since it has an empty"
+			+ " handleMessage()");
+		EditBus.removeFromBus(this);
+	}
 
 	// protected members
 	protected EBPlugin() {}

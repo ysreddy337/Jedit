@@ -100,20 +100,6 @@ class PluginList
 		String description;
 		Vector plugins = new Vector();
 
-		void install(Roster roster, String installDirectory,
-			boolean downloadSource)
-		{
-			for(int i = 0; i < plugins.size(); i++)
-			{
-				Plugin plugin = (Plugin)plugins.elementAt(i);
-				if(plugin.canBeInstalled())
-				{
-					plugin.install(roster,installDirectory,
-						downloadSource);
-				}
-			}
-		}
-
 		public String toString()
 		{
 			return plugins.toString();
@@ -209,9 +195,10 @@ class PluginList
 					installed);
 			}
 
-			roster.addOperation(new Roster.Install((downloadSource
-				? branch.downloadSource : branch.download),
-				installDirectory));
+			roster.addOperation(new Roster.Install(
+				(downloadSource ? branch.downloadSource : branch.download),
+				installDirectory,
+				(downloadSource ? branch.downloadSourceSize : branch.downloadSize)));
 
 		}
 
@@ -284,8 +271,6 @@ class PluginList
 			{
 				for(int i = 0; i < plugin.branches.size(); i++)
 				{
-					Branch branch = (Branch)plugin.branches
-						.elementAt(i);
 					if(plugin.installedVersion != null
 						&&
 					(from == null || MiscUtilities.compareStrings(

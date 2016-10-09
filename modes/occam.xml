@@ -12,8 +12,6 @@
 	</PROPS>
 
 	<RULES IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
 
 		<!-- Normal comments. -->
 		<EOL_SPAN TYPE="COMMENT1">--</EOL_SPAN>
@@ -31,13 +29,6 @@
 			<END>"</END>
 		</SPAN>
 
-		<SEQ TYPE="NULL">)</SEQ>
-		<SEQ TYPE="NULL">(</SEQ>
-		<SEQ TYPE="NULL">]</SEQ>
-		<SEQ TYPE="NULL">[</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">:</SEQ>
 		<SEQ TYPE="OPERATOR">:=</SEQ>
 		<SEQ TYPE="OPERATOR">=</SEQ>
 		<SEQ TYPE="OPERATOR">&gt;&gt;</SEQ>
@@ -59,7 +50,7 @@
 		<SEQ TYPE="OPERATOR">\/</SEQ>
 		<SEQ TYPE="OPERATOR">~</SEQ>
 
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
                         <!-- Structure keywords -->
 			<KEYWORD1>ALT</KEYWORD1>
 			<KEYWORD1>ASM</KEYWORD1>

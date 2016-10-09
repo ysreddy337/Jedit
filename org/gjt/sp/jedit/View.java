@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
+ * Copyright (C) 1998, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,7 +23,6 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
-import javax.swing.border.EmptyBorder;
 import javax.swing.event.*;
 import javax.swing.text.*;
 import javax.swing.*;
@@ -34,16 +33,48 @@ import org.gjt.sp.jedit.msg.*;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.search.*;
 import org.gjt.sp.jedit.textarea.*;
-import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * A window that edits buffers. There is no public constructor in the
- * View class. Views are created and destroyed by the <code>jEdit</code>
+ * A <code>View</code> is jEdit's top-level frame window.<p>
+ *
+ * In a BeanShell script, you can obtain the current view instance from the
+ * <code>view</code> variable.<p>
+ *
+ * The largest component it contains is an {@link EditPane} that in turn
+ * contains a {@link org.gjt.sp.jedit.textarea.JEditTextArea} that displays a
+ * {@link Buffer}.
+ * A view can have more than one edit pane in a split window configuration.
+ * A view also contains a menu bar, an optional toolbar and other window
+ * decorations, as well as docked windows.<p>
+ *
+ * The <b>View</b> class performs two important operations
+ * dealing with plugins: creating plugin menu items, and managing dockable
+ * windows.
+ *
+ * <ul>
+ * <li>When a view is being created, its initialization routine
+ * iterates through the collection of loaded plugins and calls
+ * the {@link EditPlugin#createMenuItems(Vector)} method of
+ * each plugin core class.</li>
+ * <li>The view also creates and initializes a
+ * {@link org.gjt.sp.jedit.gui.DockableWindowManager}
+ * object.  This object is
+ * responsible for creating, closing and managing dockable windows.</li>
+ * </ul>
+ *
+ * This class does not have a public constructor.
+ * Views can be opened and closed using methods in the <code>jEdit</code>
  * class.
  *
+ * @see org.gjt.sp.jedit.jEdit#newView(View)
+ * @see org.gjt.sp.jedit.jEdit#newView(View,Buffer)
+ * @see org.gjt.sp.jedit.jEdit#newView(View,Buffer,boolean)
+ * @see org.gjt.sp.jedit.jEdit#closeView(View)
+ *
  * @author Slava Pestov
- * @version $Id: View.java,v 1.17 2002/03/20 06:02:24 spestov Exp $
+ * @author John Gellene (API documentation)
+ * @version $Id: View.java,v 1.56 2003/02/20 22:17:14 spestov Exp $
  */
 public class View extends JFrame implements EBComponent
 {
@@ -101,22 +132,29 @@ public class View extends JFrame implements EBComponent
 	public static final int ABOVE_SYSTEM_BAR_LAYER = 150;
 
 	/**
-	 * System tool bar layer. jEdit uses this for the main tool bar.
+	 * System tool bar layer.
+	 * jEdit uses this for the main tool bar.
 	 * @see #addToolBar(int,int,java.awt.Component)
 	 * @since jEdit 4.0pre7
 	 */
 	public static final int SYSTEM_BAR_LAYER = 100;
 
 	/**
-	 * Search bar layer. jEdit uses this for the search bar.
+	 * Below system tool bar layer.
+	 * @see #addToolBar(int,int,java.awt.Component)
+	 * @since jEdit 4.0pre7
+	 */
+	public static final int BELOW_SYSTEM_BAR_LAYER = 75;
+
+	/**
+	 * Search bar layer.
 	 * @see #addToolBar(int,int,java.awt.Component)
 	 * @since jEdit 4.0pre7
 	 */
 	public static final int SEARCH_BAR_LAYER = 75;
 
 	/**
-	 * Below search bar layer. This is above the default layer for the
-	 * top group.
+	 * Below search bar layer.
 	 * @see #addToolBar(int,int,java.awt.Component)
 	 * @since jEdit 4.0pre7
 	 */
@@ -124,24 +162,17 @@ public class View extends JFrame implements EBComponent
 
 	// Layers for bottom group
 	/**
-	 * Above status bar layer. This is above the status bar and below the
-	 * default layer for the bottom group. Vimulator will use this.
-	 * @see #addToolBar(int,int,java.awt.Component)
-	 * @since jEdit 4.0pre7
+	 * @deprecated Status bar no longer added as a tool bar.
 	 */
 	public static final int ABOVE_STATUS_BAR_LAYER = -50;
 
 	/**
-	 * Status bar layer. jEdit uses this for the status bar.
-	 * @see #addToolBar(int,int,java.awt.Component)
-	 * @since jEdit 4.0pre7
+	 * @deprecated Status bar no longer added as a tool bar.
 	 */
 	public static final int STATUS_BAR_LAYER = -100;
 
 	/**
-	 * Below status bar layer. BufferSelector will use this.
-	 * @see #addToolBar(int,int,java.awt.Component)
-	 * @since jEdit 4.0pre7
+	 * @deprecated Status bar no longer added as a tool bar.
 	 */
 	public static final int BELOW_STATUS_BAR_LAYER = -150;
 	//}}}
@@ -202,6 +233,9 @@ public class View extends JFrame implements EBComponent
 	 */
 	public void addToolBar(int group, int layer, Component toolBar)
 	{
+		if(toolBar instanceof SearchBar)
+			searchBar = (SearchBar)toolBar;
+
 		toolBarManager.addToolBar(group, layer, toolBar);
 		getRootPane().revalidate();
 	} //}}}
@@ -213,13 +247,20 @@ public class View extends JFrame implements EBComponent
 	 */
 	public void removeToolBar(Component toolBar)
 	{
+		if(toolBar == searchBar)
+			searchBar = null;
+
 		toolBarManager.removeToolBar(toolBar);
 		getRootPane().revalidate();
 	} //}}}
 
 	//{{{ showWaitCursor() method
 	/**
-	 * Shows the wait cursor and glass pane.
+	 * Shows the wait cursor. This method and
+	 * {@link #hideWaitCursor()} are implemented using a reference
+	 * count of requests for wait cursors, so that nested calls work
+	 * correctly; however, you should be careful to use these methods in
+	 * tandem.
 	 */
 	public synchronized void showWaitCursor()
 	{
@@ -239,7 +280,7 @@ public class View extends JFrame implements EBComponent
 
 	//{{{ hideWaitCursor() method
 	/**
-	 * Hides the wait cursor and glass pane.
+	 * Hides the wait cursor.
 	 */
 	public synchronized void hideWaitCursor()
 	{
@@ -275,7 +316,11 @@ public class View extends JFrame implements EBComponent
 
 	//{{{ getStatus() method
 	/**
-	 * Returns the status bar.
+	 * Returns the status bar. The
+	 * {@link org.gjt.sp.jedit.gui.StatusBar#setMessage(String)} and
+	 * {@link org.gjt.sp.jedit.gui.StatusBar#setMessageAndClear(String)} methods can
+	 * be called on the return value of this method to display status
+	 * information to the user.
 	 * @since jEdit 3.2pre2
 	 */
 	public StatusBar getStatus()
@@ -389,11 +434,6 @@ public class View extends JFrame implements EBComponent
 					return;
 				}
 			}
-
-			Keymap keymap = ((JTextComponent)getFocusOwner())
-				.getKeymap();
-			if(keymap.getAction(KeyStroke.getKeyStrokeForEvent(evt)) != null)
-				return;
 		}
 
 		if(evt.isConsumed())
@@ -438,29 +478,29 @@ public class View extends JFrame implements EBComponent
 	//{{{ splitHorizontally() method
 	/**
 	 * Splits the view horizontally.
-	 * @since jEdit 2.7pre2
+	 * @since jEdit 4.1pre2
 	 */
-	public void splitHorizontally()
+	public EditPane splitHorizontally()
 	{
-		split(JSplitPane.VERTICAL_SPLIT);
+		return split(JSplitPane.VERTICAL_SPLIT);
 	} //}}}
 
 	//{{{ splitVertically() method
 	/**
 	 * Splits the view vertically.
-	 * @since jEdit 2.7pre2
+	 * @since jEdit 4.1pre2
 	 */
-	public void splitVertically()
+	public EditPane splitVertically()
 	{
-		split(JSplitPane.HORIZONTAL_SPLIT);
+		return split(JSplitPane.HORIZONTAL_SPLIT);
 	} //}}}
 
 	//{{{ split() method
 	/**
 	 * Splits the view.
-	 * @since jEdit 2.3pre2
+	 * @since jEdit 4.1pre2
 	 */
-	public void split(int orientation)
+	public EditPane split(int orientation)
 	{
 		editPane.saveCaretInfo();
 		EditPane oldEditPane = editPane;
@@ -469,55 +509,49 @@ public class View extends JFrame implements EBComponent
 
 		JComponent oldParent = (JComponent)oldEditPane.getParent();
 
+		final JSplitPane newSplitPane = new JSplitPane(orientation);
+		newSplitPane.setOneTouchExpandable(true);
+		newSplitPane.setBorder(null);
+		newSplitPane.setMinimumSize(new Dimension(0,0));
+
 		if(oldParent instanceof JSplitPane)
 		{
 			JSplitPane oldSplitPane = (JSplitPane)oldParent;
 			int dividerPos = oldSplitPane.getDividerLocation();
 
 			Component left = oldSplitPane.getLeftComponent();
-			final JSplitPane newSplitPane = new JSplitPane(orientation,
-				oldEditPane,editPane);
 
 			if(left == oldEditPane)
 				oldSplitPane.setLeftComponent(newSplitPane);
 			else
 				oldSplitPane.setRightComponent(newSplitPane);
 
-			oldSplitPane.setDividerLocation(dividerPos);
+			newSplitPane.setLeftComponent(oldEditPane);
+			newSplitPane.setRightComponent(editPane);
 
-			SwingUtilities.invokeLater(new Runnable()
-			{
-				public void run()
-				{
-					newSplitPane.setDividerLocation(0.5);
-					editPane.focusOnTextArea();
-				}
-			});
+			oldSplitPane.setDividerLocation(dividerPos);
 		}
 		else
 		{
-			JSplitPane newSplitPane = splitPane = new JSplitPane(orientation,
-				oldEditPane,editPane);
-			newSplitPane.setBorder(null);
-			oldParent.add(splitPane);
-			oldParent.revalidate();
+			this.splitPane = newSplitPane;
 
-			Dimension size;
-			if(oldParent instanceof JSplitPane)
-				size = oldParent.getSize();
-			else
-				size = oldEditPane.getSize();
-			newSplitPane.setDividerLocation(((orientation
-				== JSplitPane.VERTICAL_SPLIT) ? size.height
-				: size.width) / 2);
-			SwingUtilities.invokeLater(new Runnable()
-			{
-				public void run()
-				{
-					editPane.focusOnTextArea();
-				}
-			});
+			newSplitPane.setLeftComponent(oldEditPane);
+			newSplitPane.setRightComponent(editPane);
+
+			oldParent.add(newSplitPane);
+			oldParent.revalidate();
 		}
+
+		SwingUtilities.invokeLater(new Runnable()
+		{
+			public void run()
+			{
+				newSplitPane.setDividerLocation(0.5);
+				editPane.focusOnTextArea();
+			}
+		});
+
+		return editPane;
 	} //}}}
 
 	//{{{ unsplit() method
@@ -545,15 +579,79 @@ public class View extends JFrame implements EBComponent
 
 			splitPane = null;
 			updateTitle();
-		}
 
-		SwingUtilities.invokeLater(new Runnable()
-		{
-			public void run()
+			SwingUtilities.invokeLater(new Runnable()
 			{
-				editPane.focusOnTextArea();
+				public void run()
+				{
+					editPane.focusOnTextArea();
+				}
+			});
+		}
+		else
+			getToolkit().beep();
+	} //}}}
+
+	//{{{ unsplitCurrent() method
+	/**
+	 * Removes the current split.
+	 * @since jEdit 2.3pre2
+	 */
+	public void unsplitCurrent()
+	{
+		if(splitPane != null)
+		{
+			// find first split pane parenting current edit pane
+			Component comp = editPane;
+			while(!(comp instanceof JSplitPane))
+			{
+				comp = comp.getParent();
 			}
-		});
+
+			// get rid of any edit pane that is a child
+			// of the current edit pane's parent splitter
+			EditPane[] editPanes = getEditPanes();
+			for(int i = 0; i < editPanes.length; i++)
+			{
+				EditPane _editPane = editPanes[i];
+				if(GUIUtilities.isAncestorOf(comp,_editPane)
+					&& _editPane != editPane)
+					_editPane.close();
+			}
+
+			JComponent parent = (JComponent)comp.getParent();
+
+			if(parent instanceof JSplitPane)
+			{
+				JSplitPane parentSplit = (JSplitPane)parent;
+				int pos = parentSplit.getDividerLocation();
+				if(parentSplit.getLeftComponent() == comp)
+					parentSplit.setLeftComponent(editPane);
+				else
+					parentSplit.setRightComponent(editPane);
+				parentSplit.setDividerLocation(pos);
+			}
+			else
+			{
+				parent.remove(comp);
+				parent.add(editPane);
+				splitPane = null;
+			}
+
+			parent.revalidate();
+
+			updateTitle();
+
+			SwingUtilities.invokeLater(new Runnable()
+			{
+				public void run()
+				{
+					editPane.focusOnTextArea();
+				}
+			});
+		}
+		else
+			getToolkit().beep();
 	} //}}}
 
 	//{{{ nextTextArea() method
@@ -614,7 +712,10 @@ public class View extends JFrame implements EBComponent
 	 */
 	public Buffer getBuffer()
 	{
-		return editPane.getBuffer();
+		if(editPane == null)
+			return null;
+		else
+			return editPane.getBuffer();
 	} //}}}
 
 	//{{{ setBuffer() method
@@ -791,8 +892,8 @@ public class View extends JFrame implements EBComponent
 	{
 		if(searchBar == null)
 		{
-			getToolkit().beep();
-			return;
+			addToolBar(TOP_GROUP,SEARCH_BAR_LAYER,
+				new SearchBar(this,true));
 		}
 
 		JEditTextArea textArea = getTextArea();
@@ -839,8 +940,8 @@ public class View extends JFrame implements EBComponent
 		{
 			if(searchBar == null)
 			{
-				getToolkit().beep();
-				return;
+				addToolBar(TOP_GROUP,SEARCH_BAR_LAYER,
+					new SearchBar(this,true));
 			}
 
 			searchBar.setHyperSearch(true);
@@ -853,11 +954,21 @@ public class View extends JFrame implements EBComponent
 	//{{{ isClosed() method
 	/**
 	 * Returns true if this view has been closed with
-	 * <code>jEdit.closeView()</code>.
+	 * {@link jEdit#closeView(View)}.
 	 */
 	public boolean isClosed()
 	{
 		return closed;
+	} //}}}
+
+	//{{{ isPlainView() method
+	/**
+	 * Returns true if this is an auxilliary view with no dockable windows.
+	 * @since jEdit 4.1pre2
+	 */
+	public boolean isPlainView()
+	{
+		return plainView;
 	} //}}}
 
 	//{{{ getNext() method
@@ -892,8 +1003,12 @@ public class View extends JFrame implements EBComponent
 			handleBufferUpdate((BufferUpdate)msg);
 		else if(msg instanceof EditPaneUpdate)
 			handleEditPaneUpdate((EditPaneUpdate)msg);
-		else if(msg instanceof MultiSelectStatusChanged)
-			status.updateMiscStatus();
+	} //}}}
+
+	//{{{ getMinimumSize() method
+	public Dimension getMinimumSize()
+	{
+		return new Dimension(0,0);
 	} //}}}
 
 	//{{{ Package-private members
@@ -901,29 +1016,26 @@ public class View extends JFrame implements EBComponent
 	View next;
 
 	//{{{ View constructor
-	View(Buffer buffer, String splitConfig)
+	View(Buffer buffer, String splitConfig, boolean plainView)
 	{
+		this.plainView = plainView;
+
 		enableEvents(AWTEvent.KEY_EVENT_MASK);
 
 		setIconImage(GUIUtilities.getEditorIcon());
 
 		dockableWindowManager = new DockableWindowManager(this);
 
-		JPanel topToolBars = new JPanel(new VariableGridLayout(
+		topToolBars = new JPanel(new VariableGridLayout(
 			VariableGridLayout.FIXED_NUM_COLUMNS,
 			1));
-		JPanel bottomToolBars = new JPanel(new VariableGridLayout(
+		bottomToolBars = new JPanel(new VariableGridLayout(
 			VariableGridLayout.FIXED_NUM_COLUMNS,
 			1));
 
 		toolBarManager = new ToolBarManager(topToolBars, bottomToolBars);
 
-		getContentPane().add(BorderLayout.NORTH,topToolBars);
-		getContentPane().add(BorderLayout.CENTER,dockableWindowManager);
-		getContentPane().add(BorderLayout.SOUTH,bottomToolBars);
-
 		status = new StatusBar(this);
-		addToolBar(BOTTOM_GROUP, STATUS_BAR_LAYER, status);
 
 		setJMenuBar(GUIUtilities.loadMenuBar("view.mbar"));
 
@@ -933,11 +1045,12 @@ public class View extends JFrame implements EBComponent
 		Component comp = restoreSplitConfig(buffer,splitConfig);
 		dockableWindowManager.add(comp);
 
-		status.updateBufferStatus();
-		status.updateMiscStatus();
-
 		EditBus.addToBus(this);
 
+		getContentPane().add(BorderLayout.CENTER,dockableWindowManager);
+
+		// tool bar and status bar gets added in propertiesChanged()
+		// depending in the 'tool bar alternate layout' setting.
 		propertiesChanged();
 
 		setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
@@ -954,7 +1067,8 @@ public class View extends JFrame implements EBComponent
 		// save dockable window geometry, and close 'em
 		dockableWindowManager.close();
 
-		GUIUtilities.saveGeometry(this,"view");
+		GUIUtilities.saveGeometry(this,(plainView ? "plain-view"
+			: "view"));
 		EditBus.removeFromBus(this);
 		dispose();
 
@@ -971,7 +1085,7 @@ public class View extends JFrame implements EBComponent
 		inputHandler = null;
 		recorder = null;
 
-		setContentPane(new JPanel());
+		getContentPane().removeAll();
 	} //}}}
 
 	//{{{ updateTitle() method
@@ -1011,6 +1125,8 @@ public class View extends JFrame implements EBComponent
 
 	private DockableWindowManager dockableWindowManager;
 
+	private JPanel topToolBars;
+	private JPanel bottomToolBars;
 	private ToolBarManager toolBarManager;
 
 	private JToolBar toolBar;
@@ -1030,6 +1146,8 @@ public class View extends JFrame implements EBComponent
 	private int waitCount;
 
 	private boolean showFullPath;
+
+	private boolean plainView;
 	//}}}
 
 	//{{{ getEditPanes() method
@@ -1137,14 +1255,37 @@ public class View extends JFrame implements EBComponent
 		updateTitle();
 
 		dockableWindowManager.propertiesChanged();
+		status.propertiesChanged();
 
-		SwingUtilities.updateComponentTreeUI(getRootPane());
+		removeToolBar(status);
+		getContentPane().remove(status);
+
+		if(jEdit.getBooleanProperty("view.toolbar.alternateLayout"))
+		{
+			getContentPane().add(BorderLayout.NORTH,topToolBars);
+			getContentPane().add(BorderLayout.SOUTH,bottomToolBars);
+			if(!plainView && jEdit.getBooleanProperty("view.status.visible"))
+				addToolBar(BOTTOM_GROUP,STATUS_BAR_LAYER,status);
+		}
+		else
+		{
+			dockableWindowManager.add(DockableWindowManager.DockableLayout
+				.TOP_TOOLBARS,topToolBars);
+			dockableWindowManager.add(DockableWindowManager.DockableLayout
+				.BOTTOM_TOOLBARS,bottomToolBars);
+			if(!plainView && jEdit.getBooleanProperty("view.status.visible"))
+				getContentPane().add(BorderLayout.SOUTH,status);
+		}
+
+		getRootPane().revalidate();
+
+		//SwingUtilities.updateComponentTreeUI(getRootPane());
 	} //}}}
 
 	//{{{ loadToolBars() method
 	private void loadToolBars()
 	{
-		if(jEdit.getBooleanProperty("view.showToolbar"))
+		if(jEdit.getBooleanProperty("view.showToolbar") && !plainView)
 		{
 			if(toolBar != null)
 				toolBarManager.removeToolBar(toolBar);
@@ -1159,13 +1300,13 @@ public class View extends JFrame implements EBComponent
 			toolBar = null;
 		}
 
-		if(jEdit.getBooleanProperty("view.showSearchbar"))
+		if(jEdit.getBooleanProperty("view.showSearchbar") && !plainView)
 		{
-			if(searchBar == null)
-			{
-				searchBar = new SearchBar(this);
-				addToolBar(TOP_GROUP, SEARCH_BAR_LAYER, searchBar);
-			}
+			if(searchBar != null)
+				removeToolBar(searchBar);
+
+			addToolBar(TOP_GROUP,SEARCH_BAR_LAYER,
+				new SearchBar(this,false));
 		}
 		else if(searchBar != null)
 		{
@@ -1190,9 +1331,11 @@ public class View extends JFrame implements EBComponent
 	private void setEditPane(EditPane editPane)
 	{
 		this.editPane = editPane;
-		status.repaintCaretStatus();
+		status.updateCaretStatus();
 		status.updateBufferStatus();
 		status.updateMiscStatus();
+
+		EditBus.send(new ViewUpdate(this,ViewUpdate.EDIT_PANE_CHANGED));
 	} //}}}
 
 	//{{{ handleBufferUpdate() method
@@ -1221,10 +1364,12 @@ public class View extends JFrame implements EBComponent
 	//{{{ handleEditPaneUpdate() method
 	private void handleEditPaneUpdate(EditPaneUpdate msg)
 	{
-		if(msg.getEditPane().getView() == this
-			&& msg.getWhat() == EditPaneUpdate.BUFFER_CHANGED)
+		EditPane editPane = msg.getEditPane();
+		if(editPane.getView() == this
+			&& msg.getWhat() == EditPaneUpdate.BUFFER_CHANGED
+			&& editPane.getBuffer().isLoaded())
 		{
-			status.repaintCaretStatus();
+			status.updateCaretStatus();
 			status.updateBufferStatus();
 			status.updateMiscStatus();
 		}
@@ -1239,8 +1384,8 @@ public class View extends JFrame implements EBComponent
 	{
 		public void caretUpdate(CaretEvent evt)
 		{
-			status.repaintCaretStatus();
-			status.updateMiscStatus();
+			if(evt.getSource() == getTextArea())
+				status.updateCaretStatus();
 		}
 	} //}}}
 
@@ -1259,7 +1404,8 @@ public class View extends JFrame implements EBComponent
 				comp = comp.getParent();
 			}
 
-			setEditPane((EditPane)comp);
+			if(comp != editPane)
+				setEditPane((EditPane)comp);
 		}
 	} //}}}
 
@@ -1269,7 +1415,7 @@ public class View extends JFrame implements EBComponent
 		public void scrolledVertically(JEditTextArea textArea)
 		{
 			if(getTextArea() == textArea)
-				status.repaintCaretStatus();
+				status.updateCaretStatus();
 		}
 
 		public void scrolledHorizontally(JEditTextArea textArea) {}
@@ -1280,6 +1426,8 @@ public class View extends JFrame implements EBComponent
 	{
 		public void windowActivated(WindowEvent evt)
 		{
+			jEdit.setActiveView(View.this);
+
 			final Vector buffers = new Vector();
 			EditPane[] editPanes = getEditPanes();
 			for(int i = 0; i < editPanes.length; i++)
@@ -1302,7 +1450,7 @@ public class View extends JFrame implements EBComponent
 					for(int i = 0; i < buffers.size(); i++)
 					{
 						((Buffer)buffers.elementAt(i))
-							.checkModTime(View.this);
+							.checkModTime(editPane);
 					}
 				}
 			});

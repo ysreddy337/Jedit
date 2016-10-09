@@ -6,7 +6,7 @@
  *
  * Copyright (C) 1999, 2000 mike dillon
  * Portions copyright (C) 2001 Tom Locke
- * Portions copyright (C) 2001 Slava Pestov
+ * Portions copyright (C) 2001, 2002 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,13 +26,15 @@
 package org.gjt.sp.jedit.search;
 
 //{{{ Imports
+import bsh.BshMethod;
 import bsh.NameSpace;
 import gnu.regexp.CharIndexed;
-import javax.swing.text.Segment;
 import org.gjt.sp.jedit.BeanShell;
-import org.gjt.sp.util.Log;
 //}}}
 
+/**
+ * Implements literal search using the Boyer-Moore algorithm.
+ */
 public class BoyerMooreSearchMatcher implements SearchMatcher
 {
 	//{{{ BoyerMooreSearchMatcher constructor
@@ -40,33 +42,17 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 	 * Creates a new string literal matcher.
 	 */
 	public BoyerMooreSearchMatcher(String pattern, String replace,
-		boolean ignoreCase, boolean reverseSearch,
-		boolean beanshell, String replaceMethod)
+		boolean ignoreCase, boolean beanshell, BshMethod replaceMethod)
 	{
 		if (ignoreCase)
-		{
 			this.pattern = pattern.toUpperCase().toCharArray();
-		}
 		else
-		{
 			this.pattern = pattern.toCharArray();
-		}
-
-		if (reverseSearch)
-		{
-			char[] tmp = new char[this.pattern.length];
-			for (int i = 0; i < tmp.length; i++)
-			{
-				tmp[i] = this.pattern[this.pattern.length - (i + 1)];
-			}
-			this.pattern = tmp;
-		}
 
 		this.replace = replace;
 		this.ignoreCase = ignoreCase;
-		this.reverseSearch = reverseSearch;
 
-		if(beanshell && replace != null && replace.length() != 0)
+		if(beanshell && replaceMethod != null && replace.length() != 0)
 		{
 			this.beanshell = true;
 			this.replaceMethod = replaceMethod;
@@ -74,8 +60,9 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 				"search and replace");
 		}
 
-		generateSkipArray();
-		generateSuffixArray();
+		pattern_end = this.pattern.length - 1;
+
+		returnValue = new int[2];
 	} //}}}
 
 	//{{{ nextMatch() method
@@ -88,15 +75,17 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 	 * @param end True if the end of the segment is the end of the buffer
 	 * @param firstTime If false and the search string matched at the start
 	 * offset with length zero, automatically find next match
+	 * @param reverse If true, searching will be performed in a backward
+	 * direction.
 	 * @return an array where the first element is the start offset
 	 * of the match, and the second element is the end offset of
 	 * the match
-	 * @since jEdit 4.0pre3
+	 * @since jEdit 4.1pre7
 	 */
 	public int[] nextMatch(CharIndexed text, boolean start, boolean end,
-		boolean firstTime)
+		boolean firstTime, boolean reverse)
 	{
-		int pos = match(text);
+		int pos = match(text,reverse);
 
 		if (pos == -1)
 		{
@@ -104,7 +93,9 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 		}
 		else
 		{
-			return new int[] { pos, pos + pattern.length };
+			returnValue[0] = pos;
+			returnValue[1] = pos + pattern.length;
+			return returnValue;
 		}
 	} //}}}
 
@@ -138,8 +129,33 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 	 *   http://www.cs.utexas.edu/users/moore/best-ideas/string-searching/
 	 *
 	 */
-	public int match(CharIndexed text)
+	public int match(CharIndexed text, boolean reverse)
 	{
+		//{{{
+		// lazily create skip and suffix arrays for either the
+		// search pattern, or the reversed search pattern
+		int[] skip, suffix;
+		if(reverse)
+		{
+			if(back_skip == null)
+			{
+				back_skip = generateSkipArray(true);
+				back_suffix = generateSuffixArray(true);
+			}
+			skip = back_skip;
+			suffix = back_suffix;
+		}
+		else
+		{
+			if(fwd_skip == null)
+			{
+				fwd_skip = generateSkipArray(false);
+				fwd_suffix = generateSuffixArray(false);
+			}
+			skip = fwd_skip;
+			suffix = fwd_suffix;
+		} //}}}
+
 		// position variable for pattern test position
 		int pos;
 
@@ -152,10 +168,6 @@ public class BoyerMooreSearchMatcher implements SearchMatcher
 		//int last_anchor = reverseSearch
 		//	? offset + pattern.length - 1
 		//	: length - pattern.length;
-
-		// each time the pattern is checked, we start this many
-		// characters ahead of 'anchor'
-		int pattern_end = pattern.length - 1;
 
 		char ch = 0;
 
@@ -182,7 +194,8 @@ SEARCH:
 					ch = Character.toUpperCase(ch);
 
 				// pattern test
-				if (ch != pattern[pos])
+				if ((reverse ? ch != pattern[pattern_end - pos]
+					: ch != pattern[pos]))
 				{
 					// character mismatch, determine how many characters to skip
 
@@ -194,9 +207,9 @@ SEARCH:
 
 					// skip the greater of the two distances provided by the
 					// heuristics
-					int skip = (bad_char > good_suffix) ? bad_char : good_suffix;
-					anchor += skip;
-					text.move(skip);
+					int skip_index = (bad_char > good_suffix) ? bad_char : good_suffix;
+					anchor += skip_index;
+					text.move(skip_index);
 
 					// go back to the while loop
 					continue SEARCH;
@@ -213,16 +226,20 @@ SEARCH:
 
 	//{{{ Private members
 	private char[] pattern;
+	private int pattern_end;
 	private String replace;
 	private boolean ignoreCase;
-	private boolean reverseSearch;
 	private boolean beanshell;
-	private String replaceMethod;
+	private BshMethod replaceMethod;
 	private NameSpace replaceNS;
 
 	// Boyer-Moore member fields
-	private int[] skip;
-	private int[] suffix;
+	private int[] fwd_skip;
+	private int[] fwd_suffix;
+	private int[] back_skip;
+	private int[] back_suffix;
+
+	private int[] returnValue;
 	//}}}
 
 	// Boyer-Moore helper methods
@@ -233,21 +250,24 @@ SEARCH:
 	 *  hashed alphabet how many characters can be skipped if
 	 *  a mismatch occurs on a characater hashing to that index.
 	 */
-	private void generateSkipArray()
+	private int[] generateSkipArray(boolean reverse)
 	{
 		// initialize the skip array to all zeros
-		skip = new int[256];
+		int[] skip = new int[256];
 
 		// leave the table cleanly-initialized for an empty pattern
-		if (pattern.length == 0) return;
+		if (pattern.length == 0)
+			return skip;
 
 		int pos = 0;
 
 		do
 		{
-			skip[getSkipIndex(pattern[pos])] = pos;
+			skip[getSkipIndex(pattern[reverse ? pattern_end - pos : pos])] = pos;
 		}
 		while (++pos < pattern.length);
+
+		return skip;
 	} //}}}
 
 	//{{{ getSkipIndex() method
@@ -277,19 +297,20 @@ SEARCH:
 	 *  XXX: hairy code that is basically just a functional(?) port of some
 	 *  other code i barely understood
 	 */
-	private void generateSuffixArray()
+	private int[] generateSuffixArray(boolean reverse)
 	{
 		int m = pattern.length;
 
 		int j = m + 1;
 
-		suffix = new int[j];
+		int[] suffix = new int[j];
 		int[] tmp = new int[j];
 		tmp[m] = j;
 
 		for (int i = m; i > 0; --i)
 		{
-			while (j <= m && pattern[i - 1] != pattern[j - 1])
+			while (j <= m && pattern[reverse ? pattern_end - i + 1 : i - 1]
+				!= pattern[reverse ? pattern_end - j + 1 : j - 1])
 			{
 				if (suffix[j] == 0)
 				{
@@ -319,6 +340,8 @@ SEARCH:
 				k = tmp[k];
 			}
 		}
+
+		return suffix;
 	} //}}}
 
 	//}}}

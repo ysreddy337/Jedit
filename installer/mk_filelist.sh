@@ -1,5 +1,10 @@
 #!/bin/sh
 
+function print_size() {
+	echo -n "$1: "
+	ls -l `cat installer/$1` | awk 'BEGIN { size=0 } { disk_size+=(int($5/4096+1)*4); size+=$5/1024 } END { print disk_size " " size }'
+}
+
 # This script must be run from the jEdit directory, *not* the installer
 # directory!!!
 
@@ -11,17 +16,22 @@ echo properties/README.txt >> installer/jedit-program
 echo startup/README.txt >> installer/jedit-program
 find modes -name \*.xml >> installer/jedit-program
 echo modes/catalog >> installer/jedit-program
-find doc \( -name \*.txt -o -name \*.html -o -name \*.gif \) >> installer/jedit-program
-find doc -name toc.xml >> installer/jedit-program
+find doc \( -name \*.txt -o -name \*.png \) >> installer/jedit-program
+find doc/users-guide doc/FAQ doc/tips \( -name \*.html -o -name toc.xml \) >> installer/jedit-program
+echo doc/welcome.html >> installer/jedit-program
 
-echo -n "jedit-program: "
-ls -l `cat installer/jedit-program` | awk 'BEGIN { size=0 } { disk_size+=(int($5/4096+1)*4); size+=$5/1024 } END { print disk_size " " size }'
+print_size jedit-program
 
 # jedit-macros fileset
 find macros -name \*.bsh > installer/jedit-macros
 
-echo -n "jedit-macros: "
-ls -l `cat installer/jedit-macros` | awk 'BEGIN { size=0 } { disk_size+=(int($5/4096+1)*4); size+=$5/1024 } END { print disk_size " " size }'
+print_size jedit-macros
+
+# jedit-api fileset
+find doc/api \( -name \*.html -o -name toc.xml \) > installer/jedit-api
+echo doc/api/stylesheet.css >> installer/jedit-api
+
+print_size jedit-api
 
 # jedit-windows fileset
 echo jeshlstb.dl_ > installer/jedit-windows
@@ -35,23 +45,28 @@ echo jeservps.dll >> installer/jedit-windows
 echo jedidiff.exe >> installer/jedit-windows
 echo jEdit_IE.reg.txt >> installer/jedit-windows
 
-echo -n "jedit-windows: "
-ls -l `cat installer/jedit-windows` | awk 'BEGIN { size=0 } { disk_size+=(int($5/4096+1)*4); size+=$5/1024 } END { print disk_size " " size }'
+print_size jedit-windows
 
 # jedit-mac fileset
 echo jars/MacOS.jar > installer/jedit-mac
-echo -n "jedit-mac: "
-ls -l `cat installer/jedit-mac` | awk 'BEGIN { size=0 } { disk_size+=(int($5/4096+1)*4); size+=$5/1024 } END { print disk_size " " size }'
+
+print_size jedit-mac
 
 # jedit-os2 fileset
 echo jedit.cmd > installer/jedit-os2
 
-echo -n "jedit-os2: "
-ls -l `cat installer/jedit-os2` | awk 'BEGIN { size=0 } { disk_size+=(int($5/4096+1)*4); size+=$5/1024 } END { print disk_size " " size }'
+print_size jedit-os2
 
+# jedit-source fileset
+#find . \( -name \*.java -o -name \*.props -o -name \*.xml -o -name \*.png -o -name \*.gif \) -print > installer/jedit-source
+
+#print_size jedit-source
+
+rm -f installer/jedit-*.tar.bz2
 
 for file in installer/jedit-*
 do
-	sort $file > $file.tmp
-	mv $file.tmp $file
+	echo "creating $file.tar.bz2"
+	tar cfj $file.tar.bz2 `cat $file`
+	rm $file
 done

@@ -8,10 +8,6 @@
 		<PROPERTY NAME="commentEnd" VALUE="--&gt;" />
 	</PROPS>
 	<RULES>
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- SGML comment -->
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>&lt;!--</BEGIN>
@@ -54,11 +50,7 @@
 			<END>;</END>
 		</SPAN>
 	</RULES>
-	<RULES SET="TAGS" DEFAULT="MARKUP">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
+	<RULES SET="TAGS" DEFAULT="MARKUP" NO_WORD_SEP="-_">
 		<!-- SGML comment -->
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>&lt;!--</BEGIN>
@@ -76,15 +68,10 @@
 		</SPAN>
 
 		<SEQ TYPE="MARKUP">/</SEQ>
-		<SEQ TYPE="NULL">=</SEQ>
 		<MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE">:</MARK_PREVIOUS>
 		<SEQ TYPE="OPERATOR">:</SEQ>
 	</RULES>
-	<RULES SET="DTD-TAGS" DEFAULT="KEYWORD2">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
+	<RULES SET="DTD-TAGS" DEFAULT="KEYWORD2" IGNORE_CASE="FALSE">
 		<!-- SGML comment -->
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>&lt;!--</BEGIN>
@@ -119,7 +106,6 @@
 			<END>]</END>
 		</SPAN>
 
-		<SEQ TYPE="NULL">=</SEQ>
 		<SEQ TYPE="OPERATOR">(</SEQ>
 		<SEQ TYPE="OPERATOR">)</SEQ>
 		<SEQ TYPE="OPERATOR">|</SEQ>
@@ -128,7 +114,7 @@
 		<SEQ TYPE="OPERATOR">+</SEQ>
 		<SEQ TYPE="OPERATOR">,</SEQ>
 
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<KEYWORD1>CDATA</KEYWORD1>
 			<KEYWORD1>EMPTY</KEYWORD1>
 			<KEYWORD1>INCLUDE</KEYWORD1>
@@ -140,10 +126,6 @@
 		</KEYWORDS>
 	</RULES>
 	<RULES SET="ENTITY-TAGS" DEFAULT="KEYWORD2">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<!-- SGML comment -->
 		<SPAN TYPE="COMMENT1">
 			<BEGIN>&lt;!--</BEGIN>

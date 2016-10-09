@@ -26,15 +26,20 @@ package org.gjt.sp.jedit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.Component;
-import org.gjt.sp.util.Log;
 //}}}
 
 /**
+ * An action.<p>
+ *
  * Instead of subclassing EditAction directly, you should now write an
- * actions.xml file.
+ * <code>actions.xml</code> file.
+ *
+ * @see jEdit#getAction(String)
+ * @see jEdit#getActions()
+ * @see ActionSet
  *
  * @author Slava Pestov
- * @version $Id: EditAction.java,v 1.8 2002/02/08 02:37:17 spestov Exp $
+ * @version $Id: EditAction.java,v 1.16 2003/02/11 02:31:05 spestov Exp $
  */
 public abstract class EditAction
 {
@@ -60,7 +65,7 @@ public abstract class EditAction
 	//{{{ getLabel() method
 	/**
 	 * Returns the action's label. The default implementation returns the
-	 * value of the property named by the action's internal name suffixed
+	 * value of the property named by {@link #getName()} suffixed
 	 * with <code>.label</code>.
 	 */
 	public String getLabel()
@@ -176,17 +181,14 @@ public abstract class EditAction
 		/**
 		 * Called when the user selects this action from a menu.
 		 * It passes the action through the
-		 * <code>InputHandler.executeAction()</code> method,
-		 * which performs any recording or repeating. It also
-		 * loads the action if necessary.
+		 * {@link org.gjt.sp.jedit.gui.InputHandler#invokeAction(EditAction)}
+		 * method, which performs any recording or repeating.
 		 *
 		 * @param evt The action event
 		 */
 		public void actionPerformed(ActionEvent evt)
 		{
-			// Let input handler do recording, repeating, etc
-			GUIUtilities.getView((Component)evt.getSource())
-				.getInputHandler().invokeAction(action);
+			jEdit.getActiveView().getInputHandler().invokeAction(action);
 		}
 
 		private EditAction action;

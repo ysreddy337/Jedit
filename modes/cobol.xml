@@ -2,7 +2,7 @@
 
 <!DOCTYPE MODE SYSTEM "xmode.dtd">
 
-<!-- COBOL mode, by Matthias Schneider -->
+<!-- COBOL mode, by Matthias M. Schneider -->
 <MODE>
 	<PROPS>
 		<PROPERTY NAME="lineComment" VALUE="*" />
@@ -19,12 +19,6 @@
 			<END>'</END>
 		</SPAN>
 
-		<SEQ TYPE="NULL">)</SEQ>
-		<SEQ TYPE="NULL">(</SEQ>
-		<SEQ TYPE="NULL">.</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">?</SEQ>
 		<SEQ TYPE="OPERATOR"> = </SEQ>
 		<SEQ TYPE="OPERATOR"> &gt;= </SEQ>
 		<SEQ TYPE="OPERATOR"> &lt;= </SEQ>
@@ -41,16 +35,12 @@
 		<SEQ TYPE="OPERATOR"> ^ </SEQ>
 		<SEQ TYPE="OPERATOR"> ~ </SEQ>
 
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<SPAN TYPE="COMMENT2" NO_LINE_BREAK="FALSE">
 			<BEGIN>EXEC SQL</BEGIN>
 			<END>END-EXEC</END>
 		</SPAN>
 
-		<KEYWORDS IGNORE_CASE="TRUE">
+		<KEYWORDS>
 			<KEYWORD1>ACCEPT</KEYWORD1>
 			<KEYWORD1>ACCESS</KEYWORD1>
 			<KEYWORD1>ACTUAL</KEYWORD1>

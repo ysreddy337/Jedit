@@ -34,11 +34,12 @@ import org.gjt.sp.jedit.*;
 
 public class FileCellRenderer extends DefaultTreeCellRenderer
 {
-	public static Icon fileIcon = GUIUtilities.loadIcon("file.gif");
-	public static Icon dirIcon = GUIUtilities.loadIcon("closed_folder.gif");
-	public static Icon openDirIcon = GUIUtilities.loadIcon("open_folder.gif");
-	public static Icon filesystemIcon = GUIUtilities.loadIcon("drive.gif");
-	public static Icon loadingIcon = GUIUtilities.loadIcon("drive.gif");
+	public static Icon fileIcon = GUIUtilities.loadIcon("File.png");
+	public static Icon openFileIcon = GUIUtilities.loadIcon("OpenFile.png");
+	public static Icon dirIcon = GUIUtilities.loadIcon("Folder.png");
+	public static Icon openDirIcon = GUIUtilities.loadIcon("OpenFolder.png");
+	public static Icon filesystemIcon = GUIUtilities.loadIcon("DriveSmall.png");
+	public static Icon loadingIcon = GUIUtilities.loadIcon("ReloadSmall.png");
 
 	//{{{ FileCellRenderer constructor
 	public FileCellRenderer()
@@ -111,17 +112,36 @@ public class FileCellRenderer extends DefaultTreeCellRenderer
 		{
 			Font font = getFont();
 
-			FontMetrics fm = getFontMetrics(getFont());
-			int x = (getIcon() == null ? 0
-				: getIcon().getIconWidth()
-				+ getIconTextGap());
+			FontMetrics fm = getFontMetrics(font);
+			int x, y;
+			if(getIcon() == null)
+			{
+				x = 0;
+				y = fm.getAscent() + 2;
+			}
+			else
+			{
+				x = getIcon().getIconWidth() + getIconTextGap();
+				y = Math.max(fm.getAscent() + 2,16);
+			}
 			g.setColor(getForeground());
-			g.drawLine(x,fm.getAscent() + 2,
-				x + fm.stringWidth(getText()),
-				fm.getAscent() + 2);
+			g.drawLine(x,y,x + fm.stringWidth(getText()),y);
 		}
 
 		super.paintComponent(g);
+	} //}}}
+
+	//{{{ getIconForFile() method
+	public static Icon getIconForFile(VFS.DirectoryEntry file, boolean expanded)
+	{
+		if(file.type == VFS.DirectoryEntry.DIRECTORY)
+			return (expanded ? openDirIcon : dirIcon);
+		else if(file.type == VFS.DirectoryEntry.FILESYSTEM)
+			return filesystemIcon;
+		else if(jEdit.getBuffer(file.path) != null)
+			return openFileIcon;
+		else
+			return fileIcon;
 	} //}}}
 
 	//{{{ Package-private members
@@ -136,24 +156,9 @@ public class FileCellRenderer extends DefaultTreeCellRenderer
 	//}}}
 
 	//{{{ Private members
-
-	//{{{ Instance members
 	private Font plainFont;
 	private Font boldFont;
 
 	private boolean underlined;
-	//}}}
-
-	//{{{ getIconForFile() method
-	private Icon getIconForFile(VFS.DirectoryEntry file, boolean expanded)
-	{
-		if(file.type == VFS.DirectoryEntry.DIRECTORY)
-			return (expanded ? openDirIcon : dirIcon);
-		else if(file.type == VFS.DirectoryEntry.FILESYSTEM)
-			return filesystemIcon;
-		else
-			return fileIcon;
-	} //}}}
-
 	//}}}
 }

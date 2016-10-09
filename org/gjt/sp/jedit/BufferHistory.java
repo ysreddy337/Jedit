@@ -25,6 +25,11 @@ import java.util.*;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
 
+/**
+ * Recent file list.
+ * @author Slava Pestov
+ * @version $Id: BufferHistory.java,v 1.7 2003/02/11 02:31:05 spestov Exp $
+ */
 public class BufferHistory
 {
 	public static Entry getEntry(String path)
@@ -178,7 +183,6 @@ public class BufferHistory
 
 	/* private */ static void removeEntry(String path)
 	{
-		Enumeration enum = history.elements();
 		for(int i = 0; i < history.size(); i++)
 		{
 			Entry entry = (Entry)history.elementAt(i);
@@ -250,6 +254,9 @@ public class BufferHistory
 		return returnValue;
 	}
 
+	/**
+	 * Recent file list entry.
+	 */
 	public static class Entry
 	{
 		public String path;

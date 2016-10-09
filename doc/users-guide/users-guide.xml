@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 
 <!-- jEdit user's guide -->
-<!-- (C) 1999, 2000, 2001, 2002 Slava Pestov -->
+<!-- (C) 1999, 2003 Slava Pestov -->
 <!-- (C) 2001, 2002 John Gellene -->
 
 <!-- jEdit buffer-local properties: -->
@@ -28,26 +28,25 @@
 
 <!ENTITY writing-modes SYSTEM "writing-modes.xml">
 <!ENTITY installing-modes SYSTEM "installing-modes.xml">
+<!ENTITY updating-modes SYSTEM "updating-modes.xml">
 
 <!ENTITY macro-basics SYSTEM "macro-basics.xml">
-<!ENTITY simple-macros SYSTEM "simple-macros.xml">
 <!ENTITY dialog-macro SYSTEM "dialog-macro.xml">
 <!ENTITY macro-tips SYSTEM "macro-tips.xml">
+<!ENTITY bsh-commands SYSTEM "bsh-commands.xml">
 
 <!ENTITY plugin-intro SYSTEM "plugin-intro.xml">
-<!ENTITY host-design SYSTEM "host-design.xml">
 <!ENTITY plugin-implement SYSTEM "plugin-implement.xml">
+<!ENTITY plugin-tips SYSTEM "plugin-tips.xml">
 
-<!ENTITY bsh-commands SYSTEM "bsh-commands.xml">
-<!ENTITY api-guide SYSTEM "api-guide.xml">
-<!ENTITY api-message SYSTEM "api-message.xml"> ]>
+]>
 
 <book>
 
 <bookinfo>
- <title>jEdit 4.0 User's Guide</title>
+ <title>jEdit 4.1 User's Guide</title>
 
- <copyright><year>1999</year><year>2002</year><holder>Slava Pestov</holder></copyright>
+ <copyright><year>1999</year><year>2003</year><holder>Slava Pestov</holder></copyright>
  <copyright><year>2001</year><year>2002</year><holder>John Gellene</holder></copyright>
  <legalnotice><title>Legal Notice</title>
   <para>
@@ -113,6 +112,7 @@
 
  &writing-modes;
  &installing-modes;
+ &updating-modes;
 </part>
 
 <part id="writing-macros-part"><title>Writing Macros</title>
@@ -136,9 +136,9 @@
  </partintro>
 
  &macro-basics;
- &simple-macros;
  &dialog-macro;
  &macro-tips;
+ &bsh-commands;
 </part>
 
 <part id="writing-plugins-part"><title>Writing Plugins</title>
@@ -161,34 +161,8 @@
  </partintro>
 
  &plugin-intro;
- &host-design;
  &plugin-implement;
-</part>
-
-<part id="api-guide-part"><title>jEdit API Reference</title>
- <partintro>
-  <para>
-   This part of the user's guide covers the jEdit <firstterm>application
-   programming interface</firstterm>. The information in this part is only useful
-   to macro and plugin developers; you do not need to read it if you only want to
-   use jEdit.
-  </para>
-  <para>
-   The first chapter covers BeanShell commands, which can only
-   be used in macros. The second chapter covers APIs useful to both macros and
-   plugins.
-   The final chapter covers the EditBus message system, which is typically
-   only used by plugins.
-  </para>
-  <para>
-   This part of the user's guide was written by John Gellene
-   <email>jgellene@nyc.rr.com</email>.
-  </para>
- </partintro>
-
- &bsh-commands;
- &api-guide;
- &api-message;
+ &plugin-tips;
 </part>
 
 </book>

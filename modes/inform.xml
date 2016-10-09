@@ -11,14 +11,11 @@
 	<PROPS>
 		<PROPERTY NAME="indentOpenBrackets" VALUE="{" />
 		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
+		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 		<PROPERTY NAME="filenameGlob" VALUE="*.inf" />
 		<PROPERTY NAME="wordBreakChars" VALUE=",+-=&lt;&gt;/?^&amp;*" />
 	</PROPS>
 	<RULES IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<EOL_SPAN TYPE="COMMENT1">!</EOL_SPAN>
 
         <!-- strings can span lines -->
@@ -32,7 +29,6 @@
 		</SPAN>
         
         <!-- special sequences that require special highlighting -->
-		<SEQ TYPE="NULL">)</SEQ>
 		<SEQ TYPE="OPERATOR">=</SEQ>
 		<SEQ TYPE="OPERATOR">!</SEQ>
 		<SEQ TYPE="OPERATOR">&gt;=</SEQ>
@@ -53,21 +49,13 @@
 		<SEQ TYPE="OPERATOR">{</SEQ>
 		<SEQ TYPE="OPERATOR">.&amp;</SEQ>
 		<SEQ TYPE="OPERATOR">.#</SEQ>
-		<SEQ TYPE="NULL">.</SEQ>
-		<SEQ TYPE="NULL">,</SEQ>
-		<SEQ TYPE="NULL">;</SEQ>
-		<SEQ TYPE="NULL">]</SEQ>
-		<SEQ TYPE="NULL">[</SEQ>
-		<SEQ TYPE="NULL">?</SEQ>
 
 		<!-- Function calls -->
 		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
 		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">::</MARK_PREVIOUS>
 		<MARK_PREVIOUS TYPE="LABEL" EXCLUDE_MATCH="TRUE" AT_LINE_START="TRUE">:</MARK_PREVIOUS>
 
-		<SEQ TYPE="NULL">:</SEQ>
-
-		<KEYWORDS IGNORE_CASE="FALSE">
+		<KEYWORDS>
 			<KEYWORD1>has</KEYWORD1>
 			<KEYWORD1>hasnt</KEYWORD1>
 			<KEYWORD1>in</KEYWORD1>
@@ -169,10 +157,6 @@
 		</KEYWORDS>
 	</RULES>
 	<RULES SET="InformInnerText" IGNORE_CASE="FALSE" DEFAULT="LITERAL1">
-		<!-- whitespace: (space and tab) -->
-		<WHITESPACE> </WHITESPACE>
-		<WHITESPACE>	</WHITESPACE>
-
 		<SEQ TYPE="OPERATOR">^</SEQ>
 		<SEQ TYPE="OPERATOR">~</SEQ>
 		<SEQ TYPE="OPERATOR">@</SEQ>

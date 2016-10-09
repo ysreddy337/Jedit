@@ -1,20 +1,14 @@
 /*
  * OperatingSystem.java
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or any later version.
+ * Originally written by Slava Pestov for the jEdit installer project. This work
+ * has been placed into the public domain. You may use this work in any way and
+ * for any purpose you wish.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * THIS SOFTWARE IS PROVIDED AS-IS WITHOUT WARRANTY OF ANY KIND, NOT EVEN THE
+ * IMPLIED WARRANTY OF MERCHANTABILITY. THE AUTHOR OF THIS SOFTWARE, ASSUMES
+ * _NO_ RESPONSIBILITY FOR ANY CONSEQUENCE RESULTING FROM THE USE, MODIFICATION,
+ * OR REDISTRIBUTION OF THIS SOFTWARE.
  */
 
 package installer;
@@ -29,13 +23,67 @@ public abstract class OperatingSystem
 {
 	public abstract String getInstallDirectory(String name, String version);
 
-	public String getShortcutDirectory(String name, String version)
+	public abstract static class OSTask
 	{
-		return null;
+		protected Install installer;
+		protected String name;
+		protected String label;
+		protected String directory;
+		protected boolean enabled;
+
+		public OSTask(Install installer, String name)
+		{
+			this.installer = installer;
+			this.name = name;
+			this.label = installer.getProperty("ostask." + name + ".label");
+			this.directory = getDefaultDirectory(installer);
+
+			// on by default
+			enabled = true;
+		}
+
+		public String getName()
+		{
+			return name;
+		}
+
+		public String getLabel()
+		{
+			return label;
+		}
+
+		public String getDefaultDirectory(Install installer)
+		{
+			return null;
+		}
+
+		public String getDirectory()
+		{
+			return directory;
+		}
+
+		public boolean isEnabled()
+		{
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled)
+		{
+			this.enabled = enabled;
+		}
+
+		public void setDirectory(String directory)
+		{
+			this.directory = directory;
+		}
+
+		public abstract void perform(String installDir) throws IOException;
 	}
 
-	public void createScript(Install installer, String installDir,
-		String binDir, String name) throws IOException {}
+	public OSTask[] getOSTasks(Install installer)
+	{
+		return new OSTask[0];
+	}
 
 	public void mkdirs(String directory) throws IOException
 	{
@@ -49,71 +97,126 @@ public abstract class OperatingSystem
 		if(os != null)
 			return os;
 
-		String osName = System.getProperty("os.name");
-		if(osName.indexOf("Windows") != -1)
-			os = new Windows();
-		else if(osName.indexOf("Mac") != -1)
+		if(System.getProperty("mrj.version") != null)
 			os = new MacOS();
-		else if(osName.indexOf("OS/2") != -1)
-			os = new HalfAnOS();
 		else
-			os = new Unix();
+		{
+			String osName = System.getProperty("os.name");
+			if(osName.indexOf("Windows") != -1)
+				os = new Windows();
+			else if(osName.indexOf("OS/2") != -1)
+				os = new HalfAnOS();
+			else
+				os = new Unix();
+		}
 
 		return os;
-	}
-
-	public static class MacOS extends OperatingSystem
-	{
-		public String getInstallDirectory(String name, String version)
-		{
-			return "/Applications/" + name + " " + version;
-		}
 	}
 
 	public static class Unix extends OperatingSystem
 	{
 		public String getInstallDirectory(String name, String version)
 		{
-			return "/usr/local/share/" + name.toLowerCase()
-				+ "/" + version;
+			String dir = "/usr/local/share/";
+			if(!new File(dir).canWrite())
+				dir = System.getProperty("user.home");
+
+			return new File(dir,name.toLowerCase() + "/" + version).getPath();
 		}
 
-		public String getShortcutDirectory(String name, String version)
+		public class ScriptOSTask extends OSTask
 		{
-			return "/usr/local/bin";
+			public ScriptOSTask(Install installer)
+			{
+				super(installer,"unix-script");
+			}
+
+			public String getDefaultDirectory(Install installer)
+			{
+				String dir = "/usr/local/";
+				if(!new File(dir).canWrite())
+					dir = System.getProperty("user.home");
+
+				return new File(dir,"bin").getPath();
+			}
+
+			public void perform(String installDir) throws IOException
+			{
+				if(!enabled)
+					return;
+
+				mkdirs(directory);
+
+				String name = installer.getProperty("app.name");
+
+				// create app start script
+				String script = directory + File.separatorChar
+					+ name.toLowerCase();
+
+				// Delete existing copy
+				new File(script).delete();
+
+				// Write simple script
+				FileWriter out = new FileWriter(script);
+				out.write("#!/bin/sh\n");
+				out.write("# Java heap size, in megabytes\n");
+				out.write("JAVA_HEAP_SIZE=32\n");
+				out.write("exec "
+					+ System.getProperty("java.home")
+					+ "/bin/java -mx${JAVA_HEAP_SIZE}m ${"
+					+ name.toUpperCase() + "} ");
+
+				String jar = installDir + File.separator
+					+ name.toLowerCase() + ".jar";
+
+				out.write("-jar \"" + jar + "\" $@\n");
+
+				out.close();
+
+				// Make it executable
+				String[] chmodArgs = { "chmod", "755", script };
+				exec(chmodArgs);
+			}
 		}
 
-		public void createScript(Install installer,
-			String installDir, String binDir, String name)
-			throws IOException
+		public class ManPageOSTask extends OSTask
 		{
-			// create app start script
-			String script = binDir + File.separatorChar
-				+ name.toLowerCase();
+			public ManPageOSTask(Install installer)
+			{
+				super(installer,"unix-man");
+			}
 
-			// Delete existing copy
-			new File(script).delete();
+			public String getDefaultDirectory(Install installer)
+			{
+				String dir = "/usr/local/";
+				if(!new File(dir).canWrite())
+					dir = System.getProperty("user.home");
 
-			// Write simple script
-			FileWriter out = new FileWriter(script);
-			out.write("#!/bin/sh\n");
-			out.write("# Java heap size, in megabytes\n");
-			out.write("JAVA_HEAP_SIZE=32\n");
-			out.write("exec "
-				+ System.getProperty("java.home")
-				+ "/bin/java -mx${JAVA_HEAP_SIZE}m ${"
-				+ name.toUpperCase() + "} ");
+				return new File(dir,"man/man1").getPath();
+			}
 
-			String jar = installDir + File.separator
-				+ name.toLowerCase() + ".jar";
+			public void perform(String installDir) throws IOException
+			{
+				if(!enabled)
+					return;
 
-			out.write("-jar \"" + jar + "\" $@\n");
+				mkdirs(directory);
 
-			out.close();
+				String name = installer.getProperty("app.name");
 
-			// Make it executable
-			String[] chmodArgs = { "chmod", "755", script };
-			exec(chmodArgs);
+				// install man page
+				String manpage = installer.getProperty("ostask.unix-man.manpage");
+
+				InputStream in = getClass().getResourceAsStream("/" + manpage);
+				installer.copy(in,new File(directory,manpage).getPath(),
+					null);
+			}
+		}
+
+		public OSTask[] getOSTasks(Install installer)
+		{
+			return new OSTask[] { new ScriptOSTask(installer),
+				new ManPageOSTask(installer) };
 		}
 
 		public void mkdirs(String directory) throws IOException
@@ -143,6 +246,14 @@ public abstract class OperatingSystem
 		}
 	}
 
+	public static class MacOS extends Unix
+	{
+		public String getInstallDirectory(String name, String version)
+		{
+			return "/Applications/" + name + " " + version;
+		}
+	}
+
 	public static class Windows extends OperatingSystem
 	{
 		public String getInstallDirectory(String name, String version)
@@ -150,30 +261,49 @@ public abstract class OperatingSystem
 			return "C:\\Program Files\\" + name + " " + version;
 		}
 
-		public void createScript(Install installer,
-			String installDir, String binDir, String name)
-			throws IOException
+		public class JEditLauncherOSTask extends OSTask
 		{
-			// run jEditLauncher installation
-			File executable = new File(installDir,"jedit.exe");
-			if(!executable.exists())
-				return;
+			public JEditLauncherOSTask(Install installer)
+			{
+				super(installer,"jedit-launcher");
+			}
 
-			String[] args = { executable.getPath(), "/i",
-				System.getProperty("java.home")
-				+ File.separator
-				+ "bin" };
+			public String getDefaultDirectory(Install installer)
+			{
+				return null;
+			}
 
-			try
+			public void perform(String installDir)
 			{
-				Runtime.getRuntime().exec(args).waitFor();
+				if(!enabled)
+					return;
+
+				// run jEditLauncher installation
+				File executable = new File(installDir,"jedit.exe");
+				if(!executable.exists())
+					return;
+
+				String[] args = { executable.getPath(), "/i",
+					System.getProperty("java.home")
+					+ File.separator
+					+ "bin" };
+
+				try
+				{
+					Runtime.getRuntime().exec(args).waitFor();
+				}
+				catch(IOException io)
+				{
+				}
+				catch(InterruptedException ie)
+				{
+				}
 			}
-			catch(IOException io)
-			{
-			}
-			catch(InterruptedException ie)
-			{
-			}
+		}
+
+		public OSTask[] getOSTasks(Install installer)
+		{
+			return new OSTask[] { new JEditLauncherOSTask(installer) };
 		}
 	}
 

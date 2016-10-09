@@ -25,11 +25,8 @@ package org.gjt.sp.jedit.options;
 //{{{ Imports
 import javax.swing.*;
 import java.awt.event.*;
-import java.awt.*;
-import java.io.*;
 import org.gjt.sp.jedit.gui.FontSelector;
 import org.gjt.sp.jedit.*;
-import org.gjt.sp.util.Log;
 //}}}
 
 public class AppearanceOptionPane extends AbstractOptionPane
@@ -83,6 +80,10 @@ public class AppearanceOptionPane extends AbstractOptionPane
 			secondaryFont);
 
 		updateEnabled();
+
+		addSeparator("options.appearance.experimental.label");
+		addComponent(GUIUtilities.createMultilineLabel(
+			jEdit.getProperty("options.appearance.experimental.caption")));
 
 		/* Use jEdit colors in all text components */
 		textColors = new JCheckBox(jEdit.getProperty(
