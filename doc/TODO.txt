@@ -1,0 +1,152 @@
+Here is my to do list for jEdit 3.1. Tell me what you think.
+
+* Folding
+
+'foldMode' buffer local property is either 'embedded' or 'indent'.
+
+In 'embedded' mode, buffers are scanned for customizable start/end
+strings; for example, { and }.
+
+In 'indent' mode, folds are added on lines where the indent increases
+from the previous.
+
+Folding commands will be in the View->Folding menu.
+
+* Gutter changes
+
+Fold arrows will be shown in the gutter. The 'Gutter Expanded' command
+will be removed, replaced by a single 'Line Numbering' command which,
+if selected, widens the gutter appropriately and shows line numbers.
+
+The gutter will no longer be resizable, and it's size will instead be
+determined by the width of the longest line number.
+
+Make the marker/register highlight configurable.
+
+* LineInfo array moved
+
+The lineInfo array and associated methods (markTokens(), insertLines(),
+deleteLines()) will be moved from the TokenMarker class to the Buffer
+class.
+
+* Make split configuration persistent
+
+The editor will remember all split locations and what buffers were open
+in which.
+
+* Simplify XMode DTD
+
+- Remove KEYWORDS.IGNORE_CASE attribute; instead, keywords will inherit
+  the setting of the RULES.IGNORE_CASE attribute
+- Rename RULES.SET to RULES.NAME
+
+* XMode rule inclusion
+
+A new tag will be added:
+
+<INCLUDE NAME="<ruleset name>" />
+
+This tag will copy all rules from the specified ruleset to the current
+ruleset. This will reduce rule duplication by allowing, for example,
+XML-derived modes (HTML, ASP, JSP, PHP, ...) to share a common set of
+rules.
+
+* Change mode loading code
+
+Currently, the first time jEdit is run, it loads all edit modes into
+memory and writes out a 'mode cache' file. Subsequent launches only read
+the mode cache and autoload modes as needed.
+
+A consequence of this is that jEdit takes ages to start the first time
+it is run. Not only is this annoying, it also gives users a bad first
+impression.
+
+The reason each mode has to be loaded to create the cache, is that vital
+information, such as the mode's name, filename glob and first line glob
+is emedded in the mode file.
+
+However, if this information is moved out to a 'catalog' file, leaving
+only highlighting rules in the mode file, loading all edit modes at once
+will never be required.
+
+A catalog file could look like so:
+
+<MODES>
+  <MODE NAME="java" FILENAME_GLOB="*.java" GRAMMAR="java.xml" />
+  <MODE NAME="shellscript" FIRSTLINE_GLOB="#!*sh*" GRAMMAR="shellscript.xml" />
+  ... and so on ...
+</MODES>
+
+So basically, a catalog is a manually-created mode cache.
+
+* Faster HyperSearch
+
+When searching a directory, instead of loading each file into memory
+entirely, HyperSearch will read them from an input stream. This will
+speed things up a lot.
+
+* More reliable saving
+
+When saving a file, it will first be saved to .<filename>.save, and
+only then renamed to <filename> if the save was successful.
+
+* Preserving file permissions on Unix
+
+The j editor has platform-independent code to get/set file permissions.
+Use it.
+
+API:
+- VFS.DirectoryEntry.permissions variable
+- VFS.setPermissions() method
+
+* WhiteSpace plugin
+
+Perhaps integrate it into the core? It will improve performance
+considerably.
+
+* Minor changes
+
+- The File->Current Directory menu will not list backups and autosaves.
+
+- All available fonts will be shown in the font selector.
+
+- The base Metal L&F font will be configurable.
+
+- The abbrev option pane will edit the currently selected abbrev in a
+  text area.
+
+- The shortcuts option panes will support grabbing keys from the
+  keyboard, and assignment of more than one shortcut per command.
+
+- When running with the Metal L&F, the docking area border will look
+  like a split pane divider
+
+- Improve next/prev-paragraph commands -- if a line contains ONLY
+  whitespace, treat it as a paragraph separator
+
+- Better support for read-only files: option for changing read only
+  flag in buffer options dialog, automatic detect when read only
+  status is changed on disk
+
+- File system browser: change 'Open in new view' to 'Open in new split'
+
+- Make modifier code keyboard layout-neutral: handle modifier+key char
+  in keyTyped()
+
+- Bracket double click behavior is really annoying - make if configurable
+
+* UI changes
+
+The Edit menu should be simplified. The 'Selection', 'Lines',
+'Paragraphs' and 'Brackets' submenus should be merged and reorganized
+into 'Text' and 'Source Code' submenus.
+
+* Documentation
+
+Migrate to DocBook/XML.
+
+* Feature removals
+
+- Markers will be removed
+
+-- Slava Pestov <sp@gjt.org>

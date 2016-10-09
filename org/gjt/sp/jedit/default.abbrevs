@@ -1,0 +1,66 @@
+[global]
+EMAIL|sp@gjt.org
+JEDIT|http://jedit.sourceforge.net
+
+[java]
+Ex|Exception
+IOEx|IOException
+MalEx|MalformedURLException
+Ob|Object
+St|String
+Ve|Vector
+Ha|Hashtable
+hme|hasMoreElements()
+ne|nextElement()
+serr|System.err.println(\|);
+sout|System.out.println(\|);
+
+cg|Box.createGlue()
+chs|Box.createHorizontalStrut(\|)
+cvs|Box.createVerticalStrut(\|)
+Yil|SwingUtilities.invokeLater(new Runnable()\n{\npublic void run()\n{\n\|\n}\n});
+
+Yif|if(\|)\n;
+YYif|if(\|)\n{\n\n}
+Yelse|else(\|)\n;
+YYelse|else(\|)\n{\n\n}
+Yfor|for(\|)\n;
+YYfor|for(\|)\n{\n\n}
+Ywhile|while(\|)\n;
+YYwhile|while(\|)\n{\n\n}
+
+Vi|View
+B|Buffer
+JE|JEditTextArea
+VDE|VFS.DirectoryEntry
+gta|getTextArea()
+gb|getBuffer()
+gv|getView(evt)
+gp|jEdit.getProperty(\|)
+gbp|jEdit.getBooleanProperty(\|)
+sp|jEdit.setProperty(\|)
+sbp|jEdit.setBooleanProperty(\|)
+ogs|import org.gjt.sp.
+ogsj|import org.gjt.sp.jedit.
+ogsu|import org.gjt.sp.util.
+loge|Log.log(Log.ERROR,this,\|);
+logw|Log.log(Log.WARNING,this,\|);
+logn|Log.log(Log.NOTICE,this,\|);
+logm|Log.log(Log.MESSAGE,this,\|);
+logd|Log.log(Log.DEBUG,this,\|);
+
+[html]
+EMAILLINK|<a href="mailto:sp@gjt.org">sp@gjt.org</a>
+JEDITLINK|<a href="http://jedit.sourceforge.net">jEdit</a>
+
+[xml]
+Ykeycap|<keycap>\|</>
+Ykeycombo|<keycombo><keycap>\|</><keycap></></keycombo>
+Yindex|<indexterm><primary>\|</></indexterm>
+YYindex|<indexterm><primary>\|</><secondary></></indexterm>
+
+[vhdl]
+sl|std_logic
+slv|std_logic_vector( x downto y )
+var|variable
+sig|signal

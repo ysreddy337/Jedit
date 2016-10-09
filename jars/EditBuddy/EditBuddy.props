@@ -1,0 +1,28 @@
+### plugin properties
+plugin.EditBuddyPlugin.name=Edit Buddy
+plugin.EditBuddyPlugin.author=Slava Pestov
+plugin.EditBuddyPlugin.version=0.3
+plugin.EditBuddyPlugin.docs=EditBuddy.html
+plugin.EditBuddyPlugin.depend.0=jedit 02.07.03.00
+
+### First time dialog box
+welcome.title=Welcome to jEdit
+welcome.caption=Thank you for installing jEdit!
+
+### Menu bar stuff
+edit-buddy=show-tip show-welcome
+edit-buddy.label=EditBuddy
+show-tip.label=Tip of the Day
+show-welcome.label=Welcome Message
+
+### Show on startup?
+tip.show=true
+
+### Tip of the day window
+tip.title=Tip of the Day
+tip.caption=Did you know...
+tip.show-next-time=Show tips on jEdit startup
+tip.next-tip=Next Tip
+
+### Number of tips
+tip.count=29

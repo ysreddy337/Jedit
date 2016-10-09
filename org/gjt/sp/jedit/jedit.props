@@ -1,0 +1,266 @@
+###
+### jEdit global properties
+### By Slava Pestov <sp@gjt.org>
+###
+
+###
+### GLOBAL SETTINGS
+###
+
+# Autosave interval in seconds, 0=off
+autosave=30
+
+# Maximum number of elements in a history list
+history=20
+
+# Desktop saving toggle
+saveDesktop=true
+
+# Caret saving toggle
+saveCaret=true
+
+# I/O thread count
+ioThreadCount=4
+
+# Number of backups to make, 0=no backups
+backups=1
+
+# Backup directory
+backup.directory=
+
+# Backup filename prefix and suffix
+backup.prefix=
+backup.suffix=~
+
+# Sort buffer list
+sortBuffers=true
+sortByName=true
+
+###
+### BUFFER SETTINGS
+### These can also be specified as buffer-local properties
+###
+
+# Line separator
+# The OS default will be used if this is not specified
+# Unix=\n
+# Windows=\r\n
+# MacOS=\r
+#buffer.lineSeparator=\n
+
+# Encoding
+# The OS default will be used if this is not specified
+#buffer.encoding=latin1
+
+# Tab width
+buffer.tabSize=8
+
+# Indent width
+buffer.indentSize=8
+
+# Soft tabs
+buffer.noTabs=false
+
+# Auto indent
+buffer.indentOnTab=false
+buffer.indentOnEnter=true
+
+# Default edit mode
+buffer.defaultMode=text
+
+# Undo queue size
+buffer.undoCount=100
+
+# Syntax highlighting
+buffer.syntax=true
+
+# Wrap column
+buffer.maxLineLen=80
+
+# Word break characters
+buffer.wordBreakChars=
+
+# Non-alphanumeric word characters
+buffer.noWordSep=
+
+###
+### VIEW SETTINGS
+###
+
+# Show toolbar?
+view.showToolbar=true
+
+# Show searchbar?
+view.showSearchbar=true
+
+# Show buffer switcher?
+view.showBufferSwitcher=true
+
+# Show full path in title bar?
+view.showFullPath=false
+
+# Check modification status on focus?
+view.checkModStatus=true
+
+# Font
+view.font=Monospaced
+view.fontsize=12
+# 0=plain, 1=bold, 2=italic, 3=boldItalic
+view.fontstyle=0
+
+# Background and foreground colors (for the text area)
+view.bgColor=#ffffff
+view.fgColor=#000000
+
+# Line highlighting
+view.lineHighlight=true
+view.lineHighlightColor=#e0e0e0
+
+# Bracket highlighting
+view.bracketHighlight=true
+view.bracketHighlightColor=#000000
+
+# EOL markers
+view.eolMarkers=true
+view.eolMarkerColor=#009999
+
+# Wrap guide
+view.wrapGuide=true
+view.wrapGuideColor=#8080ff
+
+# Caret color
+view.caretColor=#ff0000
+
+# Selection color
+view.selectionColor=#ccccff
+
+# Caret blinking
+view.caretBlink=true
+
+# Block caret
+view.blockCaret=false
+
+# Electric borders
+view.electricBorders=3
+
+# Smart home/end
+view.homeEnd=true
+
+# Gutter background color
+view.gutter.bgColor=#ffffff
+
+# Gutter foreground color
+view.gutter.fgColor=#000000
+
+# Gutter highlight color
+view.gutter.highlightColor=#8080c0
+
+# Gutter current line highlight color
+view.gutter.currentLineColor=#d04040
+
+# Gutter marker highlight color
+view.gutter.markerColor=#ccffcc
+
+# Gutter register highlight color
+view.gutter.registerColor=#ffffcc
+
+# Gutter border colors
+view.gutter.focusBorderColor=#d04040
+view.gutter.noFocusBorderColor=#808080
+
+# Gutter font name
+view.gutter.font=Monospaced
+
+# Gutter font style
+# 0=plain, 1=bold, 2=italic, 3=boldItalic
+view.gutter.fontstyle=0
+
+# Gutter font size
+view.gutter.fontsize=10
+
+# Gutter width
+view.gutter.width=40
+
+# Gutter border width
+view.gutter.borderWidth=3
+
+# Gutter collapsed/expanded by default
+view.gutter.collapsed=true
+
+# Gutter displays line numbers
+view.gutter.lineNumbers=true
+
+# Line numbers are drawn with this alignment (left, center, right)
+view.gutter.numberAlignment=right
+
+# Gutter line numbers are highlighted at this interval
+view.gutter.highlightInterval=5
+
+# Gutter displays line numbers
+view.gutter.highlightCurrentLine=true
+
+# Docking border color
+view.docking.borderColor=#ccccff
+
+# Expand abbrevs when user finishes typing a word
+view.expandOnInput=false
+
+# Syntax styles
+view.style.comment1=color:#009900 style:i
+view.style.comment2=color:#990033 style:i
+view.style.digit=color:#009191
+view.style.function=color:#000099
+view.style.invalid=color:#ff0000 style:b
+view.style.keyword1=color:#000000 style:b
+view.style.keyword2=style:b
+view.style.keyword3=style:b
+view.style.label=color:#990033 style:ib
+view.style.literal1=color:#404040
+view.style.literal2=color:#404040
+view.style.markup=color:#5e5e5e style:b
+view.style.operator=style:b
+
+# Docking
+view.docking.alternateLayout=false
+view.docking.tabsPos=0
+
+###
+### PRINTING
+###
+
+# Font
+print.font=Monospaced
+print.fontsize=10
+print.fontstyle=0
+
+# Print header?
+print.header=true
+
+# Print footer?
+print.footer=true
+
+# Print line numbers?
+print.lineNumbers=true
+
+# Syntax highlighting?
+print.syntax=true
+
+# Margins
+print.margin.top=0.5
+print.margin.left=0.5
+print.margin.bottom=0.5
+print.margin.right=0.5
+
+###
+### VFS SETTINGS
+###
+
+vfs.browser.showHiddenFiles=false
+vfs.browser.sortFiles=true
+vfs.browser.sortMixFilesAndDirs=false
+vfs.browser.sortIgnoreCase=true
+vfs.browser.doubleClickClose=false
+vfs.browser.currentBufferFilter=true
+
+# Can be one of: buffer, home, last
+vfs.browser.defaultPath=buffer
