@@ -35,7 +35,7 @@ import org.gjt.sp.util.Log;
 /**
  * Tool bar editor.
  * @author Slava Pestov
- * @version $Id: ToolBarOptionPane.java,v 1.12 2000/10/15 04:10:35 sp Exp $
+ * @version $Id: ToolBarOptionPane.java,v 1.14 2001/03/26 07:09:20 sp Exp $
  */
 public class ToolBarOptionPane extends AbstractOptionPane
 {
@@ -178,8 +178,6 @@ public class ToolBarOptionPane extends AbstractOptionPane
 			jEdit.setProperty(button.actionName + ".icon",button.iconName);
 		}
 		jEdit.setProperty("view.toolbar",buf.toString());
-
-		GUIUtilities.invalidateMenuModels();
 	}
 
 	// private members
@@ -565,44 +563,3 @@ class ToolBarAddDialog extends EnhancedDialog
 		}
 	}
 }
-
-/*
- * Change Log:
- * $Log: ToolBarOptionPane.java,v $
- * Revision 1.12  2000/10/15 04:10:35  sp
- * bug fixes
- *
- * Revision 1.11  2000/09/23 03:01:11  sp
- * pre7 yayayay
- *
- * Revision 1.10  2000/09/03 03:16:53  sp
- * Search bar integrated with command line, enhancements throughout
- *
- * Revision 1.9  2000/08/29 07:47:13  sp
- * Improved complete word, type-select in VFS browser, bug fixes
- *
- * Revision 1.8  2000/08/10 08:30:41  sp
- * VFS browser work, options dialog work, more random tweaks
- *
- * Revision 1.7  2000/08/05 07:16:12  sp
- * Global options dialog box updated, VFS browser now supports right-click menus
- *
- * Revision 1.6  2000/07/12 09:11:38  sp
- * macros can be added to context menu and tool bar, menu bar layout improved
- *
- * Revision 1.5  2000/06/29 06:20:45  sp
- * Tool bar icon code bug fix
- *
- * Revision 1.4  2000/05/21 03:00:51  sp
- * Code cleanups and bug fixes
- *
- * Revision 1.3  2000/05/20 07:02:04  sp
- * Documentation updates, tool bar editor finished, a few other enhancements
- *
- * Revision 1.2  2000/05/16 10:47:40  sp
- * More work on toolbar editor, -gui command line switch
- *
- * Revision 1.1  2000/05/14 10:55:22  sp
- * Tool bar editor started, improved view registers dialog box
- *
- */

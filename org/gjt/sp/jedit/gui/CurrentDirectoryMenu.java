@@ -1,6 +1,6 @@
 /*
  * CurrentDirectoryMenu.java - File list menu
- * Copyright (C) 2000 Slava Pestov
+ * Copyright (C) 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -76,6 +76,10 @@ public class CurrentDirectoryMenu extends JMenu
 				}
 			};
 
+			// for filtering out backups
+			String backupPrefix = jEdit.getProperty("backup.prefix");
+			String backupSuffix = jEdit.getProperty("backup.suffix");
+
 			String[] list = dir.list();
 			if(list != null)
 			{
@@ -85,6 +89,18 @@ public class CurrentDirectoryMenu extends JMenu
 				{
 					String name = list[i];
 
+					// skip autosave files
+					if(name.startsWith("#") && name.endsWith("#"))
+						continue;
+
+					// skip backup files
+					if((backupPrefix.length() != 0
+						&& name.startsWith(backupPrefix))
+						|| (backupSuffix.length() != 0
+						&& name.endsWith(backupSuffix)))
+						continue;
+
+					// skip directories
 					file = new File(dir,name);
 					if(file.isDirectory())
 						continue;

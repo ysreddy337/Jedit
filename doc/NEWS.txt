@@ -1,97 +1,101 @@
-MAJOR CHANGES IN JEDIT 3.0 SINCE 2.6
+OVERVIEW OF CHANGES BETWEEN JEDIT 3.0 AND 3.1
 
 * Contents
 
-- Macro system improvements
-- User interface improvements
+- Folding and narrowing
+- Macro improvements
 - Search and replace improvements
-- Word wrap
-- Indent width -vs- tab width
-- Caret positions saved in recent file list
-- Scrolling improvements
-- New miscellaneous commands
-- New edit modes
-- FTP support moved to a plugin
+- Improved undo
+- File permissions on Unix
+- Shortcuts
+- Abbreviations
+- The mode catalog
+- Documentation
+- Minor changes
 
-* Macro system improvements
+* Folding and narrowing
 
-The limited macro language used in jEdit 2.6 and earlier has been
-replaced with BeanShell. BeanShell is a full-featured scripting language
-with a syntax very similar to Java; hence Java programmers will be able
-to pick it up very easily. The BeanShell homepage is located at
-<http://www.beanshell.org>. Recording user actions is still supported,
-so non-programmers can continue to use jEdit's macro features.
+The folding feature allows lines to be hidden or shown, depending on
+their indent level. Since most programming languages use indentation to
+nest code, folding away lines with a lot of indent has the effect of
+displaying an "overview" of the buffer only, while displaying higher
+indent levels "zooms in" on the code and shows more "detail".
 
-* User interface improvements
+A related feature is narrowing; narrowing hides all parts of the buffer
+except for a specified range.
 
-- The buffer switching tabs have been replaced with a combo box (the
-  BufferTabs plugin, available from plugin central, can be installed to
-  get the old tabs back)
-- I/O progress is now displayed in the top-right corner of the editor
-  window
-- Caret location information is now displayed in the bottom-left corner
-  of the text area
-- Some of the larger option panes in the 'Utilities->Global Options'
-  dialog box have been split into multiple panes, for a less cluttered
-  appearance
-- A 'tip of the day' is now shown on jEdit startup (this can be
-  disabled)
+Text hidden by folding and narrowing is still present in the buffer, and
+can be made visible again using the appropriate commands. Cursor
+movement commands skip over the hidden text, but text manipulation
+commands act on it.
+
+* Macro improvements
+
+The user's guide now has a large and detailed section and writing
+macros. A large collection of sample macros is now included. jEdit now
+checks if a macro named 'Startup' exists, and if so, runs it at startup.
 
 * Search and replace improvements
 
-- The search and replace and HyperSearch dialog boxes have been merged
-- Multiple line search and replace is now supported
-- The jEdit 2.5-style search bar is back
+Reverse search is now supported, currently only for literal strings.
+Reverse regular expression searching will be added in a future release.
 
-* Word wrap
+jEdit now includes version 1.1.2 of the gnu.regexp regular expression
+package. This version adds a number of new features, such as support for
+word boundary (\b, \B) and word anchor (\<, \>) tokens. It also fixes
+bugs and improves performance.
 
-jEdit now supports word wrap. Inserting characters beyond a specified
-wrap column will automatically place a line break at the appropriate
-location.
+* Improved undo
 
-* Indent width -vs- tab width
+Previously, entering text had to be undone character-by-character. Now,
+consecutive insertions can be undone in one operation. Edits performed
+by macros are also now batched into one undo.
 
-The indent width (used when doing auto indent and shifting lines) and
-the tab width (used when displaying tabs) can now be set separately.
+* File permissions on Unix
 
-* Caret positions saved in recent file list
+jEdit now preserves file permissions when running on Unix. This does not
+use any native code and should work on most Unix variants.
 
-jEdit now remembers the caret position in recently opened files, and
-automatically restores it when a recent file is opened.
+* Shortcuts
 
-* Scrolling improvements
+Each command can now have up to two keyboard shortcuts. Built-in and
+plugin command shortcuts are now shown in separate option panes in the
+Global Options dialog box. The option panes now support grabbing keys
+from the keyboard; this removes the need to memorize the keycode names.
 
-The line containing the caret is centered when scrolling long distances.
+* Abbreviations
 
-The horizontal scroll bar width is now set according to the longest
-visible line.
+Tabs can now be entered in abbreviation expansions. A new abbreviation
+editor dialog box is used by the 'Expand Abbreviation' command and
+'Abbrevs' option panes. The dialog allows abbreviations to be defined
+without having to remember the various escape sequences.
 
-The text area can now be scrolled from the keyboard using the commands
-in the View->Scrolling menu. (Contributed by Ollie Rutherfurd
-<oliver@rutherfurd.net>)
+* The mode catalog
 
-* New miscellaneous commands
+Information about all edit modes is now stored in a 'mode catalog' file.
+This removes the need to create a 'mode cache' the first time jEdit is
+started, which could take a very long time. Note that you must manually
+update the catalog if you add your own edit modes.
 
-- File->Insert File: inserts specified file into current buffer
-- File->Save a Copy As: saves buffer to a different file, and doesn't
-  rename the buffer
+* Documentation
 
-* New edit modes
+The help viewer now displays all available documentation, including the
+table of contents of the user's guide, in a tree to the left of the help
+text for easier navigation.
 
-Syntax highlighting was added for the following file types, bringing the
-total number of supported file types up to 46:
+* Minor changes
 
-- Assembly (Intel x86 MASM/NASM)
-- C#
-- DSSSL
-- RPM spec
-- Texinfo
+- The File->Current Directory menu no longer displays backup and
+  autosave files.
 
-Assembly syntax highlighting was contributed by Kristian Ovaska
-(<kristian.ovaska@helsinki.fi>). C# syntax highlighting was contributed
-by Ollie Rutherfurd (<oliver@rutherfurd.net>).
+- When running on Java 2, all available fonts are now listed in the font
+  selector.
 
-* FTP support moved to a plugin
+- Syntax highlighting added for Ada95, B formal method, BCEL Java
+  disassembly, Inform
 
-FTP support has been moved out of the editor core to the 'FTP' plugin,
-which can be installed using the plugin manager.
+- Various minor GUI improvements
+
+- jEdit still saves and restores the list of open files, however,
+  support for having multiple 'sessions' defined has been moved to the
+  BufferList plugin.

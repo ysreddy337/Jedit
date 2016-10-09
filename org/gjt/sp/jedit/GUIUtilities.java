@@ -1,6 +1,6 @@
 /*
  * GUIUtilities.java - Various GUI utility functions
- * Copyright (C) 1999, 2000 Slava Pestov
+ * Copyright (C) 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -50,7 +50,7 @@ import org.gjt.sp.util.Log;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: GUIUtilities.java,v 1.80 2000/12/08 04:03:42 sp Exp $
+ * @version $Id: GUIUtilities.java,v 1.87 2001/03/26 07:09:19 sp Exp $
  */
 public class GUIUtilities
 {
@@ -64,53 +64,21 @@ public class GUIUtilities
 	public static final Icon PLUGIN_WINDOW_ICON;
 
 	/**
-	 * Instructs jEdit to invalidate all menu models.
-	 * @param name The menu name
-	 */
-	public static void invalidateMenuModels()
-	{
-		menus.clear();
-	}
-
-	/**
-	 * Loads a menubar model.
-	 * @param name The menu bar name
-	 */
-	public static MenuBarModel loadMenuBarModel(String name)
-	{
-		MenuBarModel mbar = (MenuBarModel)menus.get(name);
-		if(mbar == null)
-		{
-			mbar = new MenuBarModel(name);
-			menus.put(name,mbar);
-		}
-		return mbar;
-	}
-
-	/**
 	 * Creates a menubar.
 	 * @param view The view to load the menubar for
 	 * @param name The menu bar name
 	 */
 	public static JMenuBar loadMenuBar(View view, String name)
 	{
-		return loadMenuBarModel(name).create(view);
-	}
+		String menus = jEdit.getProperty(name);
+		StringTokenizer st = new StringTokenizer(menus);
 
-	/**
-	 * Loads a menu model.
-	 * @param view The view to load the menu for
-	 * @param name The menu name
-	 */
-	public static MenuModel loadMenuModel(String name)
-	{
-		MenuModel menu = (MenuModel)menus.get(name);
-		if(menu == null)
-		{
-			menu = new MenuModel(name);
-			menus.put(name,menu);
-		}
-		return menu;
+		JMenuBar mbar = new JMenuBar();
+
+		while(st.hasMoreTokens())
+			mbar.add(GUIUtilities.loadMenu(view,st.nextToken()));
+
+		return mbar;
 	}
 
 	/**
@@ -120,7 +88,7 @@ public class GUIUtilities
 	 */
 	public static JMenu loadMenu(String name)
 	{
-		return (JMenu)loadMenuModel(name).create(null);
+		return loadMenu(null,name);
 	}
 
 	/**
@@ -131,7 +99,50 @@ public class GUIUtilities
 	 */
 	public static JMenu loadMenu(View view, String name)
 	{
-		return (JMenu)loadMenuModel(name).create(view);
+		if(view != null)
+		{
+			JMenu menu = view.getMenu(name);
+			if(menu != null)
+				return menu;
+		}
+
+		String label = jEdit.getProperty(name.concat(".label"));
+		if(label == null)
+			label = name;
+
+		char mnemonic;
+		int index = label.indexOf('$');
+		if(index != -1 && label.length() - index > 1)
+		{
+			mnemonic = Character.toLowerCase(label.charAt(index + 1));
+			label = label.substring(0,index).concat(label.substring(++index));
+		}
+		else
+			mnemonic = '\0';
+
+		JMenu menu = new JMenu(label);
+		menu.setMnemonic(mnemonic);
+
+		String menuItems = jEdit.getProperty(name);
+		if(menuItems != null)
+		{
+			StringTokenizer st = new StringTokenizer(menuItems);
+			while(st.hasMoreTokens())
+			{
+				String menuItemName = st.nextToken();
+				if(menuItemName.equals("-"))
+					menu.addSeparator();
+				else
+				{
+					if(menuItemName.startsWith("%"))
+						menu.add(loadMenu(view,menuItemName.substring(1)));
+					else
+						menu.add(loadMenuItem(menuItemName,true));
+				}
+			}
+		}
+
+		return menu;
 	}
 
 	/**
@@ -141,23 +152,28 @@ public class GUIUtilities
 	 */
 	public static JPopupMenu loadPopupMenu(String name)
 	{
-		return loadMenuModel(name).createPopup();
-	}
+		JPopupMenu menu = new JPopupMenu();
 
-	/**
-	 * Loads a menu item model.
-	 * @param name The menu item name
-	 */
-	public static MenuItemModel loadMenuItemModel(String name)
-	{
-		MenuItemModel menuitem = (MenuItemModel)menus.get(name);
-		if(menuitem == null)
+		String menuItems = jEdit.getProperty(name);
+		if(menuItems != null)
 		{
-			menuitem = new MenuItemModel(name);
-			if(!menuitem.isTransient())
-				menus.put(name,menuitem);
+			StringTokenizer st = new StringTokenizer(menuItems);
+			while(st.hasMoreTokens())
+			{
+				String menuItemName = st.nextToken();
+				if(menuItemName.equals("-"))
+					menu.addSeparator();
+				else
+				{
+					if(menuItemName.startsWith("%"))
+						menu.add(loadMenu(menuItemName.substring(1)));
+					else
+						menu.add(loadMenuItem(menuItemName,false));
+				}
+			}
 		}
-		return menuitem;
+
+		return menu;
 	}
 
 	/**
@@ -167,13 +183,67 @@ public class GUIUtilities
 	 */
 	public static JMenuItem loadMenuItem(String name)
 	{
-		// 'view' parameter is 'null' because MenuItemModel
-		// doesn't use it.
+		return loadMenuItem(name,true);
+	}
 
-		// ... but create() still needs a 'view' parameter
-		// because MenuModel (which subclasses MenuItemModel)
-		// needs it.
-		return loadMenuItemModel(name).create(null);
+	/**
+	 * Creates a menu item.
+	 * @param name The menu item name
+	 * @param setMnemonic True if the menu item should have a mnemonic
+	 * @since jEdit 3.1pre1
+	 */
+	public static JMenuItem loadMenuItem(String name, boolean setMnemonic)
+	{
+		String label;
+		EditAction action;
+
+		// HACK
+		if(name.startsWith("play-macro@"))
+		{
+			Macros.Macro macro = Macros.getMacro(name.substring(11));
+			if(macro != null)
+			{
+				label = macro.name;
+				int index = label.lastIndexOf('/');
+				label = label.substring(index + 1)
+					.replace('_',' ');
+				action = macro.action;
+			}
+			else
+			{
+				label = name.substring(11);
+				action = null;
+			}
+		}
+		else
+		{
+			action = jEdit.getAction(name);
+
+			label = jEdit.getProperty(name.concat(".label"));
+			if(label == null)
+				label = name;
+		}
+
+		char mnemonic;
+		int index = label.indexOf('$');
+		if(index != -1 && label.length() - index > 1)
+		{
+			mnemonic = Character.toLowerCase(label.charAt(index + 1));
+			label = label.substring(0,index).concat(label.substring(++index));
+		}
+		else
+			mnemonic = '\0';
+
+		JMenuItem mi;
+		if(action != null && action.isToggle())
+			mi = new EnhancedCheckBoxMenuItem(label,action);
+		else
+			mi = new EnhancedMenuItem(label,action);
+
+		if(setMnemonic && mnemonic != '\0')
+			mi.setMnemonic(mnemonic);
+
+		return mi;
 	}
 
 	/**
@@ -186,22 +256,7 @@ public class GUIUtilities
 	 */
 	public static JMenuItem loadMenuItem(View view, String name)
 	{
-		return loadMenuItem(name);
-	}
-
-	/**
-	 * Loads a tool bar model.
-	 * @param name The tool bar name
-	 */
-	public static ToolBarModel loadToolBarModel(String name)
-	{
-		ToolBarModel toolbar = (ToolBarModel)menus.get(name);
-		if(toolbar == null)
-		{
-			toolbar = new ToolBarModel(name);
-			menus.put(name,toolbar);
-		}
-		return toolbar;
+		return loadMenuItem(name,true);
 	}
 
 	/**
@@ -210,20 +265,91 @@ public class GUIUtilities
 	 */
 	public static JToolBar loadToolBar(String name)
 	{
-		return loadToolBarModel(name).create();
+		JToolBar toolBar = new JToolBar();
+		toolBar.setFloatable(false);
+		toolBar.putClientProperty("JToolBar.isRollover",Boolean.TRUE);
+
+		String buttons = jEdit.getProperty(name);
+		if(buttons != null)
+		{
+			StringTokenizer st = new StringTokenizer(buttons);
+			while(st.hasMoreTokens())
+			{
+				String button = st.nextToken();
+				if(button.equals("-"))
+					toolBar.addSeparator();
+				else
+				{
+					JButton b = loadToolButton(button);
+					if(b != null)
+						toolBar.add(b);
+				}
+			}
+		}
+
+		return toolBar;
 	}
 
 	/**
 	 * Loads a tool bar button. The tooltip is constructed from
 	 * the <code><i>name</i>.label</code> and
 	 * <code><i>name</i>.shortcut</code> properties and the icon is loaded
-	 * from the resource named '/org/gjt/sp/jedit/toolbar/' suffixed
+	 * from the resource named '/org/gjt/sp/jedit/icons/' suffixed
 	 * with the value of the <code><i>name</i>.icon</code> property.
 	 * @param name The name of the button
 	 */
 	public static EnhancedButton loadToolButton(String name)
 	{
-		return loadMenuItemModel(name).createButton();
+		String label;
+		EditAction action;
+
+		// HACK
+		if(name.startsWith("play-macro@"))
+		{
+			Macros.Macro macro = Macros.getMacro(name.substring(11));
+
+			if(macro != null)
+			{
+				label = macro.name;
+				int index = label.lastIndexOf('/');
+				label = label.substring(index + 1)
+					.replace('_',' ');
+				action = macro.action;
+			}
+			else
+			{
+				label = name.substring(11);
+				action = null;
+			}
+		}
+		else
+		{
+			action = jEdit.getAction(name);
+
+			label = jEdit.getProperty(name.concat(".label"));
+			if(label == null)
+				label = name;
+			else
+				label = prettifyMenuLabel(label);
+		}
+
+		Icon icon;
+		String iconName = jEdit.getProperty(name + ".icon");
+		if(iconName != null)
+		{
+			icon = loadIcon(iconName);
+			if(icon == null)
+				return null;
+		}
+		else
+			return null;
+
+		String toolTip = label;
+		String shortcut = jEdit.getProperty(name + ".shortcut");
+		if(shortcut != null)
+			toolTip = toolTip + " (" + shortcut + ")";
+
+		return new EnhancedButton(icon,toolTip,action);
 	}
 
 	/**
@@ -270,9 +396,9 @@ public class GUIUtilities
 	}
 
 	/**
-	 * `Prettifies' a menu item label by removing the `$' sign and the
-	 * training ellipisis, if any. This can be used to process the
-	 * contents of an <i>action</i>.label property.
+	 * `Prettifies' a menu item label by removing the `$' sign. This
+	 * can be used to process the contents of an <i>action</i>.label
+	 * property.
 	 */
 	public static String prettifyMenuLabel(String label)
 	{
@@ -282,8 +408,6 @@ public class GUIUtilities
 			label = label.substring(0,index)
 				.concat(label.substring(index + 1));
 		}
-		if(label.endsWith("..."))
-			label = label.substring(0,label.length() - 3);
 		return label;
 	}
 
@@ -370,10 +494,10 @@ public class GUIUtilities
 	 * @param def The text to display by default in the input field
 	 * @param args Positional parameters to be substituted into the
 	 * message text
-	 * @since jEdit 2.6pre2
+	 * @since jEdit 3.1pre3
 	 */
 	public static String input(Component comp, String name,
-		String[] args, Object def)
+		Object[] args, Object def)
 	{
 		hideSplashScreen();
 
@@ -394,10 +518,10 @@ public class GUIUtilities
 	 * @param args Positional parameters to be substituted into the
 	 * message text
 	 * @param def The property whose text to display in the input field
-	 * @since jEdit 2.6pre2
+	 * @since jEdit 3.1pre3
 	 */
 	public static String inputProperty(Component comp, String name,
-		String[] args, String def)
+		Object[] args, String def)
 	{
 		hideSplashScreen();
 
@@ -409,6 +533,31 @@ public class GUIUtilities
 		if(retVal != null)
 			jEdit.setProperty(def,retVal);
 		return retVal;
+	}
+
+	/**
+	 * Displays a confirm dialog box and returns the button pushed by the
+	 * user. The title of the dialog is fetched from the
+	 * <code><i>name</i>.title</code> property. The message is fetched
+	 * from the <code><i>name</i>.message</code> property.
+	 * @param comp The component to display the dialog for
+	 * @param name The name of the dialog
+	 * @param args Positional parameters to be substituted into the
+	 * message text
+	 * @param buttons The buttons to display - for example,
+	 * JOptionPane.YES_NO_CANCEL_OPTION
+	 * @param type The dialog type - for example,
+	 * JOptionPane.WARNING_MESSAGE
+	 * @since jEdit 3.1pre3
+	 */
+	public static int confirm(Component comp, String name,
+		Object[] args, int buttons, int type)
+	{
+		hideSplashScreen();
+
+		return JOptionPane.showConfirmDialog(comp,
+			jEdit.getProperty(name + ".message",args),
+			jEdit.getProperty(name + ".title"),buttons,type);
 	}
 
 	/**
@@ -433,12 +582,8 @@ public class GUIUtilities
 	}
 
 	/**
-	 * Displays a standard file selection dialog box. You should use
-	 * the VFS file selected whenever possible, instead of this one.
-	 * @param view The view
-	 * @param file The file to select by default
-	 * @param type The dialog type
-	 * @return The selected file
+	 * @deprecated You should use the VFS file selected whenever
+	 * possible, instead of this one.
 	 */
 	public static String showFileDialog(View view, String file, int type)
 	{
@@ -854,18 +999,12 @@ public class GUIUtilities
 	// private members
 	private static SplashScreen splash;
 
-	// since the names of menu items, menus, tool bars, etc are
-	// unique because of the property namespace, we can store all
-	// in one hashtable.
-	private static Hashtable menus;
-
 	private static Hashtable icons;
 
 	private GUIUtilities() {}
 
 	static
 	{
-		menus = new Hashtable();
 		icons = new Hashtable();
 		NEW_BUFFER_ICON = loadIcon("new.gif");
 		DIRTY_BUFFER_ICON = loadIcon("dirty.gif");

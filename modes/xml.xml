@@ -2,13 +2,11 @@
 
 <!DOCTYPE MODE SYSTEM "xmode.dtd">
 
-<MODE NAME="xml">
+<MODE>
 	<PROPS>
 		<PROPERTY NAME="commentStart" VALUE="&lt;!--" />
 		<PROPERTY NAME="commentEnd" VALUE="--&gt;" />
 		<PROPERTY NAME="boxComment" VALUE="--" />
-		<PROPERTY NAME="filenameGlob" VALUE="*.xml" />
-		<PROPERTY NAME="firstlineGlob" VALUE="*&lt;\?xml*" />
 	</PROPS>
 	<RULES>
 		<!-- whitespace: (space and tab) -->
@@ -78,7 +76,9 @@
 			<END>'</END>
 		</SPAN>
 
+		<SEQ TYPE="MARKUP">/</SEQ>
 		<SEQ TYPE="NULL">=</SEQ>
+		<MARK_PREVIOUS TYPE="KEYWORD2" EXCLUDE_MATCH="TRUE">:</MARK_PREVIOUS>
 		<SEQ TYPE="OPERATOR">:</SEQ>
 	</RULES>
 	<RULES SET="DTD-TAGS" DEFAULT="KEYWORD2">

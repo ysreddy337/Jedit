@@ -1,152 +1,115 @@
-Here is my to do list for jEdit 3.1. Tell me what you think.
+TO DO
 
-* Folding
+This list is a real mess... Note that not all these changes will be
+implemented in jEdit 3.2. Some might appear in a future version, some
+might never be implemented at all.
 
-'foldMode' buffer local property is either 'embedded' or 'indent'.
++ search and replace
+ - reverse regexp search
+ - option for auto wrap around in search
+ - search and replace: option to use BeanShell in replace string,
+   eg $0.toLowerCase(). That would be rather cool.
+ - don't clear hypersearch results between subsequent searches, instead
+   have a 'Clear' button in the results window
+ - hypersearch: select all found results
 
-In 'embedded' mode, buffers are scanned for customizable start/end
-strings; for example, { and }.
++ merge position registers and markers
+ - Markers top level menu:
+    Add Marker (C+e C+m)
+    Add Marker With Shortcut [x] (C+t)
+    Go to Marker With Shortcut [x] (C+y)
+    Select to Marker With Shortcut [x] (C+u)
+    Swap Caret With Marker [x] (C+k)
+    Clear Marker (???)
+    Clear All Markers
+    Go to Previous Marker
+    Go to Next Marker
+    ----
+    <list of markers>
 
-In 'indent' mode, folds are added on lines where the indent increases
-from the previous.
+ - each marker's "name" is the line of text (w/o whitespace) containing it.
+ - the shortcut is a single key, used by the register-like commands.
+ - markers are still persistent, etc.
+ - config option for controlling marker persistance
 
-Folding commands will be in the View->Folding menu.
++ editing
+ - most recently selected text stored in % register, middle mouse button
+    inserts contents of that register
+ - magic caret code a bit annoying
+ - wing comment with rect sel active puts comment start/end at the
+    beginning/end of each selected chunk
+ - improved rectangular selections
+ - soft wrap
+ - discontinuous selection
+   - Edit->Discontinuous Selection command
+ - cut-append, copy-append, cut-append-register actions
+ - Bracket double click behavior is really annoying - make if configurable
 
-* Gutter changes
++ folding
+ - expand-fold doesn't expand narrowed regions
+ - if the first line of the buffer is a collapsed fold: delete, undo,
+   text inaccessable until C+e x
+ - Perhaps try an alternative implementation of narrowing
+ - per-view fold visibility: bit-field used to store this in LineInfo
+ - eliminate virtual line map with 'virtualLine' fields in LineInfo
+   and binary search in virtualToPhysical()
 
-Fold arrows will be shown in the gutter. The 'Gutter Expanded' command
-will be removed, replaced by a single 'Line Numbering' command which,
-if selected, widens the gutter appropriately and shows line numbers.
++ plugins
+ - if a plugin is removed and put in a new dir, it is shown in both the
+   update and install lists
+ - zlib decompression errors in plugin manager
+ - display all plugin errors, batched in one window on startup
+ - plugin directory should be named 'plugins', not 'jars'
+ - move latest version plugin into the core
+ - move plugin manager into the core
+ - plugin manager: track dependencies, branches
 
-The gutter will no longer be resizable, and it's size will instead be
-determined by the width of the longest line number.
++ syntax highlighting
+ - only exit delegates at the top level (eg <?php "<?xml ...?>" ?> in PHP)
+ - XMode rule inclusion
+ - regexps in XMode
 
-Make the marker/register highlight configurable.
++ io
+ - can mini io progress, io progress command
+ - display io progress automatically after > 1 sec I/O
+ - move local fs-specific stuff from MiscUtilities to FileVFS (UrlVFS
+   calls getParentOfPath()?)
+ - encoding option in VFS browser
+ - when saving local files, save to .<filename>.save, then rename to
+   <filename>
+ - aborts not always fired
+ - encoding option in VFS browser
+ - Two-pane view in filesystem browser
 
-* LineInfo array moved
++ ui
+ - ensure find field doesn't get too large
+ - finish persistent splits
+ - The base Metal L&F font will be configurable.
+ - use Dirk's VariableGridLayout more
+ - escape in 'add abbrev' dialog
+ - docked windows: discourage use of check box menu items, instead menu
+   item calls addDockableWindow() and right click on tab shows menu with
+   'Close'
+ - fix dragStart handling in DockableWindowContainer.TabbedPane
+ - C+i in shortcuts editor
+ - 'new view' creates incorrectly sized views due to Java bugs
 
-The lineInfo array and associated methods (markTokens(), insertLines(),
-deleteLines()) will be moved from the TokenMarker class to the Buffer
-class.
++ beanshell
+ - print() in BeanShell
+ - actions.xml ACTIONS::ACTION attributes:
+   NO_READ_ONLY, NO_DISCONT_SEL -- automatic error msg if read only or
+   selection is discont.
+ - improve handling of __char__
+ - BeanShell class uses deprecated showFileDialog() method
+ - runmacro= switch, nomacro switch
 
-* Make split configuration persistent
++ documentation
+ - get rid of final blank page of user's guide
+ - Migrate documentation to DocBook/XML
+ - documentation: merge 'Text Registers' and 'The Clipboard' sections,
+   also mention MMB in those sections. Merge 'Markers' and 'Position
+   Registers'.
+ - Include John's upcoming plugin guide
 
-The editor will remember all split locations and what buffers were open
-in which.
-
-* Simplify XMode DTD
-
-- Remove KEYWORDS.IGNORE_CASE attribute; instead, keywords will inherit
-  the setting of the RULES.IGNORE_CASE attribute
-- Rename RULES.SET to RULES.NAME
-
-* XMode rule inclusion
-
-A new tag will be added:
-
-<INCLUDE NAME="<ruleset name>" />
-
-This tag will copy all rules from the specified ruleset to the current
-ruleset. This will reduce rule duplication by allowing, for example,
-XML-derived modes (HTML, ASP, JSP, PHP, ...) to share a common set of
-rules.
-
-* Change mode loading code
-
-Currently, the first time jEdit is run, it loads all edit modes into
-memory and writes out a 'mode cache' file. Subsequent launches only read
-the mode cache and autoload modes as needed.
-
-A consequence of this is that jEdit takes ages to start the first time
-it is run. Not only is this annoying, it also gives users a bad first
-impression.
-
-The reason each mode has to be loaded to create the cache, is that vital
-information, such as the mode's name, filename glob and first line glob
-is emedded in the mode file.
-
-However, if this information is moved out to a 'catalog' file, leaving
-only highlighting rules in the mode file, loading all edit modes at once
-will never be required.
-
-A catalog file could look like so:
-
-<MODES>
-  <MODE NAME="java" FILENAME_GLOB="*.java" GRAMMAR="java.xml" />
-  <MODE NAME="shellscript" FIRSTLINE_GLOB="#!*sh*" GRAMMAR="shellscript.xml" />
-  ... and so on ...
-</MODES>
-
-So basically, a catalog is a manually-created mode cache.
-
-* Faster HyperSearch
-
-When searching a directory, instead of loading each file into memory
-entirely, HyperSearch will read them from an input stream. This will
-speed things up a lot.
-
-* More reliable saving
-
-When saving a file, it will first be saved to .<filename>.save, and
-only then renamed to <filename> if the save was successful.
-
-* Preserving file permissions on Unix
-
-The j editor has platform-independent code to get/set file permissions.
-Use it.
-
-API:
-- VFS.DirectoryEntry.permissions variable
-- VFS.setPermissions() method
-
-* WhiteSpace plugin
-
-Perhaps integrate it into the core? It will improve performance
-considerably.
-
-* Minor changes
-
-- The File->Current Directory menu will not list backups and autosaves.
-
-- All available fonts will be shown in the font selector.
-
-- The base Metal L&F font will be configurable.
-
-- The abbrev option pane will edit the currently selected abbrev in a
-  text area.
-
-- The shortcuts option panes will support grabbing keys from the
-  keyboard, and assignment of more than one shortcut per command.
-
-- When running with the Metal L&F, the docking area border will look
-  like a split pane divider
-
-- Improve next/prev-paragraph commands -- if a line contains ONLY
-  whitespace, treat it as a paragraph separator
-
-- Better support for read-only files: option for changing read only
-  flag in buffer options dialog, automatic detect when read only
-  status is changed on disk
-
-- File system browser: change 'Open in new view' to 'Open in new split'
-
-- Make modifier code keyboard layout-neutral: handle modifier+key char
-  in keyTyped()
-
-- Bracket double click behavior is really annoying - make if configurable
-
-* UI changes
-
-The Edit menu should be simplified. The 'Selection', 'Lines',
-'Paragraphs' and 'Brackets' submenus should be merged and reorganized
-into 'Text' and 'Source Code' submenus.
-
-* Documentation
-
-Migrate to DocBook/XML.
-
-* Feature removals
-
-- Markers will be removed
-
--- Slava Pestov <sp@gjt.org>
++ misc
+ - site-props directory should be named 'properties'

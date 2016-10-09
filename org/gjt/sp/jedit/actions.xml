@@ -3,7 +3,7 @@
 <!DOCTYPE ACTIONS SYSTEM "actions.dtd">
 
 <!-- jEdit action table                                                      -->
-<!-- Copyright (C) 2000 Slava Pestov                                         -->
+<!-- Copyright (C) 2000, 2001 Slava Pestov                                   -->
 
 <!-- Actions are the 'glue' that binds menu item selections and keystrokes   -->
 <!-- to jEdit's APIs. For simplicity and compactness, they are written in    -->
@@ -13,7 +13,7 @@
 
 <ACTION NAME="about">
 	<CODE>
-		jEdit.showAboutDialog(view);
+		new AboutDialog(view);
 	</CODE>
 </ACTION>
 
@@ -76,7 +76,7 @@
 
 <ACTION NAME="buffer-options">
 	<CODE>
-		buffer.showBufferOptionsDialog(view);
+		new BufferOptions(view,buffer);
 	</CODE>
 </ACTION>
 
@@ -107,6 +107,12 @@
 <ACTION NAME="close-view">
 	<CODE>
 		jEdit.closeView(view);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="collapse-fold">
+	<CODE>
+		buffer.collapseFoldAt(textArea.getCaretLine());
 	</CODE>
 </ACTION>
 
@@ -254,9 +260,33 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="expand-all-folds">
+	<CODE>
+		buffer.expandAllFolds();
+	</CODE>
+</ACTION>
+
 <ACTION NAME="exit">
 	<CODE>
 		jEdit.exit(view,true);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="expand-fold">
+	<CODE>
+		buffer.expandFoldAt(textArea.getCaretLine(),true);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="expand-one-level">
+	<CODE>
+		buffer.expandFoldAt(textArea.getCaretLine(),false);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="expand-folds" NO_RECORD="TRUE">
+	<CODE>
+		view.getInputHandler().readNextChar("buffer.expandFolds(__char__);");
 	</CODE>
 </ACTION>
 
@@ -268,6 +298,14 @@
 
 <ACTION NAME="find-next" NO_RECORD="TRUE">
 	<CODE>
+		SearchAndReplace.setReverseSearch(false);
+		SearchAndReplace.find(view);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="find-prev" NO_RECORD="TRUE">
+	<CODE>
+		SearchAndReplace.setReverseSearch(true);
 		SearchAndReplace.find(view);
 	</CODE>
 </ACTION>
@@ -286,7 +324,7 @@
 
 <ACTION NAME="global-options">
 	<CODE>
-		jEdit.showGlobalOptionsDialog(view);
+		new OptionsDialog(view);
 	</CODE>
 </ACTION>
 
@@ -304,37 +342,43 @@
 
 <ACTION NAME="help">
 	<CODE>
-		HelpViewer.gotoFile("users-guide/index.html");
+		new HelpViewer("users-guide/index.html");
 	</CODE>
 </ACTION>
 
 <ACTION NAME="help-changes">
 	<CODE>
-		HelpViewer.gotoFile("CHANGES.txt");
+		new HelpViewer("CHANGES.txt");
 	</CODE>
 </ACTION>
 
 <ACTION NAME="help-copying">
 	<CODE>
-		HelpViewer.gotoFile("COPYING.txt");
+		new HelpViewer("COPYING.txt");
+	</CODE>
+</ACTION>
+
+<ACTION NAME="help-copying-doc">
+	<CODE>
+		new HelpViewer("COPYING.DOC.txt");
 	</CODE>
 </ACTION>
 
 <ACTION NAME="help-news">
 	<CODE>
-		HelpViewer.gotoFile("NEWS.txt");
+		new HelpViewer("NEWS.txt");
 	</CODE>
 </ACTION>
 
 <ACTION NAME="help-readme">
 	<CODE>
-		HelpViewer.gotoFile("README.txt");
+		new HelpViewer("README.txt");
 	</CODE>
 </ACTION>
 
 <ACTION NAME="help-todo">
 	<CODE>
-		HelpViewer.gotoFile("TODO.txt");
+		new HelpViewer("TODO.txt");
 	</CODE>
 </ACTION>
 
@@ -364,7 +408,7 @@
 
 <ACTION NAME="io-progress-monitor">
 	<CODE>
-		jEdit.showIOProgressMonitorDialog();
+		new IOProgressMonitor();
 	</CODE>
 </ACTION>
 
@@ -374,21 +418,21 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="load-session">
-	<CODE>
-		Sessions.showLoadSessionDialog(view);
-	</CODE>
-</ACTION>
-
 <ACTION NAME="log-viewer">
 	<CODE>
-		jEdit.showActivityLog();
+		new LogViewer();
 	</CODE>
 </ACTION>
 
 <ACTION NAME="match-bracket">
 	<CODE>
 		textArea.goToMatchingBracket();
+	</CODE>
+</ACTION>
+
+<ACTION NAME="narrow">
+	<CODE>
+		buffer.narrow(textArea.getSelectionStartLine(),textArea.getSelectionEndLine());
 	</CODE>
 </ACTION>
 
@@ -478,7 +522,7 @@
 
 <ACTION NAME="paste-previous">
 	<CODE>
-		Registers.showPastePreviousDialog(view);
+		new PastePrevious(view);
 	</CODE>
 </ACTION>
 
@@ -590,11 +634,11 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="reload-modes">
+<!-- <ACTION NAME="reload-modes">
 	<CODE>
 		jEdit.reloadModes(view);
 	</CODE>
-</ACTION>
+</ACTION> -->
 
 <ACTION NAME="remove-trailing-ws">
 	<CODE>
@@ -675,18 +719,6 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="save-gutter-size">
-	<CODE>
-		textArea.getGutter().saveGutterSize();
-	</CODE>
-</ACTION>
-
-<ACTION NAME="save-session">
-	<CODE>
-		Sessions.showSaveSessionDialog(view);
-	</CODE>
-</ACTION>
-
 <ACTION NAME="scroll-down-line">
 	<CODE>
 		textArea.scrollDownLine();
@@ -732,6 +764,12 @@
 <ACTION NAME="select-caret-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar("Registers.selectCaretRegister(editPane,__char__);");
+	</CODE>
+</ACTION>
+
+<ACTION NAME="select-fold">
+	<CODE>
+		textArea.selectFold();
 	</CODE>
 </ACTION>
 
@@ -927,6 +965,12 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="tip-of-the-day">
+	<CODE>
+		new TipOfTheDay(view);
+	</CODE>
+</ACTION>
+
 <ACTION NAME="to-lower">
 	<CODE>
 		textArea.toLowerCase();
@@ -939,21 +983,12 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="toggle-gutter">
-	<CODE>
-		textArea.getGutter().toggleCollapsed();
-	</CODE>
-	<IS_SELECTED>
-		return !textArea.getGutter().isCollapsed();
-	</IS_SELECTED>
-</ACTION>
-
 <ACTION NAME="toggle-line-numbers">
 	<CODE>
-		textArea.getGutter().toggleLineNumberingEnabled();
+		textArea.getGutter().toggleExpanded();
 	</CODE>
 	<IS_SELECTED>
-		return textArea.getGutter().isLineNumberingEnabled();
+		return textArea.getGutter().isExpanded();
 	</IS_SELECTED>
 </ACTION>
 
@@ -1004,7 +1039,7 @@
 
 <ACTION NAME="view-registers">
 	<CODE>
-		Registers.showViewRegistersDialog(view);
+		new ViewRegisters(view);
 	</CODE>
 </ACTION>
 

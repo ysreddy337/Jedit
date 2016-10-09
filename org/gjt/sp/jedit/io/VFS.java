@@ -27,7 +27,7 @@ import org.gjt.sp.jedit.*;
  * A virtual filesystem implementation. Note tha methods whose names are
  * prefixed with "_" are called from the I/O thread.
  * @param author Slava Pestov
- * @author $Id: VFS.java,v 1.22 2000/11/11 02:59:31 sp Exp $
+ * @author $Id: VFS.java,v 1.24 2001/04/18 03:09:45 sp Exp $
  */
 public abstract class VFS
 {
@@ -103,6 +103,18 @@ public abstract class VFS
 	public String showBrowseDialog(Object[] session, Component comp)
 	{
 		return null;
+	}
+
+	/**
+	 * Returns the file name component of the specified path. The
+	 * default implementation calls
+	 * <code>MiscUtilities.getFileName()</code>
+	 * @param path The path
+	 * @since jEdit 3.1pre4
+	 */
+	public String getFileName(String path)
+	{
+		return MiscUtilities.getFileName(path);
 	}
 
 	/**
@@ -386,6 +398,17 @@ public abstract class VFS
 	}
 
 	/**
+	 * Called after a file has been saved.
+	 * @param session The VFS session
+	 * @param buffer The buffer
+	 * @param comp The component that will parent error dialog boxes
+	 * @exception IOException If an I/O error occurs
+	 * @since jEdit 3.1pre1
+	 */
+	public void _saveComplete(Object session, Buffer buffer, Component comp)
+		throws IOException {}
+
+	/**
 	 * Finishes the specified VFS session. This must be called
 	 * after all I/O with this VFS is complete, to avoid leaving
 	 * stale network connections and such.
@@ -406,6 +429,12 @@ public abstract class VFS
 /*
  * Change Log:
  * $Log: VFS.java,v $
+ * Revision 1.24  2001/04/18 03:09:45  sp
+ * GJT was down for a long time
+ *
+ * Revision 1.23  2001/01/23 09:23:48  sp
+ * code cleanups, misc tweaks
+ *
  * Revision 1.22  2000/11/11 02:59:31  sp
  * FTP support moved out of the core into a plugin
  *

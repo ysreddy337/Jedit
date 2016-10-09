@@ -31,7 +31,7 @@ import org.gjt.sp.util.*;
 /**
  * A buffer I/O request.
  * @author Slava Pestov
- * @version $Id: BufferIORequest.java,v 1.9 2000/12/14 01:01:57 sp Exp $
+ * @version $Id: BufferIORequest.java,v 1.12 2001/04/18 03:09:45 sp Exp $
  */
 public class BufferIORequest extends WorkRequest
 {
@@ -90,7 +90,7 @@ public class BufferIORequest extends WorkRequest
 		this.path = path;
 
 		markersPath = vfs.getParentOfPath(path)
-			+ '.' + MiscUtilities.getFileName(path)
+			+ '.' + vfs.getFileName(path)
 			+ ".marks";
 	}
 
@@ -152,7 +152,7 @@ public class BufferIORequest extends WorkRequest
 		{
 			try
 			{
-				String[] args = { MiscUtilities.getFileName(path) };
+				String[] args = { vfs.getFileName(path) };
 				setStatus(jEdit.getProperty("vfs.status.load",args));
 				setAbortable(true);
 				setProgressValue(0);
@@ -185,7 +185,7 @@ public class BufferIORequest extends WorkRequest
 
 			try
 			{
-				String[] args = { MiscUtilities.getFileName(path) };
+				String[] args = { vfs.getFileName(path) };
 				setStatus(jEdit.getProperty("vfs.status.load-markers",args));
 				setAbortable(true);
 
@@ -523,7 +523,7 @@ public class BufferIORequest extends WorkRequest
 
 		try
 		{
-			String[] args = { MiscUtilities.getFileName(path) };
+			String[] args = { vfs.getFileName(path) };
 			setStatus(jEdit.getProperty("vfs.status.save",args));
 
 			// the entire save operation can be aborted...
@@ -588,6 +588,7 @@ public class BufferIORequest extends WorkRequest
 		{
 			try
 			{
+				vfs._saveComplete(session,buffer,view);
 				vfs._endVFSSession(session,view);
 			}
 			catch(IOException io)
@@ -608,7 +609,7 @@ public class BufferIORequest extends WorkRequest
 
 		try
 		{
-			String[] args = { MiscUtilities.getFileName(path) };
+			String[] args = { vfs.getFileName(path) };
 			setStatus(jEdit.getProperty("vfs.status.autosave",args));
 
 			// the entire save operation can be aborted...
@@ -637,8 +638,8 @@ public class BufferIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				Log.log(Log.ERROR,this,io);
-				/* args[0] = io.toString();
+				/* Log.log(Log.ERROR,this,io);
+				args[0] = io.toString();
 				VFSManager.error(view,"ioerror",args); */
 			}
 			finally
@@ -721,7 +722,7 @@ public class BufferIORequest extends WorkRequest
 		{
 			try
 			{
-				String[] args = { MiscUtilities.getFileName(path) };
+				String[] args = { vfs.getFileName(path) };
 				setStatus(jEdit.getProperty("vfs.status.load",args));
 				setAbortable(true);
 

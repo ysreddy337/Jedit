@@ -29,7 +29,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Option pane for editing macro key bindings.
  * @author Slava Pestov
- * @version $Id: MacroShortcutsOptionPane.java,v 1.5 2000/07/19 08:35:59 sp Exp $
+ * @version $Id: MacroShortcutsOptionPane.java,v 1.7 2001/03/01 11:03:27 sp Exp $
  */
 public class MacroShortcutsOptionPane extends ShortcutsOptionPane
 {
@@ -52,31 +52,12 @@ public class MacroShortcutsOptionPane extends ShortcutsOptionPane
 
 		for(int i = 0; i < macroList.size(); i++)
 		{
-			String name = (String)macroList.elementAt(i);
+			String name = macroList.elementAt(i).toString();
 			bindings.addElement(new KeyBinding(name,name,
-				jEdit.getProperty(name + ".shortcut")));
+				jEdit.getProperty(name + ".shortcut"),
+				jEdit.getProperty(name + ".shortcut2")));
 		}
 
 		return bindings;
 	}
 }
-
-/*
- * ChangeLog:
- * $Log: MacroShortcutsOptionPane.java,v $
- * Revision 1.5  2000/07/19 08:35:59  sp
- * plugin devel docs updated, minor other changes
- *
- * Revision 1.4  2000/07/12 09:11:38  sp
- * macros can be added to context menu and tool bar, menu bar layout improved
- *
- * Revision 1.3  2000/04/28 09:29:12  sp
- * Key binding handling improved, VFS updates, some other stuff
- *
- * Revision 1.2  2000/04/16 08:56:24  sp
- * Option pane updates
- *
- * Revision 1.1  1999/12/19 08:12:34  sp
- * 2.3 started. Key binding changes  don't require restart, expand-abbrev renamed to complete-word, new splash screen
- *
- */

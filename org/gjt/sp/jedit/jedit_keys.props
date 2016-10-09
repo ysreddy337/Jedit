@@ -1,6 +1,6 @@
 ###
 ### jEdit keyboard shortcuts
-### by Slava Pestov <sp@gjt.org>
+### Copyright (C) 1998, 2001 Slava Pestov
 ###
 
 # Function keys
@@ -13,7 +13,7 @@ copy.shortcut=C+c
 delete-line.shortcut=C+d
 find.shortcut=C+f
 find-next.shortcut=C+g
-find-selection.shortcut=C+h
+find-prev.shortcut=C+h
 indent-lines.shortcut=C+i
 join-lines.shortcut=C+j
 exchange-caret-register.shortcut=C+k
@@ -52,6 +52,7 @@ next-textarea.shortcut=A+PAGE_DOWN
 replace-all.shortcut=C+e C+a
 box-comment.shortcut=C+e C+b
 wing-comment.shortcut=C+e C+c
+find-selection.shortcut=C+e C+f
 replace-and-find-next.shortcut=C+e C+g
 center-caret.shortcut=C+e C+i
 scroll-to-current-line.shortcut=C+e C+j
@@ -61,10 +62,11 @@ set-marker.shortcut=C+e C+m
 open-path.shortcut=C+e C+o
 replace-in-selection.shortcut=C+e C+r
 save-all.shortcut=C+e C+s
-toggle-gutter.shortcut=C+e C+t
+toggle-line-numbers.shortcut=C+e C+t
 paste-previous.shortcut=C+e C+v
 close-all.shortcut=C+e C+w
 redo.shortcut=C+e C+z
+expand-folds.shortcut=C+e ENTER
 
 docking-top-expanded.shortcut=C+e 1
 docking-bottom-expanded.shortcut=C+e 2
@@ -73,10 +75,13 @@ docking-right-expanded.shortcut=C+e 4
 delete-paragraph.shortcut=C+e d
 format-paragraph.shortcut=C+e f
 select-line.shortcut=C+e l
+narrow.shortcut=C+e n
 select-paragraph.shortcut=C+e p
 remove-trailing-ws.shortcut=C+e r
+select-fold.shortcut=C+e s
 insert-literal.shortcut=C+e v
 select-word.shortcut=C+e w
+expand-all-folds.shortcut=C+e x
 prev-bracket.shortcut=C+e [
 next-bracket.shortcut=C+e ]
 
@@ -138,3 +143,6 @@ select-prev-line.shortcut=S+UP
 next-line.shortcut=DOWN
 select-next-line.shortcut=S+DOWN
 repeat.shortcut=C+ENTER
+collapse-fold.shortcut=A+BACK_SPACE
+expand-fold.shortcut=AS+ENTER
+expand-one-level.shortcut=A+ENTER

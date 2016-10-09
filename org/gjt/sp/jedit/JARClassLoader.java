@@ -30,7 +30,7 @@ import org.gjt.sp.util.Log;
 /**
  * A class loader implementation that loads classes from JAR files.
  * @author Slava Pestov
- * @version $Id: JARClassLoader.java,v 1.44 2000/12/14 01:01:57 sp Exp $
+ * @version $Id: JARClassLoader.java,v 1.48 2001/03/26 07:09:19 sp Exp $
  */
 public class JARClassLoader extends ClassLoader
 {
@@ -56,7 +56,7 @@ public class JARClassLoader extends ClassLoader
 			{
 				jEdit.loadActions(path + "!actions.xml",
 					new BufferedReader(new InputStreamReader(
-					zipFile.getInputStream(entry))));
+					zipFile.getInputStream(entry))),true);
 			}
 			else if(lname.endsWith(".props"))
 				jEdit.loadProps(zipFile.getInputStream(entry),true);
@@ -257,13 +257,10 @@ public class JARClassLoader extends ClassLoader
 
 			if(what.equals("jdk"))
 			{
-				String jreVersion = System.getProperty("java.specification.version");
-				if (jreVersion == null) jreVersion = System.getProperty("java.version");
-
-				if(jreVersion.compareTo(arg) < 0)
+				if(System.getProperty("java.version").compareTo(arg) < 0)
 				{
 					String[] args = { name, arg,
-						jreVersion };
+						System.getProperty("java.version") };
 					GUIUtilities.error(null,"plugin.dep-jdk",args);
 					return false;
 				}
@@ -295,13 +292,6 @@ public class JARClassLoader extends ClassLoader
 				String currVersion = jEdit.getProperty("plugin." 
 					+ plugin + ".version");
 
-				if(jEdit.getPlugin(plugin) instanceof EditPlugin.Broken)
-				{
-					String[] args = { name, plugin };
-					GUIUtilities.error(null,"plugin.dep-plugin.broken",args);
-					return false;
-				}
-
 				if(currVersion == null)
 				{
 					String[] args = { name, needVersion, plugin };
@@ -314,6 +304,13 @@ public class JARClassLoader extends ClassLoader
 				{
 					String[] args = { name, needVersion, plugin, currVersion };
 					GUIUtilities.error(null,"plugin.dep-plugin",args);
+					return false;
+				}
+
+				if(jEdit.getPlugin(plugin) instanceof EditPlugin.Broken)
+				{
+					String[] args = { name, plugin };
+					GUIUtilities.error(null,"plugin.dep-plugin.broken",args);
 					return false;
 				}
 			}

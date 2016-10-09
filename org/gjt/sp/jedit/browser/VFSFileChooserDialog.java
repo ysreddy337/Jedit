@@ -32,7 +32,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Wraps the VFS browser in a modal dialog.
  * @author Slava Pestov
- * @version $Id: VFSFileChooserDialog.java,v 1.17 2000/12/06 07:00:40 sp Exp $
+ * @version $Id: VFSFileChooserDialog.java,v 1.20 2001/04/18 03:09:45 sp Exp $
  */
 public class VFSFileChooserDialog extends EnhancedDialog
 {
@@ -50,8 +50,9 @@ public class VFSFileChooserDialog extends EnhancedDialog
 			name = null;
 		else
 		{
-			name = MiscUtilities.getFileName(path);
-			path = MiscUtilities.getParentOfPath(path);
+			VFS vfs = VFSManager.getVFSForPath(path);
+			name = vfs.getFileName(path);
+			path = vfs.getParentOfPath(path);
 		}
 
 		browser = new VFSBrowser(view,path,mode,multipleSelection);
@@ -124,11 +125,14 @@ public class VFSFileChooserDialog extends EnhancedDialog
 			String directory = browser.getDirectory();
 
 			filename = filenameField.getText();
+
 			if(filename.length() == 0)
 			{
 				getToolkit().beep();
 				return;
 			}
+			else if(MiscUtilities.isURL(filename))
+				return;
 			else
 			{
 				VFS vfs = VFSManager.getVFSForPath(directory);
@@ -200,10 +204,8 @@ public class VFSFileChooserDialog extends EnhancedDialog
 		if(new File(filename).exists())
 		{
 			String[] args = { MiscUtilities.getFileName(filename) };
-			int result = JOptionPane.showConfirmDialog(
-				browser,
-				jEdit.getProperty("fileexists.message",args),
-				jEdit.getProperty("fileexists.title"),
+			int result = GUIUtilities.confirm(browser,
+				"fileexists",args,
 				JOptionPane.YES_NO_OPTION,
 				JOptionPane.WARNING_MESSAGE);
 			if(result != JOptionPane.YES_OPTION)
@@ -243,11 +245,9 @@ public class VFSFileChooserDialog extends EnhancedDialog
 						parent = parent.substring(0,parent.length() - 1);
 					if(parent.equals(directory))
 						path = file.name;
-	
+
 					filenameField.setText(path);
 				}
-				else
-					filenameField.setText(null);
 			}
 			else
 			{

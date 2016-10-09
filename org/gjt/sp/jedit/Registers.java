@@ -38,30 +38,10 @@ import org.gjt.sp.util.Log;
  * the user and the methods in this class can change register contents.
  *
  * @author Slava Pestov
- * @version $Id: Registers.java,v 1.16 2000/12/01 07:39:59 sp Exp $
+ * @version $Id: Registers.java,v 1.18 2001/04/19 08:07:25 sp Exp $
  */
 public class Registers
 {
-	/**
-	 * Displays the 'view registers' dialog box.
-	 * @param view The view
-	 * @since jEdit 2.7pre2
-	 */
-	public static void showViewRegistersDialog(View view)
-	{
-		new ViewRegisters(view);
-	}
-
-	/**
-	 * Displays the 'paste previous' dialog box.
-	 * @param view The view
-	 * @since jEdit 2.7pre2
-	 */
-	public static void showPastePreviousDialog(View view)
-	{
-		new PastePrevious(view);
-	}
-
 	/**
 	 * Convinience method that copies the text selected in the specified
 	 * text area into the specified register.
@@ -81,11 +61,25 @@ public class Registers
 
 	/**
 	 * Convinience method that appends the text selected in the specified
-	 * text area to the specified register.
+	 * text area to the specified register, with a newline between the old
+	 * and new text.
 	 * @param textArea The text area
 	 * @param register The register
 	 */
 	public static void append(JEditTextArea textArea, char register)
+	{
+		append(textArea,register,"\n");
+	}
+
+	/**
+	 * Convinience method that appends the text selected in the specified
+	 * text area to the specified register.
+	 * @param textArea The text area
+	 * @param register The register
+	 * @param separator The text to insert between the old and new text
+	 */
+	public static void append(JEditTextArea textArea, char register,
+		String separator)
 	{
 		String selection = textArea.getSelectedText();
 		if(selection == null)
@@ -94,7 +88,7 @@ public class Registers
 		Register reg = getRegister(register);
 
 		if(reg != null && reg.toString() != null)
-			selection = reg.toString() + "\n" + selection;
+			selection = reg.toString() + separator + selection;
 
 		setRegister(register,selection);
 		HistoryModel.getModel("clipboard").addItem(selection);
@@ -620,6 +614,12 @@ public class Registers
 /*
  * ChangeLog:
  * $Log: Registers.java,v $
+ * Revision 1.18  2001/04/19 08:07:25  sp
+ * Macros.input(view,prompt,defaultValue) added
+ *
+ * Revision 1.17  2001/03/23 10:38:50  sp
+ * stuffs
+ *
  * Revision 1.16  2000/12/01 07:39:59  sp
  * Batch search renamed to HyperSearch, bug fixes
  *

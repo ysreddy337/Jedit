@@ -28,9 +28,9 @@ import org.gjt.sp.util.Log;
 /**
  * A file set for searching a user-specified list of buffers.
  * @author Slava Pestov
- * @version $Id: BufferListSet.java,v 1.16 2000/11/24 06:48:35 sp Exp $
+ * @version $Id: BufferListSet.java,v 1.18 2001/04/18 03:09:45 sp Exp $
  */
-public abstract class BufferListSet implements SearchFileSet
+public class BufferListSet implements SearchFileSet
 {
 	/**
 	 * Creates a new buffer list search set. This constructor is
@@ -138,6 +138,15 @@ public abstract class BufferListSet implements SearchFileSet
 	public boolean isValid()
 	{
 		return files.size() != 0;
+	}
+
+	/**
+	 * Returns the BeanShell code to recreate this fileset.
+	 */
+	public String getCode()
+	{
+		// not supported for arbitriary filesets
+		return null;
 	}
 
 	// private members

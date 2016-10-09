@@ -28,7 +28,7 @@ import org.gjt.sp.util.Log;
 /**
  * URL VFS.
  * @author Slava Pestov
- * @version $Id: UrlVFS.java,v 1.9 2000/11/11 02:59:31 sp Exp $
+ * @version $Id: UrlVFS.java,v 1.10 2001/04/18 03:09:45 sp Exp $
  */
 public class UrlVFS extends VFS
 {
@@ -66,7 +66,7 @@ public class UrlVFS extends VFS
 		catch(MalformedURLException mu)
 		{
 			Log.log(Log.ERROR,this,mu);
-			String[] args = { path };
+			String[] args = { path, mu.getMessage() };
 			VFSManager.error(comp,"badurl",args);
 			return null;
 		}
@@ -89,23 +89,3 @@ public class UrlVFS extends VFS
 		}
 	}
 }
-
-/*
- * ChangeLog:
- * $Log: UrlVFS.java,v $
- * Revision 1.9  2000/11/11 02:59:31  sp
- * FTP support moved out of the core into a plugin
- *
- * Revision 1.8  2000/09/26 10:19:47  sp
- * Bug fixes, spit and polish
- *
- * Revision 1.7  2000/07/31 11:32:09  sp
- * VFS file chooser is now in a minimally usable state
- *
- * Revision 1.6  2000/07/30 09:04:19  sp
- * More VFS browser hacking
- *
- * Revision 1.5  2000/07/29 12:24:08  sp
- * More VFS work, VFS browser started
- *
- */

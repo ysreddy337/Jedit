@@ -1,6 +1,6 @@
 /*
  * EditAction.java - jEdit action listener
- * Copyright (C) 1998, 1999, 2000 Slava Pestov
+ * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -50,7 +50,7 @@ import org.gjt.sp.util.Log;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: EditAction.java,v 1.33 2000/11/21 02:58:03 sp Exp $
+ * @version $Id: EditAction.java,v 1.35 2001/01/29 09:18:11 sp Exp $
  *
  * @see jEdit#getProperty(String)
  * @see jEdit#getProperty(String,String)
@@ -65,10 +65,28 @@ public abstract class EditAction
 	/**
 	 * Creates a new <code>EditAction</code>.
 	 * @param name The name of the action
+	 * @deprecated Create an actions.xml file instead of writing
+	 * EditAction implementations!
 	 */
 	public EditAction(String name)
 	{
+		// The only people who use this constructor are
+		// plugins written for the old action API, so
+		// we can safely assume that 'plugin' should be
+		// true.
+		this(name,true);
+	}
+
+	/**
+	 * Creates a new <code>EditAction</code>.
+	 * @param name The name of the action
+	 * @param plugin True if this is a plugin action
+	 * @since jEdit 3.1pre1
+	 */
+	/* package-private */ EditAction(String name, boolean plugin)
+	{
 		this.name = name;
+		this.plugin = plugin;
 	}
 
 	/**
@@ -77,6 +95,16 @@ public abstract class EditAction
 	public final String getName()
 	{
 		return name;
+	}
+
+	/**
+	 * Returns true if this action was loaded from a plugin, false
+	 * if it was loaded from the core.
+	 * @since jEdit 3.1pre1
+	 */
+	public boolean isPluginAction()
+	{
+		return plugin;
 	}
 
 	/**
@@ -95,8 +123,8 @@ public abstract class EditAction
 	}
 
 	/**
-	 * @deprecated Extend invoke() instead, or better yet, write
-	 * your actions in BeanShell
+	 * @deprecated Create an actions.xml file instead of writing
+	 * EditAction implementations!
 	 */
 	public void actionPerformed(ActionEvent evt) {}
 
@@ -198,6 +226,7 @@ public abstract class EditAction
 
 	// private members
 	private String name;
+	private boolean plugin;
 
 	/**
 	 * 'Wrap' EditActions in this class to turn them into AWT
@@ -230,44 +259,3 @@ public abstract class EditAction
 		private EditAction action;
 	}
 }
-
-/*
- * ChangeLog:
- * $Log: EditAction.java,v $
- * Revision 1.33  2000/11/21 02:58:03  sp
- * 2.7pre2 finished
- *
- * Revision 1.32  2000/11/17 11:15:59  sp
- * Actions removed, documentation updates, more BeanShell work
- *
- * Revision 1.31  2000/11/16 10:25:16  sp
- * More macro work
- *
- * Revision 1.30  2000/11/16 04:01:10  sp
- * BeanShell macros started
- *
- * Revision 1.29  2000/11/13 11:19:26  sp
- * Search bar reintroduced, more BeanShell stuff
- *
- * Revision 1.28  2000/09/03 03:16:52  sp
- * Search bar integrated with command line, enhancements throughout
- *
- * Revision 1.27  2000/09/01 11:31:00  sp
- * Rudimentary 'command line', similar to emacs minibuf
- *
- * Revision 1.26  2000/07/15 02:45:22  sp
- * Minor changes to core for EditBuddy plugin
- *
- * Revision 1.25  2000/04/28 09:29:11  sp
- * Key binding handling improved, VFS updates, some other stuff
- *
- * Revision 1.24  2000/04/14 11:57:38  sp
- * Text area actions moved to org.gjt.sp.jedit.actions package
- *
- * Revision 1.23  2000/04/03 10:22:24  sp
- * Search bar
- *
- * Revision 1.22  2000/02/15 07:44:30  sp
- * bug fixes, doc updates, etc
- *
- */

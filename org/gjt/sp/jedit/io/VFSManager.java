@@ -34,7 +34,7 @@ import org.gjt.sp.util.WorkThreadPool;
  * stored elsewhere than the local filesystem, for example on an FTP
  * site.
  * @author Slava Pestov
- * @version $Id: VFSManager.java,v 1.22 2000/11/11 02:59:31 sp Exp $
+ * @version $Id: VFSManager.java,v 1.23 2001/03/01 11:03:27 sp Exp $
  */
 public class VFSManager
 {
@@ -230,8 +230,8 @@ public class VFSManager
 	{
 		if(parent)
 		{
-			sendVFSUpdate(vfs,path,false);
 			sendVFSUpdate(vfs,vfs.getParentOfPath(path),false);
+			sendVFSUpdate(vfs,path,false);
 		}
 		else
 		{
@@ -321,6 +321,9 @@ public class VFSManager
 /*
  * Change Log:
  * $Log: VFSManager.java,v $
+ * Revision 1.23  2001/03/01 11:03:27  sp
+ * Improved folding, vfs bug fix
+ *
  * Revision 1.22  2000/11/11 02:59:31  sp
  * FTP support moved out of the core into a plugin
  *

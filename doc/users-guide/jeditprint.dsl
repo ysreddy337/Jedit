@@ -8,40 +8,39 @@ CDATA DSSSL> ]>
 
 (define %two-side% #t)
 (define %section-autolabel% #t)
-(define %paper-type% "A4")
+(define %paper-type% "USletter")
 (define %admon-graphics% #f)
 
+(define %body-start-indent% 2pi)
+(define %block-start-indent% 1pi)
+
+;(define %default-quadding% 'justify)
+;(define %hyphenation% #t)
+
 (declare-characteristic preserve-sdata?
-  "UNREGISTERED::James Clark//Characteristic::preserve-sdata?" #f)
+	"UNREGISTERED::James Clark//Characteristic::preserve-sdata?" #f)
 
 (define %visual-acuity% "presbyopic")
 
-; (define %left-margin%
-;   4pi)
-; (define %top-margin%
-;   4pi)
-; (define %right-margin%
-;   4pi)
-; (define %bottom-margin%
-;   4pi)
-; (define %bf-size%
-;   10pt)
-;; (define %default-quadding%
-;;  'justify)
 
-;; Since we're producing PDF output, we need to use PNG images
-;(define %graphic-default-extension% "png")
+(element funcsynopsis (process-children))
 
-;; DocBook should have some sort of %img-dir% variable, but for now,
-;; a stupid hack
+(element funcprototype
+  (let ((paramdefs (select-elements (children (current-node))
+				    (normalize "paramdef"))))
+    (make sequence
+	font-family-name: %mono-font-family%
+    font-size: (* (inherited-font-size)
+		%verbatim-size-factor%)
+	(process-children)
+      (if (equal? %funcsynopsis-style% 'kr)
+	  (with-mode kr-funcsynopsis-mode
+	    (process-node-list paramdefs))
+	  (empty-sosofo)))))
 
-;(define (graphic-file filename)
-;   (let ((ext (file-extension filename)))
-;      (if (or (not filename)
-;              (not %graphic-default-extension%)
-;	      (member ext %graphic-extensions%))
-;	  filename
-;	  (string-append "images/" filename "." %graphic-default-extension%))))
+(define %verbatim-size-factor% 0.85)
+
+(element (listitem abstract) (process-children))
 
 </style-specification-body>
 </style-specification>

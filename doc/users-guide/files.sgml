@@ -3,11 +3,6 @@
 
 <chapter id=files><title>Working With Files</>
  <sect1 id=creating><title>Creating New Files</>
-  <indexterm><primary>New File command</></indexterm>
-  <indexterm><primary>File menu</></indexterm>
-  <indexterm><primary>buffers</></indexterm>
-  <indexterm><primary>Untitled buffers</></indexterm>
-  <indexterm><primary>command line</></indexterm>
   <para>
    <guimenu>File</>&gt;<guimenuitem>New File</> (shortcut:
    <keycombo><keycap>Control</><keycap>N</></>) opens a new untitled
@@ -17,13 +12,6 @@
   </para>
  </sect1>
  <sect1 id=opening><title>Opening Files</>
-  <indexterm><primary>buffers</></indexterm>
-  <indexterm><primary>File menu</></indexterm>
-  <indexterm><primary>Open File command</></indexterm>
-  <indexterm><primary>Recent Files menu</></indexterm>
-  <indexterm><primary>Current Directory menu</></indexterm>
-  <indexterm><primary>Insert File command</></indexterm>
-  <indexterm><primary>file system browser</></indexterm>
   <para>
    <guimenu>File</>&gt;<guimenuitem>Open File</> (shortcut:
    <keycombo><keycap>Control</><keycap>O</></>) displays
@@ -65,13 +53,7 @@
  </sect1>
  <sect1 id=saving><title>Saving Files</>
   <para>
-   <indexterm><primary>buffers</></indexterm>
-   <indexterm><primary>File menu</></indexterm>
-   <indexterm><primary>Save command</></indexterm>
-   <indexterm><primary>Save As command</></indexterm>
-   <indexterm><primary>Save a Copy As command</></indexterm>
-   <indexterm><primary>file system browser</></indexterm>
-   Changed made to a buffer do not affect the disk file until the
+   Changed made to a buffer do not affect the file on disk until the
    buffer is <firstterm>saved</>.
   </para>
   <para>
@@ -96,10 +78,6 @@
    buffer, and doesn't clear the <quote>modified</> flag.
   </para>
   <sect2><title>Autosave and Backups</>
-   <indexterm><primary>autosave</></indexterm>
-   <indexterm><primary>backups</></indexterm>
-   <indexterm><primary>Global Options command</></indexterm>
-   <indexterm><primary>Utilities menu</></indexterm>
    <para>
     The autosave feature protects your work from computer crashes and
     such. Every 30 seconds, all buffers with unsaved changes are
@@ -135,24 +113,15 @@
     <guimenu>Utilities</>&gt;<guimenuitem>Global Options</> dialog box.
    </para>
   </sect2>
-  <sect2><title>Line Separator Characters</>
-   <indexterm><primary>Global Options command</></indexterm>
-   <indexterm><primary>Utilities menu</></indexterm>
-   <indexterm><primary>MacOS</></indexterm>
-   <indexterm><primary>Windows</></indexterm>
-   <indexterm><primary>Unix</></indexterm>
-   <indexterm><primary>line separators</></indexterm>
-   <indexterm><primary>Utilities menu</></indexterm>
-   <indexterm><primary>Buffer Options command</></indexterm>
-   <indexterm><primary>Global Options command</></indexterm>
+  <sect2><title>Line Separators</>
    <para>
     The three major operating systems use different conventions to mark
     line endings in text files.
     The MacOS uses Carriage-Return characters (\r, ^M) for that purpose. Unix
-    uses Newline characters (\n, ^J). DOS and Windows use both
+    uses Newline characters (\n, ^J). Windows uses both
     (\r\n, ^M^J). jEdit can read and write files in all three formats.
     When a file is opened, the line separator is automatically
-    detected. It can be changed
+    detected. The line separator can be set on a buffer-specific basis
     in the <guimenu>Utilities</>&gt;<guimenuitem>Buffer Options</> dialog box.
     The default for new files can be set in the
     <guibutton>Loading and Saving</> pane of the
@@ -161,14 +130,6 @@
   </sect2>
  </sect1>
  <sect1 id=vfs-browser><title>The File System Browser</>
-  <indexterm><primary>Utilities menu</></>
-  <indexterm><primary>File System Browser command</></>
-  <indexterm><primary>Global Options command</></>
-  <indexterm><primary>Open File command</></indexterm>
-  <indexterm><primary>Save As command</></indexterm>
-  <indexterm><primary>Save a Copy As command</></indexterm>
-  <indexterm><primary>Insert File command</></indexterm>
-  <indexterm><primary>file system browser</></indexterm>
   <para>
    <guimenu>Utilities</>&gt;<guimenuitem>File System Browser</> displays a
    file system browser window.
@@ -271,11 +232,6 @@
   </figure> -->
  </sect1>
  <sect1 id=reloading><title>Reloading Files</>
-  <indexterm><primary>Reload command</></indexterm>
-  <indexterm><primary>Reload All Buffers command</></indexterm>
-  <indexterm><primary>File menu</></indexterm>
-  <indexterm><primary>Utilities menu</></indexterm>
-  <indexterm><primary>Global Options command</></indexterm>
   <para>
    If an open buffer is modified on disk by another application, a warning
    dialog box is displayed, offering to either continue editing
@@ -300,12 +256,7 @@
    <graphic scale=50 fileref=dialog-diskmod></>
   </figure> -->
  </sect1>
- <sect1 id=threaded-io><title>Multi-threaded I/O</>
-  <indexterm><primary>Utilities menu</></>
-  <indexterm><primary>I/O Progress Monitor command</></>
-  <indexterm><primary>Global Options command</></indexterm>
-  <indexterm><primary>buffers</></indexterm>
-  <indexterm><primary>I/O threads</></indexterm>
+ <sect1 id=threaded-io><title>Multi-Threaded I/O</>
   <para>
    To improve responsiveness and perceived performance,
    jEdit executes all input/output operations asynchronously.
@@ -333,12 +284,6 @@
   </figure> -->
  </sect1>
  <sect1 id=printing><title>Printing Files</>
-  <indexterm><primary>Print command</></indexterm>
-  <indexterm><primary>File menu</></indexterm>
-  <indexterm><primary>syntax highlighting</></indexterm>
-  <indexterm><primary>Global Options command</></indexterm>
-  <indexterm><primary>Utilities menu</></indexterm>
-  <indexterm><primary>printing</></indexterm>
   <para>
    <guimenu>File</>&gt;<guimenuitem>Print</>
    (shortcut: <keycombo><keycap>Control</><keycap>P</></keycombo>)
@@ -351,49 +296,7 @@
    Options</> dialog box.
   </para>
  </sect1>
- <sect1 id=sessions><title>Editor Sessions</>
-  <indexterm><primary>sessions</></>
-  <indexterm><primary>File menu</></indexterm>
-  <indexterm><primary>Load Session command</></indexterm>
-  <indexterm><primary>Save Session command</></indexterm>
-  <indexterm><primary>Utilities menu</></indexterm>
-  <indexterm><primary>Global Options command</></indexterm>
-  <para>
-   A <firstterm>session</> is a list of file names. Sessions are stored
-   as plain text files with the extension <filename>.session</> in the
-   <filename>sessions</> subdirectory of the jEdit settings directory.
-   The location of the settings directory is operating system-specific; see
-   <xref linkend=settings-directory>.
-  </para>
-  <para>
-   <guimenu>File</>&gt;<guimenuitem>Load Session</> displays a file
-   selector dialog box and opens all file names
-   listed in the specified session.
-  </para>
-  <para>
-   <guimenu>File</>&gt;<guimenuitem>Save Session</> displays a file
-   selector dialog box and saves the list of
-   open buffers to the specified session.
-  </para>
-  <para>
-   The session named
-   <filename>default.session</> is loaded when jEdit starts, and the list of
-   open files is recorded into it when jEdit exits. The end result is
-   that open files are retained if jEdit is closed and reopened. This
-   can be disabled in the <guibutton>Loading &amp; Saving</> pane
-   of the <guimenu>Utilities</>&gt;<guimenuitem>Global Options</>
-   dialog box.
-  </para>
- </sect1>
  <sect1 id=closing-exiting><title>Closing Files and Exiting jEdit</>
-  <indexterm><primary>buffers</></indexterm>
-  <indexterm><primary>Close Buffer command</></indexterm>
-  <indexterm><primary>Close All Buffers command</></indexterm>
-  <indexterm><primary>File menu</></indexterm>
-  <indexterm><primary>Exit command</></indexterm>
-  <indexterm><primary>saving</></indexterm>
-  <indexterm><primary>Global Options command</></indexterm>
-  <indexterm><primary>Utilities menu</></indexterm>
   <para>
    <guimenu>File</>&gt;<guimenuitem>Close Buffer</>
    (shortcut: <keycombo><keycap>Control</><keycap>W</></keycombo>)

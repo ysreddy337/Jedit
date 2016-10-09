@@ -29,7 +29,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Option pane for editing command shortcuts.
  * @author Slava Pestov
- * @version $Id: CommandShortcutsOptionPane.java,v 1.4 2000/04/28 09:29:12 sp Exp $
+ * @version $Id: CommandShortcutsOptionPane.java,v 1.7 2001/02/05 09:15:30 sp Exp $
  */
 public class CommandShortcutsOptionPane extends ShortcutsOptionPane
 {
@@ -39,12 +39,6 @@ public class CommandShortcutsOptionPane extends ShortcutsOptionPane
 	}
 
 	// protected members
-	protected void _save()
-	{
-		super._save();
-		jEdit.reloadKeyBindings();
-	}
-
 	protected Vector createBindings()
 	{
 		EditAction[] actions = jEdit.getActions();
@@ -53,33 +47,22 @@ public class CommandShortcutsOptionPane extends ShortcutsOptionPane
 
 		for(int i = 0; i < actions.length; i++)
 		{
-			String name = actions[i].getName();
+			EditAction action = actions[i];
+			if(action.isPluginAction())
+				continue;
+
+			String name = action.getName();
 			String label = jEdit.getProperty(name + ".label");
 			// Skip certain actions this way (ENTER, TAB)
 			if(label == null)
 				continue;
+
 			label = GUIUtilities.prettifyMenuLabel(label);
-			String shortcut = jEdit.getProperty(name + ".shortcut");
-			bindings.addElement(new KeyBinding(name,label,shortcut));
+			String shortcut1 = jEdit.getProperty(name + ".shortcut");
+			String shortcut2 = jEdit.getProperty(name + ".shortcut2");
+			bindings.addElement(new KeyBinding(name,label,shortcut1,shortcut2));
 		}
 
 		return bindings;
 	}
 }
-
-/*
- * ChangeLog:
- * $Log: CommandShortcutsOptionPane.java,v $
- * Revision 1.4  2000/04/28 09:29:12  sp
- * Key binding handling improved, VFS updates, some other stuff
- *
- * Revision 1.3  2000/04/16 08:56:24  sp
- * Option pane updates
- *
- * Revision 1.2  2000/04/14 11:57:39  sp
- * Text area actions moved to org.gjt.sp.jedit.actions package
- *
- * Revision 1.1  1999/12/19 08:12:34  sp
- * 2.3 started. Key binding changes  don't require restart, expand-abbrev renamed to complete-word, new splash screen
- *
- */

@@ -1,7 +1,18 @@
 ###
 ### jEdit user interface definitions
-### By Slava Pestov <sp@gjt.org>
+### Copyright (C) 1998, 2001 Slava Pestov
 ###
+
+# Default user catalog file
+defaultCatalog=<?xml version="1.0"?>\n\
+	<!DOCTYPE CATALOG SYSTEM "catalog.dtd">\n\
+	\n\
+	<MODES>\n\
+	\n\
+	<!-- Add lines like the following, one for each edit mode: -->\n\
+	<!-- <MODE NAME="foo" FILE="foo.xml" FILE_NAME_GLOB="*.foo" /> -->\n\
+	\n\
+	</MODES>
 
 ###
 ### COMMON STRINGS
@@ -148,9 +159,7 @@ view.search.find=Search for:
 ###
 view.context=undo redo - cut copy paste paste-previous - select-all \
 	select-none - view-registers - to-upper to-lower - \
-	eval-selection
-
-view.gutter.context=toggle-gutter toggle-line-numbers save-gutter-size
+	narrow - eval-selection
 
 ###
 ### MENUBAR
@@ -177,9 +186,6 @@ file=new-file \
      - \
      print \
      - \
-     load-session \
-     save-session \
-     - \
      exit
 file.label=$File
 new-file.label=$New File
@@ -198,8 +204,6 @@ save-as.label=Sa$ve As...
 save-a-copy-as.label=Save a Cop$y As...
 save-all.label=Save A$ll Buffers...
 print.label=$Print...
-load-session.label=Loa$d Session...
-save-session.label=Sav$e Session...
 exit.label=E$xit
 
 ### Edit menu
@@ -222,10 +226,10 @@ edit=undo \
      goto-line \
      select-line-range \
      - \
-     %select \
-     %line \
-     %paragraph \
-     %brackets \
+     toggle-rect \
+     - \
+     %text \
+     %source \
      %registers
 edit.label=$Edit
 undo.label=$Undo
@@ -240,82 +244,63 @@ word-count.label=$Word Count...
 complete-word.label=Co$mplete Word
 expand-abbrev.label=E$xpand Abbreviation
 goto-line.label=$Go to Line...
-select-line-range.label=$Select Line Range...
+select-line-range.label=Select Line Range...
+toggle-rect.label=Rectangular $Selection
 
-### Selection menu
-select=select-word \
-       select-line \
-       select-paragraph \
-       - \
-       wing-comment \
-       box-comment \
-       block-comment \
-       - \
-       to-lower \
-       to-upper \
-       spaces-to-tabs \
-       tabs-to-spaces \
-       remove-trailing-ws \
-       - \
-       toggle-rect
-select.label=Selection
+### Text menu
+text=select-word \
+     - \
+     select-line \
+     delete-line \
+     delete-start-line \
+     delete-end-line \
+     remove-trailing-ws \
+     join-lines \
+     - \
+     select-paragraph \
+     format-paragraph \
+     delete-paragraph \
+     - \
+     to-lower \
+     to-upper \
+     spaces-to-tabs \
+     tabs-to-spaces
+text.label=Text
 select-word.label=Select Word
 select-line.label=Select Line
+delete-line.label=Delete Line
+delete-start-line.label=Delete to Start of Line
+delete-end-line.label=Delete to End of Line
+remove-trailing-ws.label=Remove Trailing Whitespace
+join-lines.label=Join Lines
 select-paragraph.label=Select Paragraph
-wing-comment.label=Wing Comment
-box-comment.label=Box Comment
-block-comment.label=Block Comment
+delete-paragraph.label=Delete Paragraph
+format-paragraph.label=Format Paragraph
 to-lower.label=To Lower Case
 to-upper.label=To Upper Case
 spaces-to-tabs.label=Spaces to Tabs
 tabs-to-spaces.label=Tabs to Spaces
-remove-trailing-ws.label=Remove Trailing Whitespace
-toggle-rect.label=Rectangular Selection
 
-### Line menu
-line=indent-lines \
-     shift-left \
-     shift-right \
-     - \
-     delete-line \
-     delete-start-line \
-     delete-end-line \
-     - \
-     join-lines
-line.label=Lines
+### Source menu
+source=wing-comment \
+       box-comment \
+       block-comment \
+       - \
+       indent-lines \
+       shift-left \
+       shift-right \
+       - \
+       select-block \
+       match-bracket \
+       prev-bracket \
+       next-bracket
+source.label=Source
+wing-comment.label=Wing Comment
+box-comment.label=Box Comment
+block-comment.label=Block Comment
 indent-lines.label=Indent Selected Lines
 shift-left.label=Shift Indent Left
 shift-right.label=Shift Indent Right
-delete-line.label=Delete Line
-delete-start-line.label=Delete to Start of Line
-delete-end-line.label=Delete to End of Line
-join-lines.label=Join Lines
-
-### Paragraph menu
-paragraph=prev-paragraph \
-	  next-paragraph \
-	  - \
-	  select-prev-paragraph \
-	  select-next-paragraph \
-	  - \
-	  delete-paragraph \
-          - \
-          format-paragraph
-paragraph.label=Paragraphs
-prev-paragraph.label=Go to Previous Paragraph
-next-paragraph.label=Go to Next Paragraph
-select-prev-paragraph.label=Select Previous Paragraph
-select-next-paragraph.label=Select Next Paragraph
-delete-paragraph.label=Delete Paragraph
-format-paragraph.label=Format Paragraph
-
-### Block menu
-brackets=select-block \
-         match-bracket \
-         - \
-         prev-bracket \
-         next-bracket
-brackets.label=Brackets
 select-block.label=Select Code Block
 match-bracket.label=Go to Matching Bracket
 prev-bracket.label=Go to Previous Bracket
@@ -351,6 +336,7 @@ view-registers.label=View Registers...
 search=find \
        find-selection \
        find-next \
+       find-prev \
        - \
        replace-in-selection \
        replace-and-find-next \
@@ -369,6 +355,7 @@ search=find \
 search.label=$Search
 find.label=$Find...
 find-next.label=Fin$d Next
+find-prev.label=Find Pre$vious
 find-selection.label=F$ind Selection...
 replace-in-selection.label=$Replace in Selection
 replace-and-find-next.label=Re$place and Find Next
@@ -388,23 +375,20 @@ goto-marker.label=Go to Marker
 view=new-view \
      close-view \
      - \
-     toggle-gutter \
      toggle-line-numbers \
-     save-gutter-size \
      - \
      prev-buffer \
      next-buffer \
      recent-buffer \
      - \
      %scrolling \
+     %folding \
      %splitting \
      %docking
 view.label=$View
 new-view.label=New $View
 close-view.label=$Close View
-toggle-gutter.label=$Gutter Expanded
-toggle-line-numbers.label=$Line Numbering
-save-gutter-size.label=Save Gutter Size
+toggle-line-numbers.label=$Line Numbers
 prev-buffer.label=Go to $Previous Buffer
 next-buffer.label=Go to $Next Buffer
 recent-buffer.label=Go to $Recent Buffer
@@ -427,6 +411,26 @@ scroll-down-line.label=Line Scroll Down
 scroll-up-page.label=Page Scroll Up
 scroll-down-page.label=Page Scroll Down
 toggle-synchro-scroll.label=Synchronized Scrolling
+
+folding=collapse-fold \
+	expand-one-level \
+	expand-fold \
+	- \
+	expand-folds \
+	expand-all-folds \
+	- \
+	select-fold \
+	- \
+	narrow
+
+folding.label=Folding
+collapse-fold.label=Collapse Fold
+expand-one-level.label=Expand Fold One Level
+expand-fold.label=Expand Fold Fully
+expand-folds.label=Expand Folds [x]
+expand-all-folds.label=Expand All Folds
+select-fold.label=Select Fold
+narrow.label=Narrow Buffer to Selection
 
 splitting=unsplit \
 	  split-horizontal \
@@ -457,8 +461,6 @@ utils=vfs-browser \
       log-viewer \
       update-log \
       - \
-      reload-modes \
-      - \
       eval \
       eval-selection \
       - \
@@ -469,7 +471,6 @@ vfs-browser.label=$File System Browser
 io-progress-monitor.label=$I/O Progress Monitor...
 log-viewer.label=$View Activity Log...
 update-log.label=Update Activity $Log on Disk
-reload-modes.label=$Reload Edit Modes
 eval.label=$Evaluate BeanShell Expression...
 eval-selection.label=E$valuate Selection
 buffer-options.label=$Buffer Options...
@@ -508,21 +509,18 @@ no-plugins.label=No Plugins
 ### Help menu
 help-menu=about \
      help \
-     - \
-     help-readme \
-     help-news \
-     help-todo \
-     help-changes \
-     help-copying \
-     -
+     tip-of-the-day
 help-menu.label=$Help
 about.label=About jEdit...
-help.label=jEdit User Guide
-help-readme.label=jEdit Read Me
-help-news.label=Major Changes in jEdit 3.0
-help-todo.label=Changes Planned for jEdit 3.1
-help-changes.label=Version History
-help-copying.label=GNU General Public License
+help.label=jEdit Help
+tip-of-the-day.label=Tip of the Day
+
+#help-readme.label=jEdit Read Me
+#help-news.label=Major Changes in jEdit 3.0
+#help-todo.label=Changes Planned for jEdit 3.1
+#help-changes.label=Version History
+#help-copying.label=GNU General Public License
+#help-copying-doc.label=GNU Free Documentation License
 
 ###
 ### MACRO STRINGS
@@ -542,37 +540,41 @@ macro.header=// This is a recorded macro. First, check over the\n\
 ### COMMANDS THAT DON'T APPEAR IN MENUS
 ###
 
-backspace.label=Delete Previous Character
 backspace-word.label=Delete Previous Word
-delete.label=Delete Next Character
+backspace.label=Delete Previous Character
 delete-word.label=Delete Next Word
-overwrite.label=Overwrite Mode
-home.label=Beginning of Line
-document-home.label=Beginning of Document
-select-document-home.label=Select to Beginning of Document
-end.label=End of Line
+delete.label=Delete Next Character
 document-end.label=End of Document
-select-document-end.label=Select to End of Document
-select-home.label=Select to Beginning of Line
-select-end.label=Select to End of Line
-prev-page.label=Previous Page
-next-page.label=Next Page
-select-prev-page.label=Select Previous Page
-select-next-page.label=Select Next Page
-prev-char.label=Previous Character
-prev-word.label=Previous Word
-select-prev-char.label=Select Previous Character
-select-prev-word.label=Select Previous Word
-next-char.label=Next Character
-next-word.label=Next Word
-select-next-char.label=Select Next Character
-select-next-word.label=Select Next Word
-prev-line.label=Previous Line
-select-prev-line.label=Select Previous Line
-next-line.label=Next Line
-select-next-line.label=Select Next Line
-repeat.label=Repeat Next Command
+document-home.label=Beginning of Document
+end.label=End of Line
+home.label=Beginning of Line
 insert-literal.label=Insert Next Character Literally
+next-char.label=Next Character
+next-line.label=Next Line
+next-page.label=Next Page
+next-paragraph.label=Go to Next Paragraph
+next-word.label=Next Word
+overwrite.label=Overwrite Mode
+prev-char.label=Previous Character
+prev-line.label=Previous Line
+prev-page.label=Previous Page
+prev-paragraph.label=Go to Previous Paragraph
+prev-word.label=Previous Word
+repeat.label=Repeat Next Command
+select-document-end.label=Select to End of Document
+select-document-home.label=Select to Beginning of Document
+select-end.label=Select to End of Line
+select-home.label=Select to Beginning of Line
+select-next-char.label=Select Next Character
+select-next-line.label=Select Next Line
+select-next-page.label=Select Next Page
+select-next-paragraph.label=Select Next Paragraph
+select-next-word.label=Select Next Word
+select-prev-char.label=Select Previous Character
+select-prev-line.label=Select Previous Line
+select-prev-page.label=Select Previous Page
+select-prev-paragraph.label=Select Previous Paragraph
+select-prev-word.label=Select Previous Word
 
 ###
 ### VIEW STUFF
@@ -597,8 +599,8 @@ print.page=Page {0}
 
 # About dialog
 about.title=About jEdit
-about.version=jEdit version: {0}
-about.caption=jEdit web site: <http://jedit.sourceforge.net>
+about.version=jEdit version {0}
+about.caption=jEdit web site: <http://www.jedit.org>
 
 # IO Error dialog, {0}=the error message
 ioerror.title=I/O Error
@@ -628,7 +630,9 @@ no-write.message=Cannot save to {0}.\n\
 # Malformed URL error
 badurl.title=Invalid URL
 # {0} - the URL
-badurl.message=The following URL is invalid: {0}
+# {1} - the error
+badurl.message=The following URL is invalid: {0}\n
+	({1})
 
 # Go to line dialog
 goto-line.title=Go To Line
@@ -690,10 +694,6 @@ no-settings.title=Feature Unavailable
 no-settings.message=jEdit was started with the -nosettings switch.\n\
 	To use this feature, you must start jEdit without that switch.
 
-# No such action dialog
-unknown-action.title=Unknown Action
-unknown-action.message=Unknown action "{0}".
-
 # Search and replace dialog
 search.title=Search And Replace
 
@@ -708,6 +708,8 @@ search.case=Ignore case
 search.case.mnemonic=g
 search.regexp=Regular expressions
 search.regexp.mnemonic=x
+search.reverse=Reverse search
+search.reverse.mnemonic=v
 search.hypersearch=HyperSearch
 search.hypersearch.mnemonic=h
 
@@ -739,7 +741,7 @@ search.replaceAllBtn.mnemonic=a
 # Keep searching dialog
 keepsearching.title=No More Matches Found
 keepsearching.message=No more matches were found. Continue search from\n\
-	beginning?
+	{0,choice,0#beginning|1#end}?
 
 # HyperSearch results dialog
 hypersearch-results.title=HyperSearch Results
@@ -766,13 +768,15 @@ pasteprev.caption=Previous clippings:
 pasteprev.insert=Insert
 
 # File changed on disk dialogs
-filechanged.title=File Changed on Disk
+filechanged-save.title=File Changed on Disk
 filechanged-save.message=The file {0}\n\
 	has been modified on disk by another program. Are you sure\n\
 	you want to continue saving it?
+filechanged-focus.title=File Changed on Disk
 filechanged-focus.message=The file {0}\n\
 	has been modified on disk by another program. Would you like to\n\
 	reload it from disk?
+filechanged-dirty.title=File Changed on Disk
 filechanged-dirty.message=The file {0}\n\
 	has been modified on disk by another program. Would you like to\n\
 	reload it from disk? IF YOU RELOAD, UNSAVED CHANGES WILL BE LOST.
@@ -812,27 +816,30 @@ close.discard.mnemonic=d
 
 # Add abbrev dialog
 add-abbrev.title=Add Abbreviation
-add-abbrev.message=The abbreviation "{0}" is undefined.\n\
-	To define it now, enter an expansion below, then\n\
-	click "mode-specific" to make it mode-specific,\n\
-	or "global" to make it apply in all edit modes.
-add-abbrev.mode=Mode-specific
-add-abbrev.global=Global
+add-abbrev.caption=Enter an expansion for abbreviation "{0}":
+add-abbrev.mode=Add mode-specific
+add-abbrev.global=Add global
+
+# Edit abbrev dialog
+edit-abbrev.title=Edit Abbreviation
+edit-abbrev.caption=Enter an expansion for abbreviation "{0}":
+
+# Abbrev editor control
+abbrev-editor.before=Text to insert before caret:
+abbrev-editor.after=Text to insert after caret:
 
 # XMode errors
-xmode-invalid-termchar.title=Invalid Attribute
-xmode-invalid-termchar.message=The AT_CHAR attribute ({1}) of the\
-	TERMINATE tag in\n\
-	{0} is not a number.
+xmode-error.title=XML Parse Error
+# {2} is the column number, but it's not too useful so we don't show it
+xmode-error.message=An error occurred while parsing {0}, line {1}:\n\
+	{3}
 
-xmode-invalid-doctype.title=Invalid Document Type
-xmode-invalid-doctype.message=The DOCTYPE of {0}\n\
-	is "{1}", not "MODE" as expected. The mode will be loaded anyway,\n\
-	but please ensure that this is a valid mode definition.
-
-xmode-parse.title=XML Parse Error
-xmode-parse.message=An error occurred while parsing {0}, line {1}:\n\
-	{2}
+xmode-error.dtd=The DTD could not be loaded ({0})
+xmode-error.termchar-invalid=The value of the AT_CHAR attribute is invalid ({0})
+xmode-error.doctype-invalid=Expected a document type of MODE, found {0}
+xmode-error.empty-tag=The {0} tag cannot be empty
+xmode-error.token-invalid=The token type {0} is invalid
+xmode-error.empty-keyword=The keyword text cannot be empty
 
 # JARClassLoader errors
 plugin.load-error.title=Cannot Load Plugin
@@ -864,15 +871,15 @@ plugin.dep-jdk.message=The plugin {0} requires Java {1} or later,\n\
 plugin.dep-jedit.title=Unsatisfied Dependency
 plugin.dep-jedit.message=The plugin {0} requires jEdit {1} or later,\n\
 	but you only have version {2}. Download new\n\
-	jEdit versions from <http://jedit.sourceforge.net>.
+	jEdit versions from <http://www.jedit.org>.
 
 plugin.dep-plugin.no-version.title=Unsatisfied Dependency
 plugin.dep-plugin.no-version.message=The plugin {0} requires version {1} or later of {2},\n\
 	but {2} does not appear to be installed.
 
 plugin.dep-plugin.broken.title=Unsatisfied Dependency
-plugin.dep-plugin.broken.message=The plugin {0} requires version {1} or later of {2},\n\
-	but an error prevented {2} from being loaded.
+plugin.dep-plugin.broken.message=The plugin {0} requires the plugin {1},\n\
+	but an error prevented {1} from being loaded.
 
 plugin.dep-plugin.title=Unsatisfied Dependency
 plugin.dep-plugin.message=The plugin {0} requires version {1} or later of {2},\n\
@@ -930,13 +937,15 @@ options.general.history=Maximum history list length:
 options.general.saveCaret=Save caret positions in recent file list
 options.general.sortBuffers=Sort buffer list
 options.general.sortByName=Sort buffer list by file name, instead of path name
-options.general.checkModStatus=Check file modification time on focus
+options.general.checkModStatus=Warn if file is modified on disk by another \
+	program
 options.general.showFullPath=Show full path of buffers in title bar
 options.general.showSearchbar=Show search bar
 options.general.showBufferSwitcher=Show buffer switcher
+options.general.showTips=Show tips on startup
 
 options.loadsave.label=Loading & Saving
-options.loadsave.saveDesktop=Restore previously open files on startup
+options.loadsave.restore=Restore previously open files on startup
 options.loadsave.encoding=File encoding:
 options.loadsave.autosave=Autosave frequency (secs):
 options.loadsave.backups=Max number of backups:
@@ -959,13 +968,12 @@ options.textarea.homeEnd="Smart" home/end key behaviour
 
 options.gutter.label=Gutter
 options.gutter.font=Gutter font:
-options.gutter.width=Gutter width:
 options.gutter.borderWidth=Gutter border width:
 options.gutter.numberAlignment=Line number alignment:
-options.gutter.expanded=Gutter expanded by default
 options.gutter.interval=Line highlight interval:
-options.gutter.lineNumbers=Line numbering enabled
+options.gutter.lineNumbers=Line numbering
 options.gutter.currentLineHighlight=Current line highlighting
+options.gutter.markerHighlight=Indicate markers and position registers
 
 options.color.label=Colors
 options.color.object=Object
@@ -984,6 +992,7 @@ options.color.gutterHighlightColor=Gutter highlight
 options.color.gutterCurrentLineColor=Current line in gutter
 options.color.gutterMarkerColor=Markers in gutter
 options.color.gutterRegisterColor=Registers in gutter
+options.color.gutterFoldColor=Fold markers in gutter
 options.color.gutterFocusBorderColor=Focused gutter border
 options.color.gutterNoFocusBorderColor=Unfocused gutter border
 options.color.dockingBorderColor=Docked window border
@@ -1011,6 +1020,7 @@ options.editing.tabSize=Tab width:
 options.editing.indentSize=Indent width:
 options.editing.maxLineLen=Wrap lines at column:
 options.editing.wordBreakChars=Break lines at these characters:
+options.editing.collapseFolds=Initially collapse folds with level:
 options.editing.undoCount=Number of undos:
 options.editing.syntax=Syntax highlighting
 options.editing.indentOnTab=Indent line when Tab key is pressed
@@ -1035,7 +1045,8 @@ options.print.fontsize=Print font size:
 options.print.header=Print a header with the file name
 options.print.footer=Print a footer with the date, time and page number
 options.print.lineNumbers=Print line numbers
-options.print.syntax=Syntax highlighting
+options.print.style=Use syntax styles in output
+options.print.color=Use syntax colors in output
 
 options.print.margins=Margins (in inches)
 options.print.margin.top=Top:
@@ -1087,15 +1098,17 @@ options.abbrevs.set=Abbrev set:
 options.abbrevs.expandOnInput=Space bar expands abbrevs
 options.abbrevs.abbrev=Abbrev
 options.abbrevs.expand=Expansion
-options.abbrevs.sort.abbrev=Sort by abbrev
-options.abbrevs.sort.expand=Sort by expansion
 
 options.keys.name=Command
-options.keys.binding=Keyboard shortcut
-options.keys.sort.label=Sort by label
-options.keys.sort.shortcut=Sort by shortcut
+options.keys.shortcut1=Primary shortcut
+options.keys.shortcut2=Alternative shortcut
+
+grab-key.title=Specify Shortcut
+grab-key.caption=Press the desired shortcut for "{0}", then click OK.
 
 options.command-keys.label=Command Shortcuts
+
+options.plugin-keys.label=Plugin Shortcuts
 
 options.macro-keys.label=Macro Shortcuts
 
@@ -1103,6 +1116,7 @@ options.browser.label=File System Browser
 options.browser.defaultPath=Default path:
 options.browser.defaultPath.buffer=Parent directory of current buffer
 options.browser.defaultPath.home=Home directory
+options.browser.defaultPath.favorites=Favorites
 options.browser.defaultPath.last=Most recently visited directory
 options.browser.showHiddenFiles=Show hidden files
 options.browser.sortFiles=Sort file list
@@ -1139,6 +1153,28 @@ helpviewer.title=jEdit Help
 helpviewer.url=Location:
 helpviewer.back=Back
 helpviewer.forward=Forward
+
+helpviewer.toc.welcome=Welcome to jEdit
+helpviewer.toc.misc=Miscellaneous Documentation
+helpviewer.toc.readme=jEdit Read Me
+helpviewer.toc.news=Major Changes in jEdit 3.1
+helpviewer.toc.todo=Changes Planned for jEdit 3.2
+helpviewer.toc.changes=Version History
+helpviewer.toc.copying=GNU General Public License
+helpviewer.toc.copying-doc=GNU Free Documentation License
+helpviewer.toc.plugins=Plugin Documentation
+
+# Tip of the day window
+tip.title=Tip of the Day
+tip.caption=Did you know...
+tip.show-next-time=Show tips on startup
+tip.next-tip=Next Tip
+
+# Show on startup?
+tip.show=true
+
+# Number of tips
+tip.count=34
 
 # Activity log
 log-viewer.title=Activity Log
@@ -1195,15 +1231,17 @@ vfs.browser.synchronize.icon=Import24.gif
 vfs.browser.more.label=More
 vfs.browser.more.icon=ToolbarMenu.gif
 
-vfs.browser.menu.close.label=Close Selected File
-vfs.browser.menu.open.label=Open Selected File
-vfs.browser.menu.open-view.label=Open Selected File in New View
-vfs.browser.menu.goto.label=Go to Selected Directory
+vfs.browser.menu.close.label=Close
+vfs.browser.menu.open.label=Open
+vfs.browser.menu.open-view.label=Open in New View
+vfs.browser.menu.insert.label=Insert
+vfs.browser.menu.browse.label=Browse
 vfs.browser.menu.choose.label=Choose
-vfs.browser.menu.delete.label=Delete Selected File...
-vfs.browser.menu.rename.label=Rename Selected File...
+vfs.browser.menu.delete.label=Delete...
+vfs.browser.menu.rename.label=Rename...
 
 vfs.browser.menu.show-hidden-files.label=Show Hidden Files
+vfs.browser.menu.new-file.label=New File
 vfs.browser.menu.new-directory.label=New Directory...
 vfs.browser.menu.add-to-favorites.label=Add to Favorites
 vfs.browser.menu.go-to-favorites.label=Go to Favorites
@@ -1247,7 +1285,7 @@ vfs.browser.rename-error.message=An error occurred while attempting\n\
 	to rename {0}.
 
 vfs.browser.mkdir.title=New Directory
-vfs.browser.mkdir.message=Create new directory named:
+vfs.browser.mkdir.message=Name (or path) of new directory:
 
 vfs.browser.mkdir-error.title=Cannot Create Directory
 vfs.browser.mkdir-error.message=An error occurred while attempting\n\

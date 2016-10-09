@@ -33,7 +33,7 @@ import org.gjt.sp.util.Log;
  * subclassing is required.
  *
  * @author Slava Pestov
- * @version $Id: Mode.java,v 1.33 2000/11/29 06:53:00 sp Exp $
+ * @version $Id: Mode.java,v 1.36 2001/01/25 02:03:37 sp Exp $
  */
 public class Mode
 {
@@ -81,15 +81,6 @@ public class Mode
 	}
 
 	/**
-	 * Returns a copy of the token marker specified with
-	 * <code>setTokenMarker()</code>.
-	 */
-	public TokenMarker createTokenMarker()
-	{
-		return (TokenMarker)getTokenMarker().clone();
-	}
-
-	/**
 	 * Returns the token marker specified with
 	 * <code>setTokenMarker()</code>. Should only be called by
 	 * <code>TokenMarker.getExternalRuleSet()</code>.
@@ -117,7 +108,7 @@ public class Mode
 	public void loadIfNecessary()
 	{
 		if(marker == null)
-			jEdit.loadMode((String)getProperty("grammar"));
+			jEdit.loadMode(this);
 	}
 
 	/**

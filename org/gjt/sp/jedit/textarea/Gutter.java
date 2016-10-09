@@ -1,6 +1,7 @@
 /*
  * Gutter.java
  * Copyright (C) 1999, 2000 mike dillon
+ * Portions copyright (C) 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -41,64 +42,72 @@ public class Gutter extends JComponent implements SwingConstants
 
 	public void paintComponent(Graphics gfx)
 	{
-		if (!collapsed)
-		{
-			// fill the background
-			Rectangle r = gfx.getClipBounds();
-			gfx.setColor(getBackground());
-			gfx.fillRect(r.x, r.y, r.width, r.height);
-
-			// if buffer is loading, don't paint anything
-			if (!textArea.getBuffer().isLoaded())
-				return;
-
-			// paint custom highlights, if there are any
-			if (highlights != null) paintCustomHighlights(gfx);
-
-			// paint line numbers, if they are enabled
-			if (lineNumberingEnabled) paintLineNumbers(gfx);
-		}
-	}
-
-	private void paintLineNumbers(Graphics gfx)
-	{
-		FontMetrics pfm = textArea.getPainter().getFontMetrics();
-		int lineHeight = pfm.getHeight();
-
+		// fill the background
 		Rectangle clip = gfx.getClipBounds();
+		gfx.setColor(getBackground());
+		gfx.fillRect(clip.x, clip.y, clip.width, clip.height);
 
-		int baseline = (clip.y - clip.y % lineHeight) + (int) Math.round(
-			(this.baseline + lineHeight - pfm.getDescent()) / 2.0);
+		// if buffer is loading, don't paint anything
+		if (!textArea.getBuffer().isLoaded())
+			return;
 
-		int firstLine = clip.y / lineHeight + textArea.getFirstLine() + 1;
-		int lastLine = firstLine + clip.height / lineHeight;
-		int caretLine = textArea.getCaretLine() + 1;
+		// paint highlights and line numbers
+		int lineHeight = textArea.getPainter().getFontMetrics()
+			.getHeight();
 
-		int firstValidLine = firstLine > 1 ? firstLine : 1;
-		int lastValidLine = (lastLine > textArea.getLineCount())
-			? textArea.getLineCount() : lastLine;
+		int firstLine = clip.y / lineHeight + textArea.getFirstLine();
+		int lastLine = (clip.y + clip.height - 1) / lineHeight
+			+ textArea.getFirstLine();
+
+		FontMetrics pfm = textArea.getPainter().getFontMetrics();
+		Color fg = getForeground();
+
+		int baseline = (int)((this.baseline + lineHeight
+			- pfm.getDescent()) / 2.0);
 
 		boolean highlightCurrentLine = currentLineHighlightEnabled
 			&& (textArea.getSelectionStart() == textArea.getSelectionEnd());
 
-		gfx.setFont(getFont());
+		int y = (clip.y - clip.y % lineHeight);
 
-		Color fg = getForeground();
-		Color hfg = getHighlightedForeground();
-		Color clfg = getCurrentLineForeground();
+		Buffer buffer = textArea.getBuffer();
 
-		String number;
-		int offset;
+		int firstValidLine = firstLine >= 0 ? firstLine : 0;
+		int lastValidLine = (lastLine >= buffer.getVirtualLineCount())
+			? buffer.getVirtualLineCount() - 1 : lastLine;
 
 		for (int line = firstLine; line <= lastLine;
-			line++, baseline += lineHeight)
+			line++, y += lineHeight)
 		{
-			// only print numbers for valid lines
-			if (line < firstValidLine || line > lastValidLine)
+			boolean valid = (line >= firstValidLine && line <= lastValidLine);
+
+			if(highlights != null)
+				highlights.paintHighlight(gfx, line, y);
+
+			if(!valid)
+				return;
+
+			// calculate the physical line
+			int physicalLine = buffer.virtualToPhysical(line);
+
+			if(physicalLine != buffer.getLineCount() - 1)
+			{
+				if(buffer.isFoldStart(physicalLine))
+				{
+					gfx.setColor(foldColor);
+					if(buffer.isLineVisible(physicalLine + 1))
+						gfx.drawRect(2,y + (lineHeight - 6) / 2,5,5);
+					else
+						gfx.fillRect(2,y + (lineHeight - 6) / 2,6,6);
+				}
+			}
+
+			if (!expanded)
 				continue;
 
-			number = Integer.toString(line);
+			String number = Integer.toString(physicalLine + 1);
 
+			int offset;
 			switch (alignment)
 			{
 			case RIGHT:
@@ -110,70 +119,19 @@ public class Gutter extends JComponent implements SwingConstants
 					- fm.stringWidth(number)) / 2;
 				break;
 			case LEFT: default:
-				offset = 1;
+				offset = 0;
 			}
 
-			if (line == caretLine && highlightCurrentLine)
-			{
-				gfx.setColor(clfg);
-			}
-			else if (interval > 1 && line % interval == 0)
-			{
-				gfx.setColor(hfg);
-			}
+			if (physicalLine == textArea.getCaretLine() && highlightCurrentLine)
+				gfx.setColor(currentLineHighlight);
+			else if (interval > 1 && (line + 1) % interval == 0)
+				gfx.setColor(intervalHighlight);
 			else
-			{
 				gfx.setColor(fg);
-			}
 
-			gfx.drawString(number, ileft + offset, baseline);
+			gfx.drawString(number, FOLD_MARKER_SIZE + offset,
+				baseline + y);
 		}
-	}
-
-	private void paintCustomHighlights(Graphics gfx)
-	{
-		int lineHeight = textArea.getPainter().getFontMetrics()
-			.getHeight();
-
-		int firstLine = textArea.getFirstLine();
-		int lastLine = firstLine + (getHeight() / lineHeight);
-
-		int y = 0;
-
-		for (int line = firstLine; line < lastLine;
-			line++, y += lineHeight)
-		{
-			highlights.paintHighlight(gfx, line, y);
-		}
-	}
-
-	/**
-	* Marks a line as needing a repaint.
-	* @param line The line to invalidate
-	*/
-	public final void invalidateLine(int line)
-	{
-		if(collapsed)
-			return;
-
-		FontMetrics pfm = textArea.getPainter().getFontMetrics();
-		repaint(0,textArea.lineToY(line) + pfm.getDescent() + pfm.getLeading(),
-			getWidth(),pfm.getHeight());
-	}
-
-	/**
-	* Marks a range of lines as needing a repaint.
-	* @param firstLine The first line to invalidate
-	* @param lastLine The last line to invalidate
-	*/
-	public final void invalidateLineRange(int firstLine, int lastLine)
-	{
-		if(collapsed)
-			return;
-
-		FontMetrics pfm = textArea.getPainter().getFontMetrics();
-		repaint(0,textArea.lineToY(firstLine) + pfm.getDescent() + pfm.getLeading(),
-			getWidth(),(lastLine - firstLine + 1) * pfm.getHeight());
 	}
 
 	/**
@@ -239,16 +197,17 @@ public class Gutter extends JComponent implements SwingConstants
 
 		if (border == null)
 		{
-			ileft = 0;
 			collapsedSize.width = 0;
 			collapsedSize.height = 0;
 		}
 		else
 		{
 			Insets insets = border.getBorderInsets(this);
-			ileft = insets.left;
-			collapsedSize.width = insets.left + insets.right;
-			collapsedSize.height = insets.top + insets.bottom;
+			collapsedSize.width = FOLD_MARKER_SIZE + insets.right;
+			collapsedSize.height = gutterSize.height
+				= insets.top + insets.bottom;
+			gutterSize.width = FOLD_MARKER_SIZE + insets.right
+				+ fm.stringWidth("12345");
 		}
 	}
 
@@ -262,6 +221,7 @@ public class Gutter extends JComponent implements SwingConstants
 		super.setFont(font);
 
 		fm = getFontMetrics(font);
+
 		baseline = fm.getAscent();
 	}
 
@@ -289,29 +249,15 @@ public class Gutter extends JComponent implements SwingConstants
 		currentLineHighlight = highlight;
  	}
 
-	/**
-	 * Set the width of the expanded gutter
-	 * @param width The gutter width
-	 */
-	public void setGutterWidth(int width)
-	{
-		if (width < collapsedSize.width) width = collapsedSize.width;
-
-		gutterSize.width = width;
-
-		// if the gutter is expanded, ask the text area to revalidate
-		// the layout to resize the gutter
-		if (!collapsed) textArea.revalidate();
+	public Color getFoldColor()
+ 	{
+		return foldColor;
 	}
 
-	/**
-	 * Get the width of the expanded gutter
-	 * @return The gutter width
-	 */
-	public int getGutterWidth()
+	public void setFoldColor(Color foldColor)
 	{
-		return gutterSize.width;
-	}
+		this.foldColor = foldColor;
+ 	}
 
 	/*
 	 * Component.getPreferredSize() is overridden here to support the
@@ -319,14 +265,10 @@ public class Gutter extends JComponent implements SwingConstants
 	 */
 	public Dimension getPreferredSize()
 	{
-		if (collapsed)
-		{
-			return collapsedSize;
-		}
-		else
-		{
+		if (expanded)
 			return gutterSize;
-		}
+		else
+			return collapsedSize;
 	}
 
 	public Dimension getMinimumSize()
@@ -338,38 +280,6 @@ public class Gutter extends JComponent implements SwingConstants
 	{
 		return (highlights == null) ? null :
 			highlights.getToolTipText(evt);
-	}
-
-	/**
-	 * Identifies whether or not the line numbers are drawn in the gutter
-	 * @return true if the line numbers are drawn, false otherwise
-	 */
-	public boolean isLineNumberingEnabled()
-	{
-		return lineNumberingEnabled;
-	}
-
-	/**
-	 * Turns the line numbering on or off and causes the gutter to be
-	 * repainted.
-	 * @param enabled true if line numbers are drawn, false otherwise
-	 */
-	public void setLineNumberingEnabled(boolean enabled)
-	{
-		if (lineNumberingEnabled == enabled) return;
-
-		lineNumberingEnabled = enabled;
-
-		repaint();
-	}
-
-	/**
-	 * Toggles line numbering.
-	 * @param enabled true if line numbers are drawn, false otherwise
-	 */
-	public void toggleLineNumberingEnabled()
-	{
-		setLineNumberingEnabled(!lineNumberingEnabled);
 	}
 
 	/**
@@ -396,24 +306,24 @@ public class Gutter extends JComponent implements SwingConstants
 
 	/**
 	 * Identifies whether the gutter is collapsed or expanded.
-	 * @return true if the gutter is collapsed, false if it is expanded
+	 * @return true if the gutter is expanded, false if it is collapsed
 	 */
-	public boolean isCollapsed()
+	public boolean isExpanded()
 	{
-		return collapsed;
+		return expanded;
 	}
 
 	/**
 	 * Sets whether the gutter is collapsed or expanded and force the text
 	 * area to update its layout if there is a change.
-	 * @param collapsed true if the gutter is collapsed,
-	 *                   false if it is expanded
+	 * @param collapsed true if the gutter is expanded,
+	 *                   false if it is collapsed
 	 */
-	public void setCollapsed(boolean collapsed)
+	public void setExpanded(boolean expanded)
 	{
-		if (this.collapsed == collapsed) return;
+		if (this.expanded == expanded) return;
 
-		this.collapsed = collapsed;
+		this.expanded = expanded;
 
 		textArea.revalidate();
 	}
@@ -421,19 +331,9 @@ public class Gutter extends JComponent implements SwingConstants
 	/**
 	 * Toggles whether the gutter is collapsed or expanded.
 	 */
-	public void toggleCollapsed()
+	public void toggleExpanded()
 	{
-		setCollapsed(!collapsed);
-	}
-
-	/**
-	 * Makes the gutter's current size the default for future sessions.
-	 * @since jEdit 2.7pre2
-	 */
-	public void saveGutterSize()
-	{
-		jEdit.setProperty("view.gutter.width", Integer.toString(
-			gutterSize.width));
+		setExpanded(!expanded);
 	}
 
 	/**
@@ -472,41 +372,30 @@ public class Gutter extends JComponent implements SwingConstants
 		repaint();
 	}
 
-	public JPopupMenu getContextMenu()
-	{
-		return context;
-	}
-
-	public void setContextMenu(JPopupMenu context)
-	{
-		this.context = context;
-	}
-
 	// private members
+	private static final int FOLD_MARKER_SIZE = 10;
+
 	private View view;
 	private JEditTextArea textArea;
 
-	private JPopupMenu context;
-
 	private TextAreaHighlight highlights;
 
-	private int baseline = 0;
-	private int ileft = 0;
+	private int baseline;
 
 	private Dimension gutterSize = new Dimension(0,0);
 	private Dimension collapsedSize = new Dimension(0,0);
 
 	private Color intervalHighlight;
 	private Color currentLineHighlight;
+	private Color foldColor;
 
 	private FontMetrics fm;
 
 	private int alignment;
 
-	private int interval = 0;
-	private boolean lineNumberingEnabled = true;
-	private boolean currentLineHighlightEnabled = false;
-	private boolean collapsed = false;
+	private int interval;
+	private boolean currentLineHighlightEnabled;
+	private boolean expanded;
 
 	private int borderWidth;
 	private Border focusBorder, noFocusBorder;
@@ -515,94 +404,56 @@ public class Gutter extends JComponent implements SwingConstants
 	{
 		public void mousePressed(MouseEvent e)
 		{
-			if(e.getX() >= getWidth() - borderWidth)
+			if(e.getX() < getWidth() - borderWidth * 2)
+			{
+				Buffer buffer = textArea.getBuffer();
+
+				int line = e.getY() / textArea.getPainter()
+					.getFontMetrics().getHeight()
+					+ textArea.getFirstLine();
+
+				if(line > buffer.getVirtualLineCount() - 1)
+					return;
+
+				line = buffer.virtualToPhysical(line);
+				if(buffer.isFoldStart(line))
+				{
+					if(e.isControlDown())
+					{
+						buffer.expandFoldAt(line,true);
+						textArea.selectFoldAt(line);
+					}
+					else if(buffer.isLineVisible(line + 1))
+						buffer.collapseFoldAt(line);
+					else
+						buffer.expandFoldAt(line,e.isShiftDown());
+				}
+			}
+			else
 			{
 				e.translatePoint(-getWidth(),0);
 				textArea.mouseHandler.mousePressed(e);
-				//return;
-			}
-			else if(context != null && (e.getModifiers()
-				& InputEvent.BUTTON3_MASK) != 0)
-			{
-				if(context.isVisible())
-					context.setVisible(false);
-				else
-				{
-					//XXX this is a hack to make sure the
-					//XXX actions get the right text area
-					textArea.requestFocus();
-
-					context.show(Gutter.this,
-						e.getX()+1, e.getY()+1);
-				}
-			}
-			else if(e.getClickCount() == 2)
-				toggleCollapsed();
-			else
-			{
-				dragStart = e.getPoint();
-				startWidth = gutterSize.width;
 			}
 		}
 
 		public void mouseDragged(MouseEvent e)
 		{
-			if ((e.getModifiers() & InputEvent.BUTTON3_MASK) != 0)
-				return;
-
-			if(collapsed || e.getX() >= getWidth() - borderWidth)
+			if(e.getX() >= getWidth() - borderWidth * 2)
 			{
 				e.translatePoint(-getWidth(),0);
 				textArea.mouseHandler.mouseDragged(e);
-				return;
 			}
-
-			if (dragStart == null) return;
-
-			gutterSize.width = startWidth + e.getX() - dragStart.x;
-
-			if (gutterSize.width < collapsedSize.width)
-				gutterSize.width = startWidth;
-
-			textArea.revalidate();
 		}
-
-		/* public void mouseExited(MouseEvent e)
-		{
-			if (dragStart != null && dragStart.x > e.getPoint().x)
-			{
-				setCollapsed(true);
-				gutterSize.width = startWidth;
-
-				textArea.revalidate();
-			}
-
-			//dragStart = null;
-		} */
 
 		public void mouseMoved(MouseEvent e) {}
 
 		public void mouseReleased(MouseEvent e)
 		{
-			if ((e.getModifiers() & InputEvent.BUTTON3_MASK) != 0)
-				return;
-
-			if(collapsed || e.getX() >= getWidth() - borderWidth)
+			if(e.getX() >= getWidth() - borderWidth * 2)
 			{
 				e.translatePoint(-getWidth(),0);
 				textArea.mouseHandler.mouseReleased(e);
-				return;
 			}
-
-			dragStart = null;
 		}
-
-		private Point dragStart = null;
-		private int startWidth = 0;
 	}
 }
-
-/*
- * ChangeLog:
- * $ Log$
- */

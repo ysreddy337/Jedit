@@ -99,7 +99,18 @@ public class BeanShell
 		String path = GUIUtilities.showFileDialog(view,
 			null,JFileChooser.OPEN_DIALOG);
 		if(path != null)
-			runScript(view,path,false);
+		{
+			Buffer buffer = view.getBuffer();
+			try
+			{
+				buffer.beginCompoundEdit();
+				runScript(view,path,true,false);
+			}
+			finally
+			{
+				buffer.endCompoundEdit();
+			}
+		}
 	}
 
 	/**
@@ -107,11 +118,11 @@ public class BeanShell
 	 * @since jEdit 2.7pre3
 	 */
 	public static void runScript(View view, String path,
-		boolean rethrowBshErrors)
+		boolean ownNamespace, boolean rethrowBshErrors)
 	{
 		Reader in;
 		Buffer buffer = jEdit.getBuffer(path);
-		if(buffer != null)
+		if(buffer != null && buffer.isLoaded())
 		{
 			Segment seg = new Segment();
 			try
@@ -140,9 +151,9 @@ public class BeanShell
 			}
 		}
 
-		NameSpace namespace = new NameSpace(interp.getNameSpace(),
-			"macro namespace");
-
+		NameSpace namespace = interp.getNameSpace();
+		if(ownNamespace)
+			namespace = new NameSpace(namespace,"macro namespace");
 
 		try
 		{
@@ -156,6 +167,15 @@ public class BeanShell
 			}
 
 			running = true;
+
+			/* if(ownNamespace)
+			{
+				// terrible hack
+				interp.eval(new InputStreamReader(
+					BeanShell.class.getResourceAsStream(
+					"/org/gjt/sp/jedit/jedit.bsh")),
+					namespace,"jedit.bsh");
+			} */
 
 			interp.eval(in,namespace,path);
 		}

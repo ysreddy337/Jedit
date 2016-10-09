@@ -28,7 +28,7 @@ import org.gjt.sp.util.Log;
 
 /**
  * @author Slava Pestov
- * @version $Id: EditServer.java,v 1.18 2000/11/29 06:53:00 sp Exp $
+ * @version $Id: EditServer.java,v 1.23 2001/04/22 04:32:31 sp Exp $
  */
 class EditServer extends Thread
 {
@@ -189,15 +189,15 @@ class EditServer extends Thread
 	}
 
 	// Thread-safe wrapper for Sessions.loadSession()
-	private Buffer TSloadSession(final String session)
+	private Buffer TSrestoreOpenFiles()
 	{
-		final Buffer[] retVal = new Buffer[1];
+		final Buffer[] retVal = new Buffer[0];
 		try
 		{
 			SwingUtilities.invokeAndWait(new Runnable() {
 				public void run()
 				{
-					retVal[0] = Sessions.loadSession(session,false);
+					retVal[0] = jEdit.restoreOpenFiles();
 				}
 			});
 		}
@@ -225,8 +225,7 @@ class EditServer extends Thread
 		boolean readOnly = false;
 		boolean newView = false;
 		String parent = null;
-		String session = (jEdit.getBooleanProperty("saveDesktop")
-			? "default" : null);
+		boolean restore = jEdit.getBooleanProperty("restore");
 		boolean endOpts = false;
 
 		View view = null;
@@ -247,14 +246,17 @@ class EditServer extends Thread
 					newView = true;
 				else if(command.startsWith("parent="))
 					parent = command.substring(7);
-				else if(command.startsWith("session="))
-					session = command.substring(8);
-				else if(command.startsWith("nosession"))
-					session = null;
+				else if(command.startsWith("norestore"))
+					restore = false;
 				else
+				{
 					Log.log(Log.ERROR,this,client
 						+ ": unknown server"
 						+ " command: " + command);
+					in.close();
+					socket.close();
+					stopServer();
+				}
 			}
 		}
 
@@ -262,19 +264,8 @@ class EditServer extends Thread
 		args.copyInto(_args);
 		Buffer buffer = TSopenFiles(parent,_args);
 
-		// Try loading session, then new file
-		if("default".equals(session))
-		{
-			if(buffer == null)
-			{
-				// Load default session
-				buffer = TSloadSession(session);
-			}
-		}
-		else if(session != null)
-		{
-			buffer = TSloadSession(session);
-		}
+		if(buffer == null && restore)
+			buffer = TSrestoreOpenFiles();
 
 		if(buffer == null)
 			buffer = TSnewFile();
@@ -293,58 +284,3 @@ class EditServer extends Thread
 			TSnewView(buffer);
 	}
 }
-
-/*
- * ChangeLog:
- * $Log: EditServer.java,v $
- * Revision 1.18  2000/11/29 06:53:00  sp
- * DSSSL syntax highlighting, documentation updates, bug fixes
- *
- * Revision 1.17  2000/10/28 00:36:58  sp
- * ML mode, Haskell mode
- *
- * Revision 1.16  2000/09/06 04:39:47  sp
- * bug fixes
- *
- * Revision 1.15  2000/08/20 07:29:30  sp
- * I/O and VFS browser improvements
- *
- * Revision 1.14  2000/06/12 02:43:29  sp
- * pre6 almost ready
- *
- * Revision 1.13  2000/04/29 03:07:37  sp
- * Indentation rules updated, VFS displays wait cursor properly, background mode
- *
- * Revision 1.12  2000/04/27 08:32:57  sp
- * VFS fixes, read only fixes, macros can prompt user for input, improved
- * backup directory feature
- *
- * Revision 1.11  2000/04/25 11:00:20  sp
- * FTP VFS hacking, some other stuff
- *
- * Revision 1.10  2000/04/21 05:32:20  sp
- * Focus tweak
- *
- * Revision 1.9  2000/03/20 03:42:55  sp
- * Smoother syntax package, opening an already open file will ask if it should be
- * reloaded, maybe some other changes
- *
- * Revision 1.8  2000/02/27 00:39:50  sp
- * Misc changes
- *
- * Revision 1.7  2000/02/20 03:14:13  sp
- * jEdit.getBrokenPlugins() method
- *
- * Revision 1.6  2000/02/03 04:53:48  sp
- * Bug fixes and small updates
- *
- * Revision 1.5  2000/01/21 00:35:29  sp
- * Various updates
- *
- * Revision 1.4  1999/10/31 07:15:34  sp
- * New logging API, splash screen updates, bug fixes
- *
- * Revision 1.3  1999/10/30 02:44:18  sp
- * Miscallaneous stuffs
- *
- */

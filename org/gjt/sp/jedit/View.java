@@ -1,6 +1,6 @@
 /*
  * View.java - jEdit view
- * Copyright (C) 1998, 1999, 2000 Slava Pestov
+ * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -41,7 +41,7 @@ import org.gjt.sp.util.Log;
  * class.
  *
  * @author Slava Pestov
- * @version $Id: View.java,v 1.213 2000/12/03 08:16:17 sp Exp $
+ * @version $Id: View.java,v 1.220 2001/04/18 03:09:44 sp Exp $
  */
 public class View extends JFrame implements EBComponent
 {
@@ -80,6 +80,7 @@ public class View extends JFrame implements EBComponent
 
 		searchBar.setHyperSearch(false);
 		searchBar.getField().setText(getTextArea().getSelectedText());
+		searchBar.getField().selectAll();
 		searchBar.getField().requestFocus();
 	}
 
@@ -97,6 +98,7 @@ public class View extends JFrame implements EBComponent
 
 		searchBar.setHyperSearch(true);
 		searchBar.getField().setText(getTextArea().getSelectedText());
+		searchBar.getField().selectAll();
 		searchBar.getField().requestFocus();
 	}
 
@@ -190,7 +192,7 @@ public class View extends JFrame implements EBComponent
 	{
 		editPane.saveCaretInfo();
 		EditPane oldEditPane = editPane;
-		setEditPane(createEditPane(oldEditPane,null));
+		setEditPane(createEditPane(oldEditPane.getBuffer()));
 		editPane.loadCaretInfo();
 
 		JComponent oldParent = (JComponent)oldEditPane.getParent();
@@ -677,12 +679,15 @@ public class View extends JFrame implements EBComponent
 		help = GUIUtilities.loadMenu(this,"help-menu");
 		plugins = GUIUtilities.loadMenu(this,"plugins");
 
-		editPane = createEditPane(null,buffer);
+		// finish persistent splits later
+		Component comp = restoreSplitConfig(buffer,"+");
+			/* jEdit.getProperty("view.splits") */;
+		dockableWindowManager.add(comp);
 
 		updateMarkerMenus();
 		updateMacrosMenu();
 		updatePluginsMenu();
-		updateHelpMenu();
+		//updateHelpMenu();
 
 		EditBus.addToBus(this);
 
@@ -708,12 +713,24 @@ public class View extends JFrame implements EBComponent
 		dockableWindowManager.init();
 	}
 
+	void saveSplitConfig()
+	{
+		StringBuffer splitConfig = new StringBuffer();
+		if(splitPane != null)
+			saveSplitConfig(splitPane,splitConfig);
+		else
+			splitConfig.append('+');
+		jEdit.setProperty("view.splits",splitConfig.reverse().toString());
+	}
+
 	void close()
 	{
 		closed = true;
 
 		// save dockable window geometry, and close 'em
 		dockableWindowManager.close();
+
+		saveSplitConfig();
 
 		GUIUtilities.saveGeometry(this,"view");
 		EditBus.removeFromBus(this);
@@ -861,6 +878,70 @@ public class View extends JFrame implements EBComponent
 		}
 	}
 
+	/*
+	 * The split config is recorded in a simple RPN "language":
+	 * + pushes a new edit pane onto the stack
+	 * - pops the two topmost elements off the stack, creates a
+	 * vertical split
+	 * | pops the two topmost elements off the stack, creates a
+	 * horizontal split
+	 *
+	 * Note that after saveSplitConfig() is called, we have to
+	 * reverse the RPN "program" because this method appends
+	 * stuff to the end, so the bottom-most nodes end up at the
+	 * end
+	 */
+	private void saveSplitConfig(JSplitPane splitPane,
+		StringBuffer splitConfig)
+	{
+		splitConfig.append(splitPane.getOrientation()
+			== JSplitPane.VERTICAL_SPLIT ? '-' : '|');
+
+		Component left = splitPane.getLeftComponent();
+		if(left instanceof JSplitPane)
+			saveSplitConfig((JSplitPane)left,splitConfig);
+		else
+			splitConfig.append('+');
+
+		Component right = splitPane.getLeftComponent();
+		if(right instanceof JSplitPane)
+			saveSplitConfig((JSplitPane)right,splitConfig);
+		else
+			splitConfig.append('+');
+	}
+
+	private Component restoreSplitConfig(Buffer buffer, String splitConfig)
+	{
+		Stack stack = new Stack();
+
+		for(int i = 0; i < splitConfig.length(); i++)
+		{
+			switch(splitConfig.charAt(i))
+			{
+			case '+':
+				stack.push(editPane = createEditPane(buffer));
+				editPane.loadCaretInfo();
+				break;
+			case '-':
+				stack.push(splitPane = new JSplitPane(
+					JSplitPane.VERTICAL_SPLIT,
+					(Component)stack.pop(),
+					(Component)stack.pop()));
+				splitPane.setBorder(null);
+				break;
+			case '|':
+				stack.push(splitPane = new JSplitPane(
+					JSplitPane.HORIZONTAL_SPLIT,
+					(Component)stack.pop(),
+					(Component)stack.pop()));
+				splitPane.setBorder(null);
+				break;
+			}
+		}
+
+		return (Component)stack.peek();
+	}
+
 	/**
 	 * Reloads various settings from the properties.
 	 */
@@ -910,9 +991,9 @@ public class View extends JFrame implements EBComponent
 		}
 	}
 
-	private EditPane createEditPane(EditPane pane, Buffer buffer)
+	private EditPane createEditPane(Buffer buffer)
 	{
-		EditPane editPane = new EditPane(this,pane,buffer);
+		EditPane editPane = new EditPane(this,buffer);
 		JEditTextArea textArea = editPane.getTextArea();
 		textArea.addFocusListener(new FocusHandler());
 		EditBus.send(new EditPaneUpdate(editPane,EditPaneUpdate.CREATED));
@@ -955,7 +1036,7 @@ public class View extends JFrame implements EBComponent
 				.elementAt(i)).path;
 			VFS vfs = VFSManager.getVFSForPath(path);
 			JMenuItem menuItem = new JMenuItem(
-				MiscUtilities.getFileName(path) + " ("
+				vfs.getFileName(path) + " ("
 				+ vfs.getParentOfPath(path) + ")");
 			menuItem.setActionCommand(path);
 			menuItem.addActionListener(listener);
@@ -1002,7 +1083,7 @@ public class View extends JFrame implements EBComponent
 					.replace('_',' ');
 
 				menu.add(new EnhancedMenuItem(label,
-					macro.action,null));
+					macro.action));
 			}
 			else if(obj instanceof Vector)
 			{
@@ -1072,7 +1153,8 @@ public class View extends JFrame implements EBComponent
 		}
 
 		// Sort them
-		MiscUtilities.quicksort(pluginMenuItems,new MenuItemCompare());
+		MiscUtilities.quicksort(pluginMenuItems,
+			new MiscUtilities.MenuItemCompare());
 
 		JMenu menu = plugins;
 		for(int i = 0; i < pluginMenuItems.size(); i++)
@@ -1090,20 +1172,13 @@ public class View extends JFrame implements EBComponent
 		}
 	}
 
-	private void updateHelpMenu()
+	/* private void updateHelpMenu()
 	{
 		ActionListener listener = new ActionListener()
 		{
 			public void actionPerformed(ActionEvent evt)
 			{
-				try
-				{
-					HelpViewer.gotoURL(new URL(evt.getActionCommand()));
-				}
-				catch(MalformedURLException e)
-				{
-					Log.log(Log.ERROR,View.this,e);
-				}
+				new HelpViewer(evt.getActionCommand());
 			}
 		};
 
@@ -1113,47 +1188,41 @@ public class View extends JFrame implements EBComponent
 		for(int i = 0; i < plugins.length; i++)
 		{
 			EditPlugin plugin = plugins[i];
-			// don't include broken plugins in list
-			// ... why?
-			//if(plugin instanceof EditPlugin.Broken)
-			//	continue;
+			EditPlugin.JAR jar = plugin.getJAR();
+			if(jar == null)
+				continue;
 
 			String name = plugin.getClassName();
 
-			String label = jEdit.getProperty("plugin." + name + ".name");
 			String docs = jEdit.getProperty("plugin." + name + ".docs");
+			String label = jEdit.getProperty("plugin." + name + ".name");
 			if(docs != null)
 			{
-				java.net.URL docsURL = plugin.getClass().getResource(docs);
-				if(label != null && docsURL != null)
+				if(label != null && docs != null)
 				{
-					if(menu.getItemCount() >= 20)
+					java.net.URL url = jar.getClassLoader()
+						.getResource(docs);
+					if(url != null)
 					{
-						menu.addSeparator();
-						JMenu newMenu = new JMenu(
-							jEdit.getProperty(
-							"common.more"));
-						menu.add(newMenu);
-						menu = newMenu;
-					}
+						if(menu.getItemCount() >= 20)
+						{
+							menu.addSeparator();
+							JMenu newMenu = new JMenu(
+								jEdit.getProperty(
+								"common.more"));
+							menu.add(newMenu);
+							menu = newMenu;
+						}
 
-					JMenuItem menuItem = new JMenuItem(label);
-					menuItem.setActionCommand(docsURL.toString());
-					menuItem.addActionListener(listener);
-					menu.add(menuItem);
+						JMenuItem menuItem = new JMenuItem(label);
+						menuItem.setActionCommand(url.toString());
+						menuItem.addActionListener(listener);
+						menu.add(menuItem);
+					}
 				}
 			}
 		}
-	}
-
-	private static class MenuItemCompare implements MiscUtilities.Compare
-	{
-		public int compare(Object obj1, Object obj2)
-		{
-			return ((JMenuItem)obj1).getText().compareTo(
-				((JMenuItem)obj2).getText());
-		}
-	}
+	} */
 
 	private void handleBufferUpdate(BufferUpdate msg)
 	{
