@@ -39,7 +39,7 @@ import org.gjt.sp.util.Log;
  * This class records and runs macros.
  *
  * @author Slava Pestov
- * @version $Id: Macros.java,v 1.51 2000/12/06 07:00:40 sp Exp $
+ * @version $Id: Macros.java,v 1.52 2000/12/24 02:54:47 sp Exp $
  */
 public class Macros
 {

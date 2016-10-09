@@ -32,7 +32,7 @@ import java.util.*;
 /**
  * Manages dockable windows.
  * @author Slava Pestov
- * @version $Id: DockableWindowManager.java,v 1.12 2000/12/06 07:00:40 sp Exp $
+ * @version $Id: DockableWindowManager.java,v 1.14 2001/01/22 10:39:26 sp Exp $
  * @since jEdit 2.6pre3
  */
 public class DockableWindowManager extends JPanel
@@ -74,7 +74,7 @@ public class DockableWindowManager extends JPanel
 	 */
 	public DockableWindowManager(View view)
 	{
-		setLayout(new BorderLayout());
+		setLayout(new DockableLayout());
 		this.view = view;
 		windows = new Hashtable();
 
@@ -82,6 +82,11 @@ public class DockableWindowManager extends JPanel
 		left = new DockableWindowContainer.TabbedPane(LEFT);
 		bottom = new DockableWindowContainer.TabbedPane(BOTTOM);
 		right = new DockableWindowContainer.TabbedPane(RIGHT);
+
+		add(BorderLayout.NORTH,top);
+		add(BorderLayout.WEST,left);
+		add(BorderLayout.SOUTH,bottom);
+		add(BorderLayout.EAST,right);
 	}
 
 	/**
@@ -320,58 +325,7 @@ public class DockableWindowManager extends JPanel
 	 */
 	public void propertiesChanged()
 	{
-		JComponent center;
-		if(view.getSplitPane() == null)
-			center = view.getEditPane();
-		else
-			center = view.getSplitPane();
-
-		removeAll();
-
-		if(jEdit.getBooleanProperty("view.docking.alternateLayout"))
-		{
-			/*
-			 +-----------+
-			 |           |
-			 +--+-----+--+
-			 |  |     |  |
-			 |  |     |  |
-			 |  |     |  |
-			 |  |     |  |
-			 +--+-----+--+
-			 |           |
-			 +-----------+
-			 */
-
-			add(BorderLayout.NORTH,top);
-			add(BorderLayout.WEST,left);
-			add(BorderLayout.EAST,right);
-			add(BorderLayout.SOUTH,bottom);
-			add(BorderLayout.CENTER,center);
-		}
-		else
-		{
-			/*
-			 +-----------+
-			 |  |     |  |
-			 |  +-----+  |
-			 |  |     |  |
-			 |  |     |  |
-			 |  |     |  |
-			 |  |     |  |
-			 |  +-----+  |
-			 |  |     |  |
-			 +-----------+
-			 */
-
-			add(BorderLayout.WEST,left);
-			JPanel centerPanel = new JPanel(new BorderLayout());
-			centerPanel.add(BorderLayout.NORTH,top);
-			centerPanel.add(BorderLayout.CENTER,center);
-			centerPanel.add(BorderLayout.SOUTH,bottom);
-			add(BorderLayout.CENTER,centerPanel);
-			add(BorderLayout.EAST,right);
-		}
+		alternateLayout = jEdit.getBooleanProperty("view.docking.alternateLayout");
 
 		left.propertiesChanged();
 		right.propertiesChanged();
@@ -384,6 +338,7 @@ public class DockableWindowManager extends JPanel
 	// private members
 	private View view;
 	private Hashtable windows;
+	private boolean alternateLayout;
 	private DockableWindowContainer.TabbedPane left;
 	private DockableWindowContainer.TabbedPane right;
 	private DockableWindowContainer.TabbedPane top;
@@ -394,6 +349,164 @@ public class DockableWindowManager extends JPanel
 		EditBus.addToBus(new DefaultFactory());
 		EditBus.addToNamedList(DockableWindow.DOCKABLE_WINDOW_LIST,"vfs.browser");
 		EditBus.addToNamedList(DockableWindow.DOCKABLE_WINDOW_LIST,"hypersearch-results");
+	}
+
+	class DockableLayout implements LayoutManager2
+	{
+		// these are Containers so that we can call getComponentCount()
+		Container top, left, bottom, right;
+		Component center;
+
+		public void addLayoutComponent(String name, Component comp)
+		{
+			addLayoutComponent(comp,name);
+		}
+
+		public void addLayoutComponent(Component comp, Object cons)
+		{
+			if(BorderLayout.NORTH.equals(cons))
+				top = (Container)comp;
+			else if(BorderLayout.WEST.equals(cons))
+				left = (Container)comp;
+			else if(BorderLayout.SOUTH.equals(cons))
+				bottom = (Container)comp;
+			else if(BorderLayout.EAST.equals(cons))
+				right = (Container)comp;
+			else
+				center = comp;
+		}
+
+		public void removeLayoutComponent(Component comp)
+		{
+			if(top == comp)
+				top = null;
+			else if(left == comp)
+				left = null;
+			else if(bottom == comp)
+				bottom = null;
+			else if(right == comp)
+				right = null;
+			else if(center == comp)
+				center = null;
+		}
+
+		public Dimension preferredLayoutSize(Container parent)
+		{
+			Dimension prefSize = new Dimension(0,0);
+			Dimension _top = top.getPreferredSize();
+			Dimension _left = left.getPreferredSize();
+			Dimension _bottom = bottom.getPreferredSize();
+			Dimension _right = right.getPreferredSize();
+			Dimension _center = (center == null
+				? new Dimension(0,0)
+				: center.getPreferredSize());
+
+			prefSize.height = _top.height + _bottom.height + _center.height;
+			prefSize.width = _left.width + _right.width + _center.width;
+
+			return prefSize;
+		}
+
+		public Dimension minimumLayoutSize(Container parent)
+		{
+			return preferredLayoutSize(parent);
+		}
+
+		public Dimension maximumLayoutSize(Container parent)
+		{
+			return new Dimension(Integer.MAX_VALUE,Integer.MAX_VALUE);
+		}
+
+		public void layoutContainer(Container parent)
+		{
+			Dimension size = parent.getSize();
+
+			Dimension prefSize = new Dimension(0,0);
+			Dimension _top = top.getPreferredSize();
+			Dimension _left = left.getPreferredSize();
+			Dimension _bottom = bottom.getPreferredSize();
+			Dimension _right = right.getPreferredSize();
+			Dimension _center = (center == null
+				? new Dimension(0,0)
+				: center.getPreferredSize());
+
+			if(_left.width + _right.width > size.width)
+			{
+				if(left.getComponentCount() == 0)
+					_left.width = 0;
+				else
+				{
+					_left.width = DockableWindowContainer
+						.TabbedPane.SPLITTER_WIDTH;
+				}
+
+				if(right.getComponentCount() == 0)
+					_right.width = 0;
+				else
+				{
+					_right.width = DockableWindowContainer
+						.TabbedPane.SPLITTER_WIDTH;
+				}
+			}
+
+			if(_top.height + _bottom.height > size.height)
+			{
+				if(top.getComponentCount() == 0)
+					_top.height = 0;
+				else
+				{
+					_top.height = DockableWindowContainer
+						.TabbedPane.SPLITTER_WIDTH;
+				}
+
+				if(bottom.getComponentCount() == 0)
+					_bottom.height = 0;
+				else
+				{
+					_bottom.height = DockableWindowContainer
+						.TabbedPane.SPLITTER_WIDTH;
+				}
+			}
+
+			int _width = size.width - _left.width - _right.width;
+			int _height = size.height - _top.height - _bottom.height;
+
+			if(alternateLayout)
+			{
+				top.setBounds(0,0,size.width,_top.height);
+				bottom.setBounds(0,size.height - _bottom.height,
+					size.width,_bottom.height);
+
+				left.setBounds(0,_top.height,_left.width,_height);
+				right.setBounds(size.width - _right.width,
+					_top.height,_right.width,_height);
+			}
+			else
+			{
+				left.setBounds(0,0,_left.width,size.height);
+				right.setBounds(size.width - _right.width,0,
+					_right.width,size.height);
+
+				top.setBounds(_left.width,0,_width,_top.height);
+				bottom.setBounds(_left.width,size.height - _bottom.height,
+					_width,_bottom.height);
+			}
+
+			if(center != null)
+				center.setBounds(_left.width,_top.height,_width,_height);
+		}
+
+		public float getLayoutAlignmentX(Container target)
+		{
+			return 0.5f;
+		}
+
+		public float getLayoutAlignmentY(Container target)
+		{
+			return 0.5f;
+		}
+
+		public void invalidateLayout(Container target) {}
 	}
 
 	static class Entry
@@ -412,7 +525,7 @@ public class DockableWindowManager extends JPanel
 	}
 
 	// factory for creating the dockables built into the jEdit core
-	// (VFS browser, etc)
+	// (VFS browser, HyperSearch results)
 	static class DefaultFactory implements EBComponent
 	{
 		public void handleMessage(EBMessage msg)

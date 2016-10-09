@@ -37,7 +37,7 @@ import org.gjt.sp.util.Log;
 /**
  * The main class of the VFS browser.
  * @author Slava Pestov
- * @version $Id: VFSBrowser.java,v 1.33 2000/12/14 01:01:57 sp Exp $
+ * @version $Id: VFSBrowser.java,v 1.35 2001/01/22 05:35:08 sp Exp $
  */
 public class VFSBrowser extends JPanel implements EBComponent, DockableWindow
 {
@@ -151,24 +151,27 @@ public class VFSBrowser extends JPanel implements EBComponent, DockableWindow
 
 		propertiesChanged();
 
-		String name = view.getBuffer().getName();
-		int index = name.lastIndexOf('.');
-
 		HistoryModel filterModel = HistoryModel.getModel("vfs.browser.filter");
 		String filter;
-		if(mode == BROWSER || !jEdit.getBooleanProperty(
+		if(mode == BROWSER || view == null || !jEdit.getBooleanProperty(
 			"vfs.browser.currentBufferFilter"))
 		{
 			filter = jEdit.getProperty("vfs.browser.last-filter");
 			if(filter == null)
 				filter = jEdit.getProperty("vfs.browser.default-filter");
 		}
-		else if(index == -1)
-			filter = jEdit.getProperty("vfs.browser.default-filter");
 		else
 		{
-			String ext = name.substring(index);
-			filter = "*" + ext;
+			String name = view.getBuffer().getName();
+			int index = name.lastIndexOf('.');
+
+			if(index == -1)
+				filter = jEdit.getProperty("vfs.browser.default-filter");
+			else
+			{
+				String ext = name.substring(index);
+				filter = "*" + ext;
+			}
 		}
 
 		filterField.setText(filter);

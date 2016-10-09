@@ -1,6 +1,6 @@
 /*
  * jEdit.java - Main class of the jEdit editor
- * Copyright (C) 1998, 1999, 2000 Slava Pestov
+ * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -39,7 +39,7 @@ import org.gjt.sp.util.Log;
 /**
  * The main class of the jEdit text editor.
  * @author Slava Pestov
- * @version $Id: jEdit.java,v 1.305 2000/12/14 01:01:57 sp Exp $
+ * @version $Id: jEdit.java,v 1.308 2001/01/22 10:39:26 sp Exp $
  */
 public class jEdit
 {
@@ -58,7 +58,7 @@ public class jEdit
 	public static String getBuild()
 	{
 		// (major).(minor).(<99 = preX, 99 = final).(bug fix)
-		return "03.00.99.00";
+		return "03.00.99.01";
 	}
 
 	/**
@@ -1009,8 +1009,8 @@ public class jEdit
 	{
 		Log.log(Log.NOTICE,jEdit.class,"Loading edit mode " + fileName);
 
-		XModeHandler xmh = new XModeHandler(fileName);
 		XmlParser parser = new XmlParser();
+		XModeHandler xmh = new XModeHandler(parser,fileName);
 		parser.setHandler(xmh);
 		try
 		{

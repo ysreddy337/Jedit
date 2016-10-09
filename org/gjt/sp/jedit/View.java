@@ -41,7 +41,7 @@ import org.gjt.sp.util.Log;
  * class.
  *
  * @author Slava Pestov
- * @version $Id: View.java,v 1.213 2000/12/03 08:16:17 sp Exp $
+ * @version $Id: View.java,v 1.216 2001/01/22 10:39:26 sp Exp $
  */
 public class View extends JFrame implements EBComponent
 {
@@ -678,6 +678,7 @@ public class View extends JFrame implements EBComponent
 		plugins = GUIUtilities.loadMenu(this,"plugins");
 
 		editPane = createEditPane(null,buffer);
+		dockableWindowManager.add(editPane);
 
 		updateMarkerMenus();
 		updateMacrosMenu();
