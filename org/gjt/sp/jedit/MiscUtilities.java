@@ -32,7 +32,7 @@ import java.util.StringTokenizer;
  * A quicksort implementation is also available.
  *
  * @author Slava Pestov
- * @version $Id: MiscUtilities.java,v 1.42 2000/12/06 07:00:40 sp Exp $
+ * @version $Id: MiscUtilities.java,v 1.43 2000/12/24 02:54:47 sp Exp $
  */
 public class MiscUtilities
 {
@@ -726,6 +726,9 @@ loop:		for(int i = 0; i < str.length(); i++)
 /*
  * ChangeLog:
  * $Log: MiscUtilities.java,v $
+ * Revision 1.43  2000/12/24 02:54:47  sp
+ * fixing bugs
+ *
  * Revision 1.42  2000/12/06 07:00:40  sp
  * Lotsa bug fixes
  *

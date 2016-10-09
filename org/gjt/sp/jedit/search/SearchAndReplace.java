@@ -33,7 +33,7 @@ import org.gjt.sp.util.Log;
  * Class that implements regular expression and literal search within
  * jEdit buffers.
  * @author Slava Pestov
- * @version $Id: SearchAndReplace.java,v 1.45 2000/12/01 07:39:59 sp Exp $
+ * @version $Id: SearchAndReplace.java,v 1.47 2001/01/22 05:35:08 sp Exp $
  */
 public class SearchAndReplace
 {
@@ -214,7 +214,7 @@ public class SearchAndReplace
 	 */
 	public static boolean hyperSearch(View view)
 	{
-		record(view,"hyperSearch(view);",false,true);
+		record(view,"hyperSearch(view)",false,true);
 
 		view.getDockableWindowManager().addDockableWindow(
 			HyperSearchResults.NAME);
@@ -267,7 +267,7 @@ public class SearchAndReplace
 			return false;
 		}
 
-		record(view,"SearchAndReplace.find(view);",false,true);
+		record(view,"find(view)",false,true);
 
 		view.showWaitCursor();
 
@@ -390,7 +390,7 @@ loop:			for(;;)
 			return false;
 		}
 
-		record(view,"SearchAndReplace.replace(view);",true,false);
+		record(view,"replace(view)",true,false);
 
 		try
 		{
@@ -433,7 +433,7 @@ loop:			for(;;)
 		int fileCount = 0;
 		int occurCount = 0;
 
-		record(view,"SearchAndReplace.replaceAll(view);",true,true);
+		record(view,"replaceAll(view)",true,true);
 
 		view.showWaitCursor();
 
@@ -611,7 +611,7 @@ loop:		for(;;)
 					+ fileset.getCode() + ");");
 			}
 
-			recorder.record("SearchAndReplace." + action);
+			recorder.record("SearchAndReplace." + action + ";");
 		}
 	}
 }

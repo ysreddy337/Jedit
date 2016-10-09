@@ -55,7 +55,7 @@ import org.gjt.sp.util.Log;
  * It is also faster and doesn't have as many bugs.
  *
  * @author Slava Pestov
- * @version $Id: JEditTextArea.java,v 1.110 2000/12/14 01:01:58 sp Exp $
+ * @version $Id: JEditTextArea.java,v 1.111 2000/12/24 02:54:48 sp Exp $
  */
 public class JEditTextArea extends JComponent
 {

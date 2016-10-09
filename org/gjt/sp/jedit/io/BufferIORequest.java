@@ -31,7 +31,7 @@ import org.gjt.sp.util.*;
 /**
  * A buffer I/O request.
  * @author Slava Pestov
- * @version $Id: BufferIORequest.java,v 1.9 2000/12/14 01:01:57 sp Exp $
+ * @version $Id: BufferIORequest.java,v 1.10 2001/01/22 10:39:26 sp Exp $
  */
 public class BufferIORequest extends WorkRequest
 {
@@ -637,8 +637,8 @@ public class BufferIORequest extends WorkRequest
 			}
 			catch(IOException io)
 			{
-				Log.log(Log.ERROR,this,io);
-				/* args[0] = io.toString();
+				/* Log.log(Log.ERROR,this,io);
+				args[0] = io.toString();
 				VFSManager.error(view,"ioerror",args); */
 			}
 			finally
