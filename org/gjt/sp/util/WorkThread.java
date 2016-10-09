@@ -22,7 +22,7 @@ package org.gjt.sp.util;
 /**
  * Services work requests in the background.
  * @author Slava Pestov
- * @version $Id: WorkThread.java,v 1.18 2000/12/06 07:00:41 sp Exp $
+ * @version $Id: WorkThread.java,v 1.1.1.1 2001/09/02 05:38:26 spestov Exp $
  */
 public class WorkThread extends Thread
 {

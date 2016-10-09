@@ -254,6 +254,8 @@ Richard Beton:      - Occam edit mode
 Saimon Moore:       - Velocity edit mode
 Tal Davidson:       - First implementation of syntax highlighting engine
 Tom Locke:          - Reverse search
+Will Sargent:       - JHTML edit mode
+                    - RelationalView edit mode
 Wojciech Stryjewski:- Verilog edit mode
 
 In addition to the above people, I would like to thank the plugin

@@ -139,7 +139,7 @@ BEGIN
     IDS_ERR_COM_FAILURE     "Application failure: could not initialize COM facilities."
     IDS_MSG_NEXTTIME        "You will be prompted for command line parameters the next time you run jEditLauncher"
     IDS_MSG_CONFIRM_NOSERVER
-                            "You have included ""--noserver"" among the jEdit command line options.  This will disable jEditLauncher;s ability to open files.  Do you wish to change this setting?"
+                            "You have included ""-noserver"" among the jEdit command line options.  This will disable jEditLauncher;s ability to open files.  Do you wish to change this setting?"
     IDS_ERR_JAVA_NOT_FOUND  "There is no Java executable in the directory %s.  Would you like to select another?"
 END
 
@@ -151,8 +151,8 @@ END
 STRINGTABLE DISCARDABLE
 BEGIN
     IDS_COMBO_1             "-jar"
-    IDS_COMBO_2             "-jar -mx32m"
-    IDS_COMBO_3             "-jar -mx64m"
+    IDS_COMBO_2             "-mx32m -jar"
+    IDS_COMBO_3             "-mx64m -jar"
     IDS_COMBO_4             "-classpath %CLASSPATH%;""C:\\Program Files\\jEdit\\jedit.jar"""
     IDS_COMBO_5             "-mx32m -classpath %CLASSPATH%;""C:\\Program Files\\jEdit\\jedit.jar"""
     IDS_COMBO_6             "-mx64m -classpath %CLASSPATH%;""C:\\Program Files\\jEdit\\jedit.jar"""

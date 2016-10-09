@@ -39,7 +39,7 @@ import org.gjt.sp.util.Log;
 /**
  * HyperSearch results window.
  * @author Slava Pestov
- * @version $Id: HyperSearchResults.java,v 1.4 2001/07/19 06:26:52 sp Exp $
+ * @version $Id: HyperSearchResults.java,v 1.1.1.1 2001/09/02 05:38:00 spestov Exp $
  */
 public class HyperSearchResults extends JPanel implements DockableWindow,
 	EBComponent

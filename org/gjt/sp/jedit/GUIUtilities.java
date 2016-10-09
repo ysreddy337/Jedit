@@ -51,7 +51,7 @@ import org.gjt.sp.util.Log;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: GUIUtilities.java,v 1.91 2001/08/04 02:18:20 sp Exp $
+ * @version $Id: GUIUtilities.java,v 1.1.1.1 2001/09/02 05:37:21 spestov Exp $
  */
 public class GUIUtilities
 {

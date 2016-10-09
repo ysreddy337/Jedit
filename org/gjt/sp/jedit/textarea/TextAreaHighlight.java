@@ -28,7 +28,7 @@ import java.awt.event.MouseEvent;
  * to paint custom highlights.
  *
  * @author Slava Pestov
- * @version $Id: TextAreaHighlight.java,v 1.3 2001/01/26 03:46:56 sp Exp $
+ * @version $Id: TextAreaHighlight.java,v 1.1.1.1 2001/09/02 05:38:11 spestov Exp $
  */
 public interface TextAreaHighlight
 {

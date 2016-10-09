@@ -28,7 +28,7 @@ import org.gjt.sp.jedit.MiscUtilities;
 /**
  * A regular expression string matcher.
  * @author Slava Pestov
- * @version $Id: RESearchMatcher.java,v 1.11 2001/07/02 09:33:02 sp Exp $
+ * @version $Id: RESearchMatcher.java,v 1.1.1.1 2001/09/02 05:37:57 spestov Exp $
  */
 public class RESearchMatcher implements SearchMatcher
 {

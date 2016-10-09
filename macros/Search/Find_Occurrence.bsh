@@ -34,7 +34,7 @@
  * which opens (if necessary) the buffer in which the search commenced
  * and restores the starting caret position.
  *
- * $Id: Find_Occurrence.bsh,v 1.2 2001/06/23 04:19:21 jgellene Exp $
+ * $Id: Find_Occurrence.bsh,v 1.1.1.1 2001/09/02 05:39:34 spestov Exp $
  */
 
  import javax.swing.SwingUtilities;

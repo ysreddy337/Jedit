@@ -28,7 +28,7 @@ import org.gjt.sp.util.Log;
 /**
  * A file set for searching a user-specified list of buffers.
  * @author Slava Pestov
- * @version $Id: BufferListSet.java,v 1.19 2001/08/23 07:39:09 sp Exp $
+ * @version $Id: BufferListSet.java,v 1.1.1.1 2001/09/02 05:37:55 spestov Exp $
  */
 public class BufferListSet implements SearchFileSet
 {

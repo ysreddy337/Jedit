@@ -30,7 +30,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Text field with an arrow-key accessable history.
  * @author Slava Pestov
- * @version $Id: HistoryTextField.java,v 1.45 2001/08/27 07:03:58 sp Exp $
+ * @version $Id: HistoryTextField.java,v 1.1.1.1 2001/09/02 05:37:45 spestov Exp $
  */
 public class HistoryTextField extends JTextField
 {

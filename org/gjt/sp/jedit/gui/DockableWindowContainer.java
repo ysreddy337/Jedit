@@ -30,7 +30,7 @@ import org.gjt.sp.jedit.*;
  * A container for dockable windows. This class should never be used
  * directly.
  * @author Slava Pestov
- * @version $Id: DockableWindowContainer.java,v 1.21 2001/04/18 03:09:45 sp Exp $
+ * @version $Id: DockableWindowContainer.java,v 1.1.1.1 2001/09/02 05:37:39 spestov Exp $
  * @since jEdit 2.6pre3
  */
 public interface DockableWindowContainer

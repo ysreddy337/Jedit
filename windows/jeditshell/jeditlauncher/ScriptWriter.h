@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: ScriptWriter.h,v 1.3 2001/08/25 00:31:02 jgellene Exp $
+ * $Id: ScriptWriter.h,v 1.4 2001/09/05 11:24:52 jgellene Exp $
  */
 
 #if !defined(__SCRIPTWRITER_H__)
@@ -152,7 +152,7 @@ class StartAppScript : public ScriptWriter
 {
 	/* constructor */
 public:
-	StartAppScript();
+	StartAppScript(LPCTSTR lpszCmdLine);
 	virtual ~StartAppScript();
 
 	/* Overrides */
@@ -164,6 +164,7 @@ protected:
 	/* Data */
 private:
 	bool bFirstFile;
+	LPCTSTR m_lpszCmdLine;
 
 	/* No copying */
 private:

@@ -35,6 +35,14 @@
 	"h:\program files\microsoft platform sdk\include\guiddef.h"\
 	
 
+.\RegistryParser.cpp : \
+	".\jeditlauncher.h"\
+	".\JELauncher.h"\
+	".\ScriptServer.h"\
+	".\ServConn.h"\
+	".\StdAfx.h"\
+	
+
 .\ScriptServer.cpp : \
 	".\ScriptServer.h"\
 	".\ServConn.h"\

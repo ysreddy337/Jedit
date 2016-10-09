@@ -25,7 +25,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: JELRegInstaller.cpp,v 1.6 2001/09/01 04:29:05 jgellene Exp $
+ * $Id: JELRegInstaller.cpp,v 1.9 2001/09/08 01:17:10 jgellene Exp $
  */
 
 #include "stdafx.h"
@@ -33,6 +33,7 @@
 #include "InstallData.h"
 #include "CtxMenuDlg.h"
 #include "StringPtr.h"
+#include "InstallerLog.h"
 #include "JELRegInstaller.h"
 #include <assert.h>
 
@@ -48,6 +49,7 @@ JELRegistryInstaller::~JELRegistryInstaller() {}
 
 HRESULT JELRegistryInstaller::Install()
 {
+	InstallerLog::Log("Commencing installation of registry entires. . . .\n");
 	HRESULT hr;
 
 	// register proxy/stub DLL
@@ -92,6 +94,10 @@ HRESULT JELRegistryInstaller::Install()
 
 HRESULT JELRegistryInstaller::RegisterDLL(LPCTSTR szPath, BOOL bRegister)
 {
+	if(bRegister)
+	{
+		InstallerLog::Log("Registering %s. . .  ", szPath);
+	}
 	FARPROC proc = 0;
 	HRESULT hr;
 	LPCTSTR szProc = bRegister ? _T("DllRegisterServer") :
@@ -100,10 +106,14 @@ HRESULT JELRegistryInstaller::RegisterDLL(LPCTSTR szPath, BOOL bRegister)
 	if(hModule == 0 || (proc = GetProcAddress(hModule, szProc)) == 0
 		|| S_OK != (proc)())
 	{
+		if(bRegister)
+			InstallerLog::Log("Registration failed.\n");
 		hr = E_FAIL;
 	}
 	else
 	{
+		if(bRegister)
+			InstallerLog::Log("Registration succeeded.\n");
 		hr = S_OK;
 	}
 	if(hModule != 0)
@@ -113,6 +123,10 @@ HRESULT JELRegistryInstaller::RegisterDLL(LPCTSTR szPath, BOOL bRegister)
 
 HRESULT JELRegistryInstaller::RegisterEXE(LPCTSTR szPath, BOOL bRegister)
 {
+	if(bRegister)
+	{
+		InstallerLog::Log("Registering %s. . .  ", szPath);
+	}
 	CString strCmdLine(szPath);
 	strCmdLine += (bRegister ? _T(" /RegServer") : _T(" /UnregServer"));
 	CStringBuf<> bufCmdLine(strCmdLine);
@@ -121,7 +135,16 @@ HRESULT JELRegistryInstaller::RegisterEXE(LPCTSTR szPath, BOOL bRegister)
 	PROCESS_INFORMATION pi;
 	BOOL bReturn =  CreateProcess(0, bufCmdLine, 0, 0, 0, 0, 0, 0, &si, &pi);
 	if(!bReturn)
+	{
+		if(bRegister)
+			InstallerLog::Log("Registration failed.\n");
 		DWORD swError = GetLastError();
+	}
+	else
+	{
+		if(bRegister)
+			InstallerLog::Log("Registration succeeded.\n");
+	}
 	return bReturn ? S_OK : E_FAIL;
 }
 
@@ -144,6 +167,7 @@ HRESULT JELRegistryInstaller::CorrectTempCtxReg()
 
 HRESULT JELRegistryInstaller::RegisterUninstall()
 {
+	InstallerLog::Log("Registering uninstall data for Add/Remove programs...\n");
 	HKEY hKey;
 	CString strUninstallKey((LPCSTR)IDS_REG_UNINSTALL_KEY);
 	strUninstallKey += pData->strInstallVersion;
@@ -153,38 +177,42 @@ HRESULT JELRegistryInstaller::RegisterUninstall()
 		KEY_WRITE, 0, &hKey, 0);
 	if(nResult == ERROR_SUCCESS)
 	{
-		::OutputDebugString("Found key\n");
+		InstallerLog::Log("Found uninstall key\n");
 		CString strUninstall(pData->strInstallDir);
 		strUninstall += "\\unlaunch.exe";
 		nResult = RegSetValueEx(hKey, "UninstallString", 0, REG_SZ,
 			(const LPBYTE)(LPCTSTR)strUninstall,
 			InstallData::GetBufferByteLen(strUninstall));
-		OutputDebugString(nResult == ERROR_SUCCESS ?
-			"UninstallString OK" : "UninstallString error");
+		InstallerLog::Log("UninstallString %s.\n",
+			nResult == ERROR_SUCCESS ? "OK" : "error");
 		CString strInstall(pData->strInstallDir);
 		strInstall += "\\jedit.exe /i ";
 		strInstall += pData->strJavaHome;
 		nResult = RegSetValueEx(hKey, "InstallPath", 0, REG_SZ,
 			(const LPBYTE)(LPCTSTR)strInstall,
 			InstallData::GetBufferByteLen(strInstall));
-		OutputDebugString(nResult == ERROR_SUCCESS ?
-			"InstallPath OK" : "InstallPath error");
+		InstallerLog::Log("Install Path %s.\n", 
+			nResult == ERROR_SUCCESS ? "OK" : "error");
 		CString strDisplayIcon(pData->strInstallDir);
 		strDisplayIcon += "\\jedit.exe, 0";
 		nResult = RegSetValueEx(hKey, "DisplayIcon", 0, REG_SZ,
 			(const LPBYTE)(LPCTSTR)strDisplayIcon,
 			InstallData::GetBufferByteLen(strDisplayIcon));
-		OutputDebugString(nResult == ERROR_SUCCESS ?
-			"DisplayIcon OK" : "DisplayIcon error");
+		InstallerLog::Log("Display Icon %s.\n",
+			nResult == ERROR_SUCCESS ? "OK" : "error");
 	}
 	else
-		::OutputDebugString("Could not find key\n");
+		InstallerLog::Log("Could not find uninstall registry key\n");
 	RegCloseKey(hKey);
+	InstallerLog::Log(nResult == ERROR_SUCCESS ?
+		"Uninstall registration succeeded.\n" :
+		"Uninstall registration failed.\n");
 	return (nResult == ERROR_SUCCESS ? S_OK : E_FAIL);
 }
 
 HRESULT JELRegistryInstaller::RegisterPrimaryVersion()
 {
+	InstallerLog::Log("Checking for multiple installations. . . .\n");
 	if(pData->nInstalledVersions == 0)
 		return S_FALSE;
 	int nIndexPrimaryVer = pData->nIndexSubjectVer;
@@ -274,6 +302,8 @@ HRESULT JELRegistryInstaller::RegisterPrimaryVersion()
 		return E_FAIL;
 	if(nIndexPrimaryVer != pData->nIndexSubjectVer)
 	{
+		InstallerLog::Log("Found multiple versions, registering version found in:\n");
+		InstallerLog::Log((LPCTSTR)strCurVerDir);
 		CString strNewPrimaryPath(strCurVerDir);
 		strNewPrimaryPath += _T("\\jeshlstb.dll");
 		RegisterDLL(strNewPrimaryPath, TRUE);
@@ -291,6 +321,7 @@ HRESULT JELRegistryInstaller::RegisterPrimaryVersion()
 
 HRESULT JELRegistryInstaller::RegisterCmdLineParameters()
 {
+	InstallerLog::Log("Registering command line parameters. . . .\n");
 	HKEY hLauncherKey, hVersionKey;
 	DWORD dwDisp;
 	int nResult;
@@ -300,7 +331,6 @@ HRESULT JELRegistryInstaller::RegisterCmdLineParameters()
 							_T("Java Options"),
 							_T("jEdit Target"),
 							_T("jEdit Options"),
-							_T("jEdit Server File"),
 							_T("jEdit Working Directory"),
 							_T("Launcher GUID"),
 							_T("Installation Directory") };
@@ -315,7 +345,12 @@ HRESULT JELRegistryInstaller::RegisterCmdLineParameters()
 			"Do you wish to retain command line parameters from your existing installation of jEditLauncher?",
 			"jEditLauncher", MB_ICONQUESTION | MB_YESNO))
 	{
+		InstallerLog::Log("Using parameters from existing installation.\n");
 		bUseOldParameters = true;
+	}
+	else
+	{
+		InstallerLog::Log("Writing default parameters.\n");
 	}
 
 	CString strLauncherParamKeyPath((LPCSTR)IDS_REG_LAUNCHER_PARAM_KEY);
@@ -325,78 +360,115 @@ HRESULT JELRegistryInstaller::RegisterCmdLineParameters()
 	RegCreateKeyEx(hLauncherKey, strVersion, 0, 0, 0,
 		KEY_ALL_ACCESS, 0, &hVersionKey, &dwDisp);
 
+	// "Java Executable"
 	if(!bUseOldParameters)
 	{
-		// "Java Executable"
 		nResult = RegQueryValueEx(hVersionKey, arszValues[0], 0, 0, 0, &dwValueSize);
 		if(nResult != ERROR_SUCCESS || dwValueSize == 0)
 		{
 			CString strJavaExec(pData->strJavaHome);
 			strJavaExec += _T("\\javaw.exe");
-			RegSetValueEx(hVersionKey, arszValues[0], 0,
+			nResult = RegSetValueEx(hVersionKey, arszValues[0], 0,
 				REG_SZ, (LPBYTE)(LPCTSTR)strJavaExec,
 				InstallData::GetBufferByteLen(strJavaExec));
+			if(ERROR_SUCCESS == nResult)
+			{
+				InstallerLog::Log(
+					"Writing \"Java Executable\" registry parameter: &s\n",
+					(LPCSTR)strJavaExec);
+			}
+			else
+			{
+				InstallerLog::Log(
+					"Could not write \"Java Executable\" registry parameter.\n");
+			}
 		}
-
-		// "Java Options"
-		nResult = RegQueryValueEx(hVersionKey, arszValues[1], 0, 0, (LPBYTE)szBuf, &dwValueSize);
-		if(nResult != ERROR_SUCCESS || dwValueSize == 0)
+	}
+	// "Java Options" - set if new parameters, update old parameter
+	nResult = RegQueryValueEx(hVersionKey, arszValues[1], 0, 0, (LPBYTE)szBuf, &dwValueSize);
+	if(!bUseOldParameters || nResult != ERROR_SUCCESS || dwValueSize == 0)
+	{
+		bUseOldParameters = false;
+		CString strJavaOptions(_T("-jar -mx32m"));
+//		strJavaOptions.Format(IDS_REG_JAVAPARAM_DEFAULT,
+//			pData->arPathNames[pData->nIndexSubjectVer]);
+		nResult = RegSetValueEx(hVersionKey, arszValues[1], 0,
+			REG_SZ, (LPBYTE)(LPCTSTR)strJavaOptions,
+			InstallData::GetBufferByteLen(strJavaOptions));
+		if(ERROR_SUCCESS == nResult)
 		{
-			CString strJavaOptions(_T("-jar -mx32m"));
-//			strJavaOptions.Format(IDS_REG_JAVAPARAM_DEFAULT,
-//				pData->arPathNames[pData->nIndexSubjectVer]);
-			RegSetValueEx(hVersionKey, arszValues[1], 0,
-				REG_SZ, (LPBYTE)(LPCTSTR)strJavaOptions,
-				InstallData::GetBufferByteLen(strJavaOptions));
+			InstallerLog::Log("Writing \"Java Options\" registry parameter:	%s\n",
+				(LPCSTR)strJavaOptions);
 		}
 		else
 		{
-			UpdateJarParameter(szBuf);
-			RegSetValueEx(hVersionKey, arszValues[1], 0,
-				REG_SZ, (LPBYTE)szBuf,
-				(_tcslen(szBuf) + 1) * sizeof(TCHAR));
+			InstallerLog::Log(
+				"Could not write \"Java Options\" registry parameter.\n");
 		}
-	}
-
-	// "jEdit Target" -- must always be set
-	nResult = RegQueryValueEx(hVersionKey, arszValues[2], 0, 0, (LPBYTE)szBuf, &dwValueSize);
-	if(nResult != ERROR_SUCCESS || dwValueSize == 0 || !bUseOldParameters)
-	{
-		CString strJEditTarget(_T("\""));
-		strJEditTarget += pData->strInstallPath.Left(pData->strInstallPath.GetLength() - 12);
-		strJEditTarget += _T("jedit.jar\"");
-		RegSetValueEx(hVersionKey, arszValues[2], 0,
-			REG_SZ, (LPBYTE)(LPCTSTR)strJEditTarget,
-			InstallData::GetBufferByteLen(strJEditTarget));
 	}
 	else
 	{
 		UpdateJarParameter(szBuf);
-		RegSetValueEx(hVersionKey, arszValues[2], 0,
+		nResult = RegSetValueEx(hVersionKey, arszValues[1], 0,
 			REG_SZ, (LPBYTE)szBuf,
 			(_tcslen(szBuf) + 1) * sizeof(TCHAR));
+		if(ERROR_SUCCESS == nResult)
+		{
+			InstallerLog::Log("Writing \"Java Options\" registry parameter:	%s\n",
+				(LPCSTR)szBuf);
+		}
+		else
+		{
+			InstallerLog::Log(
+				"Could not write \"Java Options\" registry parameter.\n");
+		}
+	}
+
+	// "jEdit Target" -- must always be set
+	CString strJEditTarget;
+	nResult = RegQueryValueEx(hVersionKey, arszValues[2], 0, 0, (LPBYTE)szBuf, &dwValueSize);
+	if(nResult != ERROR_SUCCESS || dwValueSize == 0
+		|| !bUseOldParameters || strstr(szBuf, "jedit.jar") != 0)
+	{
+		strJEditTarget = _T("\"");
+		strJEditTarget += pData->strInstallPath.Left(pData->strInstallPath.GetLength() - 12);
+		strJEditTarget += _T("jedit.jar\"");
+	}
+	else
+	{
+		strJEditTarget = _T("org.gjt.sp.jedit.jEdit");
+	}
+	nResult = RegSetValueEx(hVersionKey, arszValues[2], 0,
+		REG_SZ, (LPBYTE)(LPCTSTR)strJEditTarget,
+		InstallData::GetBufferByteLen(strJEditTarget));
+	if(ERROR_SUCCESS == nResult)
+	{
+		InstallerLog::Log("Writing \"jEdit Target\" registry parameter:	%s\n",
+			(LPCSTR)strJEditTarget);
+	}
+	else
+	{
+		InstallerLog::Log(
+			"Could not write \"jEdit Target\" registry parameter.\n");
 	}
 
 
+	// "jEdit Options" - default is no options
 	if(!bUseOldParameters)
 	{
 		// "jEdit Options"
-		nResult = RegQueryValueEx(hVersionKey, arszValues[3], 0, 0, (LPBYTE)szBuf, &dwValueSize);
-		if(nResult != ERROR_SUCCESS || dwValueSize == 0)
-		{
-			szBuf[0] = 0;
-			nResult = RegSetValueEx(hVersionKey, arszValues[3], 0,
+		char szBuf = 0;
+		nResult = RegSetValueEx(hVersionKey, arszValues[3], 0,
 			REG_SZ, (LPBYTE)szBuf, sizeof(TCHAR));
-			::OutputDebugString( nResult == ERROR_SUCCESS ? "OK" : "Error");
+		if(ERROR_SUCCESS == nResult)
+		{
+			InstallerLog::Log(
+				"Writing empty \"jEdit Options\" registry parameter.\n");
 		}
-
-		// "jEdit Server File"
-		nResult = RegQueryValueEx(hVersionKey, arszValues[4], 0, 0, (LPBYTE)szBuf, &dwValueSize);
-		if(nResult != ERROR_SUCCESS || dwValueSize == 0)
+		else
 		{
-			szBuf[0] = 0;
-			RegSetValueEx(hVersionKey, arszValues[4], 0,
-			REG_SZ, (LPBYTE)szBuf, sizeof(TCHAR));
+			InstallerLog::Log(
+				"Could not write \"jEdit Options\" registry parameter.\n");
 		}
 	}
 
@@ -405,23 +477,58 @@ HRESULT JELRegistryInstaller::RegisterCmdLineParameters()
 	// an orphan entry following an uninstall of another version
 
 	CString strWorkingDir(pData->arPathNames[pData->nIndexSubjectVer]);
-	RegSetValueEx(hVersionKey, arszValues[5], 0,
+	nResult = RegSetValueEx(hVersionKey, arszValues[4], 0,
 		REG_SZ, (LPBYTE)(LPCTSTR)strWorkingDir,
 		InstallData::GetBufferByteLen(strWorkingDir));
+	if(ERROR_SUCCESS == nResult)
+	{
+		InstallerLog::Log(
+			"Writing \"jEdit Working Directory\" registry parameter: %s\n",
+				(LPCTSTR)strWorkingDir);
+	}
+	else
+	{
+		InstallerLog::Log(
+			"Could not write \"jEdit Working Directory\" registry parameter.\n");
+	}
+
 
 	// "Launcher GUID"
-	RegSetValueEx(hVersionKey, arszValues[6], 0,
+	nResult = RegSetValueEx(hVersionKey, arszValues[5], 0,
 		REG_SZ, (LPBYTE)(LPCTSTR)pData->strInstallGUID,
 		InstallData::GetBufferByteLen(pData->strInstallGUID));
+	if(ERROR_SUCCESS == nResult)
+	{
+		InstallerLog::Log(
+			"Writing \"Launcher GUID\" registry parameter: %s\n",
+				(LPCTSTR)pData->strInstallGUID);
+	}
+	else
+	{
+		InstallerLog::Log(
+			"Could not write \"Launcher GUID\" registry parameter.\n");
+	}
 
 	// "Installation Dir"
-	RegSetValueEx(hVersionKey, arszValues[7], 0,
+	nResult = RegSetValueEx(hVersionKey, arszValues[6], 0,
 		REG_SZ, (LPBYTE)(LPCTSTR)pData->strInstallDir,
 		InstallData::GetBufferByteLen(pData->strInstallDir));
+	if(ERROR_SUCCESS == nResult)
+	{
+		InstallerLog::Log(
+			"Writing \"Installation Dir\" registry parameter: %s\n",
+				(LPCTSTR)pData->strInstallDir);
+	}
+	else
+	{
+		InstallerLog::Log(
+			"Could not write \"Installation Dir\" registry parameter.\n");
+	}
 
 
 	RegCloseKey(hVersionKey);
 	RegCloseKey(hLauncherKey);
+	InstallerLog::Log("Command line parameters registered.\n");
 	return S_OK;
 }
 

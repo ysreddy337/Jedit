@@ -40,6 +40,7 @@ CLEAN :
 	-@erase "$(INTDIR)\CtxMenuDlg.obj"
 	-@erase "$(INTDIR)\DeferFileOps.obj"
 	-@erase "$(INTDIR)\InstallData.obj"
+	-@erase "$(INTDIR)\InstallerLog.obj"
 	-@erase "$(INTDIR)\jedinstl.obj"
 	-@erase "$(INTDIR)\jedinstl.pch"
 	-@erase "$(INTDIR)\jedinstl.res"
@@ -103,6 +104,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\CtxMenuDlg.obj" \
 	"$(INTDIR)\DeferFileOps.obj" \
 	"$(INTDIR)\InstallData.obj" \
+	"$(INTDIR)\InstallerLog.obj" \
 	"$(INTDIR)\jedinstl.obj" \
 	"$(INTDIR)\JELInstaller.obj" \
 	"$(INTDIR)\JELRegInstaller.obj" \
@@ -129,6 +131,7 @@ CLEAN :
 	-@erase "$(INTDIR)\CtxMenuDlg.obj"
 	-@erase "$(INTDIR)\DeferFileOps.obj"
 	-@erase "$(INTDIR)\InstallData.obj"
+	-@erase "$(INTDIR)\InstallerLog.obj"
 	-@erase "$(INTDIR)\jedinstl.obj"
 	-@erase "$(INTDIR)\jedinstl.res"
 	-@erase "$(INTDIR)\JELInstaller.obj"
@@ -195,6 +198,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\CtxMenuDlg.obj" \
 	"$(INTDIR)\DeferFileOps.obj" \
 	"$(INTDIR)\InstallData.obj" \
+	"$(INTDIR)\InstallerLog.obj" \
 	"$(INTDIR)\jedinstl.obj" \
 	"$(INTDIR)\JELInstaller.obj" \
 	"$(INTDIR)\JELRegInstaller.obj" \
@@ -243,6 +247,11 @@ SOURCE=.\DeferFileOps.cpp
 SOURCE=.\InstallData.cpp
 
 "$(INTDIR)\InstallData.obj" : $(SOURCE) "$(INTDIR)"
+
+
+SOURCE=.\InstallerLog.cpp
+
+"$(INTDIR)\InstallerLog.obj" : $(SOURCE) "$(INTDIR)"
 
 
 SOURCE=.\jedinstl.cpp

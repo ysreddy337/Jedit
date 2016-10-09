@@ -31,7 +31,7 @@ import org.gjt.sp.util.Log;
  * actions.xml file.
  *
  * @author Slava Pestov
- * @version $Id: EditAction.java,v 1.37 2001/07/11 06:59:20 sp Exp $
+ * @version $Id: EditAction.java,v 1.1.1.1 2001/09/02 05:37:08 spestov Exp $
  */
 public abstract class EditAction
 // no longer implements ActionListener

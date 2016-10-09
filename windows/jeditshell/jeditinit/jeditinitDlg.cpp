@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: jeditinitDlg.cpp,v 1.1.1.1 2001/07/03 13:14:19 jgellene Exp $
+ * $Id: jeditinitDlg.cpp,v 1.3 2001/09/05 11:31:38 jgellene Exp $
  */
 
 // jeditinitDlg.cpp : Implementation of CJeditinitDlg
@@ -111,10 +111,10 @@ BOOL CJeditinitDlg::DoRegistryExchange(BOOL bSendToDialog)
 		{
 			hVersionKey.SetValue(m_strings[i], keyValues[i]);
 		}
-		// JAVA_SERVER_FILE variable parsed from jEdit options
-		CString strServerFile;
-		MakeServerFilePath(strServerFile);
-		hVersionKey.SetValue(strServerFile, _T("jEdit Server File"));
+		// JAVA_SERVER_FILE variable now parsed at runtime
+//		CString strServerFile;
+//		MakeServerFilePath(strServerFile);
+//		hVersionKey.SetValue(strServerFile, _T("jEdit Server File"));
 	}
 	hVersionKey.Close();
 	return TRUE;
@@ -302,6 +302,7 @@ BOOL  CJeditinitDlg::ValidateData()
 // the JAVA_SERVER_FILE variable from the contents of the
 // Java Options data without requiring a separate entry
 
+/*
 BOOL CJeditinitDlg::MakeServerFilePath(CString& strFileName)
 {
 	CStringBuf<>strPtr(strFileName);
@@ -313,8 +314,9 @@ BOOL CJeditinitDlg::MakeServerFilePath(CString& strFileName)
 		const TCHAR *pSrc = (LPCTSTR)m_strings[JEditOptions] + nSettingsIndex + 9;
 		while(*++pSrc && isspace(*pSrc));
 		TCHAR settingsStop = (*pSrc == _T('\"')) ? _T('\"') : _T(' ');
-		if(*pSrc != 0)
-			*pDest++ = *pSrc++;
+		if(*pSrc != 0 && *pSrc != '\"')
+			*pDest++ = *pSrc;
+		++pSrc;
 		while(*pSrc && *pSrc != settingsStop)
 			*pDest++ = *pSrc++;
 		if(*pSrc != _T('\\') || (*pSrc == _T('\"') && *(pSrc - 1) != _T('\\')))
@@ -353,8 +355,9 @@ BOOL CJeditinitDlg::MakeServerFilePath(CString& strFileName)
 	}
 	else if(nSettingsIndex != -1)
 		_tcscat((LPTSTR)strPtr, _T("server"));
-	if(*(LPTSTR)strPtr == _T('\"'))
-		_tcscat((LPTSTR)strPtr, _T("\""));
+//	if(*(LPTSTR)strPtr == _T('\"'))
+//		_tcscat((LPTSTR)strPtr, _T("\""));
 
 	return( nSettingsIndex != -1 || nServerNameIndex != -1);
 }
+*/

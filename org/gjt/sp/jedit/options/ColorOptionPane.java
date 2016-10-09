@@ -35,7 +35,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Color option pane.
  * @author Slava Pestov
- * @version $Id: ColorOptionPane.java,v 1.4 2001/04/24 06:52:13 sp Exp $
+ * @version $Id: ColorOptionPane.java,v 1.1.1.1 2001/09/02 05:37:54 spestov Exp $
  */
 public class ColorOptionPane extends AbstractOptionPane
 {

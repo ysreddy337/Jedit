@@ -19,7 +19,7 @@
  * along with the jEdit program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: Write_File_Header.bsh,v 1.4 2001/07/15 19:04:16 jgellene Exp $
+ * $Id: Write_File_Header.bsh,v 1.1.1.1 2001/09/02 05:39:36 spestov Exp $
  *
  * Notes on use:
  *

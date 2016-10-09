@@ -33,7 +33,7 @@ import org.gjt.sp.util.Log;
  * jEdit's registers are an extension of the clipboard metaphor.
  *
  * @author Slava Pestov
- * @version $Id: Registers.java,v 1.27 2001/08/01 07:37:11 sp Exp $
+ * @version $Id: Registers.java,v 1.1.1.1 2001/09/02 05:37:26 spestov Exp $
  */
 public class Registers
 {

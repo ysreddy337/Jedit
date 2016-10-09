@@ -4,6 +4,7 @@
 #include "Jeditlauncher.h"
 #include "FileList.h"
 #include "ScriptWriter.h"
+#include "RegistryParser.h"
 #include "JELauncher.h"
 #include <assert.h>
 
@@ -12,12 +13,14 @@
 
 CJEditLauncher::CJEditLauncher()
 	: m_bRunDiff(FALSE), m_pFileList(0),
-	  m_pScriptServer(0), m_hJEditProcess(0),
+	  m_pScriptServer(0), m_pRegParser(0),
+	  m_hJEditProcess(0),
 	  m_bSendScriptOnLaunch(FALSE),
 	  m_nIDTimer(0), m_nCounter(0),
 	  m_nDelayedRelease(0)
 {
-	m_pScriptServer = new CScriptServer();
+	m_pRegParser = new RegistryParser();
+	m_pScriptServer = new CScriptServer(m_pRegParser);
 	_Module.pLauncher = this;
 #if defined SPECIAL_BUILD
 	hFile = 0;
@@ -30,6 +33,7 @@ CJEditLauncher::~CJEditLauncher()
 	_Module.pLauncher = 0;
 	delete m_pFileList;
 	delete m_pScriptServer;
+	delete m_pRegParser;
 #if defined SPECIAL_BUILD
 	if(hFile)
 	{
@@ -225,7 +229,7 @@ STDMETHODIMP CJEditLauncher::Launch()
 	}
 	char* pScript = 0;
 	char* pDummy = 0;
-	StartAppScript script;
+	StartAppScript script(m_pRegParser->GetCommandLine());
 	script.WriteScript(&pDummy, 0, &pScript);
 	return Launch_jEdit(pScript);
 }
@@ -289,38 +293,11 @@ HRESULT CJEditLauncher::Launch_jEdit(char* szCmdLine)
 	WriteLogFile(szCmdLine);
 	WriteLogFile("\n");
 #endif
-	HKEY hKey;
-	LONG nResult;
-	TCHAR szTemp[MAX_PATH],
-		  szKeyPath[MAX_PATH];
-	const TCHAR space[2] = {_T(' '), 0};
-	DWORD dwCount = MAX_PATH * sizeof(TCHAR);
-	DWORD dwType = 0;
-	LoadString(_Module.GetModuleInstance(), IDS_REG_PARAMS_KEY_3_2,
-		szKeyPath, MAX_PATH);
-	nResult = RegOpenKeyEx(HKEY_CURRENT_USER, szKeyPath, 0, KEY_READ, &hKey);
-	if(nResult != ERROR_SUCCESS)
-	{
-		MakeErrorInfo(IDS_ERR_NO_REGISTRY_KEY);
-	}
-	else
-	{
-		dwCount = MAX_PATH;
-		nResult = RegQueryValueEx(hKey, _T("jEdit Working Directory"), 0, &dwType, (LPBYTE)szTemp, &dwCount);
-		if(nResult != ERROR_SUCCESS)
-		{
-			MakeErrorInfo(IDS_ERR_NO_JEDIT_WORKINGDIR_VALUE);
-		}
-	}
-
-	RegCloseKey(hKey);
-	if(nResult != ERROR_SUCCESS)
-		return E_FAIL;
-
 	STARTUPINFO si;
 	::ZeroMemory(&si, sizeof(si));
 	PROCESS_INFORMATION pi;
-	BOOL bReturn = CreateProcess(0, szCmdLine, 0, 0, 0, 0, 0, szTemp, &si, &pi);
+	BOOL bReturn = CreateProcess(0, szCmdLine,
+		0, 0, 0, 0, 0, m_pRegParser->GetWorkingDirectory(), &si, &pi);
 	if(!bReturn)
 	{
 		LPSTR szErrMsg;
@@ -456,8 +433,8 @@ void CJEditLauncher::OpenLogFile()
 	char *pSlash = strrchr(szFile, '\\');
 	strcpy(pSlash + 1, "jedebug.log");
 
-	hFile = CreateFile(szFile, GENERIC_WRITE, 
-		FILE_SHARE_READ | FILE_SHARE_WRITE, 
+	hFile = CreateFile(szFile, GENERIC_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
 		0, OPEN_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, 0);
 	SetFilePointer(hFile, 0, 0, SEEK_END);
 }

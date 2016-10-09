@@ -18,7 +18,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id$
+ * $Id: QuickNotepadTextArea.java,v 1.1.1.1 2001/09/02 05:39:27 spestov Exp $
  */
 
 import javax.swing.JTextArea;

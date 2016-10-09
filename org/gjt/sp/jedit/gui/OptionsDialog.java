@@ -34,7 +34,7 @@ import org.gjt.sp.util.Log;
 /**
  * An abstract tabbed options dialog box.
  * @author Slava Pestov
- * @version $Id: OptionsDialog.java,v 1.38 2001/08/07 07:24:48 sp Exp $
+ * @version $Id: OptionsDialog.java,v 1.1.1.1 2001/09/02 05:37:44 spestov Exp $
  */
 public class OptionsDialog extends EnhancedDialog
 	implements ActionListener, TreeSelectionListener

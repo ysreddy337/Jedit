@@ -29,10 +29,6 @@ NULL=
 NULL=nul
 !ENDIF 
 
-CPP=cl.exe
-MTL=midl.exe
-RSC=rc.exe
-
 !IF  "$(CFG)" == "jeditlauncher - Win32 Debug"
 
 OUTDIR=.\Debug
@@ -41,7 +37,7 @@ INTDIR=.\Debug
 OutDir=.\Debug
 # End Custom Macros
 
-ALL : "$(OUTDIR)\jeditlauncher.exe" ".\jeditlauncher.tlb" ".\jeditlauncher.h" ".\jeditlauncher_i.c" "$(OUTDIR)\jeditlauncher.bsc" ".\Debug\regsvr32.trg"
+ALL : "$(OUTDIR)\jeditsrv.exe" ".\jeditlauncher.tlb" ".\jeditlauncher.h" ".\jeditlauncher_i.c" "$(OUTDIR)\jeditlauncher.bsc" ".\Debug\regsvr32.trg"
 
 
 CLEAN :
@@ -53,6 +49,8 @@ CLEAN :
 	-@erase "$(INTDIR)\jeditlauncher.sbr"
 	-@erase "$(INTDIR)\JELauncher.obj"
 	-@erase "$(INTDIR)\JELauncher.sbr"
+	-@erase "$(INTDIR)\RegistryParser.obj"
+	-@erase "$(INTDIR)\RegistryParser.sbr"
 	-@erase "$(INTDIR)\ScriptServer.obj"
 	-@erase "$(INTDIR)\ScriptServer.sbr"
 	-@erase "$(INTDIR)\ScriptWriter.obj"
@@ -64,9 +62,9 @@ CLEAN :
 	-@erase "$(INTDIR)\vc60.idb"
 	-@erase "$(INTDIR)\vc60.pdb"
 	-@erase "$(OUTDIR)\jeditlauncher.bsc"
-	-@erase "$(OUTDIR)\jeditlauncher.exe"
-	-@erase "$(OUTDIR)\jeditlauncher.ilk"
-	-@erase "$(OUTDIR)\jeditlauncher.pdb"
+	-@erase "$(OUTDIR)\jeditsrv.exe"
+	-@erase "$(OUTDIR)\jeditsrv.ilk"
+	-@erase "$(OUTDIR)\jeditsrv.pdb"
 	-@erase ".\jeditlauncher.h"
 	-@erase ".\jeditlauncher.tlb"
 	-@erase ".\jeditlauncher_i.c"
@@ -75,7 +73,42 @@ CLEAN :
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
 
+CPP=cl.exe
 CPP_PROJ=/nologo /MLd /W3 /Gm /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /FR"$(INTDIR)\\" /Fp"$(INTDIR)\jeditlauncher.pch" /Yu"stdafx.h" /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\" /FD /GZ /c 
+
+.c{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.c{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+MTL=midl.exe
+MTL_PROJ=
+RSC=rc.exe
 RSC_PROJ=/l 0x409 /fo"$(INTDIR)\jeditlauncher.res" /d "_DEBUG" 
 BSC32=bscmake.exe
 BSC32_FLAGS=/nologo /o"$(OUTDIR)\jeditlauncher.bsc" 
@@ -83,6 +116,7 @@ BSC32_SBRS= \
 	"$(INTDIR)\FileList.sbr" \
 	"$(INTDIR)\jeditlauncher.sbr" \
 	"$(INTDIR)\JELauncher.sbr" \
+	"$(INTDIR)\RegistryParser.sbr" \
 	"$(INTDIR)\ScriptServer.sbr" \
 	"$(INTDIR)\ScriptWriter.sbr" \
 	"$(INTDIR)\ServConn.sbr" \
@@ -94,25 +128,26 @@ BSC32_SBRS= \
 <<
 
 LINK32=link.exe
-LINK32_FLAGS=kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib ws2_32.lib /nologo /subsystem:windows /incremental:yes /pdb:"$(OUTDIR)\jeditlauncher.pdb" /debug /machine:I386 /out:"$(OUTDIR)\jeditlauncher.exe" /pdbtype:sept 
+LINK32_FLAGS=kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib ws2_32.lib /nologo /subsystem:windows /incremental:yes /pdb:"$(OUTDIR)\jeditsrv.pdb" /debug /machine:I386 /out:"$(OUTDIR)\jeditsrv.exe" /pdbtype:sept 
 LINK32_OBJS= \
 	"$(INTDIR)\FileList.obj" \
 	"$(INTDIR)\jeditlauncher.obj" \
 	"$(INTDIR)\JELauncher.obj" \
+	"$(INTDIR)\RegistryParser.obj" \
 	"$(INTDIR)\ScriptServer.obj" \
 	"$(INTDIR)\ScriptWriter.obj" \
 	"$(INTDIR)\ServConn.obj" \
 	"$(INTDIR)\StdAfx.obj" \
 	"$(INTDIR)\jeditlauncher.res"
 
-"$(OUTDIR)\jeditlauncher.exe" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"$(OUTDIR)\jeditsrv.exe" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
 
 OutDir=.\Debug
-TargetPath=.\Debug\jeditlauncher.exe
-InputPath=.\Debug\jeditlauncher.exe
+TargetPath=.\Debug\jeditsrv.exe
+InputPath=.\Debug\jeditsrv.exe
 SOURCE="$(InputPath)"
 
 "$(OUTDIR)\regsvr32.trg" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
@@ -142,6 +177,7 @@ CLEAN :
 	-@erase "$(INTDIR)\jeditlauncher.pch"
 	-@erase "$(INTDIR)\jeditlauncher.res"
 	-@erase "$(INTDIR)\JELauncher.obj"
+	-@erase "$(INTDIR)\RegistryParser.obj"
 	-@erase "$(INTDIR)\ScriptServer.obj"
 	-@erase "$(INTDIR)\ScriptWriter.obj"
 	-@erase "$(INTDIR)\ServConn.obj"
@@ -159,7 +195,42 @@ CLEAN :
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
 
+CPP=cl.exe
 CPP_PROJ=/nologo /MLd /W3 /Gm /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_UNICODE" /Fp"$(INTDIR)\jeditlauncher.pch" /Yu"stdafx.h" /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\" /FD /GZ /c 
+
+.c{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.c{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+MTL=midl.exe
+MTL_PROJ=
+RSC=rc.exe
 RSC_PROJ=/l 0x409 /fo"$(INTDIR)\jeditlauncher.res" /d "_DEBUG" 
 BSC32=bscmake.exe
 BSC32_FLAGS=/nologo /o"$(OUTDIR)\jeditlauncher.bsc" 
@@ -171,6 +242,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\FileList.obj" \
 	"$(INTDIR)\jeditlauncher.obj" \
 	"$(INTDIR)\JELauncher.obj" \
+	"$(INTDIR)\RegistryParser.obj" \
 	"$(INTDIR)\ScriptServer.obj" \
 	"$(INTDIR)\ScriptWriter.obj" \
 	"$(INTDIR)\ServConn.obj" \
@@ -219,6 +291,7 @@ CLEAN :
 	-@erase "$(INTDIR)\jeditlauncher.pch"
 	-@erase "$(INTDIR)\jeditlauncher.res"
 	-@erase "$(INTDIR)\JELauncher.obj"
+	-@erase "$(INTDIR)\RegistryParser.obj"
 	-@erase "$(INTDIR)\ScriptServer.obj"
 	-@erase "$(INTDIR)\ScriptWriter.obj"
 	-@erase "$(INTDIR)\ServConn.obj"
@@ -233,7 +306,42 @@ CLEAN :
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
 
+CPP=cl.exe
 CPP_PROJ=/nologo /ML /W3 /O1 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_ATL_DLL" /D "_ATL_MIN_CRT" /Fp"$(INTDIR)\jeditlauncher.pch" /Yu"stdafx.h" /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\" /FD /c 
+
+.c{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.c{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+MTL=midl.exe
+MTL_PROJ=
+RSC=rc.exe
 RSC_PROJ=/l 0x409 /fo"$(INTDIR)\jeditlauncher.res" /d "NDEBUG" 
 BSC32=bscmake.exe
 BSC32_FLAGS=/nologo /o"$(OUTDIR)\jeditlauncher.bsc" 
@@ -245,6 +353,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\FileList.obj" \
 	"$(INTDIR)\jeditlauncher.obj" \
 	"$(INTDIR)\JELauncher.obj" \
+	"$(INTDIR)\RegistryParser.obj" \
 	"$(INTDIR)\ScriptServer.obj" \
 	"$(INTDIR)\ScriptWriter.obj" \
 	"$(INTDIR)\ServConn.obj" \
@@ -278,7 +387,7 @@ INTDIR=.\ReleaseMinDependency
 OutDir=.\ReleaseMinDependency
 # End Custom Macros
 
-ALL : "$(OUTDIR)\jeditsrvr.exe" "$(OUTDIR)\jeditlauncher.bsc" ".\ReleaseMinDependency\regsvr32.trg"
+ALL : "$(OUTDIR)\jeditsrv.exe" "$(OUTDIR)\jeditlauncher.bsc" ".\ReleaseMinDependency\regsvr32.trg"
 
 
 CLEAN :
@@ -290,6 +399,8 @@ CLEAN :
 	-@erase "$(INTDIR)\jeditlauncher.sbr"
 	-@erase "$(INTDIR)\JELauncher.obj"
 	-@erase "$(INTDIR)\JELauncher.sbr"
+	-@erase "$(INTDIR)\RegistryParser.obj"
+	-@erase "$(INTDIR)\RegistryParser.sbr"
 	-@erase "$(INTDIR)\ScriptServer.obj"
 	-@erase "$(INTDIR)\ScriptServer.sbr"
 	-@erase "$(INTDIR)\ScriptWriter.obj"
@@ -300,7 +411,7 @@ CLEAN :
 	-@erase "$(INTDIR)\StdAfx.sbr"
 	-@erase "$(INTDIR)\vc60.idb"
 	-@erase "$(OUTDIR)\jeditlauncher.bsc"
-	-@erase "$(OUTDIR)\jeditsrvr.exe"
+	-@erase "$(OUTDIR)\jeditsrv.exe"
 	-@erase ".\jeditlauncher.h"
 	-@erase ".\jeditlauncher.tlb"
 	-@erase ".\jeditlauncher_i.c"
@@ -309,7 +420,42 @@ CLEAN :
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
 
+CPP=cl.exe
 CPP_PROJ=/nologo /MT /W3 /O1 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_ATL_STATIC_REGISTRY" /D "_ATL_MIN_CRT" /FR"$(INTDIR)\\" /Fp"$(INTDIR)\jeditlauncher.pch" /Yu"stdafx.h" /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\" /FD /c 
+
+.c{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.c{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+MTL=midl.exe
+MTL_PROJ=
+RSC=rc.exe
 RSC_PROJ=/l 0x409 /fo"$(INTDIR)\jeditlauncher.res" /d "NDEBUG" 
 BSC32=bscmake.exe
 BSC32_FLAGS=/nologo /o"$(OUTDIR)\jeditlauncher.bsc" 
@@ -317,6 +463,7 @@ BSC32_SBRS= \
 	"$(INTDIR)\FileList.sbr" \
 	"$(INTDIR)\jeditlauncher.sbr" \
 	"$(INTDIR)\JELauncher.sbr" \
+	"$(INTDIR)\RegistryParser.sbr" \
 	"$(INTDIR)\ScriptServer.sbr" \
 	"$(INTDIR)\ScriptWriter.sbr" \
 	"$(INTDIR)\ServConn.sbr" \
@@ -328,25 +475,26 @@ BSC32_SBRS= \
 <<
 
 LINK32=link.exe
-LINK32_FLAGS=kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib ws2_32.lib /nologo /subsystem:windows /incremental:no /pdb:"$(OUTDIR)\jeditsrvr.pdb" /machine:I386 /out:"$(OUTDIR)\jeditsrvr.exe" 
+LINK32_FLAGS=kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib ws2_32.lib /nologo /subsystem:windows /incremental:no /pdb:"$(OUTDIR)\jeditsrv.pdb" /machine:I386 /out:"$(OUTDIR)\jeditsrv.exe" 
 LINK32_OBJS= \
 	"$(INTDIR)\FileList.obj" \
 	"$(INTDIR)\jeditlauncher.obj" \
 	"$(INTDIR)\JELauncher.obj" \
+	"$(INTDIR)\RegistryParser.obj" \
 	"$(INTDIR)\ScriptServer.obj" \
 	"$(INTDIR)\ScriptWriter.obj" \
 	"$(INTDIR)\ServConn.obj" \
 	"$(INTDIR)\StdAfx.obj" \
 	"$(INTDIR)\jeditlauncher.res"
 
-"$(OUTDIR)\jeditsrvr.exe" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"$(OUTDIR)\jeditsrv.exe" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
 
 OutDir=.\ReleaseMinDependency
-TargetPath=.\ReleaseMinDependency\jeditsrvr.exe
-InputPath=.\ReleaseMinDependency\jeditsrvr.exe
+TargetPath=.\ReleaseMinDependency\jeditsrv.exe
+InputPath=.\ReleaseMinDependency\jeditsrv.exe
 SOURCE="$(InputPath)"
 
 "$(OUTDIR)\regsvr32.trg" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
@@ -376,6 +524,7 @@ CLEAN :
 	-@erase "$(INTDIR)\jeditlauncher.pch"
 	-@erase "$(INTDIR)\jeditlauncher.res"
 	-@erase "$(INTDIR)\JELauncher.obj"
+	-@erase "$(INTDIR)\RegistryParser.obj"
 	-@erase "$(INTDIR)\ScriptServer.obj"
 	-@erase "$(INTDIR)\ScriptWriter.obj"
 	-@erase "$(INTDIR)\ServConn.obj"
@@ -390,7 +539,42 @@ CLEAN :
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
 
+CPP=cl.exe
 CPP_PROJ=/nologo /ML /W3 /O1 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_UNICODE" /D "_ATL_DLL" /D "_ATL_MIN_CRT" /Fp"$(INTDIR)\jeditlauncher.pch" /Yu"stdafx.h" /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\" /FD /c 
+
+.c{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.c{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+MTL=midl.exe
+MTL_PROJ=
+RSC=rc.exe
 RSC_PROJ=/l 0x409 /fo"$(INTDIR)\jeditlauncher.res" /d "NDEBUG" 
 BSC32=bscmake.exe
 BSC32_FLAGS=/nologo /o"$(OUTDIR)\jeditlauncher.bsc" 
@@ -402,6 +586,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\FileList.obj" \
 	"$(INTDIR)\jeditlauncher.obj" \
 	"$(INTDIR)\JELauncher.obj" \
+	"$(INTDIR)\RegistryParser.obj" \
 	"$(INTDIR)\ScriptServer.obj" \
 	"$(INTDIR)\ScriptWriter.obj" \
 	"$(INTDIR)\ServConn.obj" \
@@ -450,6 +635,7 @@ CLEAN :
 	-@erase "$(INTDIR)\jeditlauncher.pch"
 	-@erase "$(INTDIR)\jeditlauncher.res"
 	-@erase "$(INTDIR)\JELauncher.obj"
+	-@erase "$(INTDIR)\RegistryParser.obj"
 	-@erase "$(INTDIR)\ScriptServer.obj"
 	-@erase "$(INTDIR)\ScriptWriter.obj"
 	-@erase "$(INTDIR)\ServConn.obj"
@@ -464,7 +650,42 @@ CLEAN :
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
 
+CPP=cl.exe
 CPP_PROJ=/nologo /ML /W3 /O1 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_UNICODE" /D "_ATL_STATIC_REGISTRY" /D "_ATL_MIN_CRT" /Fp"$(INTDIR)\jeditlauncher.pch" /Yu"stdafx.h" /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\" /FD /c 
+
+.c{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.obj::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.c{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cpp{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+.cxx{$(INTDIR)}.sbr::
+   $(CPP) @<<
+   $(CPP_PROJ) $< 
+<<
+
+MTL=midl.exe
+MTL_PROJ=
+RSC=rc.exe
 RSC_PROJ=/l 0x409 /fo"$(INTDIR)\jeditlauncher.res" /d "NDEBUG" 
 BSC32=bscmake.exe
 BSC32_FLAGS=/nologo /o"$(OUTDIR)\jeditlauncher.bsc" 
@@ -476,6 +697,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\FileList.obj" \
 	"$(INTDIR)\jeditlauncher.obj" \
 	"$(INTDIR)\JELauncher.obj" \
+	"$(INTDIR)\RegistryParser.obj" \
 	"$(INTDIR)\ScriptServer.obj" \
 	"$(INTDIR)\ScriptWriter.obj" \
 	"$(INTDIR)\ServConn.obj" \
@@ -509,37 +731,6 @@ SOURCE="$(InputPath)"
 
 !ENDIF 
 
-.c{$(INTDIR)}.obj::
-   $(CPP) @<<
-   $(CPP_PROJ) $< 
-<<
-
-.cpp{$(INTDIR)}.obj::
-   $(CPP) @<<
-   $(CPP_PROJ) $< 
-<<
-
-.cxx{$(INTDIR)}.obj::
-   $(CPP) @<<
-   $(CPP_PROJ) $< 
-<<
-
-.c{$(INTDIR)}.sbr::
-   $(CPP) @<<
-   $(CPP_PROJ) $< 
-<<
-
-.cpp{$(INTDIR)}.sbr::
-   $(CPP) @<<
-   $(CPP_PROJ) $< 
-<<
-
-.cxx{$(INTDIR)}.sbr::
-   $(CPP) @<<
-   $(CPP_PROJ) $< 
-<<
-
-MTL_PROJ=
 
 !IF "$(NO_EXTERNAL_DEPS)" != "1"
 !IF EXISTS("jeditlauncher.dep")
@@ -632,6 +823,9 @@ SOURCE=.\jeditlauncher.cpp
 !ENDIF 
 
 SOURCE=.\jeditlauncher.idl
+
+!IF  "$(CFG)" == "jeditlauncher - Win32 Debug"
+
 MTL_SWITCHES=/tlb ".\jeditlauncher.tlb" /h "jeditlauncher.h" /iid "jeditlauncher_i.c" /Oicf 
 
 ".\jeditlauncher.tlb"	".\jeditlauncher.h"	".\jeditlauncher_i.c" : $(SOURCE) "$(INTDIR)"
@@ -639,6 +833,58 @@ MTL_SWITCHES=/tlb ".\jeditlauncher.tlb" /h "jeditlauncher.h" /iid "jeditlauncher
   $(MTL_SWITCHES) $(SOURCE)
 <<
 
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Unicode Debug"
+
+MTL_SWITCHES=/tlb ".\jeditlauncher.tlb" /h "jeditlauncher.h" /iid "jeditlauncher_i.c" /Oicf 
+
+".\jeditlauncher.tlb"	".\jeditlauncher.h"	".\jeditlauncher_i.c" : $(SOURCE) "$(INTDIR)"
+	$(MTL) @<<
+  $(MTL_SWITCHES) $(SOURCE)
+<<
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Release MinSize"
+
+MTL_SWITCHES=/tlb ".\jeditlauncher.tlb" /h "jeditlauncher.h" /iid "jeditlauncher_i.c" /Oicf 
+
+".\jeditlauncher.tlb"	".\jeditlauncher.h"	".\jeditlauncher_i.c" : $(SOURCE) "$(INTDIR)"
+	$(MTL) @<<
+  $(MTL_SWITCHES) $(SOURCE)
+<<
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Release MinDependency"
+
+MTL_SWITCHES=/tlb ".\jeditlauncher.tlb" /h "jeditlauncher.h" /iid "jeditlauncher_i.c" /Oicf 
+
+".\jeditlauncher.tlb"	".\jeditlauncher.h"	".\jeditlauncher_i.c" : $(SOURCE) "$(INTDIR)"
+	$(MTL) @<<
+  $(MTL_SWITCHES) $(SOURCE)
+<<
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Unicode Release MinSize"
+
+MTL_SWITCHES=/tlb ".\jeditlauncher.tlb" /h "jeditlauncher.h" /iid "jeditlauncher_i.c" /Oicf 
+
+".\jeditlauncher.tlb"	".\jeditlauncher.h"	".\jeditlauncher_i.c" : $(SOURCE) "$(INTDIR)"
+	$(MTL) @<<
+  $(MTL_SWITCHES) $(SOURCE)
+<<
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Unicode Release MinDependency"
+
+MTL_SWITCHES=/tlb ".\jeditlauncher.tlb" /h "jeditlauncher.h" /iid "jeditlauncher_i.c" /Oicf 
+
+".\jeditlauncher.tlb"	".\jeditlauncher.h"	".\jeditlauncher_i.c" : $(SOURCE) "$(INTDIR)"
+	$(MTL) @<<
+  $(MTL_SWITCHES) $(SOURCE)
+<<
+
+
+!ENDIF 
 
 SOURCE=.\jeditlauncher.rc
 
@@ -682,6 +928,46 @@ SOURCE=.\JELauncher.cpp
 
 
 "$(INTDIR)\JELauncher.obj" : $(SOURCE) "$(INTDIR)" "$(INTDIR)\jeditlauncher.pch"
+
+
+!ENDIF 
+
+SOURCE=.\RegistryParser.cpp
+
+!IF  "$(CFG)" == "jeditlauncher - Win32 Debug"
+
+
+"$(INTDIR)\RegistryParser.obj"	"$(INTDIR)\RegistryParser.sbr" : $(SOURCE) "$(INTDIR)" "$(INTDIR)\jeditlauncher.pch"
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Unicode Debug"
+
+
+"$(INTDIR)\RegistryParser.obj" : $(SOURCE) "$(INTDIR)" "$(INTDIR)\jeditlauncher.pch"
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Release MinSize"
+
+
+"$(INTDIR)\RegistryParser.obj" : $(SOURCE) "$(INTDIR)" "$(INTDIR)\jeditlauncher.pch"
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Release MinDependency"
+
+
+"$(INTDIR)\RegistryParser.obj"	"$(INTDIR)\RegistryParser.sbr" : $(SOURCE) "$(INTDIR)" "$(INTDIR)\jeditlauncher.pch" ".\jeditlauncher.h"
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Unicode Release MinSize"
+
+
+"$(INTDIR)\RegistryParser.obj" : $(SOURCE) "$(INTDIR)" "$(INTDIR)\jeditlauncher.pch"
+
+
+!ELSEIF  "$(CFG)" == "jeditlauncher - Win32 Unicode Release MinDependency"
+
+
+"$(INTDIR)\RegistryParser.obj" : $(SOURCE) "$(INTDIR)" "$(INTDIR)\jeditlauncher.pch"
 
 
 !ENDIF 

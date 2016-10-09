@@ -26,7 +26,7 @@ import org.gjt.sp.jedit.io.VFS;
 /**
  * A browser event listener.
  * @author Slava Pestov
- * @version $Id: BrowserListener.java,v 1.1 2000/07/30 09:04:19 sp Exp $
+ * @version $Id: BrowserListener.java,v 1.2 2001/09/08 04:50:46 spestov Exp $
  */
 public interface BrowserListener extends EventListener
 {
@@ -44,11 +44,3 @@ public interface BrowserListener extends EventListener
 	 */
 	void filesActivated(VFSBrowser browser, VFS.DirectoryEntry[] files);
 }
-
-/*
- * Change Log:
- * $Log: BrowserListener.java,v $
- * Revision 1.1  2000/07/30 09:04:19  sp
- * More VFS browser hacking
- *
- */

@@ -43,7 +43,7 @@ import org.gjt.sp.util.Log;
  * from jEdit's global properties.
  *
  * @author Slava Pestov
- * @version $Id: Buffer.java,v 1.243 2001/08/23 07:39:09 sp Exp $
+ * @version $Id: Buffer.java,v 1.1.1.1 2001/09/02 05:37:06 spestov Exp $
  */
 public class Buffer extends PlainDocument implements EBComponent
 {

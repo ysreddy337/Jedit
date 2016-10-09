@@ -30,7 +30,7 @@ import org.gjt.sp.jedit.View;
  * jEdit is in background mode.
  *
  * @author Dirk Moebius
- * @version $Id: EditorExitRequested.java,v 1.1 2001/03/17 07:07:40 sp Exp $
+ * @version $Id: EditorExitRequested.java,v 1.1.1.1 2001/09/02 05:37:34 spestov Exp $
  *
  * @since jEdit 3.1pre4
  */

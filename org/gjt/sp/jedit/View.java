@@ -38,7 +38,7 @@ import org.gjt.sp.util.Log;
  * class.
  *
  * @author Slava Pestov
- * @version $Id: View.java,v 1.241 2001/09/01 01:26:54 sp Exp $
+ * @version $Id: View.java,v 1.1.1.1 2001/09/02 05:37:27 spestov Exp $
  */
 public class View extends JFrame implements EBComponent
 {

@@ -27,7 +27,7 @@ import org.gjt.sp.util.Log;
  * A named location in a buffer.
  *
  * @author Slava Pestov
- * @version $Id: Marker.java,v 1.8 2001/08/11 11:44:01 sp Exp $
+ * @version $Id: Marker.java,v 1.1.1.1 2001/09/02 05:37:19 spestov Exp $
  */
 public class Marker
 {

@@ -8,6 +8,7 @@
 #include "ScriptServer.h"
 
 class FileListImpl;
+class RegistryParser;
 /////////////////////////////////////////////////////////////////////////////
 // CJEditLauncher
 class ATL_NO_VTABLE CJEditLauncher :
@@ -94,6 +95,7 @@ private:
 	BOOL m_bRunDiff;
     FileListImpl *m_pFileList;
 	CScriptServer *m_pScriptServer;
+	RegistryParser *m_pRegParser;
 	HANDLE m_hJEditProcess;
 	BOOL m_bSendScriptOnLaunch;
 	UINT m_nIDTimer;
@@ -104,7 +106,7 @@ private:
 public:
 	HANDLE hFile;
 	void OpenLogFile();
-	void WriteLogFile(const char* szMsg);	
+	void WriteLogFile(const char* szMsg);
 	void CloseLogFile();
 #endif
 };

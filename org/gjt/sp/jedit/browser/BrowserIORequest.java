@@ -29,7 +29,7 @@ import org.gjt.sp.util.WorkThread;
 /**
  * A browser I/O request.
  * @author Slava Pestov
- * @version $Id: BrowserIORequest.java,v 1.8 2001/06/24 10:12:14 sp Exp $
+ * @version $Id: BrowserIORequest.java,v 1.1.1.1 2001/09/02 05:38:17 spestov Exp $
  */
 public class BrowserIORequest extends WorkRequest
 {

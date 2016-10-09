@@ -27,7 +27,7 @@ import org.gjt.sp.jedit.EBMessage;
  * Message sent after jEdit has finished starting up, but before the initial
  * view is created.
  * @author Slava Pestov
- * @version $Id: EditorStarted.java,v 1.1 2000/01/28 00:20:58 sp Exp $
+ * @version $Id: EditorStarted.java,v 1.1.1.1 2001/09/02 05:37:34 spestov Exp $
  *
  * @since jEdit 2.3pre2
  */

@@ -24,7 +24,7 @@ import java.awt.Component;
 /**
  * A window that can either be docked inside a view, or float outside it.
  * @author Slava Pestov
- * @version $Id: DockableWindow.java,v 1.1 2000/08/13 07:35:24 sp Exp $
+ * @version $Id: DockableWindow.java,v 1.2 2001/09/08 04:50:46 spestov Exp $
  * @since jEdit 2.6pre3
  */
 public interface DockableWindow
@@ -49,11 +49,3 @@ public interface DockableWindow
 	 */
 	Component getComponent();
 }
-
-/*
- * Change Log:
- * $Log: DockableWindow.java,v $
- * Revision 1.1  2000/08/13 07:35:24  sp
- * Dockable window API
- *
- */

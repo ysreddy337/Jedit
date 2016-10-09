@@ -25,7 +25,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: JELInstaller.cpp,v 1.10 2001/08/04 17:23:51 jgellene Exp $
+ * $Id: JELInstaller.cpp,v 1.11 2001/09/07 15:20:23 jgellene Exp $
  */
 
 #include "stdafx.h"
@@ -34,6 +34,7 @@
 #include "DeferFileOps.h"
 #include "CtxMenuDlg.h"
 #include "StringPtr.h"
+#include "InstallerLog.h"
 #include "JELRegInstaller.h"
 #include "JELInstaller.h"
 
@@ -64,17 +65,23 @@ HRESULT JELFileInstaller::Install()
 	{
 		if(pData->strInstallPath.Compare(pData->strOldPath) == 0)
 		{
+			InstallerLog::Log("Shell extension is up to date: no copying required.\n");
 			// nothing to do here
 			return S_OK;
 		}
 		// do copy/overwrite
+		InstallerLog::Log("Overwriting shell extension with new version.\n");
 		if(!CopyFile(pData->strInstallPath, pData->strInstallFinalPath, FALSE))
 		{
 			dwError = GetLastError();
 			if(ERROR_SHARING_VIOLATION != dwError)
+			{
+				InstallerLog::Log("Overwrite failed: unspecified error.\n");
 				hr = E_FAIL;
+			}
 			else
 			{
+				InstallerLog::Log("Overwrite failed: reboot required.\n");
 				if(pData->bIsWinNT)
 					pDFO = new DeferFileOpsNT;
 				else
@@ -83,8 +90,7 @@ HRESULT JELFileInstaller::Install()
 				pDFO->Add(pData->strInstallFinalPath, pData->strInstallPath);
 				if(FAILED(pDFO->Write()))
 				{
-//					InstallData::OSErrorMsgBox(_T("Error copying COM component:"),
-//						dwError, MB_ICONERROR);
+					InstallerLog::Log("Could not set up file copy after reboot.\n");
 					hr = E_FAIL;
 				}
 				else
@@ -100,13 +106,18 @@ HRESULT JELFileInstaller::Install()
 	else
 	{
 		// do move/delete
+		InstallerLog::Log("Renaming shell extension to jeshlstb.dll.\n");
 		if(!MoveFile(pData->strInstallPath, pData->strInstallFinalPath))
 		{
 			dwError = GetLastError();
 			if(ERROR_SHARING_VIOLATION != dwError)
+			{
+				InstallerLog::Log("Rename failed: error code %d.\n", dwError);
 				hr = E_FAIL;
+			}
 			else
 			{
+				InstallerLog::Log("Rename failed: reboot required.\n");
 				if(pData->bIsWinNT)
 					pDFO = new DeferFileOpsNT;
 				else
@@ -115,8 +126,7 @@ HRESULT JELFileInstaller::Install()
 				pDFO->Add(pData->strInstallFinalPath, pData->strInstallPath);
 				if(FAILED(pDFO->Write()))
 				{
-//					InstallData::OSErrorMsgBox(_T("Error copying COM component:"),
-//						dwError, MB_ICONERROR);
+					InstallerLog::Log("Could not set up file rename after reboot.\n");
 					hr = E_FAIL;
 				}
 				else
@@ -127,7 +137,11 @@ HRESULT JELFileInstaller::Install()
 				delete pDFO;
 			}
 		}
-		else hr = S_OK;
+		else
+		{
+			InstallerLog::Log("Shell extension installed; no reboot required.\n");
+			hr = S_OK;
+		}
 	}
 	return hr;
 }
@@ -268,6 +282,7 @@ JELShortcutInstaller::~JELShortcutInstaller() {}
 
 HRESULT JELShortcutInstaller::Install()
 {
+	InstallerLog::Log("Installing shortcuts. . .\n");
 	// Always install shortcuts for the primary version
 	int nIndex = pData->nIndexNewPrimaryVer;
 	CString strPrimaryDir = (nIndex != -1) ?
@@ -320,6 +335,7 @@ HRESULT JELShortcutInstaller::CreateShortcut(LPCSTR lpszPathObj,
 	strcat(szLinkPath, "\\");
 	strcat(szLinkPath, lpszLinkName);
 	strcat(szLinkPath, ".lnk");
+	InstallerLog::Log("Creating shortcut at %s.\n", szLinkPath);
 
     HRESULT hres;
     IShellLink* psl;
@@ -356,6 +372,8 @@ HRESULT JELShortcutInstaller::CreateShortcut(LPCSTR lpszPathObj,
         }
         psl->Release();
     }
+	InstallerLog::Log("Shortcut creation %s.\n",
+		(hres == S_OK ? "succeeded" : "failed"));
     return hres;
 }
 
@@ -458,11 +476,16 @@ JELApplicationInstaller::JELApplicationInstaller(const char* ptrJavaHome,
 												 BOOL bLeaveFiles)
 	: pData(0), pFileInstaller(0), pRegistryInstaller(0),
 	  pShortcutInstaller(0), szJavaHome(ptrJavaHome),
-	  szInstallDir(ptrInstallDir), hrCOM(E_FAIL),
-	  leaveFiles(bLeaveFiles) {}
+	  szInstallDir(ptrInstallDir), leaveFiles(bLeaveFiles), 
+	  hrCOM(E_FAIL), pLog(0) 
+{
+	pLog = new InstallerLog();
+}
 
 JELApplicationInstaller::~JELApplicationInstaller()
 {
+	InstallerLog::Log("End installation.\n");
+	delete pLog;
 	Cleanup();
 }
 
@@ -471,13 +494,19 @@ bool JELApplicationInstaller::Init()
 	Cleanup();
 	hrCOM = CoInitialize(0);
 	if(FAILED(hrCOM))
+	{
+		InstallerLog::Log("Could not initialize COM facilities.\n");
 		return false;
+	}
 	const char *pEmpty = _T("");
 	if(szJavaHome == 0)
 		szJavaHome = pEmpty;
 	pData = new InstallData(szJavaHome, szInstallDir);
 	if(pData == 0 || !pData->Init())
+	{
+		InstallerLog::Log("Could not initialize installation data.\n");
 		return false;
+	}
 	pFileInstaller = new JELFileInstaller(pData, this);
 	pRegistryInstaller = new JELRegistryInstaller(pData, this);
 	pShortcutInstaller = new JELShortcutInstaller(pData, this);
@@ -505,6 +534,7 @@ void JELApplicationInstaller::Cleanup()
 
 HRESULT JELApplicationInstaller::Install()
 {
+	InstallerLog::Log("Commencing install. . . .\n");
 	if(!Init())
 		return E_FAIL;
 	HRESULT hrFile = pFileInstaller->Install();
@@ -519,13 +549,14 @@ HRESULT JELApplicationInstaller::Install()
 	hr = pShortcutInstaller->Install();
 	if(hrFile == S_FALSE)
 	{
-
+		InstallerLog::Log("Reboot required to complete installation.\n");
 		QueryReboot();
 	}
 	CString strMsg(_T("Installation of jEditLauncher "));
 	strMsg += hr == E_FAIL ? _T("failed.") : _T("was successful.");
 	MessageBox(0, strMsg, "jEditLauncher",
 		hr == E_FAIL ? MB_ICONERROR : MB_ICONINFORMATION);
+	InstallerLog::Log("%s\n", (LPCTSTR)strMsg);
 	return hr;
 }
 
@@ -534,6 +565,8 @@ HRESULT JELApplicationInstaller::Uninstall()
 {
 	if(!Init())
 		return E_FAIL;
+	// no logging of uninstall
+	delete pLog;
 	CString strConfirm;
 	// Note: resource file has commented version of query
 	// for use when full uninstall is activated
@@ -617,8 +650,10 @@ void JELApplicationInstaller::QueryReboot()
 		}
 	}
 	else
+	{
 		MessageBox(0, "Please reboot to complete installation as soon as possible.",
 			"jEditLauncher", MB_ICONEXCLAMATION);
+	}
 }
 
 // signatures for NT functions used by ExitWindowsNT()

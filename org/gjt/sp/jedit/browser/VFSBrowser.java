@@ -37,7 +37,7 @@ import org.gjt.sp.util.Log;
 /**
  * The main class of the VFS browser.
  * @author Slava Pestov
- * @version $Id: VFSBrowser.java,v 1.46 2001/07/12 05:06:52 sp Exp $
+ * @version $Id: VFSBrowser.java,v 1.1.1.1 2001/09/02 05:38:21 spestov Exp $
  */
 public class VFSBrowser extends JPanel implements EBComponent, DockableWindow
 {

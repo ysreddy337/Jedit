@@ -30,7 +30,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Key binding editor.
  * @author Slava Pestov
- * @version $Id: ShortcutsOptionPane.java,v 1.12 2001/08/10 10:35:11 sp Exp $
+ * @version $Id: ShortcutsOptionPane.java,v 1.1.1.1 2001/09/02 05:37:49 spestov Exp $
  */
 public class ShortcutsOptionPane extends AbstractOptionPane
 {

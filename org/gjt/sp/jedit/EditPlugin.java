@@ -32,7 +32,7 @@ import org.gjt.sp.jedit.gui.OptionsDialog;
  * plugins.
  *
  * @author Slava Pestov
- * @version $Id: EditPlugin.java,v 1.11 2001/08/27 07:03:58 sp Exp $
+ * @version $Id: EditPlugin.java,v 1.1.1.1 2001/09/02 05:37:20 spestov Exp $
  * @since jEdit 2.1pre1
  */
 public abstract class EditPlugin

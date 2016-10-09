@@ -33,7 +33,7 @@ import org.gjt.sp.util.Log;
  * subclassing is required.
  *
  * @author Slava Pestov
- * @version $Id: Mode.java,v 1.37 2001/06/09 08:45:02 sp Exp $
+ * @version $Id: Mode.java,v 1.1.1.1 2001/09/02 05:37:24 spestov Exp $
  */
 public class Mode
 {

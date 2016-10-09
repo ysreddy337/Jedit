@@ -1,6 +1,6 @@
 // XmlParser.java: the main parser class.
 // NO WARRANTY! See README, and copyright below.
-// $Id: XmlParser.java,v 1.1.1.1 2000/01/15 23:54:13 mdillon Exp $
+// $Id: XmlParser.java,v 1.1.1.1 2001/09/02 05:39:45 spestov Exp $
 
 package com.microstar.xml;
 

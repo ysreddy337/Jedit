@@ -32,7 +32,7 @@ import org.gjt.sp.jedit.*;
 /**
  * VFS browser tree view.
  * @author Slava Pestov
- * @version $Id: BrowserView.java,v 1.20 2001/08/04 02:18:20 sp Exp $
+ * @version $Id: BrowserView.java,v 1.1.1.1 2001/09/02 05:38:19 spestov Exp $
  */
 public class BrowserView extends JPanel
 {

@@ -25,7 +25,7 @@ import org.gjt.sp.jedit.Buffer;
 /**
  * An interface representing a portion of the current selection.
  * @author Slava Pestov
- * @version $Id: Selection.java,v 1.1 2001/04/27 11:28:46 sp Exp $
+ * @version $Id: Selection.java,v 1.1.1.1 2001/09/02 05:38:14 spestov Exp $
  * @since jEdit 3.2pre1
  */
 public abstract class Selection

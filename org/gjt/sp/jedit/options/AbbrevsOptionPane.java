@@ -31,7 +31,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Abbrev editor.
  * @author Slava Pestov
- * @version $Id: AbbrevsOptionPane.java,v 1.10 2001/02/05 09:15:30 sp Exp $
+ * @version $Id: AbbrevsOptionPane.java,v 1.1.1.1 2001/09/02 05:37:49 spestov Exp $
  */
 public class AbbrevsOptionPane extends AbstractOptionPane
 {

@@ -28,7 +28,7 @@ import org.gjt.sp.util.Log;
 /**
  * A VFS that lists local root filesystems.
  * @author Slava Pestov
- * @version $Id: FileRootsVFS.java,v 1.5 2001/07/22 07:46:26 sp Exp $
+ * @version $Id: FileRootsVFS.java,v 1.1.1.1 2001/09/02 05:38:16 spestov Exp $
  */
 public class FileRootsVFS extends VFS
 {

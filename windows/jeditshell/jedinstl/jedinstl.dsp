@@ -114,6 +114,10 @@ SOURCE=.\InstallData.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\InstallerLog.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\jedinstl.cpp
 # End Source File
 # Begin Source File
@@ -156,6 +160,10 @@ SOURCE=.\DeferFileOps.h
 # Begin Source File
 
 SOURCE=.\InstallData.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\InstallerLog.h
 # End Source File
 # Begin Source File
 

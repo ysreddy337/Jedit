@@ -31,7 +31,7 @@ import org.gjt.sp.util.Log;
  * or font style for painting that token.
  *
  * @author Slava Pestov, mike dillon
- * @version $Id: TokenMarker.java,v 1.60 2001/01/25 02:03:37 sp Exp $
+ * @version $Id: TokenMarker.java,v 1.1.1.1 2001/09/02 05:38:02 spestov Exp $
  *
  * @see org.gjt.sp.jedit.syntax.Token
  */

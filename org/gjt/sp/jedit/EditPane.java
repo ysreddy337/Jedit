@@ -33,7 +33,7 @@ import org.gjt.sp.util.Log;
  * A panel containing a text area. Each edit pane can edit one buffer at
  * a time.
  * @author Slava Pestov
- * @version $Id: EditPane.java,v 1.47 2001/08/23 07:39:09 sp Exp $
+ * @version $Id: EditPane.java,v 1.1.1.1 2001/09/02 05:37:29 spestov Exp $
  */
 public class EditPane extends JPanel implements EBComponent
 {

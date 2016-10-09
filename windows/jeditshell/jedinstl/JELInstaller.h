@@ -25,7 +25,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: JELInstaller.h,v 1.3 2001/08/04 17:19:11 jgellene Exp $
+ * $Id: JELInstaller.h,v 1.4 2001/09/07 15:20:23 jgellene Exp $
  */
 
 #if !defined(__JELINSTALLER_H__)
@@ -34,6 +34,7 @@
 interface DeferFileOps;
 struct InstallData;
 class JELRegistryInstaller;
+class InstallerLog;
 
 enum LinkLocation {
 	Desktop			= CSIDL_DESKTOP,
@@ -171,6 +172,8 @@ private:
 	BOOL leaveFiles;
 
 	HRESULT hrCOM;
+
+	InstallerLog *pLog;
 
 	/* No copy constructor */
 private:

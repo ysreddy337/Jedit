@@ -25,7 +25,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Message sent when an edit pane-related change occurs.
  * @author Slava Pestov
- * @version $Id: EditPaneUpdate.java,v 1.1 2000/05/10 08:24:05 sp Exp $
+ * @version $Id: EditPaneUpdate.java,v 1.1.1.1 2001/09/02 05:37:34 spestov Exp $
  *
  * @since jEdit 2.5pre1
  */

@@ -25,7 +25,7 @@ import java.util.Vector;
 /**
  * The base class of all EditBus messages.
  * @author Slava Pestov
- * @version $Id: EBMessage.java,v 1.2 1999/11/26 07:37:11 sp Exp $
+ * @version $Id: EBMessage.java,v 1.1.1.1 2001/09/02 05:37:06 spestov Exp $
  *
  * @since jEdit 2.2pre6
  */

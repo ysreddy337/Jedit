@@ -34,7 +34,7 @@ import org.gjt.sp.util.Log;
 /**
  * Search and replace dialog.
  * @author Slava Pestov
- * @version $Id: SearchDialog.java,v 1.14 2001/07/26 07:51:05 sp Exp $
+ * @version $Id: SearchDialog.java,v 1.1.1.1 2001/09/02 05:37:59 spestov Exp $
  */
 public class SearchDialog extends EnhancedDialog
 {

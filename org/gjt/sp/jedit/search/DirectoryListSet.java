@@ -28,7 +28,7 @@ import org.gjt.sp.util.Log;
 /**
  * Recursive directory search.
  * @author Slava Pestov
- * @version $Id: DirectoryListSet.java,v 1.7 2000/11/24 06:48:35 sp Exp $
+ * @version $Id: DirectoryListSet.java,v 1.1.1.1 2001/09/02 05:37:55 spestov Exp $
  */
 public class DirectoryListSet extends BufferListSet
 {

@@ -17,7 +17,7 @@
  * along with the jEdit program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: Open_Path.bsh,v 1.2 2001/06/20 17:33:22 jgellene Exp $
+ * $Id: Open_Path.bsh,v 1.1.1.1 2001/09/02 05:39:27 spestov Exp $
  */
 
 void openPath()

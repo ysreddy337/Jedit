@@ -25,7 +25,7 @@ import org.gjt.sp.jedit.EBMessage;
 /**
  * Message sent when the list of available macros changes.
  * @author Slava Pestov
- * @version $Id: MacrosChanged.java,v 1.1 1999/11/19 08:54:52 sp Exp $
+ * @version $Id: MacrosChanged.java,v 1.1.1.1 2001/09/02 05:37:34 spestov Exp $
  *
  * @since jEdit 2.2pre6
  */

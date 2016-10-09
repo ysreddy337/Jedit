@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: ServConn.cpp,v 1.1 2001/07/30 16:00:40 jgellene Exp $
+ * $Id: ServConn.cpp,v 1.3 2001/09/07 15:25:58 jgellene Exp $
  */
 
 #include "stdafx.h"
@@ -38,8 +38,9 @@
 #include <winsock2.h>  // winsock functions
 
 
-ServerConnection::ServerConnection()
-	: port(0), key(0L), hSocket(0), connected(false) {}
+ServerConnection::ServerConnection(LPCTSTR lpszServerPath)
+	: port(0), key(0L), hSocket(0),
+	  connected(false), pServerPath(lpszServerPath) {}
 
 ServerConnection::~ServerConnection()
 {
@@ -63,57 +64,32 @@ bool ServerConnection::IsConnected() const
 
 HRESULT ServerConnection::FindServer()
 {
-	TCHAR pszServerFileName[MAX_PATH],
-		  szKeyPath[MAX_PATH];
-	*pszServerFileName = 0;
-	// see if we have Java Server File in the registry
-	HKEY hKey;
-	strcpy(szKeyPath, "Software\\www.jedit.org\\jEditLauncher\\3.2");
-//	LoadString(_Module.GetModuleInstance(), IDS_REG_PARAMS_KEY,
-//		szKeyPath, MAX_PATH);
-	long nResult = RegOpenKeyEx(HKEY_CURRENT_USER, szKeyPath, 0, KEY_READ, &hKey);
-	if(nResult == ERROR_SUCCESS)
-	{
-		DWORD dwCount = MAX_PATH * sizeof(TCHAR);
-		nResult = RegQueryValueEx(hKey, _T("jEdit Server File"),
-			0, 0, (LPBYTE)pszServerFileName, &dwCount);
-		if(*pszServerFileName != 0 && strchr(pszServerFileName, _T('%')) != 0)
-		{
-			TCHAR buf[MAX_PATH];
-			ExpandEnvironmentStrings(pszServerFileName, buf, MAX_PATH);
-			lstrcpy(pszServerFileName, buf);
-		}
-	}
-
-	// if we don't, we'll generate one from the default settings directory.
-	if(*pszServerFileName == 0)
-	{
-		OSVERSIONINFO osver;
-		osver.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-		GetVersionEx(&osver);
-		if(osver.dwPlatformId == VER_PLATFORM_WIN32_NT)
-		{
-			GetEnvironmentVariable("USERPROFILE", pszServerFileName, MAX_PATH);
-		}
-		else  // Win95/98/Me
-		{
-			if(0 == GetEnvironmentVariable("HOME", pszServerFileName, MAX_PATH))
-				GetEnvironmentVariable("WINDIR", pszServerFileName, MAX_PATH);
-		}
-		if(*pszServerFileName == 0)
-		{
-//			::MakeErrorInfo("Could not getserver file"); //IDS_ERR_NO_ENV);
-			return E_FAIL;
-		}
-		lstrcat(pszServerFileName, "\\.jedit\\server");
-	}
 
 	UINT nErrorMsg = 0;
 	CHAR buffer[255];
 	ZeroMemory(buffer, 255);
-	HANDLE h = ::CreateFile(pszServerFileName, GENERIC_READ,
+	HANDLE h = ::CreateFile(pServerPath, GENERIC_READ,
 					FILE_SHARE_READ, 0, OPEN_EXISTING,
-					FILE_FLAG_SEQUENTIAL_SCAN, 0);
+					FILE_ATTRIBUTE_NORMAL, 0); //FLAG_SEQUENTIAL_SCAN, 0);
+	OutputDebugString(h != INVALID_HANDLE_VALUE ? "File opened." : "File not opened");
+	if(h == INVALID_HANDLE_VALUE)
+	{
+		LPSTR szErrMsg = 0;
+		::FormatMessageA(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER |
+			FORMAT_MESSAGE_FROM_SYSTEM |
+			FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL,
+			GetLastError(),
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPSTR) &szErrMsg,
+			0,
+			NULL
+		);
+		OutputDebugString(szErrMsg);
+		LocalFree((LPVOID)szErrMsg);
+	}
+
 	DWORD dwBytesRead;
 	HRESULT hr = S_OK;
 	if( h != INVALID_HANDLE_VALUE &&
@@ -204,7 +180,6 @@ HRESULT ServerConnection::Connect()
 		{
 			MakeErrorInfo("Bad connection with jEdit edit server.");
 		}
-		WSASetLastError(0);
 		return E_FAIL;
 	}
 	else connected = true;

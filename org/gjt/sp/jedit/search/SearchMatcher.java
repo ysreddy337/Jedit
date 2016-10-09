@@ -24,7 +24,7 @@ import javax.swing.text.Segment;
 /**
  * An abstract interface for matching strings.
  * @author Slava Pestov
- * @version $Id: SearchMatcher.java,v 1.6 2001/04/27 11:28:46 sp Exp $
+ * @version $Id: SearchMatcher.java,v 1.1.1.1 2001/09/02 05:37:58 spestov Exp $
  */
 public interface SearchMatcher
 {

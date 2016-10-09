@@ -47,6 +47,21 @@
 	"h:\program files\microsoft platform sdk\include\tvout.h"\
 	
 
+.\InstallerLog.cpp : \
+	".\InstallerLog.h"\
+	".\StdAfx.h"\
+	"e:\program files\microsoft visual studio\vc98\wtl31\include\atlapp.h"\
+	"e:\program files\microsoft visual studio\vc98\wtl31\include\atlgdi.h"\
+	"e:\program files\microsoft visual studio\vc98\wtl31\include\atlmisc.h"\
+	"e:\program files\microsoft visual studio\vc98\wtl31\include\atlres.h"\
+	"e:\program files\microsoft visual studio\vc98\wtl31\include\atluser.h"\
+	"h:\program files\microsoft platform sdk\include\basetsd.h"\
+	"h:\program files\microsoft platform sdk\include\guiddef.h"\
+	"h:\program files\microsoft platform sdk\include\propidl.h"\
+	"h:\program files\microsoft platform sdk\include\shldisp.h"\
+	"h:\program files\microsoft platform sdk\include\tvout.h"\
+	
+
 .\jedinstl.cpp : \
 	".\jedinstl.h"\
 	".\JELInstaller.h"\
@@ -68,6 +83,7 @@
 	".\CtxMenuDlg.h"\
 	".\DeferFileOps.h"\
 	".\InstallData.h"\
+	".\InstallerLog.h"\
 	".\JELInstaller.h"\
 	".\JELRegInstaller.h"\
 	".\StdAfx.h"\
@@ -87,6 +103,7 @@
 .\JELRegInstaller.cpp : \
 	".\CtxMenuDlg.h"\
 	".\InstallData.h"\
+	".\InstallerLog.h"\
 	".\JELInstaller.h"\
 	".\JELRegInstaller.h"\
 	".\StdAfx.h"\

@@ -1,5 +1,5 @@
 /*
- * ScriptServer.cpp - part of jEditLauncher package
+ * RegistryParser.h - part of the jEdit Launcher package
  * Copyright (C) 2001 John Gellene
  * jgellene@nyc.rr.com
  *
@@ -30,69 +30,47 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: ScriptServer.cpp,v 1.2 2001/09/05 11:24:52 jgellene Exp $
+ * $Id: RegistryParser.h,v 1.1 2001/09/05 11:24:52 jgellene Exp $
  */
 
+#if !defined(__REGISTRYPARSER_H__)
+#define __REGISTRYPARSER_H__
 
-#include "stdafx.h"
-#include "RegistryParser.h"
-#include "ScriptServer.h"
-
-/////////////////////////////////////////////////////////////////////////////
-// CScriptServer
-
-STDMETHODIMP CScriptServer::ProcessScript(unsigned char* szScript)
+class RegistryParser
 {
-	DWORD dwResult = WaitForSingleObject(m_hMutex, 30000);
-	if(dwResult == WAIT_TIMEOUT)
-		return E_FAIL;
-	pushScript(szScript);
-	HRESULT hr = SendScript();
-	ReleaseMutex(m_hMutex);
-	return hr;
-}
+public:
+	RegistryParser();
+	virtual ~RegistryParser();
 
-STDMETHODIMP CScriptServer::FindServer(VARIANT_BOOL* pVFound)
-{
-	HRESULT hr = m_pConn->FindServer();
-	*pVFound = (hr == S_OK) ? VARIANT_TRUE : VARIANT_FALSE;
-	return hr;
-}
+	/* Attributes */
+	LPCTSTR GetCommandLine();
+	LPCTSTR GetServerFilePath();
+	LPCTSTR GetWorkingDirectory();
 
-STDMETHODIMP CScriptServer::GetServerPort(ULONG* pPort)
-{
-	if(SUCCEEDED(m_pConn->FindServer()))
-		*pPort = (ULONG)m_pConn->GetPort();
-	else *pPort = 0;
-	return S_OK;
-}
-
-STDMETHODIMP CScriptServer::GetServerKey(ULONG* pKey)
-{
-	if(SUCCEEDED(m_pConn->FindServer()))
-		*pKey = (ULONG)m_pConn->GetKey();
-	else *pKey = 0;
-	return S_OK;
-}
-
-STDMETHODIMP CScriptServer::SendScript()
-{
-	HRESULT hr = m_pConn->Connect();
-	if(SUCCEEDED(hr))
-	{
-		Script_ *pScr = popScript();
-		if(pScr != 0)
-		{
-			char* pStr = (char*)pScr->szScript;
-			m_pConn->SendData(pStr, strlen(pStr));
-			delete pScr;
-		}
-	}
-	m_pConn->Disconnect();
-	return hr;
-}
+	/* Implementation */
+private:
+	BOOL InitCmdLine(HKEY hKey);
+	BOOL FetchRegParam(HKEY hKey, LPCTSTR szParam,
+		LPTSTR szCmdLine, UINT nError);
+	BOOL InitServerPath();
+	BOOL FetchCmdParam(LPCTSTR szSource, LPCTSTR szParam,
+		LPTSTR szDest);
+	BOOL InitWorkingDir(HKEY hKey);
 
 
+	/* Data */
+private:
+	BOOL m_bIsInit;
+	TCHAR m_strCmdLine[MAX_PATH * 4];
+	TCHAR m_strServerPath[MAX_PATH];
+	TCHAR m_strWorkingDir[MAX_PATH];
+
+	/* No copying */
+private:
+	RegistryParser(const RegistryParser&);
+	RegistryParser& operator=(const RegistryParser&);
+};
 
 
+#endif        //  #if !defined(__REGISTRYPARSER_H__)
 

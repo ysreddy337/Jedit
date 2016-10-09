@@ -35,7 +35,7 @@ import org.gjt.sp.util.Log;
 /**
  * Tool bar editor.
  * @author Slava Pestov
- * @version $Id: ToolBarOptionPane.java,v 1.14 2001/03/26 07:09:20 sp Exp $
+ * @version $Id: ToolBarOptionPane.java,v 1.1.1.1 2001/09/02 05:37:53 spestov Exp $
  */
 public class ToolBarOptionPane extends AbstractOptionPane
 {

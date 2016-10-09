@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: ScriptWriter.cpp,v 1.6 2001/08/28 19:37:20 jgellene Exp $
+ * $Id: ScriptWriter.cpp,v 1.7 2001/09/05 11:24:52 jgellene Exp $
  */
 
 #include "stdafx.h"
@@ -623,8 +623,8 @@ HRESULT OpenDiffScript::WriteSuffix()
 
 // Implementation of class StartAppScript
 
-StartAppScript::StartAppScript()
-	: ScriptWriter(), bFirstFile(true)
+StartAppScript::StartAppScript(LPCTSTR lpszCmdLine)
+	: ScriptWriter(), bFirstFile(true), m_lpszCmdLine(lpszCmdLine)
 {
 	InitBuffer(2048);
 }
@@ -634,80 +634,7 @@ StartAppScript::~StartAppScript() {}
 HRESULT StartAppScript::WritePrefix()
 {
 	ClearBuffer();
-	HKEY hKey;
-	LONG nResult;
-	TCHAR szExec[1024],
-		  szExpanded[1024],
-		  szTemp[MAX_PATH],
-		  szKeyPath[MAX_PATH];
-	const TCHAR space[2] = {_T(' '), 0};
-	DWORD dwCount = MAX_PATH * sizeof(TCHAR);
-	DWORD dwType = 0;
-	LoadString(_Module.GetModuleInstance(), IDS_REG_PARAMS_KEY_3_2,
-		szKeyPath, MAX_PATH);
-	nResult = RegOpenKeyEx(HKEY_CURRENT_USER, szKeyPath, 0, KEY_READ, &hKey);
-	if(nResult != ERROR_SUCCESS)
-	{
-		CJEditLauncher::MakeErrorInfo(IDS_ERR_NO_REGISTRY_KEY);
-	}
-	else
-	{
-		nResult = RegQueryValueEx(hKey, _T("Java Executable"), 0, &dwType, (LPBYTE)szExec, &dwCount);
-		if(nResult != ERROR_SUCCESS)
-		{
-			CJEditLauncher::MakeErrorInfo(IDS_ERR_NO_JAVA_EXEC_VALUE);
-		}
-		else
-		{
-			dwCount = MAX_PATH;
-			nResult = RegQueryValueEx(hKey, _T("Java Options"), 0, &dwType, (LPBYTE)szTemp, &dwCount);
-		}
-	}
-	if(nResult == ERROR_SUCCESS)
-	{
-		if(*szTemp)
-		{
-			strcat(szExec, space);
-			strcat(szExec, szTemp);
-		}
-		dwCount = MAX_PATH;
-		nResult = RegQueryValueEx(hKey, _T("jEdit Target"), 0, &dwType, (LPBYTE)szTemp, &dwCount);
-	}
-	else
-	{
-		CJEditLauncher::MakeErrorInfo(IDS_ERR_NO_JEDIT_TARGET_VALUE);
-	}
-	if(nResult == ERROR_SUCCESS)
-	{
-		if(*szTemp)
-		{
-			strcat(szExec, space);
-			strcat(szExec, szTemp);
-		}
-		dwCount = MAX_PATH;
-		nResult = RegQueryValueEx(hKey, _T("jEdit Options"), 0, &dwType, (LPBYTE)szTemp, &dwCount);
-	}
-	if(nResult == ERROR_SUCCESS)
-	{
-		if(*szTemp)
-		{
-			strcat(szExec, space);
-			strcat(szExec, szTemp);
-		}
-	}
-	else
-	{
-		CJEditLauncher::MakeErrorInfo(IDS_ERR_NO_JEDIT_OPTIONS_VALUE);
-	}
-
-	RegCloseKey(hKey);
-	if(nResult != ERROR_SUCCESS)
-		return E_FAIL;
-
-	ExpandEnvironmentStringsA(szExec, szExpanded, 1024);
-	strcat(szExpanded, space);
-	Append(szExpanded);
-
+	Append(m_lpszCmdLine);
 	return S_OK;
 }
 

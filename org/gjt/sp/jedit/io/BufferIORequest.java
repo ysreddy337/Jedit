@@ -31,7 +31,7 @@ import org.gjt.sp.util.*;
 /**
  * A buffer I/O request.
  * @author Slava Pestov
- * @version $Id: BufferIORequest.java,v 1.17 2001/06/26 08:50:00 sp Exp $
+ * @version $Id: BufferIORequest.java,v 1.1.1.1 2001/09/02 05:38:15 spestov Exp $
  */
 public class BufferIORequest extends WorkRequest
 {

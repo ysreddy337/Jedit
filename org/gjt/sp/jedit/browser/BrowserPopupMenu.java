@@ -31,7 +31,7 @@ import org.gjt.sp.jedit.search.*;
 import org.gjt.sp.jedit.*;
 
 /**
- * @version $Id: BrowserPopupMenu.java,v 1.17 2001/08/20 06:35:02 sp Exp $
+ * @version $Id: BrowserPopupMenu.java,v 1.1.1.1 2001/09/02 05:38:20 spestov Exp $
  * @author Slava Pestov and Jason Ginchereau
  */
 public class BrowserPopupMenu extends JPopupMenu

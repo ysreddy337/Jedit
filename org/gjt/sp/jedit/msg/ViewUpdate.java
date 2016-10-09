@@ -25,7 +25,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Message sent when a view-related change occurs.
  * @author Slava Pestov
- * @version $Id: ViewUpdate.java,v 1.4 2000/05/07 05:48:30 sp Exp $
+ * @version $Id: ViewUpdate.java,v 1.1.1.1 2001/09/02 05:37:34 spestov Exp $
  *
  * @since jEdit 2.2pre6
  */

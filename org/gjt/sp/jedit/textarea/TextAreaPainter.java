@@ -32,7 +32,7 @@ import org.gjt.sp.util.Log;
  * The text area repaint manager. It performs double buffering and paints
  * lines of text.
  * @author Slava Pestov
- * @version $Id: TextAreaPainter.java,v 1.66 2001/07/20 11:29:05 sp Exp $
+ * @version $Id: TextAreaPainter.java,v 1.1.1.1 2001/09/02 05:38:12 spestov Exp $
  */
 public class TextAreaPainter extends JComponent implements TabExpander
 {

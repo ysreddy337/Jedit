@@ -31,7 +31,7 @@ import org.gjt.sp.util.Log;
  * The default input handler. It maps sequences of keystrokes into actions
  * and inserts key typed events into the text area.
  * @author Slava Pestov
- * @version $Id: DefaultInputHandler.java,v 1.19 2001/08/10 10:35:11 sp Exp $
+ * @version $Id: DefaultInputHandler.java,v 1.1.1.1 2001/09/02 05:37:37 spestov Exp $
  */
 public class DefaultInputHandler extends InputHandler
 {

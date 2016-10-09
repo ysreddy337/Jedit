@@ -31,7 +31,7 @@ import org.gjt.sp.jedit.jEdit;
 /**
  * A font chooser widget.
  * @author Slava Pestov
- * @version $Id: FontSelector.java,v 1.4 2001/03/14 05:37:27 sp Exp $
+ * @version $Id: FontSelector.java,v 1.1.1.1 2001/09/02 05:37:41 spestov Exp $
  */
 public class FontSelector extends JButton
 {

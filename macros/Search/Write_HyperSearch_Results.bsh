@@ -31,7 +31,7 @@
  * routines.  To be completely reliable, the macro should be run immediately
  * after a HyperSearch.
  *
- * $Id: Write_HyperSearch_Results.bsh,v 1.4 2001/08/29 21:24:41 jgellene Exp $
+ * $Id: Write_HyperSearch_Results.bsh,v 1.1.1.1 2001/09/02 05:39:35 spestov Exp $
  */
 
 import java.text.SimpleDateFormat;

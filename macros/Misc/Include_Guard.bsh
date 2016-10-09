@@ -20,7 +20,7 @@
  * along with the jEdit program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: Include_Guard.bsh,v 1.2 2001/06/23 04:04:43 jgellene Exp $
+ * $Id: Include_Guard.bsh,v 1.1.1.1 2001/09/02 05:39:32 spestov Exp $
  *
  * Notes on use:
  *

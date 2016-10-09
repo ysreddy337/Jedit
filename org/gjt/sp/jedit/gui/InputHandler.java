@@ -37,7 +37,7 @@ import org.gjt.sp.util.Log;
  * to the implementations of this class to do so.
  *
  * @author Slava Pestov
- * @version $Id: InputHandler.java,v 1.31 2001/07/28 12:34:43 sp Exp $
+ * @version $Id: InputHandler.java,v 1.1.1.1 2001/09/02 05:37:40 spestov Exp $
  * @see org.gjt.sp.jedit.gui.DefaultInputHandler
  */
 public abstract class InputHandler extends KeyAdapter

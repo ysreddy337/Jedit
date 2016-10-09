@@ -28,7 +28,7 @@
  * To prevent confusion, only a single return is permitted;
  * to change this, see comment at the end of this listing.
  *
- * $Id: Return_From_Find.bsh,v 1.2 2001/06/23 04:19:21 jgellene Exp $
+ * $Id: Return_From_Find.bsh,v 1.1.1.1 2001/09/02 05:39:34 spestov Exp $
  */
 
 boolean doIt()

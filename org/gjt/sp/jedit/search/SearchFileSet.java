@@ -24,7 +24,7 @@ import org.gjt.sp.jedit.*;
 /**
  * An abstract interface for matching files.
  * @author Slava Pestov
- * @version $Id: SearchFileSet.java,v 1.9 2000/11/24 06:48:35 sp Exp $
+ * @version $Id: SearchFileSet.java,v 1.1.1.1 2001/09/02 05:37:58 spestov Exp $
  */
 public interface SearchFileSet
 {

@@ -27,7 +27,7 @@ import org.gjt.sp.util.Log;
 /**
  * A file set for searching all open buffers.
  * @author Slava Pestov
- * @version $Id: AllBufferSet.java,v 1.10 2000/11/24 06:48:35 sp Exp $
+ * @version $Id: AllBufferSet.java,v 1.1.1.1 2001/09/02 05:37:54 spestov Exp $
  */
 public class AllBufferSet extends BufferListSet
 {

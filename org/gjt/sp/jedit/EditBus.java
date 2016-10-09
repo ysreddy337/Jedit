@@ -32,7 +32,7 @@ import org.gjt.sp.util.Log;
  * and do something appropriate (or simply ignore it).
  *
  * @author Slava Pestov
- * @version $Id: EditBus.java,v 1.5 2000/11/29 06:53:00 sp Exp $
+ * @version $Id: EditBus.java,v 1.1.1.1 2001/09/02 05:37:08 spestov Exp $
  *
  * @since jEdit 2.2pre6
  */

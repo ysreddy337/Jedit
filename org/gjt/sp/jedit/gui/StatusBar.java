@@ -41,7 +41,7 @@ import org.gjt.sp.util.*;
  * <li>And so on
  * </ul>
  *
- * @version $Id: StatusBar.java,v 1.26 2001/07/28 12:34:43 sp Exp $
+ * @version $Id: StatusBar.java,v 1.1.1.1 2001/09/02 05:37:42 spestov Exp $
  * @author Slava Pestov
  * @since jEdit 3.2pre2
  */

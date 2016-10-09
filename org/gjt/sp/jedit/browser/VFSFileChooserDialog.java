@@ -32,7 +32,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Wraps the VFS browser in a modal dialog.
  * @author Slava Pestov
- * @version $Id: VFSFileChooserDialog.java,v 1.24 2001/08/04 02:18:20 sp Exp $
+ * @version $Id: VFSFileChooserDialog.java,v 1.1.1.1 2001/09/02 05:38:23 spestov Exp $
  */
 public class VFSFileChooserDialog extends EnhancedDialog
 {
