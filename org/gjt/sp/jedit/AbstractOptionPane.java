@@ -31,6 +31,9 @@ import java.awt.*;
 /**
  * The default implementation of the option pane interface.<p>
  *
+ * See {@link EditPlugin} for information on how jEdit obtains and constructs
+ * option pane instances.<p>
+ *
  * Most option panes extend this implementation of {@link OptionPane}, instead
  * of implementing {@link OptionPane} directly. This class provides a convenient
  * default framework for laying out configuration options.<p>
@@ -50,12 +53,9 @@ import java.awt.*;
  * <li>{@link #addSeparator(String)}</li>
  * </ul>
  *
- * @see OptionGroup
- * @see org.gjt.sp.jedit.gui.OptionsDialog#addOptionPane(OptionPane)
- *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: AbstractOptionPane.java,v 1.14 2003/02/18 22:03:19 spestov Exp $
+ * @version $Id: AbstractOptionPane.java,v 1.18 2004/03/28 00:07:26 spestov Exp $
  */
 // even though this class is called AbstractOptionPane, it is not really
 // abstract, since BufferOptions uses an instance of it to lay out its
@@ -220,16 +220,37 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 		add(comp);
 	} //}}}
 
+	//{{{ addComponent() method
+	/**
+	 * Adds a component to the option pane. Components are
+	 * added in a vertical fashion, one per row.
+	 * @param comp The component
+	 * @param fill Fill parameter to GridBagConstraints
+	 * @since jEdit 4.2pre2
+	 */
+	public void addComponent(Component comp, int fill)
+	{
+		GridBagConstraints cons = new GridBagConstraints();
+		cons.gridy = y++;
+		cons.gridheight = 1;
+		cons.gridwidth = cons.REMAINDER;
+		cons.fill = fill;
+		cons.anchor = GridBagConstraints.WEST;
+		cons.weightx = 1.0f;
+		cons.insets = new Insets(1,0,1,0);
+
+		gridBag.setConstraints(comp,cons);
+		add(comp);
+	} //}}}
+
 	//{{{ addSeparator() method
 	/**
 	 * Adds a separator component.
-	 * @param label The separator label property
 	 * @since jEdit 4.1pre7
 	 */
 	public void addSeparator()
 	{
-		if(y != 0)
-			addComponent(Box.createVerticalStrut(6));
+		addComponent(Box.createVerticalStrut(6));
 
 		JSeparator sep = new JSeparator(JSeparator.HORIZONTAL);
 
@@ -240,10 +261,12 @@ public class AbstractOptionPane extends JPanel implements OptionPane
 		cons.fill = GridBagConstraints.BOTH;
 		cons.anchor = GridBagConstraints.WEST;
 		cons.weightx = 1.0f;
-		cons.insets = new Insets(1,0,1,0);
+		//cons.insets = new Insets(1,0,1,0);
 
 		gridBag.setConstraints(sep,cons);
 		add(sep);
+
+		addComponent(Box.createVerticalStrut(6));
 	} //}}}
 
 	//{{{ addSeparator() method

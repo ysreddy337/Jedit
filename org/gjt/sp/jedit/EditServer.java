@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 1999, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,6 +23,7 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
+import bsh.NameSpace;
 import javax.swing.SwingUtilities;
 import java.io.*;
 import java.net.*;
@@ -53,7 +54,7 @@ import org.gjt.sp.util.Log;
  * complicated stuff can be done too.
  *
  * @author Slava Pestov
- * @version $Id: EditServer.java,v 1.12 2003/02/28 17:53:41 spestov Exp $
+ * @version $Id: EditServer.java,v 1.23 2004/08/08 03:41:34 spestov Exp $
  */
 public class EditServer extends Thread
 {
@@ -85,19 +86,26 @@ public class EditServer extends Thread
 			int port = socket.getLocalPort();
 
 			FileWriter out = new FileWriter(portFile);
-			out.write("b\n");
-			out.write(String.valueOf(port));
-			out.write("\n");
-			out.write(String.valueOf(authKey));
-			out.write("\n");
-			out.close();
+
+			try
+			{
+				out.write("b\n");
+				out.write(String.valueOf(port));
+				out.write("\n");
+				out.write(String.valueOf(authKey));
+				out.write("\n");
+			}
+			finally
+			{
+				out.close();
+			}
+
+			ok = true;
 
 			Log.log(Log.DEBUG,this,"jEdit server started on port "
 				+ socket.getLocalPort());
 			Log.log(Log.DEBUG,this,"Authorization key is "
 				+ authKey);
-
-			ok = true;
 		}
 		catch(IOException io)
 		{
@@ -144,7 +152,7 @@ public class EditServer extends Thread
 			}
 			finally
 			{
-				if(client != null)
+				/* if(client != null)
 				{
 					try
 					{
@@ -156,7 +164,7 @@ public class EditServer extends Thread
 					}
 
 					client = null;
-				}
+				} */
 			}
 		}
 	} //}}}
@@ -171,12 +179,24 @@ public class EditServer extends Thread
 	public static void handleClient(boolean restore, String parent,
 		String[] args)
 	{
-		String splitConfig = null;
+		handleClient(restore,false,false,parent,args);
+	} //}}}
 
-		boolean newView = jEdit.getBooleanProperty("client.newView");
-
+	//{{{ handleClient() method
+	/**
+	 * @param restore Ignored unless no views are open
+	 * @param newView Open a new view?
+	 * @param newPlainView Open a new plain view?
+	 * @param parent The client's parent directory
+	 * @param args A list of files. Null entries are ignored, for convinience
+	 * @since jEdit 4.2pre1
+	 */
+	public static Buffer handleClient(boolean restore,
+		boolean newView, boolean newPlainView, String parent,
+		String[] args)
+	{
 		// we have to deal with a huge range of possible border cases here.
-		if(jEdit.getFirstView() == null || newView)
+		if(jEdit.getFirstView() == null)
 		{
 			// coming out of background mode.
 			// no views open.
@@ -184,52 +204,66 @@ public class EditServer extends Thread
 
 			Buffer buffer = jEdit.openFiles(null,parent,args);
 
-			if(restore)
+			if(jEdit.getBufferCount() == 0)
+				jEdit.newFile(null);
+
+			boolean restoreFiles = restore
+				&& jEdit.getBooleanProperty("restore")
+				&& (buffer == null
+				|| jEdit.getBooleanProperty("restore.cli"));
+
+			View view = PerspectiveManager.loadPerspective(
+				restoreFiles);
+
+			if(view == null)
 			{
-				if(jEdit.getFirstBuffer() == null
-					|| (jEdit.getFirstBuffer().isUntitled()
-					&& jEdit.getBufferCount() == 1))
-					splitConfig = jEdit.restoreOpenFiles();
-				else if(jEdit.getBooleanProperty("restore.cli"))
-				{
-					// no initial split config
-					jEdit.restoreOpenFiles();
-				}
+				if(buffer == null)
+					buffer = jEdit.getFirstBuffer();
+				view = jEdit.newView(null,buffer);
 			}
+			else if(buffer != null)
+				view.setBuffer(buffer);
 
-			// if session file is empty or -norestore specified,
-			// we need an initial buffer
-			if(jEdit.getFirstBuffer() == null
-					|| (jEdit.getFirstBuffer().isUntitled()
-                                        && jEdit.getBufferCount() == 1))
-				buffer = jEdit.newFile(null);
-
-			if(splitConfig != null)
-				jEdit.newView(null,splitConfig);
-			else
-				jEdit.newView(null,buffer);
+			return buffer;
+		}
+		else if(newPlainView)
+		{
+			// no background mode, and opening a new view
+			Buffer buffer = jEdit.openFiles(null,parent,args);
+			if(buffer == null)
+				buffer = jEdit.getFirstBuffer();
+			jEdit.newView(null,buffer,true);
+			return buffer;
+		}
+		else if(newView)
+		{
+			// no background mode, and opening a new view
+			Buffer buffer = jEdit.openFiles(null,parent,args);
+			if(buffer == null)
+				buffer = jEdit.getFirstBuffer();
+			jEdit.newView(jEdit.getActiveView(),buffer,false);
+			return buffer;
 		}
 		else
 		{
 			// no background mode, and reusing existing view
-			View view = jEdit.getFirstView();
+			View view = jEdit.getActiveView();
 
-			jEdit.openFiles(view,parent,args);
+			Buffer buffer = jEdit.openFiles(view,parent,args);
 
 			// Hack done to fix bringing the window to the front.
 			// At least on windows, Frame.toFront() doesn't cut it.
 			// Remove the isWindows check if it's broken under other
 			// OSes too.
-			if (OperatingSystem.isWindows())
+			if (jEdit.getBooleanProperty("server.brokenToFront"))
 				view.setState(java.awt.Frame.ICONIFIED);
-			
+
 			// un-iconify using JDK 1.3 API
 			view.setState(java.awt.Frame.NORMAL);
 			view.requestFocus();
 			view.toFront();
 
-			// do not create a new view
-			return;
+			return buffer;
 		}
 	} //}}}
 
@@ -239,7 +273,13 @@ public class EditServer extends Thread
 		return ok;
 	} //}}}
 
-	// stopServer() method
+	//{{{ getPort method
+	public int getPort()
+	{
+		return socket.getLocalPort();
+	} //}}}
+
+	//{{{ stopServer() method
 	void stopServer()
 	{
 		abort = true;
@@ -265,7 +305,7 @@ public class EditServer extends Thread
 	//}}}
 
 	//{{{ handleClient() method
-	private boolean handleClient(Socket client, DataInputStream in)
+	private boolean handleClient(final Socket client, DataInputStream in)
 		throws Exception
 	{
 		int key = in.readInt();
@@ -294,8 +334,29 @@ public class EditServer extends Thread
 			{
 				public void run()
 				{
-					BeanShell.eval(null,BeanShell.getNameSpace(),
-						script);
+					try
+					{
+						NameSpace ns = new NameSpace(
+							BeanShell.getNameSpace(),
+							"EditServer namespace");
+						ns.setVariable("socket",client);
+						BeanShell.eval(null,ns,script);
+					}
+					catch(bsh.UtilEvalError e)
+					{
+						Log.log(Log.ERROR,this,e);
+					}
+					finally
+					{
+						try
+						{
+							BeanShell.getNameSpace().setVariable("socket",null);
+						}
+						catch(bsh.UtilEvalError e)
+						{
+							Log.log(Log.ERROR,this,e);
+						}
+					}
 				}
 			});
 

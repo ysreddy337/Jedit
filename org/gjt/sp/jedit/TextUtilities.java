@@ -1,6 +1,6 @@
 /*
  * TextUtilities.java - Various text functions
- * Copyright (C) 1998, 1999, 2000, 2001 Slava Pestov
+ * Copyright (C) 1998, 2003 Slava Pestov
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
@@ -40,10 +40,13 @@ import org.gjt.sp.jedit.syntax.*;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: TextUtilities.java,v 1.40 2003/01/30 02:58:40 spestov Exp $
+ * @version $Id: TextUtilities.java,v 1.47 2004/03/28 00:07:26 spestov Exp $
  */
 public class TextUtilities
 {
+	// to avoid slowdown with large files; only scan 10000 lines either way
+	public static final int BRACKET_MATCH_LIMIT = 10000;
+
 	//{{{ getTokenAtOffset() method
 	/**
 	 * Returns the token that contains the specified offset.
@@ -117,6 +120,8 @@ public class TextUtilities
 
 		boolean haveTokens = true;
 
+		int startLine = line;
+
 		//{{{ Forward search
 		if(direction)
 		{
@@ -157,7 +162,7 @@ public class TextUtilities
 
 				//{{{ Go on to next line
 				line++;
-				if(line >= buffer.getLineCount())
+				if(line >= buffer.getLineCount() || (line - startLine) > BRACKET_MATCH_LIMIT)
 					break;
 				buffer.getLineText(line,lineText);
 				offset = 0;
@@ -203,9 +208,9 @@ public class TextUtilities
 					}
 				}
 
-				//{{{ Go on to next line
+				//{{{ Go on to previous line
 				line--;
-				if(line < 0)
+				if(line < 0 || (startLine - line) > BRACKET_MATCH_LIMIT)
 					break;
 				buffer.getLineText(line,lineText);
 				offset = lineText.count - 1;
@@ -218,29 +223,6 @@ public class TextUtilities
 		return -1;
 	} //}}}
 
-	//{{{ findMatchingBracketFuzzy() method
-	/**
-	 * Works exactly like the findMatchingBracket(Bufferm int, int) method,
-	 * but if there is no (matching) bracket at the specified offset, it
-	 * looks at the next character too. The caller only needs to make sure
-	 * that the given offset is valid.
-	 * @param buffer The buffer
-	 * @param line The line
-	 * @param offset The offset within that line
-	 * @since 4.1pre1
-	 */
-	public static int findMatchingBracketFuzzy(Buffer buffer, int line, int offset)
-	{
-		int result = findMatchingBracket(buffer,line,offset);
-		if((result == -1)&&(offset + 1 < buffer.getLineLength(line)))
-		{
-			return findMatchingBracket(buffer,line,offset + 1);
-		}
-		else{
-			return result;	
-		}
-	} //}}}
-
 	//{{{ findWordStart() method
 	/**
 	 * Locates the start of the word at the specified position.
@@ -251,7 +233,7 @@ public class TextUtilities
 	 */
 	public static int findWordStart(String line, int pos, String noWordSep)
 	{
-		return findWordStart(line, pos, noWordSep, true);
+		return findWordStart(line, pos, noWordSep, true, false);
 	} //}}}
 
 	//{{{ findWordStart() method
@@ -263,10 +245,28 @@ public class TextUtilities
 	 * should be treated as word characters anyway
 	 * @param joinNonWordChars Treat consecutive non-alphanumeric
 	 * characters as one word
+	 * @since jEdit 4.2pre5
+	 */
+	public static int findWordStart(String line, int pos, String noWordSep,
+		boolean joinNonWordChars)
+	{
+		return findWordStart(line,pos,noWordSep,joinNonWordChars,false);
+	} //}}}
+
+	//{{{ findWordStart() method
+	/**
+	 * Locates the start of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @param joinNonWordChars Treat consecutive non-alphanumeric
+	 * characters as one word
+	 * @param eatWhitespace Include whitespace at start of word
 	 * @since jEdit 4.1pre2
 	 */
 	public static int findWordStart(String line, int pos, String noWordSep,
-					boolean joinNonWordChars)
+		boolean joinNonWordChars, boolean eatWhitespace)
 	{
 		char ch = line.charAt(pos);
 
@@ -284,7 +284,6 @@ public class TextUtilities
 			type = SYMBOL;
 		//}}}
 
-		int whiteSpaceEnd = 0;
 loop:		for(int i = pos; i >= 0; i--)
 		{
 			ch = line.charAt(i);
@@ -295,24 +294,41 @@ loop:		for(int i = pos; i >= 0; i--)
 				// only select other whitespace in this case
 				if(Character.isWhitespace(ch))
 					break;
+				// word char or symbol; stop
 				else
 					return i + 1; //}}}
 			//{{{ Word character...
 			case WORD_CHAR:
+				// word char; keep going
 				if(Character.isLetterOrDigit(ch) ||
 					noWordSep.indexOf(ch) != -1)
 				{
+					break;
+				}
+				// whitespace; include in word if eating
+				else if(Character.isWhitespace(ch)
+					&& eatWhitespace)
+				{
+					type = WHITESPACE;
 					break;
 				}
 				else
 					return i + 1; //}}}
 			//{{{ Symbol...
 			case SYMBOL:
-				if(!joinNonWordChars && pos!=i) return i + 1;
-				// if we see whitespace, set flag.
+				if(!joinNonWordChars && pos != i)
+					return i + 1;
+
+				// whitespace; include in word if eating
 				if(Character.isWhitespace(ch))
 				{
-					return i + 1;
+					if(eatWhitespace)
+					{
+						type = WHITESPACE;
+						break;
+					}
+					else
+						return i + 1;
 				}
 				else if(Character.isLetterOrDigit(ch) ||
 					noWordSep.indexOf(ch) != -1)
@@ -326,7 +342,7 @@ loop:		for(int i = pos; i >= 0; i--)
 			}
 		}
 
-		return whiteSpaceEnd;
+		return 0;
 	} //}}}
 
 	//{{{ findWordEnd() method
@@ -354,7 +370,25 @@ loop:		for(int i = pos; i >= 0; i--)
 	 * @since jEdit 4.1pre2
 	 */
 	public static int findWordEnd(String line, int pos, String noWordSep,
-					boolean joinNonWordChars)
+		boolean joinNonWordChars)
+	{
+		return findWordEnd(line,pos,noWordSep,joinNonWordChars,false);
+	} //}}}
+
+	//{{{ findWordEnd() method
+	/**
+	 * Locates the end of the word at the specified position.
+	 * @param line The text
+	 * @param pos The position
+	 * @param noWordSep Characters that are non-alphanumeric, but
+	 * should be treated as word characters anyway
+	 * @param joinNonWordChars Treat consecutive non-alphanumeric
+	 * characters as one word
+	 * @param eatWhitespace Include whitespace at end of word
+	 * @since jEdit 4.2pre5
+	 */
+	public static int findWordEnd(String line, int pos, String noWordSep,
+		boolean joinNonWordChars, boolean eatWhitespace)
 	{
 		if(pos != 0)
 			pos--;
@@ -394,19 +428,36 @@ loop:		for(int i = pos; i < line.length(); i++)
 				{
 					break;
 				}
+				// whitespace; include in word if eating
+				else if(Character.isWhitespace(ch)
+					&& eatWhitespace)
+				{
+					type = WHITESPACE;
+					break;
+				}
 				else
 					return i; //}}}
 			//{{{ Symbol...
 			case SYMBOL:
-				if(!joinNonWordChars && i!=pos) return i;
+				if(!joinNonWordChars && i != pos)
+					return i;
+
 				// if we see whitespace, set flag.
 				if(Character.isWhitespace(ch))
 				{
-					return i;
+					if(eatWhitespace)
+					{
+						type = WHITESPACE;
+						break;
+					}
+					else
+						return i;
 				}
 				else if(Character.isLetterOrDigit(ch) ||
 					noWordSep.indexOf(ch) != -1)
+				{
 					return i;
+				}
 				else
 				{
 					break;
@@ -415,38 +466,6 @@ loop:		for(int i = pos; i < line.length(); i++)
 		}
 
 		return line.length();
-	} //}}}
-
-	//{{{ regionMatches() method
-	/**
-	 * Checks if a subregion of a <code>Segment</code> is equal to a
-	 * character array.
-	 * @param ignoreCase True if case should be ignored, false otherwise
-	 * @param text The segment
-	 * @param offset The offset into the segment
-	 * @param match The character array to match
-	 * @since jEdit 2.7pre1
-	 */
-	public static boolean regionMatches(boolean ignoreCase, Segment text,
-		int offset, char[] match)
-	{
-		int length = offset + match.length;
-		if(length > text.offset + text.count)
-			return false;
-		char[] textArray = text.array;
-		for(int i = offset, j = 0; i < length; i++, j++)
-		{
-			char c1 = textArray[i];
-			char c2 = match[j];
-			if(ignoreCase)
-			{
-				c1 = Character.toUpperCase(c1);
-				c2 = Character.toUpperCase(c2);
-			}
-			if(c1 != c2)
-				return false;
-		}
-		return true;
 	} //}}}
 
 	//{{{ spacesToTabs() method
@@ -477,7 +496,8 @@ loop:		for(int i = pos; i < line.length(); i++)
 				if(whitespace != 0)
 				{
 					buf.append(MiscUtilities
-						.createWhiteSpace(whitespace,tabSize));
+						.createWhiteSpace(whitespace,tabSize,
+						width - whitespace));
 				}
 				whitespace = 0;
 				width = 0;
@@ -487,7 +507,8 @@ loop:		for(int i = pos; i < line.length(); i++)
 				if(whitespace != 0)
 				{
 					buf.append(MiscUtilities
-						.createWhiteSpace(whitespace,tabSize));
+						.createWhiteSpace(whitespace,tabSize,
+						width - whitespace));
 					whitespace = 0;
 				}
 				buf.append(in.charAt(i));
@@ -498,7 +519,8 @@ loop:		for(int i = pos; i < line.length(); i++)
 
 		if(whitespace != 0)
 		{
-			buf.append(MiscUtilities.createWhiteSpace(whitespace,tabSize));
+			buf.append(MiscUtilities.createWhiteSpace(whitespace,tabSize,
+				width - whitespace));
 		}
 
                 return buf.toString();
@@ -542,7 +564,8 @@ loop:		for(int i = pos; i < line.length(); i++)
 	 * Formats the specified text by merging and breaking lines to the
 	 * specified width.
 	 * @param text The text
-	 * @param maxLineLen The maximum line length
+	 * @param maxLineLength The maximum line length
+	 * @param tabSize The tab size
 	 */
 	public static String format(String text, int maxLineLength, int tabSize)
 	{

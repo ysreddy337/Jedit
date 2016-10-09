@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 1999, 2004 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,7 +27,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.StringTokenizer;
+import java.util.Arrays;
 import org.gjt.sp.jedit.buffer.FoldHandler;
 import org.gjt.sp.jedit.*;
 //}}}
@@ -35,7 +35,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Buffer-specific options dialog.
  * @author Slava Pestov
- * @version $Id: BufferOptions.java,v 1.25 2003/01/12 03:08:24 spestov Exp $
+ * @version $Id: BufferOptions.java,v 1.31 2004/06/28 06:45:26 spestov Exp $
  */
 public class BufferOptions extends EnhancedDialog
 {
@@ -77,13 +77,8 @@ public class BufferOptions extends EnhancedDialog
 		//}}}
 
 		//{{{ Encoding
-		DefaultComboBoxModel encodings = new DefaultComboBoxModel();
-		StringTokenizer st = new StringTokenizer(jEdit.getProperty("encodings"));
-		while(st.hasMoreTokens())
-		{
-			encodings.addElement(st.nextToken());
-		}
-
+		String[] encodings = MiscUtilities.getEncodings();
+		Arrays.sort(encodings,new MiscUtilities.StringICaseCompare());
 		encoding = new JComboBox(encodings);
 		encoding.setEditable(true);
 		encoding.setSelectedItem(buffer.getStringProperty(Buffer.ENCODING));
@@ -102,18 +97,9 @@ public class BufferOptions extends EnhancedDialog
 
 		//{{{ Edit mode
 		modes = jEdit.getModes();
-		String bufferMode = buffer.getMode().getName();
-		int index = 0;
-		String[] modeNames = new String[modes.length];
-		for(int i = 0; i < modes.length; i++)
-		{
-			Mode mode = modes[i];
-			modeNames[i] = mode.getName();
-			if(bufferMode.equals(mode.getName()))
-				index = i;
-		}
-		mode = new JComboBox(modeNames);
-		mode.setSelectedIndex(index);
+		MiscUtilities.quicksort(modes,new MiscUtilities.StringICaseCompare());
+		mode = new JComboBox(modes);
+		mode.setSelectedItem(buffer.getMode());
 		mode.addActionListener(actionListener);
 		panel.addComponent(jEdit.getProperty("buffer-options.mode"),mode);
 		//}}}
@@ -138,6 +124,7 @@ public class BufferOptions extends EnhancedDialog
 		wrap.setSelectedItem(buffer.getStringProperty("wrap"));
 		panel.addComponent(jEdit.getProperty("options.editing.wrap"),
 			wrap);
+		wrap.addActionListener(new ActionHandler());
 		//}}}
 
 		//{{{ Max line length
@@ -146,6 +133,7 @@ public class BufferOptions extends EnhancedDialog
 		maxLineLen = new JComboBox(lineLengths);
 		maxLineLen.setEditable(true);
 		maxLineLen.setSelectedItem(buffer.getStringProperty("maxLineLen"));
+		maxLineLen.addActionListener(new ActionHandler());
 		panel.addComponent(jEdit.getProperty("options.editing.maxLineLen"),
 			maxLineLen);
 		//}}}
@@ -194,7 +182,7 @@ public class BufferOptions extends EnhancedDialog
 
 		pack();
 		setLocationRelativeTo(view);
-		show();
+		setVisible(true);
 	} //}}}
 
 	//{{{ ok() method
@@ -315,8 +303,7 @@ public class BufferOptions extends EnhancedDialog
 				cancel();
 			else if(source == mode)
 			{
-				Mode _mode = jEdit.getMode((String)
-					mode.getSelectedItem());
+				Mode _mode = (Mode)mode.getSelectedItem();
 				folding.setSelectedItem(_mode.getProperty(
 					"folding"));
 				wrap.setSelectedItem(_mode.getProperty(
@@ -329,6 +316,28 @@ public class BufferOptions extends EnhancedDialog
 					"indentSize"));
 				noTabs.setSelected(_mode.getBooleanProperty(
 					"noTabs"));
+			}
+			else if(source == wrap)
+			{
+				if(!wrap.getSelectedItem().equals("none"))
+				{
+					if(maxLineLen.getSelectedItem()
+						.equals("0"))
+					{
+						maxLineLen.setSelectedItem("80");
+					}
+				}
+			}
+			else if(source == maxLineLen)
+			{
+				if(!wrap.getSelectedItem().equals("none"))
+				{
+					if(maxLineLen.getSelectedItem()
+						.equals("0"))
+					{
+						wrap.setSelectedItem("none");
+					}
+				}
 			}
 		} //}}}
 	} //}}}

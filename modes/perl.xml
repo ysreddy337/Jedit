@@ -9,46 +9,54 @@
 		<PROPERTY NAME="indentCloseBrackets" VALUE="}" />
 		<PROPERTY NAME="lineUpClosingBracket" VALUE="true" />
 	</PROPS>
-	<RULES ESCAPE="\" IGNORE_CASE="FALSE" HIGHLIGHT_DIGITS="TRUE">
+	<RULES ESCAPE="\" HIGHLIGHT_DIGITS="TRUE" IGNORE_CASE="FALSE">
 		<!-- Comments -->
 		<EOL_SPAN TYPE="COMMENT1">#</EOL_SPAN>
 
 		<!-- TYPE is LABEL so that =head1 and =cut are highlighted as so -->
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=head1</BEGIN>
-			<END>=cut</END>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=head1</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=head2</BEGIN>
-			<END>=cut</END>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=head2</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=item</BEGIN>
-			<END>=cut</END>
+        <SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=head3</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=over</BEGIN>
-			<END>=cut</END>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=head4</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=back</BEGIN>
-			<END>=cut</END>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=item</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=pod</BEGIN>
-			<END>=cut</END>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=over</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=for</BEGIN>
-			<END>=cut</END>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=back</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=begin</BEGIN>
-			<END>=cut</END>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=pod</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
-		<SPAN TYPE="LABEL" AT_LINE_START="TRUE" DELEGATE="POD">
-			<BEGIN>=end</BEGIN>
-			<END>=cut</END>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=for</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
+		</SPAN>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=begin</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
+		</SPAN>
+		<SPAN TYPE="LABEL" DELEGATE="POD">
+			<BEGIN AT_LINE_START="TRUE">=end</BEGIN>
+			<END AT_LINE_START="TRUE">=cut</END>
 		</SPAN>
 
 		<!-- Variables -->
@@ -61,22 +69,19 @@
 			<END>}</END>
 		</SPAN>
 
-		<MARK_FOLLOWING TYPE="KEYWORD2">$#</MARK_FOLLOWING>
-		<MARK_FOLLOWING TYPE="KEYWORD2">$</MARK_FOLLOWING>
+		<SEQ_REGEXP HASH_CHAR="$" TYPE="KEYWORD2">\$(?:#|\w)+</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="@" TYPE="KEYWORD2">@(?:#|\w)+</SEQ_REGEXP>
+		<SEQ_REGEXP HASH_CHAR="%" TYPE="KEYWORD2">%(?:#|\w)+</SEQ_REGEXP>
 
 		<SPAN TYPE="KEYWORD2" NO_LINE_BREAK="TRUE" DELEGATE="VARIABLE">
 			<BEGIN>@{</BEGIN>
 			<END>}</END>
 		</SPAN>
 
-		<MARK_FOLLOWING TYPE="KEYWORD2">@</MARK_FOLLOWING>
-
 		<SPAN TYPE="KEYWORD2" NO_LINE_BREAK="TRUE" DELEGATE="VARIABLE">
 			<BEGIN>%{</BEGIN>
 			<END>}</END>
 		</SPAN>
-
-		<MARK_FOLLOWING TYPE="KEYWORD2">%</MARK_FOLLOWING>
 
 		<!-- Literals -->
 		<SPAN TYPE="LITERAL1" DELEGATE="LITERAL">
@@ -94,11 +99,15 @@
 			<END>`</END>
 		</SPAN>
 
-		<!-- Readins -->
-		<SPAN TYPE="LITERAL1" DELEGATE="LITERAL">
-			<BEGIN>&lt;&lt;EOF</BEGIN>
-			<END>EOF</END>
-		</SPAN>
+		<!-- Heredoc -->
+		<SPAN_REGEXP HASH_CHAR="&lt;" TYPE="LITERAL2" DELEGATE="LITERAL">
+		<BEGIN><![CDATA[<<[:space:]*(['"])([[:space:][:alnum:]_]*)\1;?\s*]]></BEGIN>
+		<END>$2</END>
+		</SPAN_REGEXP>
+		<SPAN_REGEXP HASH_CHAR="&lt;" TYPE="LITERAL2" DELEGATE="LITERAL">
+		<BEGIN><![CDATA[<<([[:alpha:]_][[:alnum:]_]*);?\s*]]></BEGIN>
+		<END>$1</END>
+		</SPAN_REGEXP>
 
 		<!-- jEdit 4.1 adds regular expression syntax rules so we can
 		     highlight this sort of crap. -->
@@ -109,10 +118,10 @@
                 >/[^[:blank:]]*?[^\\]/</SEQ_REGEXP>
 
                 <!-- q//, qq//, qr//, qx//, tr///, y///, m//, s/// -->
-                <SEQ_REGEXP TYPE="MARKUP"
-                        HASH_CHAR="q"
-                        AT_WORD_START="TRUE"
-                >q(?:|[qrx])([[:punct:]])(?:.*?[^\\])*?\1</SEQ_REGEXP>
+		<SEQ_REGEXP TYPE="MARKUP"
+                	HASH_CHAR="q"
+                	AT_WORD_START="TRUE"
+		>q(?:|[qrx])\{(?:.*?[^\\])*?\}</SEQ_REGEXP>
 
                 <SEQ_REGEXP TYPE="MARKUP"
                         HASH_CHAR="t"

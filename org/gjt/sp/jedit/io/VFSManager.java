@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000 Slava Pestov
+ * Copyright (C) 2000, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,11 +23,16 @@
 package org.gjt.sp.jedit.io;
 
 //{{{ Imports
-import java.util.Enumeration;
-import java.util.Hashtable;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-import java.awt.*;
+import java.awt.Component;
+import java.awt.Frame;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Vector;
 import org.gjt.sp.jedit.gui.ErrorListDialog;
 import org.gjt.sp.jedit.msg.VFSUpdate;
@@ -39,12 +44,25 @@ import org.gjt.sp.util.WorkThreadPool;
 /**
  * jEdit's virtual filesystem allows it to transparently edit files
  * stored elsewhere than the local filesystem, for example on an FTP
- * site.
+ * site. See the {@link VFS} class for implementation details.<p>
+ *
+ * Note that most of the jEdit API is not thread-safe, so special care
+ * must be taken when making jEdit API calls. Also, it is not safe to
+ * call <code>SwingUtilities.invokeAndWait()</code> from a work request;
+ * it can cause a deadlock if the given runnable then later calls
+ * {@link #waitForRequests()}.
+ *
  * @author Slava Pestov
- * @version $Id: VFSManager.java,v 1.7 2002/06/01 02:32:02 spestov Exp $
+ * @version $Id: VFSManager.java,v 1.15 2004/05/10 03:21:11 spestov Exp $
  */
 public class VFSManager
 {
+	/**
+	 * The service type. See {@link org.gjt.sp.jedit.ServiceManager}.
+	 * @since jEdit 4.2pre1
+	 */
+	public static final String SERVICE = "org.gjt.sp.jedit.io.VFS";
+
 	//{{{ init() method
 	/**
 	 * Do not call.
@@ -53,9 +71,12 @@ public class VFSManager
 	{
 		int count = jEdit.getIntegerProperty("ioThreadCount",4);
 		ioThreadPool = new WorkThreadPool("jEdit I/O",count);
-		registerVFS(FavoritesVFS.PROTOCOL,new FavoritesVFS());
-		if(OperatingSystem.isDOSDerived() || OperatingSystem.isMacOS())
-			registerVFS(FileRootsVFS.PROTOCOL,new FileRootsVFS());
+		JARClassLoader classLoader = new JARClassLoader();
+		for(int i = 0; i < ioThreadPool.getThreadCount(); i++)
+		{
+			ioThreadPool.getThread(i).setContextClassLoader(
+				classLoader);
+		}
 	} //}}}
 
 	//{{{ start() method
@@ -91,13 +112,16 @@ public class VFSManager
 
 	//{{{ getVFSByName() method
 	/**
-	 * Returns the VFS for the specified name.
-	 * @param name The VFS name
-	 * @since jEdit 2.6pre4
+	 * @deprecated Use <code>getVFSForProtocol()</code> instead.
 	 */
 	public static VFS getVFSByName(String name)
 	{
-		return (VFS)vfsHash.get(name);
+		// in new api, protocol always equals name
+		VFS vfs = (VFS)ServiceManager.getService(SERVICE,name);
+		if(vfs == null)
+			return (VFS)vfsHash.get(name);
+		else
+			return vfs;
 	} //}}}
 
 	//{{{ getVFSForProtocol() method
@@ -112,7 +136,10 @@ public class VFSManager
 			return fileVFS;
 		else
 		{
-			VFS vfs = (VFS)protocolHash.get(protocol);
+			VFS vfs = (VFS)ServiceManager.getService(SERVICE,protocol);
+			if(vfs == null)
+				vfs = (VFS)protocolHash.get(protocol);
+
 			if(vfs != null)
 				return vfs;
 			else
@@ -136,10 +163,8 @@ public class VFSManager
 
 	//{{{ registerVFS() method
 	/**
-	 * Registers a virtual filesystem.
-	 * @param protocol The protocol
-	 * @param vfs The VFS
-	 * @since jEdit 2.5pre1
+	 * @deprecated Write a <code>services.xml</code> file instead;
+	 * see {@link org.gjt.sp.jedit.ServiceManager}.
 	 */
 	public static void registerVFS(String protocol, VFS vfs)
 	{
@@ -152,12 +177,36 @@ public class VFSManager
 
 	//{{{ getFilesystems() method
 	/**
-	 * Returns an enumeration of all registered filesystems.
-	 * @since jEdit 2.5pre1
+	 * @deprecated Use <code>getVFSs()</code> instead.
 	 */
 	public static Enumeration getFilesystems()
 	{
 		return vfsHash.elements();
+	} //}}}
+
+	//{{{ getVFSs() method
+	/**
+	 * Returns a list of all registered filesystems.
+	 * @since jEdit 4.2pre1
+	 */
+	public static String[] getVFSs()
+	{
+		// the sooner ppl move to the new api, the less we'll need
+		// crap like this
+		List returnValue = new LinkedList();
+		String[] newAPI = ServiceManager.getServiceNames(SERVICE);
+		if(newAPI != null)
+		{
+			for(int i = 0; i < newAPI.length; i++)
+			{
+				returnValue.add(newAPI[i]);
+			}
+		}
+		Enumeration oldAPI = vfsHash.keys();
+		while(oldAPI.hasMoreElements())
+			returnValue.add(oldAPI.nextElement());
+		return (String[])returnValue.toArray(new String[
+			returnValue.size()]);
 	} //}}}
 
 	//}}}
@@ -265,7 +314,7 @@ public class VFSManager
 	 *
 	 * @param comp The component
 	 * @param path The path name that caused the error
-	 * @param message The error message property name
+	 * @param messageProp The error message property name
 	 * @param args Positional parameters
 	 * @since jEdit 4.0pre3
 	 */
@@ -285,15 +334,16 @@ public class VFSManager
 
 			if(errors.size() == 1)
 			{
-				final String caption = jEdit.getProperty(
-					"ioerror.caption" + (errors.size() == 1
-					? "-1" : ""),new Integer[] {
-					new Integer(errors.size()) });
+				
 
 				VFSManager.runInAWTThread(new Runnable()
 				{
 					public void run()
 					{
+						String caption = jEdit.getProperty(
+							"ioerror.caption" + (errors.size() == 1
+							? "-1" : ""),new Integer[] {
+							new Integer(errors.size()) });
 						new ErrorListDialog(
 							frame.isShowing()
 							? frame
@@ -336,7 +386,7 @@ public class VFSManager
 				for(int i = 0; i < vfsUpdates.size(); i++)
 				{
 					VFSUpdate msg = (VFSUpdate)vfsUpdates
-						.elementAt(i);
+						.get(i);
 					if(msg.getPath().equals(path))
 					{
 						// don't send two updates
@@ -345,7 +395,7 @@ public class VFSManager
 					}
 				}
 
-				vfsUpdates.addElement(new VFSUpdate(path));
+				vfsUpdates.add(new VFSUpdate(path));
 
 				if(vfsUpdates.size() == 1)
 				{
@@ -365,12 +415,20 @@ public class VFSManager
 		{
 			synchronized(vfsUpdateLock)
 			{
+				// the vfs browser has what you might call
+				// a design flaw, it doesn't update properly
+				// unless the vfs update for a parent arrives
+				// before any updates for the children. sorting
+				// the list alphanumerically guarantees this.
+				Collections.sort(vfsUpdates,
+					new MiscUtilities.StringCompare()
+				);
 				for(int i = 0; i < vfsUpdates.size(); i++)
 				{
-					EditBus.send((VFSUpdate)vfsUpdates.elementAt(i));
+					EditBus.send((VFSUpdate)vfsUpdates.get(i));
 				}
 
-				vfsUpdates.removeAllElements();
+				vfsUpdates.clear();
 			}
 		}
 	} //}}}
@@ -387,7 +445,7 @@ public class VFSManager
 	private static Object errorLock;
 	private static Vector errors;
 	private static Object vfsUpdateLock;
-	private static Vector vfsUpdates;
+	private static List vfsUpdates;
 	//}}}
 
 	//{{{ Class initializer
@@ -400,7 +458,7 @@ public class VFSManager
 		vfsHash = new Hashtable();
 		protocolHash = new Hashtable();
 		vfsUpdateLock = new Object();
-		vfsUpdates = new Vector();
+		vfsUpdates = new ArrayList(10);
 	} //}}}
 
 	private VFSManager() {}

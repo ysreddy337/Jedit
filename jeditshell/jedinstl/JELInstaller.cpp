@@ -25,7 +25,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: JELInstaller.cpp,v 1.16 2002/02/19 03:33:44 jgellene Exp $
+ * $Id: JELInstaller.cpp,v 1.17 2003/11/19 11:16:34 springle Exp $
  */
 
 #include "stdafx.h"
@@ -285,6 +285,25 @@ HRESULT JELShortcutInstaller::Install()
 	CreateShortcut(strFile, "jEdit", strFile, Desktop,
 		strJEditDesc, strPrimaryDir, 0);
 	return S_OK;
+}
+
+HRESULT JELShortcutInstaller::SHGetSpecialFolderLocation( HWND hwndOwner,
+    int nFolder,
+    LPITEMIDLIST *ppidl
+    ) {
+	OSVERSIONINFO osver;
+	osver.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+	GetVersionEx(&osver);
+	if(osver.dwPlatformId == VER_PLATFORM_WIN32_NT)
+	{
+		if ( nFolder == CSIDL_PROGRAMS )
+			nFolder = CSIDL_COMMON_PROGRAMS;
+		else if ( nFolder == CSIDL_STARTMENU )
+			nFolder = CSIDL_COMMON_STARTMENU;
+		else if ( nFolder == CSIDL_DESKTOP )
+			nFolder = CSIDL_COMMON_DESKTOPDIRECTORY;
+	}
+	return ::SHGetSpecialFolderLocation( hwndOwner, nFolder, ppidl );
 }
 
 

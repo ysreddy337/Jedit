@@ -52,14 +52,14 @@ class BSHType extends SimpleNode
     private int arrayDims;
 
 	/** 
-		Internal cache of the fully expressed type. 
-		i.e. primtive, class, or array.  Cleared on classloader change.
+		Internal cache of the type.  Cleared on classloader change.
 	*/
     private Class type;
 
+	String descriptor;
+
     BSHType(int id) { 
 		super(id); 
-		BshClassManager.addCMListener(this);
 	}
 
 	/**
@@ -70,25 +70,91 @@ class BSHType extends SimpleNode
 		arrayDims++; 
 	}
 
+	SimpleNode getTypeNode() {
+        return (SimpleNode)jjtGetChild(0);
+	}
+
     /**
-		 Returns a class for the type
+		 Returns a class descriptor for this type.
+		 If the type is an ambiguous name (object type) evaluation is 
+		 attempted through the namespace in order to resolve imports.
+		 If it is not found and the name is non-compound we assume the default
+		 package for the name.
 	*/
-    public Class getType( NameSpace namespace ) 
+    public String getTypeDescriptor( 
+		CallStack callstack, Interpreter interpreter, String defaultPackage ) 
+    {
+        // return cached type if available
+		if ( descriptor != null )
+			return descriptor;
+
+		String descriptor;
+        //  first node will either be PrimitiveType or AmbiguousName
+        SimpleNode node = getTypeNode();
+        if ( node instanceof BSHPrimitiveType )
+            descriptor = getTypeDescriptor( ((BSHPrimitiveType)node).type );
+        else 
+		{
+            String clasName = ((BSHAmbiguousName)node).text;
+			BshClassManager bcm = interpreter.getClassManager();
+			// Note: incorrect here - we are using the hack in bsh class
+			// manager that allows lookup by base name.  We need to eliminate
+			// this limitation by working through imports.  See notes in class
+			// manager.
+			String definingClass = bcm.getClassBeingDefined( clasName );
+
+            Class clas = null;
+			if ( definingClass == null )
+			{
+				try {
+					clas = ((BSHAmbiguousName)node).toClass( 
+						callstack, interpreter );
+				} catch ( EvalError e ) {
+					//throw new InterpreterError("unable to resolve type: "+e);
+					// ignore and try default package
+					//System.out.println("BSHType: "+node+" class not found");
+				}
+			} else
+				clasName = definingClass;
+
+			if ( clas != null )
+			{
+				//System.out.println("found clas: "+clas);
+            	descriptor = getTypeDescriptor( clas );
+			}else
+			{
+				if ( defaultPackage == null || Name.isCompound( clasName ) )
+            		descriptor = "L" + clasName.replace('.','/') + ";";
+				else
+            		descriptor = 
+						"L"+defaultPackage.replace('.','/')+"/"+clasName + ";";
+			}
+		}
+
+		for(int i=0; i<arrayDims; i++)
+			descriptor = "["+descriptor;
+
+		this.descriptor = descriptor;
+	//System.out.println("BSHType: returning descriptor: "+descriptor);
+        return descriptor;
+    }
+
+    public Class getType( CallStack callstack, Interpreter interpreter ) 
 		throws EvalError
     {
         // return cached type if available
-		if (type != null)
+		if ( type != null )
 			return type;
 
         //  first node will either be PrimitiveType or AmbiguousName
-        SimpleNode node = (SimpleNode)jjtGetChild(0);
-
-        if(node instanceof BSHPrimitiveType)
+        SimpleNode node = getTypeNode();
+        if ( node instanceof BSHPrimitiveType )
             baseType = ((BSHPrimitiveType)node).getType();
         else 
-            baseType = ((BSHAmbiguousName)node).toClass( namespace );
+            baseType = ((BSHAmbiguousName)node).toClass( 
+				callstack, interpreter );
 
-        if(arrayDims > 0) {
+        if ( arrayDims > 0 ) {
             try {
                 // Get the type by constructing a prototype array with
 				// arbitrary (zero) length in each dimension.
@@ -96,10 +162,15 @@ class BSHType extends SimpleNode
                 Object obj = Array.newInstance(baseType, dims);
                 type = obj.getClass(); 
             } catch(Exception e) {
-                throw new EvalError("Couldn't construct array type", this);
+                throw new EvalError("Couldn't construct array type", 
+					this, callstack );
             }
         } else
             type = baseType;
+
+		// hack... sticking to first interpreter that resolves this
+		// see comments on type instance variable
+		interpreter.getClassManager().addListener(this);
 
         return type;
     }
@@ -123,5 +194,25 @@ class BSHType extends SimpleNode
 	public void classLoaderChanged() {
 		type = null;
 		baseType = null;
+	}
+
+	public static String getTypeDescriptor( Class clas ) 
+	{
+		if ( clas == Boolean.TYPE ) return "Z";
+		if ( clas == Character.TYPE ) return "C"; 
+		if ( clas == Byte.TYPE ) return "B";
+		if ( clas == Short.TYPE ) return "S";
+		if ( clas == Integer.TYPE ) return "I";
+		if ( clas == Long.TYPE ) return "J";
+		if ( clas == Float.TYPE ) return "F";
+		if ( clas == Double.TYPE ) return "D";
+		if ( clas == Void.TYPE ) return "V";
+	// Is getName() ok?  test with 1.1
+		String name = clas.getName().replace('.','/');
+
+		if ( name.startsWith("[") || name.endsWith(";") )
+			return name;
+		else
+			return "L"+ name.replace('.','/') +";";
 	}
 }

@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * Copyright (C) 1999, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,8 @@ package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
 import javax.swing.KeyStroke;
-import java.awt.event.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.InputEvent;
 import java.awt.Toolkit;
 import java.util.Hashtable;
 import java.util.StringTokenizer;
@@ -36,7 +37,7 @@ import org.gjt.sp.util.Log;
  * The default input handler. It maps sequences of keystrokes into actions
  * and inserts key typed events into the text area.
  * @author Slava Pestov
- * @version $Id: DefaultInputHandler.java,v 1.15 2003/01/14 20:05:18 spestov Exp $
+ * @version $Id: DefaultInputHandler.java,v 1.40 2004/04/19 05:59:31 spestov Exp $
  */
 public class DefaultInputHandler extends InputHandler
 {
@@ -77,36 +78,26 @@ public class DefaultInputHandler extends InputHandler
 	 * name in the KeyEvent class prefixed with VK_ (e.g., BACK_SPACE)
 	 * @param keyBinding The key binding
 	 * @param action The action
+	 * @since jEdit 4.2pre1
+	 */
+	public void addKeyBinding(String keyBinding, String action)
+	{
+		_addKeyBinding(keyBinding,(Object)action);
+	} //}}}
+
+	//{{{ addKeyBinding() method
+	/**
+	 * Adds a key binding to this input handler. The key binding is
+	 * a list of white space separated key strokes of the form
+	 * <i>[modifiers+]key</i> where modifier is C for Control, A for Alt,
+	 * or S for Shift, and key is either a character (a-z) or a field
+	 * name in the KeyEvent class prefixed with VK_ (e.g., BACK_SPACE)
+	 * @param keyBinding The key binding
+	 * @param action The action
 	 */
 	public void addKeyBinding(String keyBinding, EditAction action)
 	{
-	        Hashtable current = bindings;
-
-		StringTokenizer st = new StringTokenizer(keyBinding);
-		while(st.hasMoreTokens())
-		{
-			String keyCodeStr = st.nextToken();
-			KeyStroke keyStroke = parseKeyStroke(keyCodeStr);
-			if(keyStroke == null)
-				return;
-
-			if(st.hasMoreTokens())
-			{
-				Object o = current.get(keyStroke);
-				if(o instanceof Hashtable)
-					current = (Hashtable)o;
-				else
-				{
-					Hashtable hash = new Hashtable();
-					hash.put(PREFIX_STR,keyCodeStr);
-					o = hash;
-					current.put(keyStroke,o);
-					current = (Hashtable)o;
-				}
-			}
-			else
-				current.put(keyStroke,action);
-		}
+		_addKeyBinding(keyBinding,(Object)action);
 	} //}}}
 
 	//{{{ removeKeyBinding() method
@@ -117,7 +108,37 @@ public class DefaultInputHandler extends InputHandler
 	 */
 	public void removeKeyBinding(String keyBinding)
 	{
-		throw new InternalError("Not yet implemented");
+		Hashtable current = bindings;
+
+		StringTokenizer st = new StringTokenizer(keyBinding);
+		while(st.hasMoreTokens())
+		{
+			String keyCodeStr = st.nextToken();
+			KeyEventTranslator.Key keyStroke = KeyEventTranslator.parseKey(keyCodeStr);
+			if(keyStroke == null)
+				return;
+
+			if(st.hasMoreTokens())
+			{
+				Object o = current.get(keyStroke);
+				if(o instanceof Hashtable)
+					current = ((Hashtable)o);
+				else if(o != null)
+				{
+					// we have binding foo
+					// but user asks to remove foo bar?
+					current.remove(keyStroke);
+					return;
+				}
+				else
+				{
+					// user asks to remove non-existent
+					return;
+				}
+			}
+			else
+				current.remove(keyStroke);
+		}
 	} //}}}
 
 	//{{{ removeAllKeyBindings() method
@@ -143,7 +164,8 @@ public class DefaultInputHandler extends InputHandler
 
 		while(st.hasMoreTokens())
 		{
-			KeyStroke keyStroke = parseKeyStroke(st.nextToken());
+			KeyEventTranslator.Key keyStroke = KeyEventTranslator.parseKey(
+				st.nextToken());
 			if(keyStroke == null)
 				return null;
 
@@ -151,7 +173,12 @@ public class DefaultInputHandler extends InputHandler
 			{
 				Object o = current.get(keyStroke);
 				if(o instanceof Hashtable)
-					current = (Hashtable)o;
+				{
+					if(!st.hasMoreTokens())
+						return o;
+					else
+						current = (Hashtable)o;
+				}
 				else
 					return o;
 			}
@@ -170,54 +197,49 @@ public class DefaultInputHandler extends InputHandler
 	 */
 	public boolean isPrefixActive()
 	{
-		return bindings != currentBindings;
+		return bindings != currentBindings
+			|| super.isPrefixActive();
 	} //}}}
 
-	//{{{ keyPressed() method
+	//{{{ handleKey() method
 	/**
-	 * Handle a key pressed event. This will look up the binding for
-	 * the key stroke and execute it.
+	 * Handles the given keystroke.
+	 * @param keyStroke The key stroke
+	 * @since jEdit 4.2pre5
 	 */
-	public void keyPressed(KeyEvent evt)
+	public boolean handleKey(KeyEventTranslator.Key keyStroke)
 	{
-		int keyCode = evt.getKeyCode();
-		int modifiers = evt.getModifiers();
-
-		if(!(evt.isControlDown() || evt.isAltDown() || evt.isMetaDown()))
+		char input = '\0';
+		if(keyStroke.modifiers == null
+			|| keyStroke.modifiers.equals("S"))
 		{
-			// if modifier active, handle all keys, otherwise
-			// only some
-			if((keyCode >= KeyEvent.VK_A && keyCode <= KeyEvent.VK_Z)
-				|| (keyCode >= KeyEvent.VK_0 && keyCode <= KeyEvent.VK_9))
+			switch(keyStroke.key)
 			{
-				return;
-			}
-			else if(keyCode == KeyEvent.VK_SPACE)
-			{
-				return;
-			}
-			else if(readNextChar != null)
-			{
-				if(keyCode == KeyEvent.VK_ESCAPE)
-				{
-					readNextChar = null;
-					view.getStatus().setMessage(null);
-				}
-				else if(!evt.isActionKey()
-					&& keyCode != KeyEvent.VK_TAB
-					&& keyCode != KeyEvent.VK_ENTER)
-				{
-					return;
-				}
-			}
-			else
-			{
-				// ok even with no modifiers
+			case '\n':
+			case '\t':
+				input = (char)keyStroke.key;
+				break;
+			default:
+				input = keyStroke.input;
+				break;
 			}
 		}
 
-		KeyStroke keyStroke = KeyStroke.getKeyStroke(keyCode,
-			modifiers);
+		if(readNextChar != null)
+		{
+			if(input != '\0')
+			{
+				setCurrentBindings(bindings);
+				invokeReadNextChar(input);
+				repeatCount = 1;
+				return true;
+			}
+			else
+			{
+				readNextChar = null;
+				view.getStatus().setMessage(null);
+			}
+		}
 
 		Object o = currentBindings.get(keyStroke);
 		if(o == null)
@@ -231,137 +253,58 @@ public class DefaultInputHandler extends InputHandler
 				Toolkit.getDefaultToolkit().beep();
 				// F10 should be passed on, but C+e F10
 				// shouldn't
-				repeatCount = 0;
-				repeat = false;
-				evt.consume();
+				repeatCount = 1;
 				setCurrentBindings(bindings);
 			}
-			else if(modifiers == 0 && (keyCode == KeyEvent.VK_ENTER
-				|| keyCode == KeyEvent.VK_TAB))
+
+			if(input != '\0')
+				userInput(input);
+			else
 			{
-				userInput((char)keyCode);
-				evt.consume();
+				// this is retarded. excuse me while I drool
+				// and make stupid noises
+				switch(keyStroke.key)
+				{
+				case KeyEvent.VK_NUMPAD0:
+				case KeyEvent.VK_NUMPAD1:
+				case KeyEvent.VK_NUMPAD2:
+				case KeyEvent.VK_NUMPAD3:
+				case KeyEvent.VK_NUMPAD4:
+				case KeyEvent.VK_NUMPAD5:
+				case KeyEvent.VK_NUMPAD6:
+				case KeyEvent.VK_NUMPAD7:
+				case KeyEvent.VK_NUMPAD8:
+				case KeyEvent.VK_NUMPAD9:
+				case KeyEvent.VK_MULTIPLY:
+				case KeyEvent.VK_ADD:
+				/* case KeyEvent.VK_SEPARATOR: */
+				case KeyEvent.VK_SUBTRACT:
+				case KeyEvent.VK_DECIMAL:
+				case KeyEvent.VK_DIVIDE:
+					KeyEventWorkaround.numericKeypadKey();
+					break;
+				}
 			}
-		}
-
-		if(readNextChar != null)
-		{
-			readNextChar = null;
-			view.getStatus().setMessage(null);
-		}
-
-		if(o instanceof EditAction)
-		{
-			setCurrentBindings(bindings);
-			invokeAction((EditAction)o);
-			evt.consume();
 		}
 		else if(o instanceof Hashtable)
 		{
 			setCurrentBindings((Hashtable)o);
-			evt.consume();
+			return true;
 		}
-
-		if(o == null)
+		else if(o instanceof String)
 		{
-			switch(evt.getKeyCode())
-			{
-				case KeyEvent.VK_NUMPAD0:   case KeyEvent.VK_NUMPAD1:
-				case KeyEvent.VK_NUMPAD2:   case KeyEvent.VK_NUMPAD3:
-				case KeyEvent.VK_NUMPAD4:   case KeyEvent.VK_NUMPAD5:
-				case KeyEvent.VK_NUMPAD6:   case KeyEvent.VK_NUMPAD7:
-				case KeyEvent.VK_NUMPAD8:   case KeyEvent.VK_NUMPAD9:
-				case KeyEvent.VK_MULTIPLY:  case KeyEvent.VK_ADD:
-				/* case KeyEvent.VK_SEPARATOR: */ case KeyEvent.VK_SUBTRACT:
-				case KeyEvent.VK_DECIMAL:   case KeyEvent.VK_DIVIDE:
-					KeyEventWorkaround.numericKeypadKey();
-					break;
-			}
-		}
-	} //}}}
-
-	//{{{ keyTyped() method
-	/**
-	 * Handle a key typed event. This inserts the key into the text area.
-	 */
-	public void keyTyped(KeyEvent evt)
-	{
-		char c = evt.getKeyChar();
-
-		// ignore
-		if(c == '\b')
-			return;
-
-		KeyStroke keyStroke;
-
-		// this is a hack. a literal space is impossible to
-		// insert in a key binding string, but you can write
-		// SPACE.
-		switch(c)
-		{
-		case ' ':
-			keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_SPACE,
-				evt.getModifiers());
-			break;
-		case '\t':
-			keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_TAB,
-				evt.getModifiers());
-			break;
-		case '\n':
-			keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER,
-				evt.getModifiers());
-			break;
-		default:
-			keyStroke = KeyStroke.getKeyStroke(c);
-			break;
-		}
-
-		Object o = currentBindings.get(keyStroke);
-
-		if(o instanceof Hashtable)
-		{
-			setCurrentBindings((Hashtable)o);
+			setCurrentBindings(bindings);
+			invokeAction((String)o);
+			return true;
 		}
 		else if(o instanceof EditAction)
 		{
 			setCurrentBindings(bindings);
 			invokeAction((EditAction)o);
+			return true;
 		}
-		else
-		{
-			// otherwise, reset to default map and do user input
-			setCurrentBindings(bindings);
 
-			if(repeat && Character.isDigit(c))
-			{
-				repeatCount *= 10;
-				repeatCount += (c - '0');
-				view.getStatus().setMessage(null);
-			}
-			else
-				userInput(c);
-		}
-	} //}}}
-
-	//{{{ setModifierMapping() method
-	/**
-	 * Changes the mapping between symbolic modifier key names
-	 * (<code>C</code>, <code>A</code>, <code>M</code>, <code>S</code>) and
-	 * Java modifier flags.
-	 *
-	 * @param c The modifier to map the <code>C</code> modifier to
-	 * @param a The modifier to map the <code>A</code> modifier to
-	 * @param m The modifier to map the <code>M</code> modifier to
-	 * @param s The modifier to map the <code>S</code> modifier to
-	 *
-	 * @since jEdit 4.1pre3
-	 */
-	public static void setModifierMapping(int c, int a, int m, int s)
-	{
-		DefaultInputHandler.c = c;
-		DefaultInputHandler.a = a;
-		DefaultInputHandler.m = m;
-		DefaultInputHandler.s = s;
+		return false;
 	} //}}}
 
 	//{{{ getSymbolicModifierName() method
@@ -375,18 +318,7 @@ public class DefaultInputHandler extends InputHandler
 	 */
 	public static char getSymbolicModifierName(int mod)
 	{
-		// this relies on the fact that if C is mapped to M, then
-		// M will be mapped to C.
-		if(mod == c)
-			return 'C';
-		else if(mod == a)
-			return 'A';
-		else if(mod == m)
-			return 'M';
-		else if(mod == s)
-			return 'S';
-		else
-			return '\0';
+		return KeyEventTranslator.getSymbolicModifierName(mod);
 	} //}}}
 
 	//{{{ getModifierString() method
@@ -400,27 +332,12 @@ public class DefaultInputHandler extends InputHandler
 	 */
 	public static String getModifierString(InputEvent evt)
 	{
-		StringBuffer buf = new StringBuffer();
-		if(evt.isControlDown())
-			buf.append(getSymbolicModifierName(InputEvent.CTRL_MASK));
-		if(evt.isAltDown())
-			buf.append(getSymbolicModifierName(InputEvent.ALT_MASK));
-		if(evt.isMetaDown())
-			buf.append(getSymbolicModifierName(InputEvent.META_MASK));
-		if(evt.isShiftDown())
-			buf.append(getSymbolicModifierName(InputEvent.SHIFT_MASK));
-		return buf.toString();
+		return KeyEventTranslator.getModifierString(evt);
 	} //}}}
 
 	//{{{ parseKeyStroke() method
 	/**
-	 * Converts a string to a keystroke. The string should be of the
-	 * form <i>modifiers</i>+<i>shortcut</i> where <i>modifiers</i>
-	 * is any combination of A for Alt, C for Control, S for Shift
-	 * or M for Meta, and <i>shortcut</i> is either a single character,
-	 * or a keycode name from the <code>KeyEvent</code> class, without
-	 * the <code>VK_</code> prefix.
-	 * @param keyStroke A string description of the key stroke
+	 * @deprecated We don't use Swing KeyStrokes anymore.
 	 */
 	public static KeyStroke parseKeyStroke(String keyStroke)
 	{
@@ -436,16 +353,16 @@ public class DefaultInputHandler extends InputHandler
 					.charAt(i)))
 				{
 				case 'A':
-					modifiers |= a;
+					modifiers |= KeyEventTranslator.a;
 					break;
 				case 'C':
-					modifiers |= c;
+					modifiers |= KeyEventTranslator.c;
 					break;
 				case 'M':
-					modifiers |= m;
+					modifiers |= KeyEventTranslator.m;
 					break;
 				case 'S':
-					modifiers |= s;
+					modifiers |= KeyEventTranslator.s;
 					break;
 				}
 			}
@@ -491,29 +408,6 @@ public class DefaultInputHandler extends InputHandler
 
 	//{{{ Private members
 
-	//{{{ Class initializer
-	static
-	{
-		if(OperatingSystem.isMacOS())
-		{
-			setModifierMapping(
-				InputEvent.META_MASK,
-				InputEvent.ALT_MASK,
-				InputEvent.CTRL_MASK,
-				InputEvent.SHIFT_MASK);
-		}
-		else
-		{
-			setModifierMapping(
-				InputEvent.CTRL_MASK,
-				InputEvent.ALT_MASK,
-				InputEvent.META_MASK,
-				InputEvent.SHIFT_MASK);
-		}
-	} //}}}
-
-	private static int c, a, m, s;
-
 	// Stores prefix name in bindings hashtable
 	private static Object PREFIX_STR = "PREFIX_STR";
 
@@ -523,22 +417,56 @@ public class DefaultInputHandler extends InputHandler
 	//{{{ setCurrentBindings() method
 	private void setCurrentBindings(Hashtable bindings)
 	{
-		String prefixStr = (String)bindings.get(PREFIX_STR);
-		if(prefixStr != null)
-		{
-			if(currentBindings != this.bindings)
-			{
-				//XXX this won't work past 2 levels of prefixing
-				prefixStr = currentBindings.get(PREFIX_STR)
-					+ " " + prefixStr;
-			}
-
-			view.getStatus().setMessage(prefixStr);
-		}
-		else
-			view.getStatus().setMessage(null);
-
+		view.getStatus().setMessage((String)bindings.get(PREFIX_STR));
 		currentBindings = bindings;
+	} //}}}
+
+	//{{{ _addKeyBinding() method
+	/**
+	 * Adds a key binding to this input handler. The key binding is
+	 * a list of white space separated key strokes of the form
+	 * <i>[modifiers+]key</i> where modifier is C for Control, A for Alt,
+	 * or S for Shift, and key is either a character (a-z) or a field
+	 * name in the KeyEvent class prefixed with VK_ (e.g., BACK_SPACE)
+	 * @param keyBinding The key binding
+	 * @param action The action
+	 */
+	public void _addKeyBinding(String keyBinding, Object action)
+	{
+		Hashtable current = bindings;
+
+		String prefixStr = null;
+
+		StringTokenizer st = new StringTokenizer(keyBinding);
+		while(st.hasMoreTokens())
+		{
+			String keyCodeStr = st.nextToken();
+			if(prefixStr == null)
+				prefixStr = keyCodeStr;
+			else
+				prefixStr = prefixStr + " " + keyCodeStr;
+
+			KeyEventTranslator.Key keyStroke = KeyEventTranslator.parseKey(keyCodeStr);
+			if(keyStroke == null)
+				return;
+
+			if(st.hasMoreTokens())
+			{
+				Object o = current.get(keyStroke);
+				if(o instanceof Hashtable)
+					current = (Hashtable)o;
+				else
+				{
+					Hashtable hash = new Hashtable();
+					hash.put(PREFIX_STR,prefixStr);
+					o = hash;
+					current.put(keyStroke,o);
+					current = (Hashtable)o;
+				}
+			}
+			else
+				current.put(keyStroke,action);
+		}
 	} //}}}
 
 	//}}}

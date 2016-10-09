@@ -32,12 +32,13 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.Log;
 //}}}
 
 /**
  * An abstract tabbed options dialog box.
  * @author Slava Pestov
- * @version $Id: OptionsDialog.java,v 1.29 2003/02/05 01:01:52 spestov Exp $
+ * @version $Id: OptionsDialog.java,v 1.38 2004/06/28 06:45:27 spestov Exp $
  */
 public abstract class OptionsDialog extends EnhancedDialog
 	implements ActionListener, TreeSelectionListener
@@ -59,26 +60,28 @@ public abstract class OptionsDialog extends EnhancedDialog
 	//{{{ addOptionGroup() method
 	public void addOptionGroup(OptionGroup group)
 	{
-		addOptionGroup(group, getDefaultGroup());
+		getDefaultGroup().addOptionGroup(group);
 	} //}}}
 
 	//{{{ addOptionPane() method
 	public void addOptionPane(OptionPane pane)
 	{
-		addOptionPane(pane, getDefaultGroup());
+		getDefaultGroup().addOptionPane(pane);
 	} //}}}
 
 	//{{{ ok() method
 	public void ok()
 	{
-		jEdit.setProperty(name + ".last",currentPane);
+		if(currentPane != null)
+			jEdit.setProperty(name + ".last",currentPane.getName());
 		ok(true);
 	} //}}}
 
 	//{{{ cancel() method
 	public void cancel()
 	{
-		jEdit.setProperty(name + ".last",currentPane);
+		if(currentPane != null)
+			jEdit.setProperty(name + ".last",currentPane.getName());
 		dispose();
 	} //}}}
 
@@ -87,7 +90,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 	{
 		OptionTreeModel m = (OptionTreeModel) paneTree
 			.getModel();
-		((OptionGroup) m.getRoot()).save();
+		save(m.getRoot());
 
 		/* This will fire the PROPERTIES_CHANGED event */
 		jEdit.propertiesChanged();
@@ -132,105 +135,121 @@ public abstract class OptionsDialog extends EnhancedDialog
 	{
 		TreePath path = evt.getPath();
 
-		if (path == null || !(path.getLastPathComponent() instanceof
-			OptionPane)) return;
+		if(path == null)
+			return;
+
+		Object lastPathComponent = path.getLastPathComponent();
+		if(!(lastPathComponent instanceof String
+			|| lastPathComponent instanceof OptionPane))
+		{
+			return;
+		}
 
 		Object[] nodes = path.getPath();
 
 		StringBuffer buf = new StringBuffer();
 
 		OptionPane optionPane = null;
-		String name = null;
 
 		int lastIdx = nodes.length - 1;
 
 		for (int i = paneTree.isRootVisible() ? 0 : 1;
 			i <= lastIdx; i++)
 		{
-			if (nodes[i] instanceof OptionPane)
+			String label;
+			Object node = nodes[i];
+			if (node instanceof OptionPane)
 			{
-				optionPane = (OptionPane)nodes[i];
-				name = optionPane.getName();
+				optionPane = (OptionPane)node;
+				label = jEdit.getProperty("options."
+					+ optionPane.getName()
+					+ ".label");
 			}
-			else if (nodes[i] instanceof OptionGroup)
+			else if (node instanceof OptionGroup)
 			{
-				name = ((OptionGroup)nodes[i]).getName();
+				label = ((OptionGroup)node).getLabel();
+			}
+			else if (node instanceof String)
+			{
+				label = jEdit.getProperty("options."
+					+ node + ".label");
+				optionPane = (OptionPane)deferredOptionPanes
+					.get((String)node);
+				if(optionPane == null)
+				{
+					String propName = "options." + node + ".code";
+					String code = jEdit.getProperty(propName);
+					if(code != null)
+					{
+						optionPane = (OptionPane)
+							BeanShell.eval(
+							jEdit.getActiveView(),
+							BeanShell.getNameSpace(),
+							code
+						);
+
+						if(optionPane != null)
+						{
+							deferredOptionPanes.put(
+								node,optionPane);
+						}
+						else
+							continue;
+					}
+					else
+					{
+						Log.log(Log.ERROR,this,propName
+							+ " not defined");
+						continue;
+					}
+				}
 			}
 			else
 			{
 				continue;
 			}
 
-			if (name != null)
-			{
-				String label = jEdit.getProperty("options." +
-					name + ".label");
+			buf.append(label);
 
-				if (label == null)
-				{
-					buf.append(name);
-				}
-				else
-				{
-					buf.append(label);
-				}
-			}
-
-			if (i != lastIdx) buf.append(": ");
+			if (i != lastIdx)
+				buf.append(": ");
 		}
 
-		currentLabel.setText(buf.toString());
+		if(optionPane == null)
+			return;
 
-		optionPane.init();
+		setTitle(jEdit.getProperty("options.title-template",
+			new Object[] { jEdit.getProperty(this.name + ".title"),
+			buf.toString() }));
 
-		((CardLayout)cardPanel.getLayout()).show(cardPanel, name);
+		try
+		{
+			optionPane.init();
+		}
+		catch(Throwable t)
+		{
+			Log.log(Log.ERROR,this,"Error initializing options:");
+			Log.log(Log.ERROR,this,t);
+		}
 
-		// workaround...
-		addNotify();
+		if(currentPane != null)
+			stage.remove(currentPane.getComponent());
+		currentPane = optionPane;
+		stage.add(BorderLayout.CENTER,currentPane.getComponent());
+		stage.revalidate();
+		stage.repaint();
+
+		if(!isShowing())
+			addNotify();
 
 		updateSize();
 
-		currentPane = name;
+		currentPane = optionPane;
 	} //}}}
 
 	//{{{ Protected members
 	protected abstract OptionTreeModel createOptionTreeModel();
 	protected abstract OptionGroup getDefaultGroup();
-
-	//{{{ addOptionGroup() method
-	protected void addOptionGroup(OptionGroup child, OptionGroup parent)
-	{
-		Enumeration enum = child.getMembers();
-
-		while (enum.hasMoreElements())
-		{
-			Object elem = enum.nextElement();
-
-			if (elem instanceof OptionPane)
-			{
-				addOptionPane((OptionPane) elem, child);
-			}
-			else if (elem instanceof OptionGroup)
-			{
-				addOptionGroup((OptionGroup) elem, child);
-			}
-		}
-
-		parent.addOptionGroup(child);
-	} //}}}
-
-	//{{{ addOptionPane() method
-	protected void addOptionPane(OptionPane pane, OptionGroup parent)
-	{
-		String name = pane.getName();
-		if(firstPane == null)
-			firstPane = name;
-
-		cardPanel.add(pane.getComponent(), name);
-
-		parent.addOptionPane(pane);
-	} //}}}
-
 	//}}}
 
 	//{{{ Private members
@@ -239,13 +258,12 @@ public abstract class OptionsDialog extends EnhancedDialog
 	private String name;
 	private JSplitPane splitter;
 	private JTree paneTree;
-	private JPanel cardPanel;
-	private JLabel currentLabel;
+	private JPanel stage;
 	private JButton ok;
 	private JButton cancel;
 	private JButton apply;
-	private String currentPane;
-	private String firstPane;
+	private OptionPane currentPane;
+	private Map deferredOptionPanes;
 	//}}}
 
 	//{{{ init() method
@@ -253,20 +271,13 @@ public abstract class OptionsDialog extends EnhancedDialog
 	{
 		this.name = name;
 
+		deferredOptionPanes = new HashMap();
+
 		JPanel content = new JPanel(new BorderLayout(12,12));
 		content.setBorder(new EmptyBorder(12,12,12,12));
 		setContentPane(content);
 
-		JPanel stage = new JPanel(new BorderLayout(6,6));
-
-		// currentLabel displays the path of the currently selected
-		// OptionPane at the top of the stage area
-		currentLabel = new JLabel();
-		currentLabel.setHorizontalAlignment(JLabel.LEFT);
-		stage.add(currentLabel, BorderLayout.NORTH);
-
-		cardPanel = new JPanel(new CardLayout());
-		stage.add(cardPanel, BorderLayout.CENTER);
+		stage = new JPanel(new BorderLayout());
 
 		paneTree = new JTree(createOptionTreeModel());
 		paneTree.setVisibleRowCount(1);
@@ -284,7 +295,6 @@ public abstract class OptionsDialog extends EnhancedDialog
 			JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 		splitter = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
 			scroller,stage);
-		splitter.setDividerLocation(scroller.getPreferredSize().width);
 		content.add(splitter, BorderLayout.CENTER);
 
 		Box buttons = new Box(BoxLayout.X_AXIS);
@@ -319,8 +329,14 @@ public abstract class OptionsDialog extends EnhancedDialog
 			new Object[] { rootNode, rootNode.getMember(i) }));
 		}
 
-		if(pane == null || !selectPane(rootNode,pane))
-			selectPane(rootNode,firstPane);
+		// returns false if no such pane exists; calling with null
+		// param selects first option pane found
+		if(!selectPane(rootNode,pane))
+			selectPane(rootNode,null);
+
+		splitter.setDividerLocation(paneTree.getPreferredSize().width
+			+ scroller.getVerticalScrollBar().getPreferredSize()
+			.width);
 
 		GUIUtilities.loadGeometry(this,name);
 		int dividerLocation = jEdit.getIntegerProperty(name + ".splitter",-1);
@@ -330,7 +346,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 		// in case saved geometry is too small
 		updateSize();
 
-		show();
+		setVisible(true);
 	} //}}}
 
 	//{{{ selectPane() method
@@ -344,10 +360,10 @@ public abstract class OptionsDialog extends EnhancedDialog
 	{
 		path.add(node);
 
-		Enumeration enum = node.getMembers();
-		while(enum.hasMoreElements())
+		Enumeration e = node.getMembers();
+		while(e.hasMoreElements())
 		{
-			Object obj = enum.nextElement();
+			Object obj = e.nextElement();
 			if(obj instanceof OptionGroup)
 			{
 				OptionGroup grp = (OptionGroup)obj;
@@ -364,10 +380,25 @@ public abstract class OptionsDialog extends EnhancedDialog
 				else if(selectPane((OptionGroup)obj,name,path))
 					return true;
 			}
-			else
+			else if(obj instanceof OptionPane)
 			{
 				OptionPane pane = (OptionPane)obj;
-				if(pane.getName().equals(name))
+				if(pane.getName().equals(name)
+					|| name == null)
+				{
+					path.add(pane);
+					TreePath treePath = new TreePath(
+						path.toArray());
+					paneTree.scrollPathToVisible(treePath);
+					paneTree.setSelectionPath(treePath);
+					return true;
+				}
+			}
+			else if(obj instanceof String)
+			{
+				String pane = (String)obj;
+				if(pane.equals(name)
+					|| name == null)
 				{
 					path.add(pane);
 					TreePath treePath = new TreePath(
@@ -382,6 +413,36 @@ public abstract class OptionsDialog extends EnhancedDialog
 		path.remove(node);
 
 		return false;
+	} //}}}
+
+	//{{{ save() method
+	private void save(Object obj)
+	{
+		if(obj instanceof OptionGroup)
+		{
+			OptionGroup grp = (OptionGroup)obj;
+			Enumeration members = grp.getMembers();
+			while(members.hasMoreElements())
+			{
+				save(members.nextElement());
+			}
+		}
+		else if(obj instanceof OptionPane)
+		{
+			try
+			{
+				((OptionPane)obj).save();
+			}
+			catch(Throwable t)
+			{
+				Log.log(Log.ERROR,this,"Error saving options:");
+				Log.log(Log.ERROR,this,t);
+			}
+		}
+		else if(obj instanceof String)
+		{
+			save(deferredOptionPanes.get(obj));
+		}
 	} //}}}
 
 	//{{{ updateSize() method
@@ -409,6 +470,8 @@ public abstract class OptionsDialog extends EnhancedDialog
 		public PaneNameRenderer()
 		{
 			paneFont = UIManager.getFont("Tree.font");
+			if(paneFont == null)
+				paneFont = jEdit.getFontProperty("metal.secondary.font");
 			groupFont = paneFont.deriveFont(Font.BOLD);
 		}
 
@@ -423,7 +486,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 
 			if (value instanceof OptionGroup)
 			{
-				name = ((OptionGroup)value).getName();
+				setText(((OptionGroup)value).getLabel());
 				this.setFont(groupFont);
 			}
 			else if (value instanceof OptionPane)
@@ -431,12 +494,13 @@ public abstract class OptionsDialog extends EnhancedDialog
 				name = ((OptionPane)value).getName();
 				this.setFont(paneFont);
 			}
-
-			if (name == null)
+			else if (value instanceof String)
 			{
-				setText(null);
+				name = ((String)value);
+				this.setFont(paneFont);
 			}
-			else
+
+			if (name != null)
 			{
 				String label = jEdit.getProperty("options." +
 					name + ".label");
@@ -517,7 +581,7 @@ public abstract class OptionsDialog extends EnhancedDialog
 
 		public boolean isLeaf(Object node)
 		{
-			return node instanceof OptionPane;
+			return !(node instanceof OptionGroup);
 		}
 
 		public void valueForPathChanged(TreePath path, Object newValue)

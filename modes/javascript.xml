@@ -24,22 +24,6 @@
 		HIGHLIGHT_DIGITS="TRUE"
 		DIGIT_RE="(0x[[:xdigit:]]+[lL]?|[[:digit:]]+(e[[:digit:]]*)?[lLdDfF]?)">
 
-		<!-- PHP code, copied from php.xml by Chris Petersen -->
-		<SPAN TYPE="MARKUP" DELEGATE="php::PHP">
-			<BEGIN>&lt;?php</BEGIN>
-			<END>?&gt;</END>
-		</SPAN>
-
-		<SPAN TYPE="MARKUP" DELEGATE="php::PHP">
-			<BEGIN>&lt;?</BEGIN>
-			<END>?&gt;</END>
-		</SPAN>
-
-		<SPAN TYPE="MARKUP" DELEGATE="php::PHP">
-			<BEGIN>&lt;%=</BEGIN>
-			<END>%&gt;</END>
-		</SPAN>
-
 		<!-- The rest of the javascript info -->
 
 		<SPAN TYPE="COMMENT1">
@@ -59,7 +43,7 @@
 
 		<MARK_PREVIOUS TYPE="FUNCTION" EXCLUDE_MATCH="TRUE">(</MARK_PREVIOUS>
 
-		<EOL_SPAN TYPE="COMMENT1">//</EOL_SPAN>
+		<EOL_SPAN TYPE="COMMENT2">//</EOL_SPAN>
 
 		<SEQ TYPE="COMMENT1">&lt;!--</SEQ>
 

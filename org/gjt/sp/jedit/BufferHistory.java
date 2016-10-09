@@ -1,6 +1,9 @@
 /*
- * BufferHistory.java - Remembers caret positions 
- * Copyright (C) 2000, 2001 Slava Pestov
+ * BufferHistory.java - Remembers caret positions
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 2000, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,25 +22,29 @@
 
 package org.gjt.sp.jedit;
 
+//{{{ Imports
 import com.microstar.xml.*;
 import java.io.*;
 import java.util.*;
+import org.gjt.sp.jedit.msg.DynamicMenuChanged;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * Recent file list.
  * @author Slava Pestov
- * @version $Id: BufferHistory.java,v 1.7 2003/02/11 02:31:05 spestov Exp $
+ * @version $Id: BufferHistory.java,v 1.16 2004/08/12 22:42:43 spestov Exp $
  */
 public class BufferHistory
 {
+	//{{{ getEntry() method
 	public static Entry getEntry(String path)
 	{
-		Enumeration enum = history.elements();
-		while(enum.hasMoreElements())
+		Iterator iter = history.iterator();
+		while(iter.hasNext())
 		{
-			Entry entry = (Entry)enum.nextElement();
+			Entry entry = (Entry)iter.next();
 			if(pathsCaseInsensitive)
 			{
 				if(entry.path.equalsIgnoreCase(path))
@@ -51,59 +58,126 @@ public class BufferHistory
 		}
 
 		return null;
-	}
+	} //}}}
 
+	//{{{ setEntry() method
 	public static void setEntry(String path, int caret, Selection[] selection,
 		String encoding)
 	{
 		removeEntry(path);
-		addEntry(new Entry(path,caret,selectionToString(selection),encoding));
-	}
+		addEntry(new Entry(path,caret,selectionToString(selection),
+			encoding));
+		EditBus.send(new DynamicMenuChanged("recent-files"));
+	} //}}}
 
-	public static Vector getBufferHistory()
+	//{{{ getHistory() method
+	/**
+	 * @since jEdit 4.2pre2
+	 */
+	public static List getHistory()
 	{
 		return history;
-	}
+	} //}}}
 
-	public static void load(File file)
+	//{{{ getBufferHistory() method
+	/**
+	 * @deprecated Call {@link #getHistory()} instead.
+	 */
+	public static Vector getBufferHistory()
 	{
-		max = jEdit.getIntegerProperty("recentFiles",50);
+		Vector retVal = new Vector(history.size());
+		Iterator iter = history.iterator();
+		while(iter.hasNext())
+			retVal.add(iter.next());
+		return retVal;
+	} //}}}
 
-		Log.log(Log.MESSAGE,jEdit.class,"Loading recent file list " + file);
+	//{{{ load() method
+	public static void load()
+	{
+		String settingsDirectory = jEdit.getSettingsDirectory();
+		if(settingsDirectory == null)
+			return;
+
+		File recent = new File(MiscUtilities.constructPath(
+			settingsDirectory,"recent.xml"));
+		if(!recent.exists())
+			return;
+
+		recentModTime = recent.lastModified();
+
+		Log.log(Log.MESSAGE,BufferHistory.class,"Loading recent.xml");
 
 		RecentHandler handler = new RecentHandler();
 		XmlParser parser = new XmlParser();
+		Reader in = null;
 		parser.setHandler(handler);
 		try
 		{
-			BufferedReader in = new BufferedReader(new FileReader(file));
+			in = new BufferedReader(new FileReader(recent));
 			parser.parse(null, null, in);
 		}
 		catch(XmlException xe)
 		{
 			int line = xe.getLine();
 			String message = xe.getMessage();
-			Log.log(Log.ERROR,BufferHistory.class,file + ":" + line
+			Log.log(Log.ERROR,BufferHistory.class,recent + ":" + line
 				+ ": " + message);
 		}
 		catch(FileNotFoundException fnf)
 		{
-			Log.log(Log.DEBUG,BufferHistory.class,fnf);
+			//Log.log(Log.DEBUG,BufferHistory.class,fnf);
 		}
 		catch(Exception e)
 		{
 			Log.log(Log.ERROR,BufferHistory.class,e);
 		}
-	}
+		finally
+		{
+			try
+			{
+				if(in != null)
+					in.close();
+			}
+			catch(IOException io)
+			{
+				Log.log(Log.ERROR,BufferHistory.class,io);
+			}
+		}
+	} //}}}
 
-	public static void save(File file)
+	//{{{ save() method
+	public static void save()
 	{
+		String settingsDirectory = jEdit.getSettingsDirectory();
+		if(settingsDirectory == null)
+			return;
+
+		File file1 = new File(MiscUtilities.constructPath(
+			settingsDirectory, "#recent.xml#save#"));
+		File file2 = new File(MiscUtilities.constructPath(
+			settingsDirectory, "recent.xml"));
+		if(file2.exists() && file2.lastModified() != recentModTime)
+		{
+			Log.log(Log.WARNING,BufferHistory.class,file2
+				+ " changed on disk; will not save recent"
+				+ " files");
+			return;
+		}
+
+		jEdit.backupSettingsFile(file2);
+
+		Log.log(Log.MESSAGE,BufferHistory.class,"Saving " + file1);
+
 		String lineSep = System.getProperty("line.separator");
+
+		boolean ok = false;
+
+		BufferedWriter out = null;
 
 		try
 		{
-			BufferedWriter out = new BufferedWriter(
-				new FileWriter(file));
+			out = new BufferedWriter(new FileWriter(file1));
 
 			out.write("<?xml version=\"1.0\"?>");
 			out.write(lineSep);
@@ -112,17 +186,17 @@ public class BufferHistory
 			out.write("<RECENT>");
 			out.write(lineSep);
 
-			Enumeration enum = history.elements();
-			while(enum.hasMoreElements())
+			Iterator iter = history.iterator();
+			while(iter.hasNext())
 			{
 				out.write("<ENTRY>");
 				out.write(lineSep);
 
-				Entry entry = (Entry)enum.nextElement();
+				Entry entry = (Entry)iter.next();
 
-				out.write("<PATH><![CDATA[");
-				out.write(entry.path);
-				out.write("]]></PATH>");
+				out.write("<PATH>");
+				out.write(MiscUtilities.charsToEntities(entry.path));
+				out.write("</PATH>");
 				out.write(lineSep);
 
 				out.write("<CARET>");
@@ -155,45 +229,85 @@ public class BufferHistory
 			out.write(lineSep);
 
 			out.close();
+
+			ok = true;
 		}
 		catch(Exception e)
 		{
 			Log.log(Log.ERROR,BufferHistory.class,e);
 		}
-	}
-
-	// private members
-	private static Vector history;
-	private static boolean pathsCaseInsensitive;
-	private static int max;
-
-	static
-	{
-		history = new Vector();
-		pathsCaseInsensitive = (File.separatorChar == '\\'
-			|| File.separatorChar == ':');
-	}
-
-	/* private */ static void addEntry(Entry entry)
-	{
-		history.addElement(entry);
-		while(history.size() > max)
-			history.removeElementAt(0);
-	}
-
-	/* private */ static void removeEntry(String path)
-	{
-		for(int i = 0; i < history.size(); i++)
+		finally
 		{
-			Entry entry = (Entry)history.elementAt(i);
-			if(entry.path.equals(path))
+			try
 			{
-				history.removeElementAt(i);
-				return;
+				if(out != null)
+					out.close();
+			}
+			catch(IOException e)
+			{
 			}
 		}
-	}
 
+		if(ok)
+		{
+			/* to avoid data loss, only do this if the above
+			 * completed successfully */
+			file2.delete();
+			file1.renameTo(file2);
+		}
+
+		recentModTime = file2.lastModified();
+	} //}}}
+
+	//{{{ Private members
+	private static LinkedList history;
+	private static boolean pathsCaseInsensitive;
+	private static long recentModTime;
+
+	//{{{ Class initializer
+	static
+	{
+		history = new LinkedList();
+		pathsCaseInsensitive = OperatingSystem.isDOSDerived()
+			|| OperatingSystem.isMacOS();
+	} //}}}
+
+	//{{{ addEntry() method
+	/* private */ static void addEntry(Entry entry)
+	{
+		history.addFirst(entry);
+		int max = jEdit.getIntegerProperty("recentFiles",50);
+		while(history.size() > max)
+			history.removeLast();
+	} //}}}
+
+	//{{{ removeEntry() method
+	/* private */ static void removeEntry(String path)
+	{
+		Iterator iter = history.iterator();
+		while(iter.hasNext())
+		{
+			Entry entry = (Entry)iter.next();
+			if(pathsCaseInsensitive)
+			{
+				if(entry.path.equalsIgnoreCase(path))
+				{
+					iter.remove();
+					return;
+				}
+			}
+			else
+			{
+				if(entry.path.equals(path))
+				{
+					iter.remove();
+					return;
+				}
+			}
+		}
+	} //}}}
+
+	//{{{ selectionToString() method
 	private static String selectionToString(Selection[] s)
 	{
 		if(s == null)
@@ -217,8 +331,9 @@ public class BufferHistory
 		}
 
 		return buf.toString();
-	}
+	} //}}}
 
+	//{{{ stringToSelection() method
 	private static Selection[] stringToSelection(String s)
 	{
 		if(s == null)
@@ -252,8 +367,11 @@ public class BufferHistory
 		Selection[] returnValue = new Selection[selection.size()];
 		selection.copyInto(returnValue);
 		return returnValue;
-	}
+	} //}}}
 
+	//}}}
+
+	//{{{ Entry class
 	/**
 	 * Recent file list entry.
 	 */
@@ -276,10 +394,24 @@ public class BufferHistory
 			this.selection = selection;
 			this.encoding = encoding;
 		}
-	}
 
+		public String toString()
+		{
+			return path + ": " + caret;
+		}
+	} //}}}
+
+	//{{{ RecentHandler class
 	static class RecentHandler extends HandlerBase
 	{
+		public void endDocument()
+			throws java.lang.Exception
+		{
+			int max = jEdit.getIntegerProperty("recentFiles",50);
+			while(history.size() > max)
+				history.removeLast();
+		}
+
 		public Object resolveEntity(String publicId, String systemId)
 		{
 			if("recent.dtd".equals(systemId))
@@ -318,7 +450,9 @@ public class BufferHistory
 		{
 			if(name.equals("ENTRY"))
 			{
-				addEntry(new Entry(path,caret,selection,encoding));
+				history.addLast(new Entry(
+					path,caret,selection,
+					encoding));
 				path = null;
 				caret = 0;
 				selection = null;
@@ -347,5 +481,5 @@ public class BufferHistory
 		private String selection;
 		private String encoding;
 		private String charData;
-	}
+	} //}}}
 }

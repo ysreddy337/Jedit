@@ -3,7 +3,7 @@
 ### :tabSize=8:indentSize=8:noTabs=false:
 ### :folding=explicit:collapseFolds=1:
 ###
-### Copyright (C) 1998, 2002 Slava Pestov
+### Copyright (C) 1998, 2003 Slava Pestov
 ###
 
 #{{{ Global settings
@@ -37,17 +37,14 @@ autosave=30
 # Maximum number of elements in a history list
 history=20
 
-# Number of files for which to remember caret positions
-recentFiles=50
+# Number of recent files
+recentFiles=40
 
 # Restore open files on startup?
 restore=true
 
 # Restore even if file names specified on command line?
-restore.cli=false
-
-# Client instances open new views?
-client.newView=false
+restore.cli=true
 
 # Persistent markers
 persistentMarkers=true
@@ -77,6 +74,9 @@ backup.directory=
 backup.prefix=
 backup.suffix=~
 
+# Min time between backups (0 = always backup)
+backup.minTime=0
+
 # Sort buffer list
 sortBuffers=true
 sortByName=true
@@ -89,6 +89,17 @@ firewall.enabled=false
 
 # Keep dialog on by default
 search.keepDialog.toggle=true
+
+# Confirm dialogs
+confirmSaveAll=true
+
+# Check modification status on focus?
+
+# If this is true, show a dialog; if false, do nothing
+autoReloadDialog=true
+
+# If this is true, auto reload; if false, 'reload' button in dialog
+autoReload=true
 
 #}}}
 
@@ -105,6 +116,9 @@ search.keepDialog.toggle=true
 # Encoding
 # The OS default will be used if this is not specified
 #buffer.encoding=ISO8859_1
+
+# Auto-detect GZIP, UTF16, UTF8 and XML encodings?
+buffer.encodingAutodetect=true
 
 # Tab width
 buffer.tabSize=8
@@ -125,7 +139,7 @@ buffer.undoCount=100
 buffer.wrap=none
 
 # Wrap column
-buffer.maxLineLen=0
+buffer.maxLineLen=80
 
 # Word break characters
 buffer.wordBreakChars=
@@ -157,9 +171,6 @@ view.showBufferSwitcher=true
 # Show full path in title bar?
 view.showFullPath=false
 
-# Check modification status on focus?
-view.checkModStatus=true
-
 # Font
 view.font=Monospaced
 view.fontsize=12
@@ -175,12 +186,12 @@ view.lineHighlight=true
 view.lineHighlightColor=#ffffe0
 
 # Bracket highlighting
-view.bracketHighlight=true
-view.bracketHighlightColor=#000000
+view.structureHighlight=true
+view.structureHighlightColor=#000000
 
 # EOL markers
 view.eolMarkers=true
-view.eolMarkerColor=#009999
+view.eolMarkerColor=#ff6633
 
 # Wrap guide
 view.wrapGuide=true
@@ -191,6 +202,7 @@ view.caretColor=#ff0000
 
 # Selection color
 view.selectionColor=#ccccff
+view.multipleSelectionColor=#ccffcc
 
 # Caret blinking
 view.caretBlink=true
@@ -207,33 +219,36 @@ view.joinNonWordChars=true
 # Middle mouse button pastes % register
 view.middleMousePaste=false
 
+# Drag and drop of text
+view.dragAndDrop=true
+
 #{{{ Gutter
 
 # Gutter background color
-view.gutter.bgColor=#ffffff
+view.gutter.bgColor=#dbdbdb
 
 # Gutter foreground color
 view.gutter.fgColor=#000000
 
 # Gutter highlight color
-view.gutter.highlightColor=#000066
+view.gutter.highlightColor=#990066
 
 # Gutter current line highlight color
-view.gutter.currentLineColor=#d04040
+view.gutter.currentLineColor=#ff0033
 
 # Gutter bracket highlighting
-view.gutter.bracketHighlight=true
-view.gutter.bracketHighlightColor=#666699
+view.gutter.structureHighlight=true
+view.gutter.structureHighlightColor=#666699
 
 # Gutter marker highlight color
 view.gutter.markerColor=#ccffcc
 
 # Gutter border colors
-view.gutter.focusBorderColor=#666699
-view.gutter.noFocusBorderColor=#a0a0b4
+view.gutter.focusBorderColor=#990099
+view.gutter.noFocusBorderColor=#ffffff
 
 # Fold triangle color
-view.gutter.foldColor=#666699
+view.gutter.foldColor=#838383
 
 # Gutter font name
 view.gutter.font=Monospaced
@@ -264,30 +279,41 @@ view.gutter.highlightCurrentLine=true
 view.gutter.markerHighlight=true
 
 # Click behavior
-view.gutter.gutterClick=toggleFold
-view.gutter.gutterShiftClick=toggleFoldFully
-view.gutter.gutterControlClick=selectFold
-view.gutter.gutterAltClick=toggleFold
+view.gutter.foldClick=toggle-fold
+view.gutter.SfoldClick=toggle-fold-fully
+view.gutter.CfoldClick=select-fold
+view.gutter.AfoldClick=narrow-fold
+view.gutter.structClick=match-struct
+view.gutter.CstructClick=select-struct
+view.gutter.AstructClick=narrow-struct
 #}}}
 
 # Expand abbrevs when space bar pressed
 view.expandOnInput=false
 
 #{{{ Syntax styles
-view.style.comment1=color:#006666 style:i
-view.style.comment2=color:#990033 style:i
-view.style.digit=color:#666600
-view.style.function=color:#000066
-view.style.invalid=color:#ff0000
-view.style.keyword1=color:#000000 style:b
-view.style.keyword2=color:#660066 style:b
-view.style.keyword3=color:#000066 style:b
-view.style.label=color:#990033 style:ib
-view.style.literal1=color:#404040
-view.style.literal2=color:#404040
-view.style.markup=color:#5e5e5e style:b
-view.style.operator=style:b
-view.style.foldLine=bgColor:#e8e8e8 color:#009999 style:b
+view.style.comment1=color:#cc0000
+view.style.comment2=color:#ff8400
+view.style.comment3=color:#6600cc
+view.style.comment4=color:#cc6600
+view.style.digit=color:#ff0000
+view.style.foldLine.0=color:#000000 bgColor:#dafeda style:b
+view.style.foldLine.1=color:#000000 bgColor:#fff0cc style:b
+view.style.foldLine.2=color:#000000 bgColor:#e7e7ff style:b
+view.style.foldLine.3=color:#000000 bgColor:#ffe0f0 style:b
+view.style.function=color:#9966ff
+view.style.invalid=color:#ff0066 bgColor:#ffffcc
+view.style.keyword1=color:#006699 style:b
+view.style.keyword2=color:#009966 style:b
+view.style.keyword3=color:#0099ff style:b
+view.style.keyword4=color:#66ccff style:b
+view.style.label=color:#02b902
+view.style.literal1=color:#ff00cc
+view.style.literal2=color:#cc00cc
+view.style.literal3=color:#9900cc
+view.style.literal4=color:#6600cc
+view.style.markup=color:#0000ff
+view.style.operator=color:#000000 style:b
 #}}}
 
 # Fancy Java2D stuff
@@ -298,7 +324,9 @@ view.fracFontMetrics=false
 view.docking.alternateLayout=false
 view.toolbar.alternateLayout=false
 
-# Status bar
+#{{{ Status bar
+view.status.foreground=black
+view.status.background=white
 view.status.visible=true
 view.status.show-caret-status=true
 view.status.show-edit-mode=true
@@ -306,11 +334,14 @@ view.status.show-fold-mode=true
 view.status.show-encoding=true
 view.status.show-wrap=true
 view.status.show-multi-select=true
+view.status.show-rect-select=true
 view.status.show-overwrite=true
 view.status.show-line-seperator=true
 view.status.show-memory=true
+view.status.show-clock=false
 view.status.memory.foreground=#cccccc
 view.status.memory.background=#666699a
+#}}}
 
 #}}}
 
@@ -336,17 +367,22 @@ print.color=false
 # Print tab size
 print.tabSize=2
 
+# Force JDK 1.3 API even on 1.4
+print.force13=false
+
+# Force use of glyph vectors to work around spacing problems
+print.glyphVector=false
 #}}}
 
 #{{{ File system browser settings
-
+vfs.browser.showMenubar=true
 vfs.browser.showToolbar=true
 vfs.browser.showIcons=true
 vfs.browser.showHiddenFiles=false
 vfs.browser.sortMixFilesAndDirs=false
 vfs.browser.sortIgnoreCase=true
 vfs.browser.doubleClickClose=false
-vfs.browser.splitHorizontally=false
+vfs.browser.currentBufferFilter=false
 
 # Can be one of: buffer, home, favorites, last
 vfs.browser.defaultPath=buffer
@@ -375,10 +411,19 @@ vfs.browser.colors.8.color=#666666
 
 #}}}
 
+#{{{ Plugin manager settings
+plugin-manager.downloadSource=false
+plugin-manager.installUser=true
+plugin-manager.showAll=true
+plugin-manager.mirror.id=NONE
+plugin-manager.deleteDownloads=true
+plugin-manager.hide-libraries.toggle=true
+#}}}
+
 #{{{ Hidden settings
 menu.spillover=20
 bufferSwitcher.maxRowCount=10
 showTooltips=true
-view.monospacedHack=false
 ioThreadCount=4
+server.brokenToFront=false
 #}}}

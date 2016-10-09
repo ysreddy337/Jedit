@@ -30,6 +30,7 @@ import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.Log;
 //}}}
 
 /**
@@ -45,7 +46,7 @@ import org.gjt.sp.jedit.*;
  * @see JEditTextArea
  *
  * @author Mike Dillon and Slava Pestov
- * @version $Id: Gutter.java,v 1.29 2003/01/14 02:09:23 spestov Exp $
+ * @version $Id: Gutter.java,v 1.51 2004/08/12 22:42:44 spestov Exp $
  */
 public class Gutter extends JComponent implements SwingConstants
 {
@@ -79,6 +80,7 @@ public class Gutter extends JComponent implements SwingConstants
 
 		setAutoscrolls(true);
 		setOpaque(true);
+		setRequestFocusEnabled(false);
 
 		extensionMgr = new ExtensionManager();
 
@@ -87,6 +89,8 @@ public class Gutter extends JComponent implements SwingConstants
 		addMouseMotionListener(ml);
 
 		addExtension(new MarkerHighlight());
+
+		updateBorder();
 	} //}}}
 
 	//{{{ paintComponent() method
@@ -106,12 +110,28 @@ public class Gutter extends JComponent implements SwingConstants
 		int lineHeight = textArea.getPainter().getFontMetrics()
 			.getHeight();
 
+		if(lineHeight == 0)
+			return;
+
 		int firstLine = clip.y / lineHeight;
 		int lastLine = (clip.y + clip.height - 1) / lineHeight;
 
+		if(lastLine - firstLine > textArea.getVisibleLines())
+		{
+			Log.log(Log.ERROR,this,"BUG: firstLine=" + firstLine);
+			Log.log(Log.ERROR,this,"     lastLine=" + lastLine);
+			Log.log(Log.ERROR,this,"     visibleLines=" + textArea.getVisibleLines());
+			Log.log(Log.ERROR,this,"     height=" + getHeight());
+			Log.log(Log.ERROR,this,"     painter.height=" + textArea.getPainter().getHeight());
+			Log.log(Log.ERROR,this,"     clip.y=" + clip.y);
+			Log.log(Log.ERROR,this,"     clip.height=" + clip.height);
+			Log.log(Log.ERROR,this,"     lineHeight=" + lineHeight);
+		}
+	
 		int y = (clip.y - clip.y % lineHeight);
 
-		textArea.chunkCache.updateChunksUpTo(lastLine);
+		extensionMgr.paintScreenLineRange(textArea,gfx,
+			firstLine,lastLine,y,lineHeight);
 
 		for (int line = firstLine; line <= lastLine;
 			line++, y += lineHeight)
@@ -211,22 +231,12 @@ public class Gutter extends JComponent implements SwingConstants
 	 */
 	public void updateBorder()
 	{
-		// because we are called from the text area's focus handler,
-		// we do an invokeLater() so that the view's focus handler
-		// has a chance to execute and set the edit pane properly
-		SwingUtilities.invokeLater(new Runnable()
-		{
-			public void run()
-			{
-				if(view.getEditPane() == null)
-					return;
-
-				if(view.getEditPane().getTextArea() == textArea)
-					setBorder(focusBorder);
-				else
-					setBorder(noFocusBorder);
-			}
-		});
+		if(view.getEditPane() == null)
+			setBorder(noFocusBorder);
+		else if(view.getEditPane().getTextArea() == textArea)
+			setBorder(focusBorder);
+		else
+			setBorder(noFocusBorder);
 	} //}}}
 
 	//{{{ setBorder() method
@@ -380,7 +390,7 @@ public class Gutter extends JComponent implements SwingConstants
 	/**
 	 * Sets whether the gutter is collapsed or expanded and force the text
 	 * area to update its layout if there is a change.
-	 * @param collapsed true if the gutter is expanded,
+	 * @param expanded true if the gutter is expanded,
 	 *                   false if it is collapsed
 	 */
 	public void setExpanded(boolean expanded)
@@ -441,51 +451,48 @@ public class Gutter extends JComponent implements SwingConstants
 		repaint();
 	} //}}}
 
-	//{{{ getBracketHighlightColor() method
+	//{{{ getStructureHighlightColor() method
 	/**
-	 * Returns the bracket highlight color.
+	 * Returns the structure highlight color.
+	 * @since jEdit 4.2pre3
 	 */
-	public final Color getBracketHighlightColor()
+	public final Color getStructureHighlightColor()
 	{
-		return bracketHighlightColor;
+		return structureHighlightColor;
 	} //}}}
 
-	//{{{ setBracketHighlightColor() method
+	//{{{ setStructureHighlightColor() method
 	/**
-	 * Sets the bracket highlight color.
-	 * @param bracketHighlightColor The bracket highlight color
-	 * @since jEdit 4.0pre1
+	 * Sets the structure highlight color.
+	 * @param structureHighlightColor The structure highlight color
+	 * @since jEdit 4.2pre3
 	 */
-	public final void setBracketHighlightColor(Color bracketHighlightColor)
+	public final void setStructureHighlightColor(Color structureHighlightColor)
 	{
-		this.bracketHighlightColor = bracketHighlightColor;
+		this.structureHighlightColor = structureHighlightColor;
 		repaint();
 	} //}}}
 
-	//{{{ isBracketHighlightEnabled() method
+	//{{{ isStructureHighlightEnabled() method
 	/**
-	 * Returns true if bracket highlighting is enabled, false otherwise.
-	 * When bracket highlighting is enabled, the bracket matching the
-	 * one before the caret (if any) is highlighted.
-	 * @since jEdit 4.0pre1
+	 * Returns true if structure highlighting is enabled, false otherwise.
+	 * @since jEdit 4.2pre3
 	 */
-	public final boolean isBracketHighlightEnabled()
+	public final boolean isStructureHighlightEnabled()
 	{
-		return bracketHighlight;
+		return structureHighlight;
 	} //}}}
 
-	//{{{ setBracketHighlightEnabled() method
+	//{{{ setStructureHighlightEnabled() method
 	/**
-	 * Enables or disables bracket highlighting.
-	 * When bracket highlighting is enabled, the bracket matching the
-	 * one before the caret (if any) is highlighted.
-	 * @param bracketHighlight True if bracket highlighting should be
+	 * Enables or disables structure highlighting.
+	 * @param structureHighlight True if structure highlighting should be
 	 * enabled, false otherwise
-	 * @since jEdit 4.0pre1
+	 * @since jEdit 4.2pre3
 	 */
-	public final void setBracketHighlightEnabled(boolean bracketHighlight)
+	public final void setStructureHighlightEnabled(boolean structureHighlight)
 	{
-		this.bracketHighlight = bracketHighlight;
+		this.structureHighlight = structureHighlight;
 		repaint();
 	} //}}}
 
@@ -542,8 +549,8 @@ public class Gutter extends JComponent implements SwingConstants
 	private boolean currentLineHighlightEnabled;
 	private boolean expanded;
 
-	private boolean bracketHighlight;
-	private Color bracketHighlightColor;
+	private boolean structureHighlight;
+	private Color structureHighlightColor;
 
 	private boolean markerHighlight;
 	private Color markerHighlightColor;
@@ -556,39 +563,25 @@ public class Gutter extends JComponent implements SwingConstants
 	private void paintLine(Graphics2D gfx, int line, int y)
 	{
 		Buffer buffer = textArea.getBuffer();
+		if(!buffer.isLoaded())
+			return;
 
 		int lineHeight = textArea.getPainter().getFontMetrics()
 			.getHeight();
 
 		ChunkCache.LineInfo info = textArea.chunkCache.getLineInfo(line);
-		if(!info.chunksValid)
-			System.err.println("gutter paint: not valid");
 		int physicalLine = info.physicalLine;
-
-		//{{{ Paint text area extensions
-		if(physicalLine != -1)
-		{
-			int start = textArea.getScreenLineStartOffset(line);
-			int end = textArea.getScreenLineEndOffset(line);
-
-			extensionMgr.paintValidLine(gfx,line,physicalLine,start,end,y);
-		}
-		else
-			extensionMgr.paintInvalidLine(gfx,line,y);
-		//}}}
 
 		// Skip lines beyond EOF
 		if(physicalLine == -1)
 			return;
 
 		//{{{ Paint fold triangles
-		if(info.firstSubregion
-			&& physicalLine != buffer.getLineCount() - 1
-			&& buffer.isFoldStart(physicalLine))
+		if(info.firstSubregion && buffer.isFoldStart(physicalLine))
 		{
 			int _y = y + lineHeight / 2;
 			gfx.setColor(foldColor);
-			if(textArea.getFoldVisibilityManager()
+			if(textArea.displayManager
 				.isLineVisible(physicalLine + 1))
 			{
 				gfx.drawLine(1,_y - 3,10,_y - 3);
@@ -605,50 +598,67 @@ public class Gutter extends JComponent implements SwingConstants
 				gfx.drawLine(7,_y - 2,7,_y + 1);
 				gfx.drawLine(8,_y - 1,8,_y);
 			}
+		}
+		else if(info.lastSubregion && buffer.isFoldEnd(physicalLine))
+		{
+			gfx.setColor(foldColor);
+			int _y = y + lineHeight / 2;
+			gfx.drawLine(4,_y,4,_y + 3);
+			gfx.drawLine(4,_y + 3,7,_y + 3);
 		} //}}}
 		//{{{ Paint bracket scope
-		else if(bracketHighlight)
+		else if(structureHighlight)
 		{
-			int bracketLine = textArea.getBracketLine();
+			StructureMatcher.Match match = textArea.getStructureMatch();
 			int caretLine = textArea.getCaretLine();
 
-			if(textArea.isBracketHighlightVisible()
-				&& physicalLine >= Math.min(caretLine,bracketLine)
-				&& physicalLine <= Math.max(caretLine,bracketLine))
+			if(textArea.isStructureHighlightVisible()
+				&& physicalLine >= Math.min(caretLine,match.startLine)
+				&& physicalLine <= Math.max(caretLine,match.startLine))
 			{
 				int caretScreenLine;
 				if(caretLine > textArea.getLastPhysicalLine())
 					caretScreenLine = Integer.MAX_VALUE;
-				else
+				else if(textArea.displayManager.isLineVisible(
+						textArea.getCaretLine()))
 				{
 					caretScreenLine = textArea
 						.getScreenLineOfOffset(
 						textArea.getCaretPosition());
 				}
-
-				int bracketScreenLine;
-				if(bracketLine > textArea.getLastPhysicalLine())
-					bracketScreenLine = Integer.MAX_VALUE;
 				else
 				{
-					bracketScreenLine = textArea.chunkCache
-						.getScreenLineOfOffset(
-						bracketLine,
-						textArea.getBracketPosition());
+					caretScreenLine = -1;
 				}
 
-				if(caretScreenLine > bracketScreenLine)
+				int structScreenLine;
+				if(match.startLine > textArea.getLastPhysicalLine())
+					structScreenLine = Integer.MAX_VALUE;
+				else if(textArea.displayManager.isLineVisible(
+						match.startLine))
+				{
+					structScreenLine = textArea
+						.getScreenLineOfOffset(
+						match.start);
+				}
+				else
+				{
+					structScreenLine = -1;
+				}
+
+				if(caretScreenLine > structScreenLine)
 				{
 					int tmp = caretScreenLine;
-					caretScreenLine = bracketScreenLine;
-					bracketScreenLine = tmp;
+					caretScreenLine = structScreenLine;
+					structScreenLine = tmp;
 				}
 
-				gfx.setColor(bracketHighlightColor);
-				if(bracketScreenLine == caretScreenLine)
+				gfx.setColor(structureHighlightColor);
+				if(structScreenLine == caretScreenLine)
 				{
 					// do nothing
 				}
+				// draw |^
 				else if(line == caretScreenLine)
 				{
 					gfx.fillRect(5,
@@ -662,7 +672,8 @@ public class Gutter extends JComponent implements SwingConstants
 						2,
 						lineHeight - lineHeight / 2);
 				}
-				else if(line == bracketScreenLine)
+				// draw |_
+				else if(line == structScreenLine)
 				{
 					gfx.fillRect(5,
 						y,
@@ -673,8 +684,9 @@ public class Gutter extends JComponent implements SwingConstants
 						5,
 						2);
 				}
+				// draw |
 				else if(line > caretScreenLine
-					&& line < bracketScreenLine)
+					&& line < structScreenLine)
 				{
 					gfx.fillRect(5,
 						y,
@@ -728,6 +740,7 @@ public class Gutter extends JComponent implements SwingConstants
 	//{{{ MouseHandler class
 	class MouseHandler extends MouseInputAdapter
 	{
+		MouseActions mouseActions = new MouseActions("gutter");
 		boolean drag;
 		int toolTipInitialDelay, toolTipReshowDelay;
 
@@ -752,6 +765,8 @@ public class Gutter extends JComponent implements SwingConstants
 		//{{{ mousePressed() method
 		public void mousePressed(MouseEvent e)
 		{
+			textArea.requestFocus();
+
 			if(GUIUtilities.isPopupTrigger(e)
 				|| e.getX() >= getWidth() - borderWidth * 2)
 			{
@@ -765,7 +780,6 @@ public class Gutter extends JComponent implements SwingConstants
 
 				int screenLine = e.getY() / textArea.getPainter()
 					.getFontMetrics().getHeight();
-				textArea.chunkCache.updateChunksUpTo(screenLine);
 
 				int line = textArea.chunkCache.getLineInfo(screenLine)
 					.physicalLine;
@@ -773,87 +787,92 @@ public class Gutter extends JComponent implements SwingConstants
 				if(line == -1)
 					return;
 
-				FoldVisibilityManager foldVisibilityManager
-					= textArea.getFoldVisibilityManager();
-
-				//{{{ Clicking on fold triangle does various things
+				//{{{ Determine action
+				String defaultAction;
+				String variant;
 				if(buffer.isFoldStart(line))
 				{
-					StringBuffer property = new StringBuffer(
-						"view.gutter.gutter");
-					if(e.isShiftDown())
-						property.append("Shift");
-					if(e.isControlDown())
-						property.append("Control");
-					if(e.isAltDown())
-						property.append("Alt");
-					property.append("Click");
+					defaultAction = "toggle-fold";
+					variant = "fold";
+				}
+				else if(structureHighlight
+					&& textArea.isStructureHighlightVisible()
+					&& textArea.lineInStructureScope(line))
+				{
+					defaultAction = "match-struct";
+					variant = "struct";
+				}
+				else
+					return;
 
-					String action = jEdit.getProperty(property
-						.toString());
-					if(action == null)
-					{
-						action = jEdit.getProperty(
-							"view.gutter.gutterClick");
-					}
+				String action = mouseActions.getActionForEvent(
+					e,variant);
 
-					if(action == null)
-						action = "toggleFold";
+				if(action == null)
+					action = defaultAction;
+				//}}}
 
-					if(action.equals("selectFold"))
-					{
-						foldVisibilityManager
-							.expandFold(line,true);
-						textArea.selectFold(line);
-					}
-					else if(foldVisibilityManager
+				//{{{ Handle actions
+				StructureMatcher.Match match = textArea
+					.getStructureMatch();
+
+				if(action.equals("select-fold"))
+				{
+					textArea.displayManager.expandFold(line,true);
+					textArea.selectFold(line);
+				}
+				else if(action.equals("narrow-fold"))
+				{
+					int[] lines = buffer.getFoldAtLine(line);
+					textArea.displayManager.narrow(lines[0],lines[1]);
+				}
+				else if(action.startsWith("toggle-fold"))
+				{
+					if(textArea.displayManager
 						.isLineVisible(line + 1))
 					{
-						foldVisibilityManager
-							.collapseFold(line);
+						textArea.displayManager.collapseFold(line);
 					}
 					else
 					{
-						if(action.equals(
-							"toggleFoldFully"))
+						if(action.endsWith("-fully"))
 						{
-							foldVisibilityManager
+							textArea.displayManager
 								.expandFold(line,
 								true);
 						}
 						else
 						{
-							foldVisibilityManager
+							textArea.displayManager
 								.expandFold(line,
 								false);
 						}
 					}
-				} //}}}
-				//{{{ Clicking in bracket scope locates matching bracket
-				else if(bracketHighlight)
+				}
+				else if(action.equals("match-struct"))
 				{
-					if(textArea.isBracketHighlightVisible())
+					if(match != null)
+						textArea.setCaretPosition(match.end);
+				}
+				else if(action.equals("select-struct"))
+				{
+					if(match != null)
 					{
-						int bracketLine = textArea.getBracketLine();
-						int caretLine = textArea.getCaretLine();
-						if(caretLine != bracketLine)
-						{
-							if(caretLine > bracketLine)
-							{
-								int tmp = caretLine;
-								caretLine = bracketLine;
-								bracketLine = tmp;
-							}
-
-							if(line >= caretLine
-								&& line <= bracketLine)
-							{
-								if(e.isControlDown())
-									textArea.selectToMatchingBracket();
-								else
-									textArea.goToMatchingBracket();
-							}
-						}
+						match.matcher.selectMatch(
+							textArea);
+					}
+				}
+				else if(action.equals("narrow-struct"))
+				{
+					if(match != null)
+					{
+						int start = Math.min(
+							match.startLine,
+							textArea.getCaretLine());
+						int end = Math.max(
+							match.endLine,
+							textArea.getCaretLine());
+						textArea.displayManager.narrow(start,end);
 					}
 				} //}}}
 			}
@@ -907,7 +926,11 @@ public class Gutter extends JComponent implements SwingConstants
 		{
 			if(isMarkerHighlightEnabled())
 			{
-				int line = y / textArea.getPainter().getFontMetrics().getHeight();
+				int lineHeight = textArea.getPainter().getFontMetrics().getHeight();
+				if(lineHeight == 0)
+					return null;
+
+				int line = y / lineHeight;
 				int start = textArea.getScreenLineStartOffset(line);
 				int end = textArea.getScreenLineEndOffset(line);
 				if(start == -1 || end == -1)

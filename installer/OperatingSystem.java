@@ -14,6 +14,7 @@
 package installer;
 
 import java.io.*;
+import java.util.Vector;
 
 /*
  * Abstracts away operating-specific stuff, like finding out the installation
@@ -77,7 +78,8 @@ public abstract class OperatingSystem
 			this.directory = directory;
 		}
 
-		public abstract void perform(String installDir) throws IOException;
+		public abstract void perform(String installDir,
+			Vector filesets) throws IOException;
 	}
 
 	public OSTask[] getOSTasks(Install installer)
@@ -106,6 +108,8 @@ public abstract class OperatingSystem
 				os = new Windows();
 			else if(osName.indexOf("OS/2") != -1)
 				os = new HalfAnOS();
+			else if(osName.indexOf("VMS") != -1)
+				os = new VMS();
 			else
 				os = new Unix();
 		}
@@ -140,7 +144,8 @@ public abstract class OperatingSystem
 				return new File(dir,"bin").getPath();
 			}
 
-			public void perform(String installDir) throws IOException
+			public void perform(String installDir,
+				Vector filesets) throws IOException
 			{
 				if(!enabled)
 					return;
@@ -161,9 +166,15 @@ public abstract class OperatingSystem
 				out.write("#!/bin/sh\n");
 				out.write("# Java heap size, in megabytes\n");
 				out.write("JAVA_HEAP_SIZE=32\n");
-				out.write("exec "
+				out.write("DEFAULT_JAVA_HOME=\""
 					+ System.getProperty("java.home")
-					+ "/bin/java -mx${JAVA_HEAP_SIZE}m ${"
+					+ "\"\n");
+				out.write("if [ \"$JAVA_HOME\" = \"\" ]; then\n");
+				out.write("JAVA_HOME=\"$DEFAULT_JAVA_HOME\"\n");
+				out.write("fi\n");
+
+				out.write("exec \"$JAVA_HOME"
+					+ "/bin/java\" -mx${JAVA_HEAP_SIZE}m ${"
 					+ name.toUpperCase() + "} ");
 
 				String jar = installDir + File.separator
@@ -195,7 +206,8 @@ public abstract class OperatingSystem
 				return new File(dir,"man/man1").getPath();
 			}
 
-			public void perform(String installDir) throws IOException
+			public void perform(String installDir,
+				Vector filesets) throws IOException
 			{
 				if(!enabled)
 					return;
@@ -273,9 +285,11 @@ public abstract class OperatingSystem
 				return null;
 			}
 
-			public void perform(String installDir)
+			public void perform(String installDir,
+				Vector filesets)
 			{
-				if(!enabled)
+				if(!enabled
+					|| !filesets.contains("jedit-windows"))
 					return;
 
 				// run jEditLauncher installation
@@ -303,7 +317,7 @@ public abstract class OperatingSystem
 
 		public OSTask[] getOSTasks(Install installer)
 		{
-			return new OSTask[] { new JEditLauncherOSTask(installer) };
+			return new OSTask[] { /* new JEditLauncherOSTask(installer) */ };
 		}
 	}
 
@@ -312,6 +326,14 @@ public abstract class OperatingSystem
 		public String getInstallDirectory(String name, String version)
 		{
 			return "C:\\" + name + " " + version;
+		}
+	}
+
+	public static class VMS extends OperatingSystem
+	{
+		public String getInstallDirectory(String name, String version)
+		{
+			return "./" + name.toLowerCase() + "/" + version;
 		}
 	}
 

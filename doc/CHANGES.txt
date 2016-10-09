@@ -1,1403 +1,2455 @@
-JEDIT 4.1 VERSION HISTORY
+JEDIT 4.2 VERSION HISTORY
 
-* Version 4.1final
+{{{ Version 4.2final
 
-Thanks to Alex Jacoby, Andreas Mross, Kris Kopicki, and Patrick Tingen
+Thanks to Brant Gurganus, Justin Dieters, Ollie Rutherfurd and Thomas
+Bock for contributing to this release.
+
+{{{ Syntax Highlighting
+
+- Added Factor syntax highlighting.
+
+- Updated BBj syntax highlighting (Thomas Bock).
+
+- Added ANTLR syntax highlighting (Brant Gurganus).
+
+- Added D syntax highlighting (Jim Lawton).
+
+- Added INNO setup syntax highlighting (Ollie Rutherfurd).
+
+- Added Doxygen syntax highlighting. This includes doxyfile*
+  configuration files, and Doxygen comments in C, C++, Objective-C and
+  D modes. (Jim Lawton)
+
+}}}
+{{{ Scripting
+
+- Some new clipboard macros (Ollie Rutherfurd).
+
+}}}
+{{{ Bug Fixes
+
+- Fix a roundoff error in the monospaced font optimization that would
+  result in zero-width tabs using some fonts.
+
+- When printing, any syntax styles with a foreground color of white are
+  printed as black (Justin Dieters).
+
+- Entering / in the file system browser dialog's text field no longer
+  has any special action if the caret is not at the end of the field.
+
+- Removed the feature that would pass arrow keys to the text area from
+  the search bar, since people didn't like it and it didn't work
+  properly anyway.
+
+- Fix appearance of rollover toolbar buttons on Windows.
+
+- "Go to Next Bracket" would throw an exception if the caret was
+  positioned at the end of the buffer.
+
+- The caret position of the current buffer was not saved when closing
+  all buffers.
+
+- The activity log set an incorrect list row height.
+
+- File names containing & and < were not properly being escaped when
+  perspective.xml was being written.
+
+- Some file names could not be opened because jEdit would mistake them
+  for URLs (for example, "foo.bar:baz").
+
+- the +line: and +marker: command line parameters moved the caret to
+  the right position, but the text area was not always scrolled
+  correctly.
+
+- The scroll state was not updated correctly if the caret was at the end
+  of the buffer and a 'Replace All' was performed replacing \n\n with
+  \n.
+
+- jEdit did not auto-detect the character encoding within GZipped files.
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre15
+
+Thanks to Adrian Baker, Bertalan Fodor, Eric Ladner, Justin Hagstrom,
+Lionel Fiol, Nicholas O'Leary, Ollie Rutherfurd and Thomas Alspaugh for
+contributing to this release.
+
+{{{ License Change
+
+A small amendment has been added to jEdit's license. It formally allows
+development of non-GPL jEdit plugins. See doc/COPYING.PLUGINS.txt.
+
+}}}
+{{{ Syntax Highlighting
+
+- Updated PHP syntax highlighting for PHP5 and PHPDoc (Justin Hagstrom).
+
+- Updated PL/SQL syntax highlighting (Eric Ladner).
+
+- Updated LaTeX syntax highlighting (Thomas Alspaugh).
+
+- Added Lilypond syntax highlighting (Bertalan Fodor).
+
+- Updated Omnimark syntax highlighting (Lionel Fiol).
+
+- Added Groovy syntax highlighting (Ollie Rutherfurd).
+
+- Added PTL syntax highlighting (Ollie Rutherfurd).
+
+}}}
+{{{ Miscellaneous
+
+- More flexible remapping of modifier keys (Adrian Baker).
+
+For example, this BeanShell snippet points both the ALT and META
+modifiers to A+:
+
+KeyEventTranslator.setModifierMapping(
+    InputEvent.CTRL_MASK,
+    InputEvent.ALT_MASK | InputEvent.META_MASK,
+    0,
+    InputEvent.SHIFT_MASK);
+
+- "Java File Save", "Move Line Up", "Move Line Down" macros
+  (Nicholas O'Leary).
+
+}}}
+{{{ Bug Fixes
+
+- The rest.xml and embperl.xml mode files were missing from the
+  distribution.
+
+- HyperSearch results would not use floating positions if the files
+  being searched were symbolic links.
+
+- Findbugs suggests changing 'new Boolean(' to 'Boolean.valueOf(', so I
+  changed all occurrences in pre14. However, the latter does not exist
+  in JDK 1.3. This change was reverted.
+
+- File permission preservation code no longer waits for 'chmod' command
+  to exit; since on some Java versions, Process.waitFor() would hang.
+
+- Fix problem if a line had more than 127 screen lines.
+
+- The dirty flag was not cleared if 'redo' was invoked when the redone
+  edit was created as part of a compound edit.
+
+- Fix a possible ArrayIndexOutOfBoundsException with zero-height text
+  areas.
+
+- Fix some problems when deleting all visible lines with folding or
+  narrowing active.
+
+- If jEdit was run with the -background -nogui switches, there was no
+  perspective.xml, and then a client instance was started, a
+  NullPointerException would be printed.
+
+- On Windows, C:\ was considered an absolute path (which is correct)
+  but C:/ was considered a relative path (which is incorrect).
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre14
+
+Thanks to Gerd Knops, Ollie Rutherfurd, Paul Libbrecht and Rob Watson
 for contributing to this release.
 
-+ Enhancements:
+{{{ Miscellaneous Changes
+
+- jEditLauncher no longer included due to a large number of bugs, and
+  the fact that it is unmaintained.
+
+- Join Lines (C+j) now inserts a space between joined lines.
+
+- Added some global abbreviations for inserting Greek letters and
+  various math symbols (Paul Libbrecht).
+
+- The buffer state icons and window icon can now be customized with
+  icon themes.
+
+}}}
+{{{ Syntax Highlighting
+
+- PL/I syntax highlighting (Rob Watson).
+
+- Embperl syntax highlighting (Ollie Rutherfurd).
+
+- reStructuredText syntax highligting (Ollie Rutherfurd).
+
+- Fix an issue with SSI directives in SHTML files.
+
+}}}
+{{{ Bug Fixes
+
+- Fix exceptions being thrown if the text area has a negative height.
+
+- "File Changed Since Save" warning on Reload now has the buffer name,
+  to make it clear which buffer is being reloaded.
+
+- Abbreviations are now loaded/saved using the UTF8 encoding, making
+  them more friendly towards international characters.
+
+- Fix a few problems (mainly not closing streams after exceptions, and
+  unused fields/methods) found by the FindBugs tool.
+
+- Fix possible ArrayIndexOutOfBoundsException in
+  DisplayManager.hideLineRange() when narrowing to folds in
+  indent-folded buffers.
+
+- Fix for window geometry load/save on multiple monitor setups
+  (Gerd Knops).
+
+- If a plugin creates an ActionSet with a null label (which would be a
+  bug in the plugin), the Shortcuts option pane didn't work.
+
+- The folding triangles in the gutter were not always being repainted
+  when using indent folding.
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre13
+
+Thanks to Magnus Henriksson, Nicholas O'Leary, Ollie Rutherfurd and
+Patrick Tingen for contributing to this release.
+
+{{{ Miscellaneous Changes
+
+- During auto-save, ~/.jedit/perspective.xml is only written if files
+  were opened or closed or views were split or unsplit since the last
+  time it was auto-saved.
+
+- Greedy_Backspace, _Left and _Right macros (Ollie Rutherfurd).
+
+}}}
+{{{ Syntax Highlighting
 
 - Updated Progress syntax highlighting (Patrick Tingen).
 
-- Updated FAQ (Kris Kopicki).
+- Zope Page Template syntax highlighting (Ollie Rutherfurd).
 
-- Updated batch file syntax highlighting (Alex Jacoby).
+- Updated XSLT syntax highlighting (Magnus Henriksson).
 
-+ Bug Fixes:
+}}}
+{{{ Bug Fixes
 
-- Fixed possible ArrayIndexOutOfBoundsException when using
-  "Collapse All Folds" or "Expand Folds With Level" due to a regression
-  from pre11.
+- Fix ClassCastException when changing kill ring size.
 
-- Cached token marker state was not properly cleared when switching
-  modes due to a regression from pre10.
+- QuickNotepad plugin didn't compile.
 
-- MacOS plugin 2.0.4 fixes a few bugs when opening files from the
-  Finder.
+- jEdit didn't compile with jikes due to overly pedantic inner class
+  semantics.
 
-- Minor fix for XML syntax highlighting.
+- Pressing "Reload" after "Select All" in the files changed dialog
+  didn't work (Nicholas O'Leary).
 
-- Fixed "Preview Javadoc of Buffer" macro (Andreas Mross).
+- Fix a problem where sometimes after loading, only the first line of a
+  file would be visible.
 
-- The file system browser's completion no longer breaks when entering
-  paths not in the current directory.
+- PropertyManager.getProperties() did not include site properties.
 
-- EditServer class no longer uses deprecated Thread.stop() method.
+- When creating a new file, the horizontal scroll bar was not updated
+  correctly.
 
-* Version 4.1pre11
+}}}
+{{{ API Changes
 
-Thanks to Kris Kopicki and Stefan Kost for contributing to this release.
+- A few methods added to JEditTextArea for Gestures plugin:
 
-+ Enhancements:
+  isRightClickPopupEnabled()
+  setRightClickPopupEnabled(boolean)
+  handlePopupTrigger(MouseEvent)
 
-- "BeanShell Error" dialog box now shows the full traceback, not just
-  the exception message.
+}}}
 
-- Some minor optimizations.
+}}}
 
-- FAQ updates (Kris Kopicki).
+{{{ Version 4.2pre12
 
-+ Bug Fixes:
+Thanks to Lionel Fiol, Nicholas O'Leary, Ollie Rutherfurd and
+Thomas Alspaugh for contributing to this release.
 
-- Minor fix to BibTeX syntax highlighting (Stefan Kost).
+{{{ Miscellaneous Changes
 
-- jEditLauncher was not being correctly installed on Windows.
+- The Buffer Options and Global Options->Editing panes no longer allow
+  setting the wrap mode to 'soft' with a wrap margin of zero. Previously
+  this was allowed, but did nothing since the feature was removed in
+  4.2.
 
-- Fixed accidental AbstractOptionPane API breakage.
+- DELETE key works with the tall caret now.
 
-- FileVFS._mkdir() did not send the correct VFSUpdates if more than one
-  nested directory had to be created.
+- Macros in the user macros directory now override macros in the system
+  macro directory.
 
-- Fixed some obscure problems with file system browser dialog box
-  completion.
+- Added 'Next Dirty Buffer' and 'Insert Selection' macros
+  (Ollie Rutherfurd).
 
-- Narrowing would display the wrong text if the text area was scrolled
-  to the start of the buffer.
+- Pressing A+DOWN in a history text field now shows the field's popup
+  menu (Joerg Spieler).
 
-- jEdit.exit() no longer throws an exception if no views are open. This
-  fixes the problem of not being able to exit jEdit when running on
-  MacOS X with the -background command line switch (Kris Kopicki).
+- Added "Mode Switcher" macro (Nicholas O'Leary).
 
-- Narrowing to one set of lines and then immediately to another such
-  that the intersection of the two sets is empty would cause problems.
+}}}
+{{{ Syntax Highlighting
 
-+ API Additions:
+- Updated BibTeX and LaTeX syntax highlighting (Thomas Alspaugh).
 
-- Added Buffer.invalidateCachedFoldLevels() method needed by SideKick
-  plugin.
+- PHP mode now recognizes <script language="PHP">...</script>.
 
-* Version 4.1pre10
+- Updated Omnimark syntax highlighting (Lionel Fiol).
 
-Thanks to Kris Kopicki and Oliver Rutherfurd for contributing to this
-release.
+- Added RTF syntax highlighting (Lionel Fiol).
 
-+ Enhancements:
+}}}
+{{{ Bug Fixes
 
-- Divider position in Global Options dialog box is now saved.
+- Fixed a possible deadlock on startup when loading the SQL plugin. In
+  fact this would happen with any plugin that attempted to load icons
+  from its class initializer.
 
-- Minor improvement to Python auto indent (Oliver Rutherfurd).
+- Fixed NullPointerException when unloading a plugin which has at least
+  one floating window that is not docked.
 
-- Invocations of 'Delete Line' are now undone one at a time.
+- Fixed problems immediately after changing the font size due to a
+  missing recalculateLastPhysicalLine() call.
+
+- Fixed NullPointerException in PluginJAR on startup if settings
+  directory can not be written to.
+
+- File->Save All would ask for confirmation even if "Confirm Save All
+  Buffers" was switched off.
+
+- Fixed off-by-one error in Edit->Word Count if the selection ended with
+  whitespace.
+
+- Text area's horizontal scroll did not update when the text area was
+  resized.
+
+- jEdit.getActiveView() would return null if the current view was
+  closed, and another view was not focused. This would break the
+  edit server if -reuseview was specified.
+
+- Fixed NullPointerException from syntax highlighting code when buffer
+  switching APIs were called in a certain sequence.
+
+- Fixed exception when clicking in one-line-high text area.
+
+- Fixed problems with rectangular selections when changes were being
+  made before the selection in the buffer.
+
+- Disabling the status bar in the Status Bar option pane did not disable
+  the "Show clock" option.
+
+- Scrolling with the keyboard did not update the horizontal scroll bar.
+
+- Control-clicking in a read-only buffer would beep, even if the click
+  location was not beyond the end of a line.
+
+- Fix possible deadlock when calling VFSManager.waitForRequests() from
+  an EditBus message handler for BufferUpdate.CREATED or
+  EditPaneUpdate.BUFFER_CHANGED.
+
+- The new PropertyManager in pre10 broke handling of site properties;
+  they would be overriden by plugin properties, which is not intended
+  behavior.
+
+- QuickNotepad was not saving files with the correct encoding.
+
+- Filename completion on backspace was not disabled in the "Save As"
+  dialog box, as intended.
+
+- Minor fix to VHDL syntax highlighting.
+
+- Kill ring was not being loaded properly; the text entries were loaded
+  but the count was never incremented, so the "Paste Deleted" dialog
+  would always be blank after a jEdit restart.
+
+- Fixed a possible deadlock when unloading the ProjectViewer plugin.
+
+- Workaround for A+PAGE_UP/PAGE_DOWN inserting garbage in the text area
+  on Windows.
+
+- Fix ClassCastException when changing edit mode in Buffer Options
+  dialog box.
+
+- A zero-length file did not open with the default line separator, but
+  rather the Unix line separator.
+
+- jEdit did not start if the font size was set to zero.
+
+- Changing the font size did not update the font in open activity log
+  windows.
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre11
+
+This release fixes a show-stopper bug in pre10. The JAR file included in
+the installer was not completely up-to-date, and it had a property file
+lossage bug.
+
+Note that if you compiled from source, you will not see this problem.
+
+}}}
+
+{{{ Version 4.2pre10
+
+Thanks to Barry Carr, Brad Mace, Ken Turner, Nahuel Foronda,
+Ollie Rutherfurd, Trevor Harmon and Thomas Galvin for contributing to
+this release.
+
+{{{ Miscellaneous
+
+- Added "Create Constructor" macro, updated "Make Get and Set Methods"
+  and "Get Class Name" macros (Thomas Galvin).
+
+- It is now possible to customize the metal look and feel fonts under
+  JDK 1.5.
+
+- Page Up/Page Down restored to jEdit 4.1 behavior: when they are
+  invoked at the beginning/end of the buffer, the caret is moved to
+  the beginning/end, instead of staying at its current position.
+
+- File system browser now uses locale's short date format, not a
+  hard-coded DD/MM/YYYY hh:mm (Ollie Rutherfurd).
+
+- Many macros updated, new Keywords_to_Uppercase.bsh,
+  Emacs_Next_Line.bsh, Emacs_Previous_Line.bsh, Buffer_Switcher.bsh,
+  Delete_Current.bsh, Glob_Close.bsh, Reverse_Lines.bsh,
+  Single_Space_Buffer.bsh macros added (Ollie Rutherfurd).
 
 - Documentation updates.
 
-- FAQ updates (Kris Kopicki).
+- Status bar clock now uses locale's short time format, instead of a
+  hardcoded format.
 
-- API documentation generated with javadoc is now included. A custom
-  doclet is used to generate a tree view for the help viewer.
+}}}
+{{{ Syntax Highlighting
 
-- The installer now packs .tar.bz2 archives instead of storing files in
-  the JAR directly. Now that javadocs have been added to the core
-  distribution, the old installer balooned to 2.7Mb; the new installer
-  is only 1.4Mb.
+- Updated Pascal syntax highlighting (Barry Carr).
 
-  To implement this the installer uses the org.apache.excalibur.bzip2
-  and com.ice.tar libraries. Licensing info and home page links can be
-  found in README.txt.
+- Updated ActionScript syntax highlighting (Nahuel Foronda).
 
-+ Bug Fixes:
+- Updated SDL/PR syntax highlighting (Ken Turner).
 
-- Stricter checks for windows being out-of-bounds.
+- Added CVS and Subversion commit info syntax highlighting
+  (Ollie Rutherfurd).
 
-- The text area no longer falls over if an exception is thrown while
-  firing a caret or scroll event.
+- Added S# syntax highlighting (Barry Carr).
 
-- Saving a file within jEdit will refresh the directory search file list
-  if necessary.
+}}}
+{{{ Bug Fixes
 
-- The Format Paragraph command was once again broken on Java 1.3.
+- Fixed another NullPointerException in the file system browser when
+  using VFS's that do not set the VFS.DirectoryEntry.symlinkPath field.
 
-- Installer's "auto" mode works now. The command line syntax has
-  changed:
+- Actually fix the MacOS plugin for the latest MRJ update.
 
-  java installer.Install auto <install directory>
-    unix-script=<bin directory> unix-man=<man directory>
+- Fix status bar problem with GTK look and feel if memory indicator is
+  enabled.
 
-  The last two parameters are optional.
+- Fixed exception with auto indent (Brad Mace).
 
-- EOL_SPAN_REGEXP rule was broken (Oliver Rutherfurd).
+- jEdit didn't compile with Sun's JDK 1.5 beta (Trevor Harmon).
 
-- Undoing all changes up to a save would not delete the autosave file,
-  even though the buffer was no longer marked as "dirty".
+- "Find Next" didn't work with directory searches where the paths
+  contained symbolic links.
 
-- Fixed minor problem with expanding files when moving the caret outside
-  the narrowed range.
+- Fixed highlighting of verbatim environments in LaTeX files.
 
-- Fixed digit highlighting regexp since it didn't pick up 0xff00 (and
-  various other combinations) properly.
+- Fixed ArrayIndexOutOfBoundsException when invoking "Expand Fold"
+  outside of a narrowed range.
 
-- Installer didn't work on OS/2.
+- Fixed problem where any dialogs boxes shown by the search and replace
+  code would force the search and replace dialog to be shown on OS X.
 
-- "Toggle Line Separator" command now sets buffer dirty status.
+- Fixed a performance regression since 4.2pre7 on MacOS X.
 
-- Splitting the view more than once could break.
+- More deep indent fixes (Brad Mace).
 
-- Fixed a NullPointerException when doing a "Replace All" over a
-  directory right after a HyperSearch in the same directory, then
-  closing some of the buffers touched by the "Replace All".
+- The JARClassLoader's loadClass() method was not synchronized -- this
+  problem has been there for ages!
 
-- Fixed display of docking buttons on Mac OS X (Kris Kopicki).
+- Fixed backspace key in file name field of file dialogs on Java 1.5.
 
-- Dialog boxes shown by search and replace are now parented by a
-  search dialog, if one is open.
+- Fixed exception when control-clicking beyond the end of a line in a
+  read-only buffer.
 
-- Fixed yet another bug when editing the same buffer in two splits,
-  this time if the second split was narrowed.
+- Fixed key binding conflict on OS X; command-drag would both activate
+  rectangular selection and quick copy. This has been resolved and now
+  quick copy is activated with an option-drag.
 
-- Fixed obscure file system browser selection bug.
+- The order of the elements in the recent file list was being reversed
+  each time jEdit was restarted if 'sort recent files' was switched off.
 
-- Fixed unnecessary repainting in text area, this should improve
-  performance.
+- PluginJAR.generateCache() didn't correctly handle the case where a
+  plugin JAR file had an actions.xml but no core class.
 
-* Version 4.1pre9
+- Unloading a plugin did not remove the buttons for its docked windows.
 
-Thanks to Chris Petersen, Iain Hewson, Kris Kopicki, Randolf Mock and
-Reinout van Schouwen for contributing to this release.
+- The "Rescan Macros" command did not update the actions list in the
+  action bar.
 
-+ Syntax Highlighting Changes:
+}}}
+{{{ API Changes
 
-- Added gettext mode (primarily used on Unix for translating programs
-  to other languages) (Reinout van Schouwen).
+- Added "optional dependencies". An optional dependency looks like this:
 
-- Added APDL mode (Randolf Mock).
+  plugin.MyPlugin.depend.0=optional plugin AnotherPlugin 1.3.1
 
-- Updated CSS, PHP, Perl syntax highlighting (Chris Petersen).
+  On startup, optional dependency are ignored; if AnotherPlugin does not
+  exist, MyPlugin will still load. However, if AnotherPlugin is unloaded
+  while jEdit is running, all plugins that depend on it, even ones with
+  optional dependencies, will be reloaded.
 
-+ Miscellaneous Changes:
+  If your plugin does a runtime check for the existence of another
+  plugin, and uses its services if it exists, but can otherwise
+  function fine, then you *MUST* add an optional dependency on that
+  plugin, otherwise reloading plugins will leave stale classes in the
+  active class loader.
 
-- Global options dialog box remembers its size and position now.
+- jEdit.getProperties() now returns a new collection, not the internal
+  insance.
 
-- Much faster auto indent.
+}}}
 
-- Prefix keys (C+e, C+e n, C+m, C+r) now show a status bar message.
+}}}
 
-- Added a "Docking Options" item to the docking button's right-click
-  menu.
+{{{ Version 4.2pre9
 
-+ Installer Changes:
+Thanks to Brad Mace, David Hardin,  Matthew J. Price, Ollie Rutherfurd,
+Patrick Tingen, Thomas Galvin and Wiktor Adamski for contributing to
+this release.
 
-- On Unix systems, a jedit.1 manual page is now installed.
+{{{ Miscellaneous
 
-+ Bug Fixes:
+- Includes new "Create Get/Set Methods" macro (Thomas Galvin).
 
-- Saving a file from one file system to another using the "Save a Copy
-  As" command could cause problems if the destination VFS implemented
-  the _saveComplete() method. This method was only passed a buffer
-  instance, and there was no way to obtain the destination path.
+- Minor improvements to "Deep Indent" feature (Brad Mace).
 
-- Making changes above the first line did not scroll the text area.
+- "Reload All Buffers" command now only asks for confirmation if there
+  are buffers with unsaved changes (Ollie Rutherfurd).
 
-- Fixed a bug with nested compound edits. I'm not sure if it ever caused
-  any problems, however it did affect performance.
+}}}
+{{{ Syntax Highlighting
 
-- More fixes for non-standard mouse button handling under MacOS X
-  (Kris Kopicki).
+- Updated Visual FoxPro syntax highlighting (Matthew J. Price).
 
-- Fixed possible incorrect enabling and disabling of controls, and an
-  ArrayIndexOutOfBoundsException when selecting the last edit mode in
-  the Editing option pane's list.
+- Updated Lisp syntax highlighting (David Hardin).
 
-- Fixed possible ArrayIndexOutOfBoundsException while scrolling in a
-  text area that was narrowed to a specific region in the buffer.
+- Updated Progress syntax highlighting (Patrick Tingen)
 
-- Fixed problem with Gutter marker tooltips not showing up sometimes if
-  the text area was scrolled horizontally.
+}}}
+{{{ Bug Fixes
 
-- JEditTextArea.getPhysicalLineOfScreenLine() was broken. This caused
-  problems for JDiff.
+- Horizontal scroll bar was not updated sometimes.
 
-- Fixed problem when scrolling with soft wrap where the last visible
-  line would get clipped.
+- The code that determines if a selection is being dragged is now much
+  more accurate; for example, with rectangular selections is only
+  registers a drag if the mouse is actually within the rectangular
+  region, not just between the start and end locations in the buffer.
 
-- The jeditshell directory was missing from the source download.
+- jEdit did not compile with Java 1.3.
 
-- Plugin properties would override site properties.
+- Clicking "Select All" in the "Files Changed on Disk" dialog box did
+  not enable the Reload button (Ollie Rutherfurd).
 
-- Various modes were missing a "lineUpClosingBracket" property.
+- startup.bsh file was not included in installer bundle.
 
-- Editing option pane's "Use default settings" check box was broken.
+- Fixed a performance problem with rollover buttons.
 
-- Fixed an auto-indent bug that would give lines incorrect indent if
-  they contained both a closing and an opening bracket.
+- Pressing a shortcut that reads the next character from the keyboard
+  while a control other than the text area is focused will now shift
+  focus to the text area, and back again to the original control when
+  the key is pressed. This allows you to use commands like "Go to
+  marker" from the search bar, and so on.
 
-- Fixed a problem with undo -- after undoing the full undo queue,
-  further edits were not being added. This problem has been there since
-  the 4.0 pre-releases, damn.
+- Collapsing a folder node in the file system browser that is
+  immediately followed by an expanded folder node would remove all
+  columns from the view.
 
-- Fixed problem with grabbing keystrokes with the Shift modifier set and
-  all other modifiers unset (Iain Hewson).
+- This change was advertised in the pre8 change log but didn't actually
+  make it in:
 
-+ API Changes:
+  - Fixed possible deadlock in VFSFileChooserDialog when changing the
+    cursor.
 
-- VFS._saveComplete(Object session, Buffer buffer, Component comp) is
-  now VFS._saveComplete(Object session, Buffer buffer, String path,
-  Component comp).
+- Hard wrap would wrap one word too early when inserting beyond the wrap
+  margin.
 
-+ API Additions:
+- Fixed exception when tab size was set to 0.
 
-- HyperSearchResults.getTree() method added.
+- Fixed caret being offset too far to the right when dropping text in
+  the text area, due to the gutter's width not being taken into account
+  (Wiktor Adamski).
 
-* Version 4.1pre8
+- Dismissing the buffer switcher popup now sends focus back to the text
+  area.
 
-Thanks to Carmine Lucarelli, Chris Petersen, Jonathan Revusky,
-Kris Kopicki, Silas Smith and Will Varfar for contributing to this
-release.
+- Fix layout problem with tool bars at the bottom of the view.
 
-+ Syntax Highlighting Changes:
+- Fix layout problem with tool bar obscuring the right docking area.
 
-- Icon syntax highlighting (Silas Smith).
+- Docking area sizes would be determined before the button sizes were
+  known, so it was possible to resize a docking area beyond the edge of
+  the view.
 
-- Redcode syntax highlighting (Will Varfar).
+- ChunkCache.getScreenLineOfOffset() didn't return the correct value -1
+  if the given offset was before the first visible line.
 
-- Minor updates to JavaScript, PHP and ShellScript modes
-  (Chris Petersen).
+- "Confirm 'Save All Buffers' command" option didn't work.
 
-- Updated FreeMarker syntax highlighting (Jonathan Revusky).
+- jEdit would throw an exception on startup if the GTK look and feel was
+  in use.
 
-- Java mode now highlights "assert" and "strictfp" keywords.
+- The MacOS plugin didn't work with the latest MRJ release.
 
-+ Auto Indent Changes:
+- Commands in the right-click menu of the parent directories list
+  operated on the files currently selected in the file listing table.
 
-- "indentPrevLine" buffer-local property now named "indentNextLine".
-  Update your modes.
+- Fixed NullPointerException in GUIUtilities.getComponentParent().
 
-- Added a new "indentNextLines" property that indents all subsequent
-  lines, not just the next line. This finally gives correct auto-indent
-  behavior in Python files.
+}}}
+{{{ API Changes
 
-- Added a new "lineUpClosingBracket" property. If false, then a closing
-  bracket will not unindent the current line, but rather the next line.
-  This gives us semi-correct indent behavior in Lisp and Scheme modes.
+- BufferUpdate.SAVING is now sent before the IO flag is set to true.
 
-+ Miscellaneous Changes:
+}}}
 
-- Plugin manager progress window now only has one progress bar.
+}}}
 
-- In the file system browser, S+ENTER with a directory selected opens
-  the directory in a new browser window.
+{{{ Version 4.2pre8
 
-- Pressing LEFT in the filename field with the caret already at the
-  left-most position goes to the parent directory location.
+Thanks to David Moss, Justin Dieters, Kris Kopicki, Ollie Rutherfurd,
+Philipp Janda, and Scott Allen for contributing to this release.
 
-- Added View->Show Buffer Switcher command (shortcut: A+BACK_QUOTE). It
-  shows the buffer switcher combo box if it is enabled.
+{{{ Miscellaneous
 
-- Improved scrolling performance when soft wrap is on. In previous 4.1
-  pre-releases and especially in 4.0, the editor was noticably less
-  responsive if soft wrap was on. No longer.
+- New splash screen (Kris Kopicki).
 
-- Documentation updates.
+- Clicking "Reload" in the "Files Changed on Disk" dialog box now
+  selects the next buffer. This improves usability.
 
-- Added some more tips of the day.
+- Added Alt-key mnemonics to "Files Changed" dialog box
+  (Ollie Rutherfurd).
 
-+ Bug Fixes:
+- Alternative caret movement shortcuts (A+a,i,j,k,l,q,x,z) now work
+  together with Shift to extend the selection.
 
-- Sometimes the status bar was not updated properly in newly created
-  views.
+- "Using jEdit" section of the jEdit user's guide is now mostly up to
+  date for jEdit 4.2.
 
-- Fixed a few help viewer quirks.
+- Fixed various mistakes in the documentation (Justin Dieters).
 
-- Fixed several bugs in the text area scrolling code.
+}}}
+{{{ Scripting
 
-- Fixed Global Options dialog box resizing problems.
+- BeanShell 2.0b1 imported. It has the following improvements over the
+  previously-bundled release (1.3.1):
 
-- Fixed possible ArrayIndexOutOfBoundsExceptions when deleting text.
+  - Full support for scripted classes that behave exactly the same as
+    compiled classes.
 
-- Fixed various minor bugs with the "Format Paragraph" command.
+  - Java 1.5-style static imports (this does not require Java 1.5). For
+    example:
 
-- Fixed some popup menu display bugs.
+    static import java.lang.Math.*;
+    sqrt(4.0);
 
-- Fixed possible NullPointerException in Syntax Highlighting option
-  pane.
+  - Instance object imports (mix-ins) with the importObject() command.
+    For example:
 
-- Highlighting of m{...} and s{...}{...} in Perl mode was broken.
+    importObject( new HashMap() );
+    put("foo", "bar");
+    print( get("foo") ); // prints "bar"
 
-- The 4.1pre7 changelog claimed that roots: now listed the desktop. This
-  was broken and has now been fixed (Carmine Lucarelli).
+- The ASM bytecode generation library is now bundled with jEdit since it
+  is required by BeanShell 2.0.
 
-- Fixed NPE when a client instance of jEdit requested an already opened
-  buffer to be shown in a new view if that buffer had been changed on
-  disk.
+}}}
+{{{ Syntax Highlighting
 
-- Contents of filename field in "Save As" dialog box now take precedence
-  over the currently selected file in the file list.
+- Lua syntax highlighting (Philipp Janda)
 
-- Fixed possible deadlock on startup if jEdit was opening a file stored
-  on a remote server using, say, the FTP plugin and the plugin displayed
-  a modal dialog box.
+- SMI-MIB syntax highlighting (Scott Allen).
 
-- If "two stage save" was disabled, saving a file did not send VFS
-  update messages, so features that relied on that message didn't work
-  (reload of file system browser, reload of edit modes).
+- Updated Lisp syntax highlighting (Ollie Rutherfurd).
 
-- Fixed minor XSLT syntax highlighting glitch.
+- Added Swig and PSP syntax highlighting (Ollie Rutherfurd).
 
-- Fixed minor CSS syntax highlighting glitch.
+- Added Poplog-11 syntax highlighting (David Moss).
 
-- jEdit would misdetect Windows ME as Windows NT. This caused problems
-  for the Console plugin.
+- Java mode now highlights the "enum" keyword, and annotation types that
+  were added in Java 1.5.
 
-- Right mouse button should work on MacOS X now.
+- BeanShell mode is now loaded from java.xml since now that BeanShell
+  2.0 supports class declarations, the syntax is almost identical. The
+  "beanshell" mode is still distinct from "java" mode though, to allow
+  plugins to differentiate between the two file types.
 
-- Markers menu showed wrong line text (Ollie Rutherfurd).
+}}}
+{{{ Bug Fixes
 
-- "Write HyperSearch Results" macro updated to work with
-  multiple-results code (Rudi Widmann).
+- Fixed NullPointerException in FileCellRenderer if a VFS.DirectoryEntry
+  had a null symlinkPath (which should not be the case anyway).
 
-- Fixed various auto indent bugs.
+- Fixed the roots: VFS to return non-null symlinkPaths.
 
-- Wheel mouse page scroll now scrolls the correct amount if soft wrap is
-  on.
+- "Go to Last Visible Line" went one line too far if the last visible
+  line was only partially visible.
 
-- Starting a rectangular selection on a bracket should no longer leave a
-  bogus bracket block selection in place.
+- "Remove" button in Tool Bar pane of the Global Options dialog box now
+  selects the next item after removing the currently selected item.
 
-+ API Additions:
+- Changing the view layout in the View pane of the Global Options dialog
+  box did not take effect for currently opened views.
 
-- Added org.gjt.sp.jedit.gui.AnimatedIcon class (Kris Kopicki).
+- Fixed a few dockable window layout problems.
 
-* Version 4.1pre7
+- Fix for numeric keypad not working after switching virtual desktops
+  with various keyboard sequences on Linux.
 
-Thanks to Chris Kent, Jonathan Revusky and Marcelo Vanzin for
-contributing to this release.
+- Fixed a performance regression -- the entire text area was being
+  repainted on every edit.
 
-+ Syntax Highlighting Changes:
+- apacheconf.xml in 4.2pre7 distribution was corrupted.
 
-- FreeMarker syntax highlighting (Jonathan Revusky).
+- New files no longer appear in the perspective if the autosave task
+  runs while the "Close Files" dialog box is showing.
 
-+ User Interface Changes:
+- Delete perspective.xml before saving it so that past versions don't
+  accumulate on OpenVMS.
 
-- The parent directory list in the file system browser now requires a
-  double-click (or middle mouse button click) to open a directory. This
-  makes it consistent with the behavior of the file tree below it, which
-  also requires double-clicks.
+- Fixed MiscUtilities.isAbsolutePath() on OpenVMS.
 
-- The tooltips shown by the file system browser when a filename is
-  partially obscured are no longer positioned over the filename, because
-  Swing does not pass clicks inside tooltips to the underlying
-  component.
+- It was not possible to bind an action to S+SPACE.
 
-- The help viewer now shows the title of the current page in place of
-  the location field, and the location field is now gone. As a result
-  the help viewer can no longer be used to view arbitriary URLs. Use the
-  InfoViewer plugin for that purpose instead.
+- Key event workaround code now uses the time when an event was fired,
+  not when it was received. This should fix the problem with stray keys
+  getting inserted into the text area when an action takes a long time
+  to execute.
 
-+ Global Options Dialog Changes:
+- Fixed possible deadlock in VFSFileChooserDialog when changing the
+  cursor.
 
-- The Global Options dialog box now opens to display the most recently
-  viewed option pane. Also the "overview" pane is gone.
+- 0-byte files are now opened with the default line separator, not the
+  Unix line separator.
 
-- Merged the Editing and Mode-Specific option panes.
+- Fixed some minor inconsistencies in the behavior of the directory
+  chooser dialog box.
 
-- The text area right-click popup menu now contains an item "Customize"
-  for quick access to the Context Menu pane of the Global Options dialog
-  box.
+- On some Windows systems, the last few lines of each page would not
+  be printed. This was due to a Java bug; the incorrect
+  FontRenderContext was being returned. There is now a workaround for
+  this bug.
 
-- If a HyperSearch produces no results, older result nodes are collapsed
-  in the "HyperSearch Results" window.
+- BeanShell 2.0b1 fixes a problem with variable scoping in macros.
 
-+ Performance Improvements:
+- Added a workaround for a Java bug where switching between windows
+  using A+TAB would focus the menu bar.
 
-- Improved performance of line offset manager when a lot of changes are
-  made starting from the end of the buffer going to the beginning. Early
-  in the 4.1 series a corresponding optimization was added for edits
-  going in the other direction, which improved performance of "Replace
-  All" and similar operations significantly. This change improves
-  performance of undos of "Replace All".
+- Removed debugging message from VFSBrowser class ("request already in
+  progress").
 
-- Improved performance of text area when a lot of changes are made to a
-  buffer, especially while selections are active, or if soft wrap is
-  switched on. Again this improves performance of "Replace All", which
-  was nearly unusable with soft wrap.
+- The backspace key now functions correctly with a tall caret.
 
-- Updated to BeanShell 1.2b7. This version has less debugging code and
-  should be faster.
+- Making changes in a buffer before the start of a rectangular selection
+  would cause exceptions to be thrown.
 
-+ Miscellaneous Changes:
+}}}
 
-- If the user and system macro directories have a subdirectory with the
-  same name, the contents of the subdirectories are merged in the
-  "Macros" menu. Previously, one could end up with two "Text" menus, for
-  instance.
+}}}
 
-- The plugin list in the "Install Plugins" and "Update Plugins" dialog
-  boxes is now categorized.
+{{{ Version 4.2pre7
 
-- jEdit now remembers if a window was maximized when saving geometry if
-  running under Java 1.4. (Chris Kent)
+Thanks to Aaron Bell, Alessandro Falappa, Ben Williams, Chris Petersen,
+Kris Kopicki, Lee Turner, Ollie Rutherfurd, Mike Dillon, Randolf Mock,
+and Randy Hudson for contributing to this release.
 
-- The roots: filesystem now calls Java 1.4 methods where appropriate to
-  obtain the roots. This means that on Windows, for example, in addition
-  to listing drive letters, it will also list files on the desktop.
+{{{ Miscellaneous
 
-- The tips of the day have been updated for assorted jEdit 4.1 changes.
+- The list of modes in various dialog boxes is now sorted (this does not
+  affect the order that buffer names are matched against modes).
 
-- User's guide is more up-to-date with respect to jEdit 4.1 now. There
-  is still much to be done though.
+- Bundled some macros from various sources (Ollie Rutherfurd).
 
-+ Bug Fixes:
+- The plugin manager no longer lists the JDK's "tools.jar" if it is
+  loaded.
 
-- The action "Insert Tab and Indent" was broken. If you reassigned TAB
-  to "Insert Tab" to work around this problem in pre6, you can revert
-  the assignment (unless you'd like the TAB key to always insert a tab,
-  without indenting).
+- The "Search in Directory" command now always selects the most recently
+  searched in directory. To search in the current directory with the
+  filter based on the current buffer's file name, click the
+  "Synchronize" button.
 
-- Backed out Rex Young's ReadWriteLock.java fix from pre6 since it
-  caused deadlocks.
+- Updated "Preview Javadoc of Current Buffer" macro (Tom Gutwin).
 
-- Fixed some long-standing bugs in the reverse search code.
+- Added option to file system browser's Commands->Encoding menu to
+  disable encoding auto-detection.
 
-- Dialogs that are shown by other dialogs have been updated to have the
-  invoking dialog as their parent, instead of the containing frame. This
-  should fix problems with some windows obscuring others, etc.
-  (Marcelo Vanzin)
+- Added support for UTF-8Y encoding, which is like UTF-8 except there
+  is a three-byte signature (0xEFBBBF) at the beginning of the file.
+  See http://oss.software.ibm.com/icu/docs/papers/forms_of_unicode/#t2.
+  UTF-8Y files are automatically detected, just like UTF-16.
 
-- Fixed a possible ClassCastException that could occur if macro
-  directories were nested.
-
-- "Rectangular selection mode" status message was not being shown on
-  MacOS X.
-
-- Fixed a NoSuchMethodError when invoking "Format Paragraph" on Java
-  1.3.
-
-- A Control-click did not bring up the right-click popup menu in the
-  file system browser on MacOS X.
-
-- Fixed a NullPointerException when selecting text in the last visible
-  line, if soft wrap was on and only the top part of the last visible
-  line was visible.
-
-- Fixed a possible ArrayIndexOutOfBoundsException when a rectangular
-  selection started or ended within a hard tab.
-
-- Plugin actions and dockables are no longer loaded if the plugin's
-  start() method failed, or if dependencies were unsatisfied.
-
-- Wheel mouse scrolling should once again respect the operating system's
-  scroll amount setting.
-
-- The Page Scroll Up and Page Scroll Down commands now scroll the
-  correct amount if soft wrap is enabled.
-
-- Fixed possible ArrayIndexOutOfBoundsException if a buffer had a
-  HyperSearch performed in it, then modified, closed and opened again.
-
-- When doing a Replace All operation over a directory, edits performed
-  on files that were not open before the search started were not batched
-  in a compound edit due to an erronous "isTemporary()" check in
-  begin/endCompoundEdit().
-
-- Fixed a possible ArrayIndexOutOfBoundsException in the status bar when
-  making changes near the end of the buffer.
-
-- Closing the Global Options dialog box would add dockables to plain
-  views. Plain views are not supposed to have dockables.
-
-- Bracket highlight color setting in Gutter option pane was broken.
-
-- Digits would not be highlighted properly in modes which did not define
-  any keywords.
-
-+ API Additions:
-
-- You can now open the Global Options dialog box on a specified option
-  pane using the new GlobalOptions(Frame,String) and
-  GlobalOptions(Dialog,String) constructor.
-
-- Added VFS.getTwoStageSaveName() method. Override this if your VFS does
-  not allow file names to contain the # character.
-
-* Version 4.1pre6
-
-Thanks to Cullen Linn, Giulio Piancastelli, John Perry, Joshua Miller,
-Kris Kopicki, Marcelo Vanzin, Peter Cox, Rex Young, Ryan Grove,
-Rudolf Widmann and Steve Snider for contributing to this release.
-
-+ Help System Changes:
-
-- The user's guide, FAQ, and plugin documentation is now searchable. An
-  in-memory index is built the first time a search is performed during a
-  jEdit session. Currently, the search engine is very simple and only
-  performs whole-word matching (so searching for "auto save" and
-  "autosave" will yield different results). Results are ranked according
-  to how many times that word appears in the document. Searching for
-  multiple words returns all documents that contain at least one of the
-  words, however documents containing multiple search terms are ranked
-  higher.
-
-+ Editing Changes:
-
-- The "Indent on Enter" and "Indent on Tab" options are no longer.
-  (Actually, the former was removed in pre5, but I forgot to mention it
-  in the changelog).
-
-  The new way to change these options is to just rebind the ENTER and
-  TAB keys in the Shortcuts option pane. There are several actions they
-  can be bound to:
-
-  Insert Enter
-  Insert Enter and Indent
-  Insert Tab
-  Insert Tab and Indent
-  Indent Line (if you want TAB to indent anywhere in a line, not just in
-  the leading whitespace, like in emacs).
-
-+ Syntax Highlighting Changes:
-
-- Added .NET CIL syntax highlighting (Cullen Linn).
-- Added Maple syntax highlighting (John Perry).
-- Added NSIS2 syntax highlighting (Ryan Grove).
-- Updated ColdFusion syntax highlighting (Joshua Miller).
-- Updated Fortran syntax highlighting (Yifan Song).
-- Updated PL-SQL syntax highlighting (Steve Snider).
-- Updated Prolog syntax highlighting (Giulio Piancastelli)
-
-+ Miscellaneous Changes:
-
-- Holding down Alt while scrolling with the wheel mouse now moves the
-  caret up or down. Holding down Shift and Alt will extend the selection
-  up or down (Rudolf Widmann).
-
-- The "HyperSearch Results" window now remembers old search results.
-  They can be cleared out by right-clicking and selecting "Remove Node"
-  from the resulting popup menu (Peter Cox).
-
-- The content of the status bar can be customized in the new
-  "Status Bar" pane of the Global Options dialog box (Kenrick Drew).
-
-+ Platform-Specific Changes:
-
-- Updated MacOS plugin (Kris Kopicki).
-  - Added MacOS menu to the Plugins menu. Provides time saving features
-    like revealing files and folders in the Finder, and running
-    AppleScripts.
-  - You can run AppleScripts (compiled, uncompiled and standalone).
-    Scripts must be located in the scripts folder in the jEdit folder.
-    They can be either plain text or compiled scripts. Scripts must have
-    their type and creator set correctly, have a .scpt (for compiled
-    scripts) or .applescript (for uncompiled scripts) extension, or
-    both. Note: Scripts that require user interaction are not supported.
-  - Added and option to Mac OS Plugin settings to change the script
-    folder search depth.
-
-+ Bug Fixes:
-
-- Removed erronous check box from Buffer Options dialog box.
-- Changed the code that makes sure windows are always displayed in the
-  visible region of the screen. It now only moves windows if their
-  top-left corner is invisible; windows with other parts obscured are
-  not moved.
-- Fixed possible ArrayIndexOutOfBoundsException with regular expression
-  syntax rules.
-- Plugin manager's dialog boxes are now parented by the plugin manager,
-  not the view (Marcelo Vanzin).
-- Fixed repaint problems in tool bar option pane's buttons (and possibly
-  other places) by making RolloverButton's isOpaque() method return
-  false.
-- Fixed highlighting of digits in C, C++, Java and similar modes; now
-  hex digits are only highlighted if the number begins with "0x".
-- Print output would be clipped if the "print header" option was
-  switched off.
-- Fixed obscure deadlock condition in ReadWriteLock.java (Rex Young).
-- The drop down box on a history text field was painted in the menu
-  foreground, not the text field foreground. This could look bad if text
-  field colors were customized using the "Use jEdit text area colors in
-  all text components".
-- Fixed a problem where the Complete Word popup would not be closed
-  under some circumstances.
-- "Unsplit Current" command no longer changes the divider location to
-  zero.
-- "Copy Append to Register" and "Cut Append to Register" commands would
-  throw NullPointerExceptions when appending to a register that didn't
-  exist. The correct behavior is to put the selected text in the
-  register.
-- $ at the end of an abbreviation expansion is now treated literally.
-- Fixed an obscure bug that could result in exceptions being thrown by
-  the caret status display.
-- Fixed a problem with BeanShell namespace handling that would cause
-  some macros to fail (eg, Add_Prefix_and_Suffix.bsh).
-
-+ API Changes
-
-- Macros.Handler.accept() now takes a path name, not a file name. This
-  should not affect existing plugins since none that I know of
-  override this method.
-
-* Version 4.1pre5
-
-Thanks to Axel Biernat, Chris Petersen, Eric Benoit, Fan Ho Yin, Kris
-Kopicki, Marco Gotze, Ollie Rutherfurd, and Steve Snider for
-contributing to this release.
-
-+ Syntax Highlighting Changes:
-
-- Added NQC syntax highlighting (Fan Ho Yin)
-- Added Ruby-HTML syntax highlighting (Eric Benoit)
-- Added Pike syntax highlighting (Marco Gotze)
-- Updated C-Sharp syntax highlighting (Ollie Rutherfurd)
-- Updated Perl syntax highlighting (Chris Petersen)
-- Updated PL-SQL syntax highlighting (Steve Snider)
-- Updated CSS syntax highlighting (Axel Biernat)
-- The "More accurate syntax highlighting" option is no longer. When it
-  was on, it would do the following:
-
-  - Cause the buffer to be parsed entirely by the syntax engine when
-    first loaded.
-  - When parsing a line for syntax tokens, it would scan back to the
-    start of the buffer looking for a line with valid syntax info,
-    instead of only looking 100 lines back.
-
-  However, the second made the first unnecessary, and with the first
-  behavior gone, the performance hit is not noticable. So this option is
-  now effectively always on.
-
-+ Global Options Dialog Changes:
-
-- The tool bar option pane now has an "Edit" button for modifying the
-  currently selected tool bar entry.
-- Now org.gjt.sp.jedit.gui.OptionsDialog is an abstract class, with a
-  concrete org.gjt.sp.jedit.options.GlobalOptions subclass with the
-  Global Options-specific code. This allows plugins to create paned
-  dialog boxes similar to Global Options.
-- The "Standard go to next/previous word behavior" setting has been
-  removed; instead some new actions have been added which can be bound
-  to C+LEFT, C+RIGHT, CS+LEFT and CS+RIGHT to achieve the behavior of
-  this setting:
-
-  Go to Next Word (Eats Whitespace)
-  Go to Previous Word (Eats Whitespace)
-  Select Next Word (Eats Whitespace)
-  Select Previous Word (Eats Whitespace)
-
-+ Plugin Manager Changes:
-
-- Added "Select All" button to Install and Update Plugins dialogs
-- The plugin list is only downloaded once per Plugin Manager dialog box
-  instance
-
-+ Miscellaneous Changes:
-
-- Added an "Unsplit Current" command, bound to C+0 by default. It
-  removes the split pane containing the current edit pane only, as
-  opposed to the "Unsplit All" command (previously "Unsplit", still
-  bound to C+1) which removes all splits from the view.
-- Behavior of "Warn if file is modified on disk by another program"
-  setting is now more intuitive; even if its off, the write protection
-  status of a buffer is still updated if it changes on disk. Also this
-  setting now controls the modification check when saving; previously it
-  only controlled the check performed when jEdit received focus.
-- jEdit now makes sure that windows are within the bounds of the screen
-  when loading saved geometry. This should improve matters for people
-  who use a laptop with a docking station that has a different
-  resolution, etc. (Kris Kopicki)
-
-+ Bug Fixes:
-
-- Line numbers in the 'Markers' menu were off by one
-- On some Java versions, the popup menu code would not work in frames
-  and dialog boxes and print a stream of exceptions
-- Fixed exception thrown on MacOS X when attempting to list "Local
-  Drives" in the file system browser (Kris Kopicki)
-- Fixed problems if a macro file name had a space in it
-- Fixed a number of problems with mode property handling:
-  - It was not possible to override a mode's property with a blank
-    value; for example if you no longer wanted objective-c mode to open
-    *.m files (and instead use matlab mode for those files) you had to
-    enter a dummy filename glob in the objective-c settings.
-  - Changing the filename or first line glob in the "Mode Specific" pane
-    would not take effect until jEdit was restarted.
-- Entering a relative path in the file system browser's "Path" field
-  didn't work
-- "Format Paragraph" command would insert extra newlines if a line ended
-  with a space
-- The MacOS plugin had a version check that looked for an exact MRJ
-  version match, rather than an equal or newer version. This broke the
-  plugin when running on MacOS X 10.2. (Kris Kopicki)
-- If an action caused the creation of a dockable window, the standard
-  variables (view, buffer, textArea, editPane) would be cleared from the
-  action's namespace from that point on. This has been fixed by making
-  dockable creation and action invocation take place in different
-  namespaces.
-- Fixed a display problem if a SEQ_REGEXP, SPAN_REGEXP or
-  EOL_SPAN_REGEXP syntax highlighting rule matched a tab.
-- Added a workaround for a Java problem were very wide rectangles were
-  not painted properly in the selection painting code.
-- The TERMINATE_AT rule was broken; the number of characters to
-  terminate at was taken to be from the start of the file, not from the
-  start of the current line. This broke FORTRAN syntax highlighting, for
-  example.
-- The "Close Current Docking Area" command should work now.
-
-* Version 4.1pre4
-
-Thanks to Kris Kopicki and Stefan Jozsa for contributing to this
-release.
-
-+ Syntax Highlighting Changes:
-
-- Added AppleScript syntax highlighting (Kris Kopicki)
-- Improved Informix-4GL syntax highlighting (Stefan Jozsa)
-
-+ User Interface Changes:
-
-- TAB key can now be used to insert completions in the 'Complete Word'
-  popup.
-
-+ Bug Fixes:
-
-- Macro listing code was completely broken in 4.1pre3; only the first
-  macro in each directory would be shown.
-- Disabled Java-style auto indent for LISP and Scheme modes since in
-  fact it is quite inappropriate there.
-- Gutter highlight interval setting was broken.
-
-* Version 4.1pre3
-
-Thanks to Ivan Herman, Kris Kopicki, Marco Hunsicker, Matthias Schneider
-and Rudolf Widmann for contributing to this release.
-
-+ Syntax Highlighting Changes:
-
-- Added regular expression matching features. Currently this is used to
-  implement better (but still not 100% accurate) highlighting of various
-  constructs in Perl mode, like s/// and such.
-
-  - SEQ_REGEXP rule: highlights a sequence matching a regular
-    expression.
-  - SPAN_REGEXP rule: like SPAN but the start string is a regular
-    expression (the end cannot be a regular expression currently).
-  - EOL_SPAN_REGEXP rule: ditto, but for EOL_SPAN.
-
-  - All rules must define a HASH_CHAR attribute; this is the character
-    that the rule will be hashed by, to avoid checking every character
-    against every regexp.
-
-- Added a new AT_WORD_START attribute to all syntax rules. If this is
-  set to TRUE, the rule will only match if it is at the start of a token
-  boundary (in most cases, this is the same as a word boundary, hence
-  the name).
-
-  To illustrate the difference, suppose you have a SPAN rule that
-  matches from "quux(" to ")". Without AT_WORD_START, it would highlight
-  this sequence:
-
-  foobarquux(hello world)
-
-  However with AT_WORD_START it would only highlight if there was a
-  token in between foobar and quux().
-
-- CHILL (CCITT recommendation language) syntax highlighting added.
-  (Rudolf Widmann)
-
-- Updated CSS syntax highlighting for CSS2 spec. (Ivan Herman)
-
-- Updated AWK and COBOL syntax highlighting. (Matthias Schneider)
-
-+ Editing Changes:
-
-- Previously when expanding an abbreviation with positional parameters,
-  unspecified parameters would expand to $n where 'n' is the number of
-  the parameter. This was not very intuitive; now missing parameters
-  expand to empty strings, and result in a status bar message being
-  shown.
-
-+ File System Browser Changes:
-
-- In file dialog boxes, the 'File name' text field now supports
-  auto-completion. Previously auto-completion was only supported in the
-  browser view itself.
-
-- For some reason I can't remember now, the state of the 'Filter' check
-  box was only being saved on the browser, and not the dialog box
-  versions of this control. I have changed this so the state of the
-  check box is preserved in all cases.
-
-- You can now right-click on directories in the parent directory list to
-  display a menu of commands.
-
-+ Global Options Dialog Changes:
-
-- Added an option to Utilities->Global Options->Docking for
-  jEdit 4.0-style tool bar placement.
-
-- Text area and gutter color settings have been moved to the Text Area
-  and Gutter panes of the Global Options dialog box; the Colors pane is
-  no longer.
-
-- The "smart home" and "smart end" settings are now much more flexible.
-  Instead of them being flags in the Text Area pane, the various
-  behaviors of the Home and End keys have been split into multiple
-  actions, all of which can be bound to any shortcut key (including HOME
-  and END of course) in the Shortcuts pane.
-
-+ Window Docking Changes:
-
-- 'Close Top/Left/Bottom/Right Docking Area' commands all merged into a
-  single 'Close Current Docking Area' command, bound by default to
-  C+e C+BACK_QUOTE.
-
-- 'Go to Top/Left/Bottom/Right Docking Area' commands added, bound by
-  default to C+e C+UP/LEFT/DOWN/RIGHT. It opens the docking area in
-  question if it is closed, and sends keyboard focus to the selected
-  dockable window.
-
-- 'Go to Text Area' command added, bound by default to C+e C+e. It sends
-  keyboard focus to the text area.
-
-- The popup menu shown when right-clicking on the strip of buttons in a
-  dockable window container now contains a new sub-menu, labelled "New
-  Floating Instance". This menu contains items which open new floating
-  instances of the windows docked in this area.
-
-+ User Interface Changes:
-
-- A few more menu bar rearrangements:
-  - 'Recent Directories' moved from File to Utilities menu.
-  - 'Current Directory' moved from File to Utilities menu.
-  - 'Select Line Range' from from Edit to Edit->More Selection.
-  - BeanShell evaluation commands moved from Macros to
-    Utilities->BeanShell.
-  - Various troubleshooting-related commands moved from Utilities to
-    Utilities->Troubleshooting (like they were in 4.1pre1).
-
-- More tool bar icons added. (Kris Kopicki)
-
-+ Miscellaneous Changes:
-
-- The JARClassLoader now registers plugin packages and manifest files.
-  (Marco Hunsicker)
-
-- Because a lot of people send me their .jedit/activity.log files
-  without invoking 'Update Activity Log on Disk' first, I have added a
-  notice to this file, stating that you must invoke the above command
-  otherwise the file will be incomplete.
-
-- Added two new actions, by default not in any menu, nor bound to any
-  keystroke; 'Toggle Line Separator' and 'Toggle Word Wrap'. They have
-  the same effect as clicking the appropriate section of the status bar,
-  and they can be bound to shortcut keys or added to the tool bar, etc.
-
-- Removed ICONS.LICENSE.txt file since we no longer use the Sun icons.
-
-+ Bug Fixes:
-
-- Clicking the 'Open' button or pressing Enter in the 'Open File' dialog
-  box did not work; only double-clicking would open files.
-
-- Changing the tab size, indent size or maximum line length settings on
-  a global or mode-specific basis should now take effect in all open
-  buffers. Previously changes to these settings would only take effect
-  in subsequently opened files.
-
-- Under some circumstances the file system browser would case a
-  different buffer to be selected in the current view after a directory
-  was loaded. It has been confirmed that one jEdit user was admitted
-  to a mental asylum because of this bug.
-
-- The file system browser's 'Encoding' menu did not work at all.
-
-- Adding a mode to the user modes directory with the same name as one in
-  the system directory would not take effect until jEdit was restarted.
-
-- Abbreviations whose expansions started with the text "<html>" could
-  cause problems since Swing automatically tries to display such strings
-  as HTML. A workaround has now been added.
-
-- If a virtual file system displayed a dialog box upon creating a VFS
-  session (for example, an FTP login dialog box), cancelling the dialog
-  would leave the file system browser stuck with a 'Loading' message.
-  This has now been fixed.
-
-- If multiple selection mode was enabled, clicking the mouse did not
-  move the caret! What a silly bug...
-
-- If a mode file did not contain well-formed XML, the resulting error
-  dialog box would be empty.
-
-- Due to an oversight when implementing the ability to have startup
-  scripts written in any language, scripts were being run in their
-  own namespace in 4.1pre2; as a result functions and variables defined
-  at startup were not available to other macros.
-
-+ API Changes:
-
-- Buffer.getFile() method deprecated. Use Buffer.getPath() and the VFS
-  API instead.
-
-* Version 4.1pre2
-
-Thanks to Alexander Maryanovsky and Gerd Knops for contributing to this
-release.
-
-+ Editing Changes:
-
-- The 'Smart Home/End' setting has been split into two separate
-  settings, one for Home and one for End.
-
-- Made behavior of mouse in gutter more customizable. (Gerd Knops)
-
-- Added option to make double-click drag treat each non-alphanumeric
-  character as one word. (Gerd Knops)
-
-- Added an option to not hide the final end of line character of a
-  buffer.
-
-+ Syntax Highlighting Changes:
-
-- Syntax rules can now specify the AT_WHITESPACE_END attribute. If this
-  is set to TRUE, then the rule will only match if it is the first
-  non-whitespace text in the line.
-
-- Fixed minor highlighting problem with properties mode.
-
-+ File System Browser Changes:
-
-- Multiple files can now be selected in the stand-alone browser;
-  right-clicking no longer deselects all but the clicked file.
-
-- Right-click menus in the 'Open File' dialog box now contain menu items
-  for opening files in new views and new splits.
-
-- File->Open With Encoding menu replaced with an 'Encoding' menu in the
-  file system browser's 'Commands' menu.
-
-+ Scripting Changes:
-
-- 'scriptPath' BeanShell variable is set to the macro file path while a
-  macro or startup script is executing.
-
-- Startup scripts can now be written in any language supported by a
-  registered macro handler; so you can put Python scripts in the
-  'startup' directory if you have the JythonInterpreter plugin
-  installed, for example.
-
-- Slight performance improvement when invoking editor actions.
-
-+ Miscellaneous Changes:
-
-- The HyperSearch feature no longer blocks the GUI while listing a
-  directory (which could take some time).
-
-- New 'broken image' icon shown in place of tool bar buttons whose icons
-  cannot be located.
-
-- Improved popup menu positioning code.
-
-- jEdit.get{Integer,Double}Property and Buffer.getIntegerProperty() no
-  longer barf if the property contains leading or trailing whitespace.
-
-- Added View->New Plain View command that opens a new view without
-  toolbars or dockables. This can be useful for opening up a quick
-  window for taking notes, etc.
-
-- File system browser color regexps are now case-insensitive.
-
-- Each dockable window now has a <name>-float action that opens a new
-  instance of that dockable in a few floating window (regardless of the
-  docking status of the window). These commands do not appear in the
-  menu bar, however they can be added to the context menu and tool bar,
-  or bound to keystrokes.
-
-+ Bug Fixes:
-
-- Fixed default install path settings in installer when running on Unix.
-  Now, instead of checking for a user name of "root", it checks if the
-  appropriate subdirectories of /usr/local are writable.
-
-- When evaluating BeanShell expressions, the standard
-  view/buffer/editPane/textArea variables would not be unset when the
-  expression finishes executing.
-
-- The text area did not get initial focus if there is a window docked
-  in the left or top part of the view, and the 'tip of the day' was
-  switched on.
-
-- Removed debugging messages from PanelWindowContainer.java.
-
-- Fixed bottom tool bar layout problem.
-
-- Image shown in 'welcome to jEdit' page in help was not being installed
-  by the installer.
-
-- Fixed a bug in the folding code that could be triggered by switching
-  to indent fold mode, collapsing some folds, switching to explicit fold
-  mode, then switching back to indent fold mode again.
-
-- The view's minimum size was rather large, this caused problems while
-  trying to resize it if the option to decorate window borders using the
-  Swing L&F was enabled.
-
-- 'Expand Fold Fully' command didn't work.
-
-- The 'gutter bracket highlight' setting in the Color option pane didn't
-  work.
-
-- Fixed possible ClassCastException if a 'paste previous' string started
-  with the text "<html>". Swing has a weird feature where any text label
-  beginning with <html> is rendered using the Swing HTML engine, and
-  this would trip it off.
-
-- HyperSearch inside a selection did not handle ^ and $ in regular
-  expressions correctly on the first or last line of the selection.
-
-- Insertion of { and } in C-like modes can now be undone in one step.
-
-- Another indentPrevLine regexp fix. (Alexander Maryanovsky)
-
-+ API Changes:
-
-- It is no longer necessary to define labels for dockable window
-  -toggle actions. The label is now automatically created by appending
-  "(Toggle)" to the non-toggle action's label.
-
-- Old-style dockable window API no longer supported; the following
-  symbols have been removed:
-
-  EditBus.addToNamedList() method
-  EditBus.removeFromNamedList() method
-  EditBus.getNamedLists() method
-  CreateDockableWindow class
-  DockableWindow interface
-
-* Version 4.1pre1
-
-Thanks to Alexander Maryanovsky, Alfonso Garcia, Claude Eisenhut,
-Joseph Schroer, Kris Kopicki, Steve Snider and Thomas Dilts for
-contributing to this release.
-
-+ Editing Changes:
-
-- Improved rectangular selection. It now does the right thing with hard
-  tabs, and the width of the selection is no longer limited to the width
-  of the last line. A new 'Vertical Paste' command has been added (it
-  behaves in a similar manner to the 'Virtual Paste' macro, which has
-  now been removed). When inserting text into a rectangle, the inserted
-  text is left-justified with spaces. The quick copy feature has been
-  extended to support this -- a Control-middle click vertically pastes
-  the most recently selected text.
-
-- Fixed auto-indent behavior when entering constructs like:
-  if(foo)
-    bar();
-  baz();
-  in Java/C/C++/etc modes. Previously the 'baz();' would get an
-  unnecessary level of indent, requiring it to be removed manually.
-  (Alexander Maryanovsky)
-
-- Added an option to the 'Text Area' pane to implement "standard"
-  previous/next word behavior, like that in a lot of other programs
-  (next word moves caret to start of next word, instead of end of
-  current word; previous word moves caret to end of previous word,
-  instead of start of current word).
-
-  You might remember I implemented this behavior for a little while in
-  the 4.0 pre-releases, but now it's back as a configurable option.
-  (Alexander Maryanovsky)
-
-- Added a few extra key bindings for Windows users:
-  S+DELETE bound to cut
-  C+INSERT bound to copy
-  S+INSERT bound to paste
-
-- Optimized the several parts of the buffer code; this should make
- 'Replace All' and similar edit-intensive tasks much faster.
-
-+ Search and Replace Changes:
-
-- HyperSearch now respects rectangular selections. 'Replace All' already
-  supported rectangular selections.
-
-- Directory search is now VFS-aware; however it shows a confirm dialog
-  before doing a search on a remote filesystem. If your VFS is not
-  affected by network latency, you can have the getCapabilities() method
-  return the new LOW_LATENCY_CAP capability.
-
-- Tool bars no longer take up the full width of the view. This saves
-  some screen space.
-
-- Clicking 'Cancel' or closing the search and replace dialog box no
-  longer shows warnings about empty filesets, etc.
-
-+ Syntax Highlighting Changes:
-
-- More intelligent highlighting of numbers. Instead of hard-coded
-  heuteristic that only worked for C-like languages, numbers are now
-  highlighted as follows:
-  - A keyword consisting of only digits is automatically marked with the
-    DIGIT token type.
-  - If it has a mix of digits and letters, it is marked as DIGIT of it
-    matches the regexp specified in the rule set's DIGIT_RE attribute.
-    If this attribute is not set, then mixed sequences of digits and
-    letters are not highlighted.
-  - In Java mode, for example, the default value of this regexp is
-    "(0x[[:xdigit:]]+|[[:digit:]]+)[lLdDfF]?".
-
-- EOL_SPAN elements can now have DELEGATE attributes.
-
-- SEQ elements can now have DELEGATE attributes. If specified, this rule
-  set will be swapped in after the text matched by the sequence rule.
-
-- Delegates to rulesets with TERMINATE rules should work now.
-
-- IGNORE_CASE attribute of KEYWORDS rule removed. This value is now the
-  same as the IGNORE_CASE attribute of the parent RULES tag.
-
-- WHITESPACE rule no longer necessary in mode definitions.
-
-- It is no longer necessary to define <SEQ TYPE="NULL"> rules for
-  keyword separator characters. Now, any non-alphanumeric character,
-  that does not appear in a keyword string or the "noWordSep"
-  buffer-local property is automatically treated like it had a sequence
-  rule.
-
-- Added FORTRAN syntax highlighting (Joseph Schroer)
-  Added Interilis syntax highlighting (Claude Eisenhut)
-  Updated PL-SQL mode (Steve Snider)
-  Updated NetRexx mode (Patric Bechtel)
-
-- HTML and related edit modes now correctly highlight sequences like:
-
-  <SCRIPT LANGUAGE="JavaScript">...</SCRIPT>
-  <SCRIPT ... whatever ...>...</SCRIPT>
-
-  Previously only JavaScript between <SCRIPT> and </SCRIPT> was
-  highlighted. A similar change has been made for <STYLE> tags.
-
-- Improved loading time of plain text files if 'more accurate syntax
-  highlighting' is on.
-
-+ User Interface Changes:
-
-- Status bar looks somewhat different now, and shows the word wrap mode
-  and line separator status.
-
-- The search bar commands now show the search bar if it is hidden.
-  Search bars that come into existence as a result of this have an
-  extra close box button on the right. Pressing ESCAPE in the text field
-  or clicking the button hides the search bar.
-
-  I have renamed the search bar setting in the General option pane to
-  "Always show search bar", and made it be switched off by default.
-  You can revert to the old behavior simply by switching this setting
-  back on.
-
-- The text color and style used to show the "[n lines]" string can now
-  be set independently of the EOL marker color.
-
-- Plugin manager window can be closed by pressing Escape.
-
-- Open buffers are shown with a different icon in the file system
-  browser.
-
-- 'I/O Progress Monitor' window is dockable now.
-
-- Added two new sub-menus to the Utilities menu, 'jEdit Home Directory'
-  and 'Settings Directory'. These two work in a similar fashion to the
-  'Current Directory' menu.
-
-  Also the 'Current Directory' menu (and these two new menus) now also
-  lists directories; selecting a directory menu item opens it in the
+- Removed File->Insert File command. As before, you can still invoke
+  File->Open and select "Insert" from a file's right-click menu in the
   file system browser.
 
-- Moved BeanShell evaluation commands from 'Utilities' to 'Macros' menu,
-  rearranged 'Edit' menu.
+- Added "Display Actions" macro (Lee Turner).
 
-- New splash screen, about box, and tool bar icons. (Kris Kopicki)
+- Wrote "What's new in jEdit 4.2" document.
 
-- Added ColorWellButton control. Under Mac OS X, changing the background
-  color of a JButton doesn't work if the MacOS Adaptive look and feel is
-  in use... so I wrote a custom control. It looks better and eliminates
-  duplicated code anyway. Plugin developers, please use this instead of
-  the widely-copied and pasted JButton trick. (Kris Kopicki)
+}}}
+{{{ Syntax Highlighting
 
-- Added RolloverButton control. Use this instead of the JToolBar
-  "isRollover" client property (which only works in the Metal L&F unless
-  you're running Java 2 version 1.4). (Kris Kopicki)
+- Added MoinMoin syntax highlighting (Ollie Rutherfurd).
 
-+ OS-specific Changes:
+- Added Relax NG compact syntax highlighting (Randy Hudson).
 
-- MacOS plugin version 1.2.1 adds an option pane with a few settings,
-  and some bug fixes and cleanups. (Kris Kopicki)
+- Minor fix to Perl heredoc syntax highlighting (Chris Petersen).
 
-- When running on MacOS, the roots: filesystem now lists all disks
-  mounted under /Volumes. (Kris Kopicki)
+- Updated ADPL syntax highlighting (Randolf Mock)
 
-- On Unix, the installer now defaults to installing in the user's home
-  directory when running as a non-root user.
+- Added Renderman-RIB syntax highlighting (Alessandro Falappa).
 
-+ Miscellaneous Changes:
+- Added PowerDynamo syntax highlighting (Ben Williams).
 
-- WheelMouse plugin integrated into core -- no need to install a
-  separate plugin to get wheel mouse scrolling under Java 2 version 1.4.
+- Added WebSphere MQ scripting syntax highlighting (Aaron Bell).
 
-- Added SOCKS proxy support. This option will help people trapped behind
-  a Microsoft Proxy Server configured to use NTLM authentication.
-  Normal HTTP connections through the proxy would not be possible since
-  Java does not implement this proprietary protocol; however a little
-  known fact is that MS Proxy Server also usually runs a SOCKS service
-  that does not require a password. (Alfonso Garcia)
+- Added squid.conf syntax highlighting (Kris Kopicki).
 
- - BeanShell 1.2b6 included. Changes since 1.2b5 are:
+}}}
+{{{ Platform Specific
 
-  - Made bsh.Parser public and added a main() method allowing users to
-    call the parser on files for simple validity checking.
-  - Made a small addition to grammar to provide an option to retain
-    formal (javadoc style) comments in the parse tree.
-  - Fixed accessibility bug in finding fields.
-  - Fixed scoping on catch blocks such that untyped variables in the
-    catch parameter do not leak out of the block. They now act as they
-    would with a declared type in Java (local).
-  - Fixed some thread safety bugs with try/catch blocks.
-  - Fixed Interpreter serialization issue - reset streams.
-  - Fixed bug in accessibility affecting access to package hidden
-    superclasses.
-  - Exposed bsh.BshMethod and added a public invoke() method.
-  - Added getMethods() method to namespace to enumerate methods.
+- MacOS plugin now supports services (Kris Kopicki).
 
-  The fact that BshMethod is now public has facilitated optimizations
-  which improve performance of BeanShell search and replace.
+}}}
+{{{ Bug Fixes
 
-- Updated printing code (Thomas Dilts)
-  - Uses Java 2 version 1.4 print dialogs when running on that Java
-    version
-  - Performs printing in a background thread
+- Fixed NullPointerException on startup which prevented jEdit from
+  loading if a corrupted JAR file was present in one of the jars
+  directories.
 
-- Documentation is now generated using DocBook-XSL 1.51.1 stylesheets.
+- Dropping a file onto the text area did not work if the text area was
+  read-only.
 
-+ Bug Fixes:
+- On Windows, MiscUtilities.constructPath() would fail if the parent
+  path was a URL and the child path started with a \.
 
-- Select Open File; press Enter first; then choose a file to open. Bang,
-  an error message. Now fixed.
+- On Windows, MiscUtilities.constructPath() would return a path with a
+  double backslash if the parent used / as a separator, and ended with a
+  /.
 
-- When closing a file with unsaved changes, the file will now stay open
-  if the save failed. Previously it would be closed and the unsaved
-  changes would be lost forever.
+- UTF16 files with a byte order mark were not being detected due to a
+  regression in pre6.
 
-- If 'Keep Dialog' was off, the search dialog would close, even after an
-  unsuccessful HyperSearch. This was inconsistent with the bahavior for
-  normal searches, where an unsuccessful match did not close the dialog
-  (so you could correct the search string easier).
+- The history code now tries very hard not to write a malformed
+  ~/.jedit/history file.
 
-- The 'initially collapse folds with level' setting was not being
-  honored when reloading files.
+- Fixed a slowdown of 5-7 seconds on startup in some cases that results
+  from calling GraphicsDevice.getConfigurations().
 
-- A few printing bugs fixed. (Thomas Dilts)
+- The list of words in the "Complete Word" window was not sorted.
 
-- Workaround for views not being brought to front on windows. This
-  workaround minimises and then restores the view, so a minimise
-  animation might be visible for a brief period of time. However,
-  there is no other way of fixing this. (Alexander Maryanovsky)
+- Fixed a race condition where the text area would throw a
+  NullPointerException if EditPane.setBuffer() was called twice in a row
+  with buffers that were not yet loaded.
 
-- Dynamic menus (Recent Files, etc) did not work under MacOS X if the
-  menu bar was at the top of the screen. Note that this does not solve
-  the other problem with having the menu bar there, namely keyboard
-  shortcuts not being displayed. For now, leave the menu bar inside the
-  frame for best results. (Kris Kopicki)
+- Loading and unloading plugins that added menu items to the file system
+  browser did not update the file system browser's "Plugins" menu.
 
-- Fixed silly windows backup saving bug.
+- History lists were not being saved at all unless the history file
+  existed in the first place!
 
-- Fixed minor problem when Control-clicking characters in the text area.
+- The "Shortcuts" option pane will no longer refuse to display with
+  various malformed plugins.
 
-- A single invalid file system browser coloring regular expression no
-  longer stops the remaining expressions from being loaded.
+- An entry for inform.xml was missing from the mode catalog file.
 
-- Fixed a bug in the undo request merging code that would occur
-  sometimes when multiple consecutive pieces of text were removed one
-  after the other.
+- Removing from the before the first visible line to inside the visible
+  region threw an exception.
 
-- Fixed a bug in the undo request merging code that would occur when
-  a selection was replaced with some text.
+- Fixed NullPointerException when pressing PageUp/PageDown inside a
+  collapsed fold.
 
-- If the splash screen was disabled, running jEdit with the -nogui and
-  -nobackground command line arguments didn't work, because the AWT
-  event thread was never started, because no GUI calls were made, and as
-  a result jEdit exited immediately after starting up instead of
-  entering the event loop.
+- Sometimes, multiple line insertions did not update the screen line
+  count of newly inserted lines. This would result in the scroll bar
+  value being incorrect until you went to the end of the buffer and back
+  again.
 
-- Fixed erronous assignment in VFS browser code that would cause
-  NullPointerExceptions after opening a file in a new view.
+- Using the TextTools plugin's "Transpose Lines" command in the first
+  line of a collapsed fold would cause the folding state to be
+  incorrectly updated, resulting in exceptions and an unusable text
+  area.
 
-- Triple-clicking on the last line of a file printed an
-  ArrayIndexOutOfBoundsException.
+- When performing a text removal that would put the first visible line
+  inside an invisible region, the chunk cache would be updated
+  prematurely so the invisible line would be visible, and trying to
+  move the caret to it would throw exceptions.
 
-- One of the tips of the day referred to an invalid URL.
+- GZipped files were not being loaded correctly.
 
-- Previously, the filesystem browser opens the clicked directory if
-  clickCount == 2. This doesn't work if you double click once and then
-  immediate double click again on a directory (or a file) at the same
-  physical location, because the 2nd double click is reported with a
-  click count of 3 and 4. (Alexander Maryanovsky)
+- Opening an XML file that specified an invalid encoding name in the
+  <?xml?> processing instruction would throw an exception. Now, XML
+  files that specify an invalid encoding are opened with the default
+  encoding.
 
-- The help viewer should no longer open behind the view when jEdit is
-  run for the first time on some Java implementations.
+- Changed default shortcut of "Find Previous" from C+h to C+e g since on
+  Mac OS X, C+h is always captured by the OS.
 
-- StatusBar.MemoryIndicator.removeNotify() was missing a
-  super.removeNotify() call. This could cause 'InputContext' errors when
-  exiting jEdit. (Alexander Maryanovsky)
+- Changing the wrap mode didn't invalidate screen line counts, this
+  could result in scrolling getting messed up.
 
-- The plugin manager did not delete downloaded files from the
-  'PluginManager.download' directory on some operating systems, due to a
-  missing close() call.
+- Fixed NullPointerException when right-clicking on a drive root in the
+  file system browser on Windows.
 
-- JEditTextArea.goToEndOfLine() (bound to END if 'smart home/end' is
-  off, or END END if its on) followed by goToNextLine() would move the
-  cursor to the first column.
+- Fixed floppy drive access when selecting a floppy drive in the drives
+  list on Windows.
 
-- Preview_Javadoc_of_Buffer.bsh macro used the deprecated
-  DockableWindowManager.getDockableWindow() method.
+- Fixed a problem on some Windows versions where going to the drives
+  list would display an error message from the OS.
 
-- Text area would not automatically scroll to the caret location when
-  working with multiple views under certain circumstances.
+- A display manager that is not associated with a visible buffer no
+  longer tries to maintain state; instead everything is recalculated
+  when it becomes visible. This fixes a whole class of bugs that would
+  manifest usually as incorrect scrolling behavior after switching
+  buffers.
 
-- Middle mouse button drags now work if there is an existing selection.
+- The Utilities->Action Bar command would only work once.
 
-+ API Changes:
+- Scrolling would jump if electric scrolling was off when moving the
+  caret past the first or last visible line, if they were only partially
+  visible due to soft wrapping.
 
-- Two methods added to jEdit class:
-  getDoubleProperty()
-  setDoubleProperty()
+- Fixed scrolling inconsistencies after collapsing a fold with soft wrap
+  switched on.
 
-- Removed unused TextUtilities.findMatchingBracket(Buffer buffer,
-  int line, int offset, int startLine, int endLine) method.
+}}}
+{{{ API Changes
 
-- New ViewUpdate.EDIT_PANE_CHANGED message added; it is sent when a
-  different edit pane in a split view receives focus.
+- MiscUtilities.getFileExtension() now works with path names too.
 
-- EBMessage.veto(), isVetoable() methods and EBMessage.NonVetoable class
-  deprecated.
+- Removed BufferListener.wrapModeChanged() method.
 
-- Removed old text area highlighter API, old buffer folding API.
+}}}
 
-- Removed BufferUpdate.ENCODING_CHANGED, FOLD_HANDLER_CHANGED messages;
-  replaced with generic BufferUpdate.PROPERTIES_CHANGED.
+}}}
 
-- MultiSelectStatusChanged message removed.
+{{{ Version 4.2pre6
 
-- Buffer.markTokens(int lineIndex) deprecated; use
-  Buffer.markTokens(int lineIndex, TokenHandler tokenHandler) instead,
-  with one of the available TokenHandler implementations from
-  org.gjt.sp.jedit.syntax.
+Thanks to Magnus Henriksson, Mirco Bova, Ollie Rutherfurd, and
+Stephen Bartlett for contributing to this release.
 
-  The tokenizer now behaves differently with respect to whitespace. Tab
-  characters are always put into separate tokens with type Token.TAB;
-  other whitespace gets token type Token.WHITESPACE.
+{{{ Syntax Highlighting
 
-- Added new jEdit.getActiveView() method.
+- Added Apache httpd.conf syntax highlighting (Ollie Rutherfurd).
 
-- VFS file chooser now supports a new 'CHOOSE_DIRECTORY_DIALOG' mode.
+- Improved Scheme syntax highlighting (Stephen Bartlett).
 
-- Buffer.getRuleSetAtOffset() method is now public.
+- Improved MS-DOS batch file syntax highlighting (Mirco Bova).
+
+- Added MCS51 (8051) microcontroller assembly syntax highlighting
+  (Mirco Bova).
+
+- Updated XSLT syntax highlighting (Magnus Henriksson).
+
+}}}
+{{{ Miscellaneous
+
+- Pressing TAB with a rectangular selection now inserts a tab at the
+  appropriate column, instead of shifting indent to the right.
+
+- Added Up/Down arrows to the file system browser's colors option pane.
+  This lets you change the order that file names are matched against the
+  patterns in the list.
+
+- Collapsed/expanded arrow icons in file system browser should now look
+  good with a dark background as well (Kris Kopicki).
+
+- The option for what to do when files change on disk in the General
+  pane of the Utilities->Global Options dialog box is now tri-state:
+
+  - Do nothing
+  - Prompt
+  - Automatically reload
+
+  The first and last options correspond to the previous setting in
+  4.2pre5. The second option is similar to the behavior in jEdit 4.1,
+  except all changed buffers are listed in one dialog box.
+
+- Edit->Complete Word now completes words in all visible buffers (ie,
+  showing in at least one edit pane). So as a poor man's CodeAid, you
+  can open a text file listing Java classes and methods in a zero-height
+  split.
+
+- The plugin manager now has better handling of loading and unloading
+  plugins with dependencies.
+
+- jEdit now attempts to auto-detect the encoding of XML files by looking
+  for an <?xml ... encoding="..." ?> processing instruction on the first
+  line of the file. Note that if this processing instruction is present,
+  an encoding selected in the File->Open dialog box is ignored.
+
+- jEdit will now refuse to load a plugin if some of the JAR files listed
+  in its 'jars' property are missing.
+
+- Added a few macros to the base distribution (Ollie Rutherfurd).
+
+}}}
+{{{ Bug Fixes
+
+- Fixed problems with structure matching when soft wrap is on, if the
+  structure spans more than one screen line (for example, this can
+  happen with the tag matcher in the XML plugin).
+
+- If 'Complete Word' was bound to TAB, pressing TAB would show the popup
+  and immediately hide it.
+
+- File drag and drop actually works now (so you should now remove the
+  DragAndDrop plugin. Having it installed causes all dropped text to be
+  copied, instead of moved.)
+
+- Fixed a problem highlighting C preprocessor directives containing <.
+
+- Batch mode didn't recognize @rem as a comment.
+
+- The multiple results toggle in the HyperSearch results window was not
+  being saved.
+
+- International keys should once again work on JVMs that send AltGR
+  sequences as Control+Alt (which is completely broken).
+
+- Buffer.getPriorNonEmptyLine() did not access segments properly. This
+  caused obscure problems with auto-indent.
+
+- Fixed more problems with symbolic link handling in the file system
+  browser.
+
+- Fixed long-standing race condition in file system browser that could
+  prevent a directory listing from being updated after a file was
+  created, removed or renamed.
+
+- Changes made in the Docking option pane only took effect after a
+  restart.
+
+- Fixed minor problem with digit handling in the Complete Word popup.
+
+- Fixed problem with repeating user input in the action bar.
+
+- Made it so that site properties are loaded just before user
+  properties. This allows the look and feel to be changed via the site
+  properties.
+
+- Fixed a problem with Replace All over rectangular selections where
+  only the first occurrence would be replaced.
+
+- If a duplicate copy of a plugin was installed, opening the Shortcuts
+  option pane could throw an exception.
+
+- The Plugin Options dialog box can still be opened if initialization of
+  an option pane fails.
+
+- The key event workaround would ignore a KEY_TYPED event with the AltGR
+  modifier that followed a KEY_PRESSED with a keyCode of \0. This is
+  incorrect, and broke international key handling.
+
+- Changing the buffer sorting options, or having untitled files would
+  would cause the wrong buffers to be restored on startup.
+
+- Fixed a problem with inserting text at the beginning of a fold line.
+
+- The behaviour of shift-clicking inside an existing selection did not
+  work in 4.2pre5.
+
+- Selecting the "Install" or "Update" tab in the plugin manager no
+  longer shows a modal dialog, since on some systems this would cause a
+  beep.
+
+- After opening a new file, the scroll bars would still reflect the
+  previous buffer's state while the new file was being loaded.
+
+- If a Replace All failed (for example, because the regular expression
+  was invalid) the wait cursor would linger in the search and replace
+  dialog box.
+
+- If a buffer listed in the 'files on changed' dialog box was closed,
+  clicking it in the list would cause problems.
+
+- When editing a buffer in more than one text area, changing the last
+  token of a line (for example, by inserting the start of a comment on
+  that line) would not update subsequent lines in some cases.
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre5
+
+Thanks to Ollie Rutherfurd, Peter Lundqvist and Silas Smith for
+contributing to this release.
+
+{{{ Syntax Highlighting
+
+- Updated Icon syntax highlighting (Silas Smith).
+
+- Updated Pike syntax highlighting (Peter Lundqvist).
+
+- The "if" in #include <net/if.h> is no longer highlighted in C and C++
+  modes.
+
+- SCRIPT tags in HTML files no longer recognize <?php ... ?>.
+
+}}}
+{{{ Miscellaneous Changes
+
+- Drag and drop in the text area. You can disable this in the Mouse pane
+  of the Global Options dialog box. The functionality of the DragAndDrop
+  plugin (handling files dropped from your operating system's file
+  manager) has been incorporated too.
+
+- Files that don't exist on disk are no longer saved in the perspective
+  (Ollie Rutherfurd).
+
+- The end of a fold is now indicated in the gutter.
+
+- Added "Plugin Options" button to plugin manager.
+
+- Pressing a non-alphanumeric character with the 'Complete Word' popup
+  showing now inserts the currently selected entry first, instead of
+  just closing the popup and then inserting the entered character.
+
+- If there are several search results in one line, clicking the line in
+  the HyperSearch Results window now selects all occurrences, not just
+  the first one.
+
+- If regular expressions are on, the search bar now shows an error
+  message instead of silently failing if you attempt a reverse search
+  with S+ENTER (reverse search with regular expressions is not
+  supported).
+
+- Added an option for disabling the confirmation dialog box shown by the
+  "Save All Buffers" command.
+
+- When running on Java 2 version 1.4, jEdit now uses NIO APIs to obtain
+  a list of supported file encodings. On Java 2 version 1.3, the same
+  hard-coded list of encodings is offered as before.
+
+- The Docking option pane has been reintroduced since a number of people
+  preferred the old docking style (the new direct manipulation still
+  works of course).
+
+}}}
+{{{ Bug Fixes
+
+- Fixed international keys on MacOS X.
+
+- "Multiple results" button in the HyperSearch Results window did not
+  work correctly.
+
+- Line number shown in status bar when matching brackets was off by one.
+
+- Fixed some usability issues with the "Search in selection" setting in
+  the Find dialog box.
+
+- Directory search settings were being reset when a search flag was
+  changed.
+
+- Fixed handling of space bar which could result in extra spaces being
+  inserted when using dead keys.
+
+- Fixed NullPointerException sometimes thrown when scrolling to the line
+  after the last visible line with electric scrolling switched off.
+
+- Fixed problems such as ArrayIndexOutOfBoundsExceptions or the
+  beginning of the buffer becoming inaccessible when expanding the last
+  fold in a buffer.
+
+- Pressing ENTER at the end of a collapsed fold line now properly
+  expands the fold.
+
+- Setting indentOpenBrackets and indentCloseBrackets to ( and ) didn't
+  work, this broke Lisp auto indent.
+
+- When text editing moves the caret out of the visible region, jEdit
+  only scrolls the text area if its active, so that editing with a split
+  view does not scroll the inactive text area's caret into the visible
+  region. However the logic for handling this case in jEdit 4.2 was
+  flawed and even selecting a command from a menu would not cause
+  scrolling.
+
+- "Searching..." message in HyperSearch window did not go away if the
+  file set contained no files.
+
+- jEdit will no longer fail to start if the user properties file could
+  not be loaded.
+
+- Fixed a few cosmetic bugs in the Global Options dialog box.
+
+- In some cases changing between text and BeanShell replace mode would
+  not take effect.
+
+- Clicking "Replace and Find" or "Replace All" in Search dialog will now
+  beep if no search string is entered, instead of using the last search
+  string.
+
+- Text insertion while overwrite mode is on is now recorded correctly in
+  macros.
+
+- Collapsing or expading nodes in the file system browser would deselect
+  the node. This was a usability problem since pressing LEFT or RIGHT
+  should not deselect anything.
+
+- The labels of -toggle and -float actions for dockables were not being
+  set correctly.
+
+- Triple clicking to select a line did not place the line in the %
+  register.
+
+- Various combinations of insertions and removes could mess up floating
+  positions.
+
+- "Run Temporary Macro" no longer runs the temporary macro file from
+  disk if the buffer is not open.
+
+- Inserting text at the end of the buffer did not update the vertical
+  scroll bar in other text areas viewing the same buffer.
+
+- Fixed an exception thrown when narrowing to a range where the first or
+  last line was the first or last line of the buffer.
+
+- Various combinations of insertions and removes could mess up the fold
+  visibility map.
+
+- The up/down arrow keys, delete line, expand/collapse fold and a few
+  other commands might not have put the caret in the right place if
+  horizontal scrolling was involved.
+
+- AElred (the XML parser used by jEdit) would bomb if an XML element
+  contained more than twice the text of the current I/O buffer size.
+  When it ran out of the room, the I/O buffer was always doubled even if
+  the text to be inserted was more than this length.
+
+- Restored the jEdit 4.1 behavior of consuming key events that are bound
+  to an action. So now you can bind A+f to a command, and pressing A+f
+  will execute the command without popping up the File menu.
+
+- The text area's screen line cache was not invalidated on buffer
+  changes. This caused rare and obscure problems like bracket matching
+  and the caret showing up in the wrong place.
+
+- Incorporated BeanShell 1.3final, which fixes a bug with static field
+  access.
+
+- _REGEXP syntax rules that matched strings containing whitespace did
+  not display in some circumstances.
+
+- The file system browser would not refresh, and edit modes would not be
+  reloaded, if the paths in question contained symbolic links.
+
+- "Join Lines" no longer prints an exception if the buffer is read only.
+
+- Fixed NullPointerException being thrown when clicking tool bar buttons
+  in a file dialog box with no associated view.
+
+- Fixed NullPointerException when pressing RIGHT at the end of a line
+  with rectangular selection mode on.
+
+- The "Save As" dialog box no longer completes file names on the fly.
+  Press TAB to complete file names. This was done since previously it
+  was impossible to save to a file named "jjj.sss" if there was a file
+  "jjj.sss.xxx" already in the destination directory.
+
+}}}
+{{{ API Additions
+
+- Icon theme support. Pass a URL to GUIUtilities.setIconPath() and all
+  icons will be loaded from that URL prepended to the icon name.
+
+- Added BeanShell.runScript(View view, String path, Reader in,
+  NameSpace namespace) method. Also added a corresponding _runScript()
+  method.
+
+}}}
+{{{ API Changes
+
+- Within an event listener, Buffer.isTransactionInProgress() always
+  returns true, and transactionComplete() is now always called on each
+  event listener after every buffer change. As far as I know, no plugins
+  use the transaction API so this should not affect anyone.
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre4
+
+Thanks to Chris Morris, Marcelo Vanzin, Ryan Fowler and Ryan Grove for
+contributing to this release.
+
+{{{ Syntax Highlighting
+
+- Updated NSIS2 syntax highlighting (Ryan Grove).
+
+- Modes from the user catalog file are checked first for a matching
+  first line or file name glob (Ryan Fowler).
+
+- Updated Ruby syntax highlighting (Chris Morris).
+
+- Updated Pike syntax highlighting (Peter Lundqvist).
+
+}}}
+{{{ Scripting
+
+- BeanShell 1.3b2 is now included. Improvements since 1.3a1 (which was
+  included with jEdit 4.2pre3) include:
+
+  - Properties style auto-allocation of variables.
+
+    // foo is initially undefined
+    foo.bar.gee = 42; 
+    print( foo.bar.gee ); // 42
+
+  - Scripted class support (with class keyword). Limitations:
+
+    - Scripted classes may only extend other scripted classes
+    - implement clauses are currently ignored
+    - All Scripted classes appear as type bsh.This - they are
+      effectively the same type of object.
+
+  - The bsh.system object which is shared across Interpreter instances
+    has been renamed "bsh.shared".  For backwards compatability it is
+    still referenced as bsh.system as well.
+
+  - All scripted objects now implement the standard object protocol of
+    toString(), hashcode() and equals().
+
+  - Various bug fixes and optimizations.
+
+- Actions and dockables are now invoked in their own temporary
+  namespace. This prevents memory leaks in code like this:
+
+  antfarm = wm.getDockable("antfarm");
+  antfarm.foo();
+  // reference to 'antfarm' remains in global namespace, possibly
+  // after the dockable is closed
+
+}}}
+{{{ Miscellaneous
+
+- Removed the "synchronized scrolling" option which hasn't actually
+  worked since 4.2pre1 or 4.2pre2. If you liked this feature, you can
+  write a plugin that does the same thing pretty easily.
+
+- The kill ring is saved between editing sessions.
+
+- The Latest Version plugin now shows the latest stable and development
+  version numbers, previously it only showed the latest development
+  version.
+
+}}}
+{{{ Optimizations
+
+- Faster regular expression search and replace.
+
+}}}
+{{{ Bug Fixes
+
+- Changing the no modifier click action for the gutter didn't work.
+
+- The 'jedit' script was not being created on Unix.
+
+- Fixed AltGR key on certain JVMs that send it as Control+Alt.
+
+- Regular expression replace didn't work with certain regular
+  expressions.
+
+- When deep indent is on, indentation of code like this is handled a bit
+  better:
+
+  if(foo
+     bar)
+  {
+
+  However it is still not 100% correct.
+
+- Added an option for the "deep indent" setting to the Editing option
+  pane.
+
+- "Save as" did not update the buffer map properly if buffer sorting was
+  switched off, or if symbolic links were involved.
+
+- Heredocs in PHP are <<< not <<.
+
+- Position tree update code had several problems, and this caused hangs
+  and various exceptions.
+
+- jEdit would do a two-stage save for settings files, but it would still
+  delete the old file if the save failed, thus settings could be lost of
+  the disk is almost full, etc. Now, files are only overwritten if the
+  new settings are saved successfully.
+
+- Fixed possible NullPointerException in Shortcuts option pane when a
+  newly-installed plugin contains dockables but no actions.
+
+- Using the Global Options dialog box or anything else that calls
+  jEdit.propertiesChanged() no longer clears the kill ring.
+
+- Escape sequences in the replace string (\n, \t) didn't work properly.
+
+- When viewing the favorites: URL, the full path of the entries is now
+  shown, just like in 4.1.
+
+- The Favorites menu in the file system browser was sorted by entry
+  name, but full paths were listed, so it looked like there was no order
+  to it at all.
+
+- Fixed bogus DIRTY_CHANGED messages sent when loading a buffer with
+  persistent markers.
+
+- The numeric keypad didn't work on JDK 1.3.
+
+- Apparently OS/2 Java has a broken File.getCanonicalPath()
+  implementation, so we don't call this method on that OS.
+
+- Reload command now works with Untitled files.
+
+- If a virtual file system threw an exception other than an IOException,
+  the file system browser would refuse to perform further operations
+  with an "I/O already in progress" message.
+
+- Fixed Perl syntax highlighting for variable names that began with
+  s, m, q or tr followed by a non-alphanumeric character.
+
+}}}
+{{{ API Changes
+
+- SearchMatcher.nextMatch() returns an instance of SearchMatcher.Match
+  instead of a two-element integer array.
+
+- Added jEdit.getPlugin(String name, boolean loadIfNecessary) method
+  (Marcelo Vanzin).
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre3
+
+Thanks to Brad Mace, Brant Langer Gurganus, Christoph Daniel Schulze,
+Jonathan Revusky, Ken Turner, Kris Kopicki and Ollie Rutherfurd for
+contributing to this release.
+
+{{{ Editing
+
+- The kill ring no longer shows duplicate entries, or entries that
+  consist entirely of whitespace.
+
+- Added emacs-like "deep indent" which can be enabled using the
+  deepIndent buffer-local property:
+
+  fooBar(baz,
+         moreParameters,
+	 ...); (Brad Mace)
+
+- Just like the Find Previous command, S+ENTER in the search bar now
+  shows an error message if regular expression search is enabled.
+  Previously it would just search forward.
+
+- The "Format Paragraph" command now shows an error message instead of
+  just beeping if the wrap margin is not set.
+
+- The "Paste Previous" and "Paste From List" dialog boxes now show the
+  selected item in a multiple-line text area (Ollie Rutherfurd).
+
+}}}
+{{{ Syntax Highlighting
+
+- Added LOTOS syntax highlighting (Ken Turner).
+
+- Added SDL/PL syntax highlighting (Ken Turner).
+
+- Added IMPORT element to RULES tag. All rules from the ruleset named
+  by the required attribute DELEGATE are copied into this ruleset.
+
+- Improved Velocity syntax highlighting.
+
+- Added TPL syntax highlighting (Brant Langer Gurganus).
+
+- Added UnrealScript syntax highlighting (Christoph Daniel Schulze).
+
+- Updated FreeMaker syntax highlighting (Jonathan Revusky).
+
+- Updated Pyrex syntax highlighting (Ollie Rutherfurd).
+
+}}}
+{{{ User Interface
+
+- Activity Log now autoscrolls when dragging the mouse outside the log
+  area bounds.
+
+- Docked window menu buttons should now look better on MacOS X.
+
+- When closing a buffer, the previous buffer is now selected, not the
+  first buffer. The code that does this was actually there all along,
+  but it never worked and I didn't notice (it would just go to the first
+  buffer).
+
+- On Windows, entering X:\ or X:/ where X is a drive letter will
+  automatically list that drive so that further paths can be completed.
+  This is similar to how on Unix entering / opens the root directory.
+
+- Improved 'Choose Directory' dialog box.
+
+- A warning dialog box is now shown if nothing is selected in the text
+  area and the "search in selection" setting is activated.
+
+}}}
+{{{ Plugin Manager
+
+- The plugin manager now lists JARs that do not contain a plugin core
+  class.
+
+- A warning is shown when updating a plugin from a version using the old
+  API to a version using the new API, advising the user to restart
+  jEdit.
+
+- The plugin manager no longer removes an existing plugin if downloading
+  of an update failed.
+
+}}}
+{{{ Optimizations
+
+- Fixed a performance regression from pre2. Opening large files with
+  soft wrap off should now be as fast (or faster) than 4.1.
+
+- Fixed delays when exiting editor if help viewer and/or plugin manager
+  windows were open.
+
+- jEdit.getBuffer() now uses a hashtable instead of a linear scan.
+
+- Optimized away some redundant code in the display manager, which
+  should result in improved performance.
+
+- Search dialog should open a little bit faster. This fixes the issue
+  where if you press C+f and type a search string really quickly,
+  characters would be inserted in the text area.
+
+- Undo queue is now stored in a linked list, rather than an array. As
+  offensive as it might sound, the array was being shifted along one
+  position for each (non-compound) edit! Especially if the undo limit
+  was set to a large value this could cause slowdowns.
+
+- The buffer no longer grabs a write lock when calculating a fold level
+  or syntax tokens for a line. This should prevent the text area from
+  stalling if the buffer is being saved in an I/O thread.
+
+- Fixed a performance regression from pre2. If all line contexts were
+  valid, a subsequent request for a line's syntax tokens would
+  invalidate all contexts from that line onwards. This did not happen if
+  for example all but one context was valid.
+
+- Faster directory listing in the file system browser.
+
+- Fixed slowdown if activity log was docked and the "tail" option was on
+  in Java 1.3.
+
+- Floating positions are now stored in a more efficient data structure
+  allowing operations to be performed in logarithmic time. This improves
+  performance with plugins that create a lot of positions, such as XML
+  and anything using ErrorList.
+
+}}}
+{{{ Bug Fixes
+
+- Fixed NullPointerException when loading plugins if opened buffers
+  contained an invalid 'folding' property.
+
+- Fixed NullPointerException when invoking Complete Word in an edit mode
+  that did not define a keyword map.
+
+- Selecting 'Close' from a cloned dockable's popup menu closed the wrong
+  window.
+
+- Plugin manager window did not have the same icon as all other jEdit
+  windows.
+
+- "What's new in jEdit 4.2" document was missing from the download due
+  to a packaging error.
+
+- "Highlight every n lines" color setting in Gutter option pane didn't
+  work properly.
+
+- Plugin manager hardcoded the table foreground color to black, this
+  could make the table unreadable if the text area background was dark
+  and "use jEdit text area colors in all text controls" was on.
+
+- EOL_SPAN_REGEXP rules threw NullPointerExceptions.
+
+- Plugins that failed to load were not marked as such, and showed up as
+  "Loaded" in the plugin manager.
+
+- Added a workaround for a MacOS X Java bug where renaming a file to
+  contain a path to a non-existent directory would delete the file.
+
+- It is now possible to rename a file to another name that only differs
+  in case on Windows.
+
+- If "Ignore Case" was on, searching for strings containing certain
+  characters (such as Unicode 0x00df) did not work since
+  String.toUpperCase() sometimes mangles the string in various ways.
+  Processing the string with Character.toUpperCase() doesn't seem to do
+  this.
+
+- The "Abbreviations" option pane now correctly handles expansions with
+  duplicate abbreviations.
+
+- An undoable edit is no longer merged if there is a pending redo. This
+  would cause the undo queue to become inconsistent.
+
+- Changed input modifier mapping on MacOS X.
+
+  C+ is the Command key as before
+  A+ is now the Control key
+  M+ is no longer bound!
+
+  A+ used to be the Option key however this caused problems such as
+  special characters on international keyboards triggering jEdit
+  shortcuts; for example, Option+' inserts # on an Italian keyboard, and
+  jEdit would pick this up as A+QUOTE which is bound to "Scroll Page
+  Up".
+
+- Fixed NullPointerException when clicking in text area in a soft
+  wrapped line that was but off at the bottom.
+
+- Fixed NullPointerException when scrolling to a line that was longer
+  than the visible area.
+
+- Added a workaround for a problem with the Toolkit class which is
+  non-reentrant on the Solaris JDK. This could cause a segmentation
+  fault on jEdit startup.
+
+- Fixed a problem in the text offset to screen line conversion. It
+  usually manifested itself in the form of the "disappearing selection"
+  bug; if only part of the first line was visible due to scrolling and a
+  selection began in the part that was not visible, painting the
+  selection would throw an exception which would result in the selection
+  extension being removed from the text area.
+
+- Printing is no longer done in a background thread, and now blocks the
+  UI, due to various thread-safety problems.
+
+- Printing a range of pages would always print starting from the first
+  page.
+
+- jEdit didn't compile with Java 2 version 1.3.
+
+- Invalid delegates in syntax mode files could throw exceptions.
+
+- "Spaces to Tabs" was broken.
+
+- Added a workaround for the print spacing problem on some Java
+  versions. Note that this results in much larger spool files. Enable in
+  Utilities->Global Options->Printing.
+
+- Added a workaround for buggy/incomplete implementations of JDK 1.4
+  printing API. Now you can force use of the JDK 1.3 API when running on
+  1.4. Enable in Utilities->Global Options->Printing.
+
+- Re-introduced jEdit 3.2.2-style Unix window geometry workarounds. If
+  you saw problems like dialog boxes getting smaller each time they were
+  opened, etc, let me know if this fixes them.
+
+- Fixed hang if a mode contains regular expression rules that match a
+  zero-width string.
+
+- The jEditLauncher configuration is no longer updated if installing a
+  new jEdit release over an old one with the jEditLauncher de-selected
+  in the installer.
+
+- When searching for text, jEdit tries a little harder to make sure the
+  search occurrence is visible if the text area needs to be scrolled
+  horizontally.
+
+- When using TAB to move focus from the buffer switcher, or search bar,
+  etc. it should eventually end up in the text area, instead of getting
+  stuck.
+
+- Simplified key event workaround code. Let me know if you encouter any
+  problems (such as garbage being inserted in the text area when certain
+  keys are pressed, etc.)
+
+- File dialog's completion was case sensitive when the TAB key was
+  pressed. This was inconsistent with all other completion behavior
+  which was case insensitive.
+
+- File names that ended with a colon (:) were being treated like URLs
+  even if there was no VFS named by the string before the colon. This
+  made it impossible to open files named "foo:".
+
+- Docking areas can no longer be resized beyond visible bounds if the
+  "alternate tool bar layout" setting is off.
+
+- Fixed a problem where the status bar would throw errors about negative
+  array offsets if a buffer change resulted in the text area being
+  scrolled.
+
+- Glob patterns of the form {!{a,b,c}} didn't work properly.
+
+- Browser actions were incorrectly written in the resource cache, so for
+  example the FTP plugin's menu in the file system browser did not work.
+
+- The install directory setting of the plugin manager didn't work.
+
+- Refactored key dispatching code should make alternative keyboard
+  layouts work better on MacOS X.
+
+- gnu.regexp has rather strange substitution behavior, which caused
+  problems with some SPAN_REGEXP's.
+
+- Dialog box for confirming plugin removal now lists the JAR files to be
+  removed in a scrolling list, this fixes the problem of the dialog
+  getting too large in some cases.
+
+- Fix a minor UI layout problem with the style editor dialog box of the
+  Syntax Highlighting option pane.
+
+- Fixed exception when reloading a buffer if a marker was set beyond the
+  location where the buffer ends on disk.
+
+- Fixed problem with table columns in the file system browser resizing
+  incorrectly when a node was collapsed.
+
+- Redoing a remove did not clear the buffer's modified flag if
+  necessary.
+
+- Fixed status bar display for prefixes longer than three keys.
+
+- Pressing TAB in the action bar on JDK 1.3 would cause it to lose
+  focus.
+
+- Glob patterns containing + caused exceptions to be thrown.
+
+- "Select Line Range" now respects the multiple selection setting.
+
+- When installing updates, dependencies are now correctly installed
+  (Kris Kopicki).
+
+}}}
+{{{ API Changes
+
+- TokenHandler.handleToken() method now takes a Segment instance as
+  the first parameter.
+
+- Direct construction of SearchDialog no longer possible due to internal
+  changes. The SearchDialog.showSearchDialog() method that has been
+  recommended since jEdit 4.0 still works.
+
+- Buffer.setReadOnly() can be used to make a buffer read only even if
+  the file is writable on disk.
+
+- Added JEditTextArea.addTopComponent() method (Brad Mace).
+
+- Case-sensitivity is now determined on a per-filesystem basis, instead
+  of always being on when running on Windows or MacOS X. To have your
+  VFS be case-insensitive, define the CASE_INSENSITIVE_CAP.
+
+- Added generic structure matching API for presenting the user a
+  consistent interface for bracket matching, XML tag matching, BEGIN/END
+  matching, etc.
+
+  Simply write an implementation of StructureMatcher and add it to the
+  text area with JEditTextArea.addStructureMatcher().
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre2
+
+Thanks to Carmine Lucarelli, Matt Albrecht, Ollie Rutherfurd and
+Sebastien Pierre for contributing to this release.
+
+{{{ Editing
+
+- "Complete Word" now inserts the longest common prefix if there is more
+  than one possible completion (the popup is still displayed as well).
+
+- Added Ignore Case (C+e C+i) and Regular Expressions (C+e C+x) commands
+  to Search menu for changing search bar settings from the keyboard.
+
+- Incremental Search Bar and HyperSearch Bar commands now always
+  disregard the selection. Use Incremental Search for Word and
+  HyperSearch for Word commands if you want to search for the selected
+  text.
+
+- Made behavior of auto indent caused by "Insert Tab and Indent",
+  "Insert Enter and Indent", and "Indent Selected Lines" commands is
+  more consistent.
+
+- Register commands now list registers, and marker commands now list
+  markers with shortcuts in the status bar.
+
+- Added Edit->More Clipboard->Paste Deleted (C+e C+y) command. Similar
+  to Paste Previous, it lists recently deleted strings.
+
+- Quick copy now works between text areas.
+
+- Paste Previous dialog box now supports multiple selection.
+
+}}}
+{{{ File System Browser
+
+- The favorites list can contain files now.
+
+- Added a Utilities->Favorites menu.
+
+- The expansion triangles are now flush with the icon. Previously they
+  were vertically aligned which was inconsistent with Swing JTrees.
+
+- Added "Copy Path Name" command to file system browser's right-click
+  menu.
+
+}}}
+{{{ Syntax Highlighting
+
+- Updated Inform syntax highlighting (Matt Albrecht).
+
+- Added S+ syntax highlighting (Matt Albrecht).
+
+- Added Io syntax highlighting (Sebastien Pierre).
+
+- Added Pyrex syntax highlighting (Ollie Rutherfurd).
+
+- Added Erlang syntax highlighting (Ollie Rutherfurd).
+
+}}}
+{{{ User Interface
+
+- The Global Options dialog box has been rearranged a little. There are
+  two new panes, Autosave & Backup, and View. The Loading & Saving pane
+  has been removed.
+
+- "Copy" button in Activity Log window now copies entire log if nothing
+  is selected.
+
+- Added "Remove All Nodes" button to HyperSearch Results window
+  (Carmine Lucarelli).
+
+- Removed "Go to Text Area" (C+e C+e) action. "Scroll to Current Line"
+  (C+e C+j) now sends focus to the text area, and also expands the
+  current fold if the caret is not visible.
+
+- The block caret is now drawn as a hollow box. Previously it was drawn
+  as a filled box using XOR paint mode, but the XOR paint mode caused
+  problems on some Java versions and was slightly slower.
+
+- New gutter mouse behavior for brackets:
+
+  C-click on a bracket scope selects the scope.
+  A-click on a bracket scope narrows to the scope.
+
+  These were changed to be consistent with the behavior when clicking on
+  a fold.
+
+- Previously, jEdit would remember the caret position for the 50 most
+  recent files, and the File->Recent Files menu would list the same
+  number of entries as the history text field setting. Now, a single
+  recent files setting in the General pane of the Global Options
+  controls both.
+
+- A change makes the buffer history use a linked list instead of an
+  array to store entries. However, since Java provides no way to iterate
+  backwards over a linked list, this results in the recent file list
+  being stored backward from how it was in previous versions. So when
+  upgrading from 4.2pre1 or older, your oldest files will be at the top
+  of the list.
+
+}}}
+{{{ Plugin Loader
+
+- The plugin manager now loads plugins immediately after they are
+  installed if they are using the jEdit 4.2 plugin API, and unloads
+  plugins when removing and updating. Note that a restart is still
+  required after updating from a jEdit 4.1 version of a plugin to the
+  4.2 plugin, but future updates do not require a restart.
+
+- Added an option to Global Options->Plugin Manager to leave the
+  downloaded ZIP archives in ~/.jedit/PluginManager.download.
+
+- If a plugin failed to load, its actions, dockables, etc are no longer
+  visible from the UI.
+
+}}}
+{{{ Scripting Changes
+
+- BeanShell 1.3a1 included. This release features improved error
+  reporting, code cleanups and minor bug fixes.
+
+- For some reason the search and replace code was hard-coded to auto
+  wrap around if it was run from a macro. I'm not sure what the original
+  rationale for this was, but it has been changed to always respect the
+  auto wrap flag.
+
+- "Evaluate For Selected Lines" can now be recorded in a macro.
+
+}}}
+{{{ Optimizations
+
+- Fold visibility information is now stored in a more efficient manner.
+  Folding should be faster and more robust. Also, the limit of 8 text
+  areas editing the same buffer has been lifted.
+
+- Various minor display manager optimizations.
+
+}}}
+{{{ Bug Fixes
+
+- It was possible to open multiple plugin manager instances from the
+  "Plugin Error" dialog box.
+
+- Fixed selection issue when right-clicking on a file system browser
+  window.
+
+- The file system browser would report files larger than 1 megabyte as
+  being an order of magnitude smaller, eg 13 kilobytes instead of 13
+  megabytes.
+
+- Changing the folding mode to "none" did not work correctly.
+
+- Changing from a syntax highlighting mode to text mode did not
+  invalidate line contexts.
+
+- The file system browser's "Open in" menu didn't work.
+
+- Toggle menu items did not show up as such when a plugin was
+  constructed from the summary cache.
+
+- -nobackground command-line switch did not actually work.
+
+- Title bar "modified" indicator was not displayed for recovered
+  autosave files.
+
+- jEdit never closed streams of XML files being read in. This bug has
+  been there for ages, however its not too major since the stream
+  objects would get garbage collected and closed eventually.
+
+- Fixed incorrect handling of buffer modification flag in undo code.
+
+- No longer print an exception if the clipboard contains a zero-length
+  string.
+
+- The file system browser might not have been updated correctly after
+  moving a file from one expanded branch to the root.
+
+- Right-clicks in the empty space below the file list should work now.
+
+- Fixed possible NullPointerException on MacOS X in the OperatingSystem
+  class.
+
+- Various fixes for dynamic plugin loading.
+
+- Changing the plugin download mirror had no effect on an open plugin
+  manager window.
+
+- Fixed popup menu positioning.
+
+- Fixed possible corruption of the undo queue due to a regression in
+  pre1.
+
+- Fixed some problems with symbolic links.
+
+- Collapsing a directory in a file system browser threw an exception if
+  it was the last item in the list.
+
+- Using C+e C+` shortcut to close dockables didn't work because the view
+  would send focus to the text area after C+e was pressed. This was done
+  to correctly handle shortcuts like C+e n n while a text field had
+  focus (previously "nn" would be inserted in the field). Now, if the
+  focus was sent to the text area as a result of a prefix, it is sent
+  back to the original owner when the prefix is finished.
+
+- Fixed various file system browser completion problems.
+
+- PHP mode's inline script ruleset was missing a commentEnd property.
+
+- Plugins which provided a dockables.xml file but no actions.xml could
+  not be invoked, since the action set was only added if the actions.xml
+  file was present.
+
+- Disabled CS+click to narrow to a bracket scope since it didn't
+  actually work.
+
+- DynamicMenuUpdate messages only worked for top-level menus.
+
+- TAB didn't work in the action bar if there was nothing entered (it is
+  supposed to list all actions.)
+
+- Fixed obscure problem with work thread code where an AWT request added
+  from another AWT request could be executed before I/O is complete.
+
+- Fixed repainting problem when removing text from the last line of a
+  buffer with soft wrap on.
+
+- Selecting "Search in Directory" from the file system browser's
+  Commands menu with a file selected was supposed to set the directory
+  search filter to that file's extension, however this didn't work.
+
+- Fix a problem with "Indent Selected Lines" on text like the following:
+
+    if(foo)
+        bar();
+    if(baz) {
+        quux();
+    }
+
+- Fixed possible exceptions thrown when the buffer is narrowed to a
+  range, and with the caret outside this range.
+
+- Action bar's action list wasn't updated if plugins were added or
+  removed at runtime.
+
+}}}
+{{{ API Additions
+
+- Added a new dynamic menu API, so that plugins using the 4.2 plugin API
+  can provide dynamic menus. Simply write an implementation of
+  org.gjt.sp.jedit.menu.DynamicMenuProvider
+
+- EditPlugin.start() is always called from the AWT thread now.
+
+- Added a method to bsh.NameSpace:
+
+  addCommandPath(String path, Class clas)
+
+  You can call this on BeanShell.getNameSpace(). BeanShell will search
+  for resources named path + methodName + ".bsh" in the class loader of
+  the given class when an undeclared method is invoked. Plugins can use
+  this to provide additional scripting commands, the Console plugin uses
+  this for example.
+
+- Added a new method to TextAreaExtension class:
+
+  public void paintScreenLineRange(Graphics2D gfx, int firstLine,
+    int lastLine, int[] physicalLines, int[] start, int[] end,
+    int y, int lineHeight)
+
+  This method paints a whole bunch of lines at once, instead of one at a
+  time, so it should be more efficient for plugins like Background and
+  ErrorList.
+
+  See javadoc for parameter documentation.
+
+- Added long-missing DefaultInputHandler.removeKeyBinding() method.
+
+- Added AbstractOptionPane.addComponent(Component comp, int fill)
+  method.
+
+- Virtual file systems can now show arbitriary columns in the file
+  system browser.
+
+  - Use the VFS constructor that accepts a String[] of extended
+    attribute names. You can use the canned names (EA_TYPE, EA_STATUS,
+    EA_SIZE, EA_MODIFIED) or add your own. If you add your own, you
+    must also define properties "vfs.browser.<extended attribute name>".
+
+  - Then, write a VFS.DirectoryEntry subclass that overrides
+    getExtendedAttribute(). Return instances of this class in
+    _getDirectoryEntry() and _listDirectory().
+
+}}}
+
+}}}
+
+{{{ Version 4.2pre1
+
+Thanks to Bill McMilleon, Kasper Graversen, Kris Kopicki,
+Oliver Rutherfurd, Rudi Widmann and Ryan Grove for contributing to this
+release.
+
+{{{ Editing
+
+- Quick copy now more consistent with usual mouse behavior:
+
+  - Control-middle-clicking on a bracket will insert the contents of the
+    bracketed block at the caret position.
+
+  - Shift-middle-clicking at a point will insert text from the caret to
+    the point at the caret position. Can be used to duplicate a line,
+    for example.
+
+- Register contents are now saved across editing sessions in
+  ~/.jedit/registers.xml.
+
+- Complete Word popup now has keyboard shortcuts (1 - 0) for inserting
+  the first 10 elements in the list.
+
+- Entering a prefix while a JTextComponent has focus will move focus to
+  the text area. This allows shortcuts like C+e n n to be used from the
+  search bar and such without having to prefix them with C+e C+e first.
+
+- Control-Shift-click on a bracket scope in the gutter or a bracket in
+  the text area narrows to that scope.
+
+- Previously setting the wrap margin to zero with soft wrap on would
+  wrap to the width of the text area. This is no longer supported.
+
+- The text area now scrolls by screen lines, not by physical lines, when
+  soft wrap is enabled. The previous behavior resulted in simpler code
+  but was extremely counter-intuitive.
+
+- Right-clicking in the text area with no selection (or if multiple
+  selection mode is enabled) moves the caret to the clicked line before
+  displaying the popup menu (Rudi Widmann).
+
+- Control-clicking beyond the end of a line inserts the appropriate
+  amount of white space and moves the caret there (Rudi Widmann).
+
+}}}
+{{{ Rectangular Selection
+
+- Edit->More Selection->Rectangular Selection (A+\) enables rectangular
+  selection mode:
+
+  - Dragging with the mouse or using keyboard selection commands creates
+    rectangular selections.
+
+  - A status bar indicator has been added for this mode.
+
+  - Clicking beyond the end of the line inserts the appropriate amount
+    of white space and moves the caret there (just like when Control is
+    held down, see above).
+
+- Changed vertical paste behavior. Now if the rectangle we are inserting
+  into has more lines than the pasted text, the pasted text cycles
+  through the rectangle. Previously, it would be inserted at the top
+  with the remaining lines blank. The new behavior is very convinient;
+  for example, you can select a zero-width rectangle and paste "final"
+  to mark a set of variables in Java source as being final.
+
+- Entering text while a zero-width rectangular selection is active now
+  shifts the selection horizontally.
+
+}}}
+{{{ Syntax Highlighting
+
+- A new default color scheme.
+
+- Added a few more token types: COMMENT3, COMMENT4, LITERAL3, LITERAL4,
+  KEYWORD4.
+
+- AT_LINE_START, AT_WORD_START and AT_WHITESPACE_END attributes can now
+  be set independently for BEGIN and END tags of a SPAN.
+
+- The default background color of a token is now the background color of
+  the current ruleset's default token type. It now only defaults to the
+  text area background if the ruleset's default token type does not have
+  a background color. This matters because for example if COMMENT2 has a
+  background but MARKUP does not, HTML markup in Javadocs now has the
+  same background as the rest of the comment.
+
+- Any groups matched by a SPAN_REGEXP's BEGIN sequence are substituted
+  into any positional parameters in the END sequence. This allows
+  read-ins to be properly handled in languages like Shell Script, PHP,
+  and Perl.
+
+- Added NO_ESCAPE attribute to SPAN and SPAN_REGEXP rules. This allows
+  C# literals (@"...") to be highlighted correctly.
+
+- Added JCL and SAS syntax highlighting (Bill McMilleon).
+
+- Improved C pre-processor syntax highlighting.
+
+- Updated NSIS2 syntax highlighting (Ryan Grove).
+
+- Parrot syntax highlighting (Oliver Rutherfurd).
+
+- Aspect-J syntax highlighting (Kasper Graversen).
+
+}}}
+{{{ Folding
+
+- Different syntax styles are used for collapsed fold lines with
+  different fold levels. Fold levels 1, 2 and 3 have distinct styles,
+  and all higher levels are assigned another style.
+
+- Alt-clicking on a fold triangle in the gutter narrows to that fold.
+
+}}}
+{{{ Action Bar
+
+- Utilities->Action Bar (shortcut C+ENTER) shows the action bar, for
+  quickly invoking editor commands and changing settings from the
+  keyboard.
+
+- Enter an action name (or a substring) to invoke that action.
+
+- Press TAB for a completion popup.
+
+- Enter a repeat count then invoke an action using any means to repeat
+  that action.
+
+- Enter "buffer.<prop>=<value>" to set the buffer-local property
+  <prop> to <value>; for example, "buffer.tabSize=4" changes the
+  curent buffer's tab size to 4.
+
+- Enter "!buffer.<prop>=<value>" to set a buffer property on a global
+  basis; for example, "!buffer.tabSize=4" changes the default tab size
+  for all buffers to 4.
+
+- Buffer-local properties are documented in the user's guide.
+
+- Enter "<prop>=<value>" to set any other global property; for
+  example, "view.showToolbar=false" hides the tool bar.
+
+- Note that global property names are undocumented, so this feature is
+  primarily for plugin developers. You can get a list using the
+  Misc->Properties->jEdit Properties macro.
+
+}}}
+{{{ File System Browser
+
+- The file system view now shows file attributes such as type, status,
+  size and modification date.
+
+- Re-added "Filter in file dialogs is current buffer extension" option
+  that used to be present in jEdit 4.0.
+
+- Added "Show menu bar" option.
+
+- Improved completion in file dialogs. Completion in the field is now
+  case-insensitive, and the full path is not inserted into the field
+  unless you press TAB.
+
+- Added option to make the default directory the working directory of
+  the jEdit process.
+
+}}}
+{{{ User Interface
+
+- If regular expressions are enabled, Search->Find Previous now shows a
+  dialog box message instead of silently searching forwards.
+
+- Added an option to Appearance option pane to control menu spillover
+  (default is 20 items).
+
+- The title bar now indicates if the current buffer has been modified
+  since the last save.
+
+- Moved plugin option panes to a new Plugins->Plugin Options dialog box.
+
+- Improved window docking.
+
+  - Floating windows now have a bar across the top with a menu for
+    docking the window.
+
+  - Right-clicking on a docked window button shows a menu for undocking
+    the window, opening a cloned instance, and moving it to another
+    docking area.
+
+  - Docking pane of Global Options dialog box removed because it is no
+    longer necessary.
+
+- Added Utilities->Repeat Last Action command, bound to C+SPACE.
+
+- jEdit now remembers if more than one view was open, and if the view
+  was split.
+
+}}}
+{{{ Miscellaneous
+
+- Symbolic links are no longer resolved in buffer path names. Opening
+  two buffers both pointing to the same file on disk is still not
+  allowed.
+
+- If buffers have changed on disk, instead of asking for each one, they
+  are all listed in a single dialog box. Also, if the buffer is not
+  dirty, it is reloaded automatically.
+
+}}}
+{{{ Command Line
+
+- Added a few new command line parameters, documented in jedit -usage:
+
+  -gui
+  -newplainview
+  -newview
+  -nobackground
+  -plugins
+  -quit
+  -restore
+  -reuseview
+  -startupscripts
+  -wait
+
+}}}
+{{{ Optimizations
+
+- New "deferred loading" plugin API. Plugins must be updated for this,
+  however existing plugins continue to work (with no performance
+  improvement). jEdit's startup time remains constant (+/- some
+  milliseconds) regardless of how many plugins using the new API are
+  installed.
+
+- Faster buffer loading.
+
+- Faster activity log.
+
+- Bracket matching is now only performed 200ms after the last caret
+  movement. This should solve the problem of annoyingly slow response
+  when eg, inserting a number of characters before an unclosed bracket
+  near the beginning of a large source file.
+
+- Bracket matching now only scans up to 10,000 lines.
+
+- Consecutive "chunks" with the same style attributes were previously
+  merged when a line was being painted, for improved performance. Now we
+  take this one step further and merge them when putting a line's chunk
+  list in the cache. This should improve scrolling performance,
+  especially when smooth text is on.
+
+- jEdit now performs much better when very long lines are present in a
+  buffer.
+
+- A funky little display optimization with monospaced fonts is now
+  performed. In jEdit 4.1 this could be enabled with a hidden property,
+  but now we detect if a monospaced font is actually in use. If this
+  causes display problems, please let me know about it and put this in a
+  startup script:
+
+  Debug.DISABLE_MONOSPACE_HACK = true;
+
+- Faster line insertion and removal when there are collapsed folds below
+  the insertion point.
+
+- Faster painting of tokens with background colors. Previously if tokens
+  defined a background color, there was a noticable lag when scrolling
+  for example (at least with Java 1.4.1 on Linux). This no longer
+  happends.
+
+- Faster buffer transactions if both soft wrap and narrowing is active.
+
+- Faster search and replace where the search or replace string matches
+  on multiple lines.
+
+- Dockable window resizing is now done with a "rubber band", instead of
+  live updates of the dockable container's size. This improves
+  responsiveness of resizing noticably.
+
+- When dragging with the mouse, the text area now autoscroll at a rate
+  proportional to how far away the mouse is from the edge of the area.
+
+}}}
+{{{ Platform-Specific
+
+- MacOS plugin version 3.0 now requires Java 1.4.1. All native calls now
+  use the Cocoa API, and a dock menu has been added. The dock menu
+  provides similar functionality to the plugin menu (Kris Kopicki).
+
+- Background mode is now enabled by default on MacOS, since this is the
+  platform convention.
+
+- Added compatibility with Java 1.4.2 beta's GTK look and feel. Note
+  that the look and feel itself is quite buggy, at least with the 1.4.2
+  beta.
+
+- The installer should now work on VMS.
+
+}}}
+{{{ Bug Fixes
+
+- jEdit no longer minimizes and then restores windows when files are
+  opened through the edit server on windows. This was done to work
+  around an apparent bug in the Windows JRE. If you still experience the
+  problem, there is a hidden property that can be set with the action
+  bar:
+
+  C+ENTER server.brokenToFront=true
+
+- Some HTTP proxies decompress GZip streams for whatever reason. The
+  plugin manager now checks if the stream starts with the GZip magic
+  characters; if not, it parses it without decompression, instead of
+  throwing an exception.
+
+- Multiple monitors should work properly now (Kris Kopicki).
+
+- Selecting "Search in Directory" from the right-click menu of a
+  directory in the parent directories list would search in the wrong
+  directory.
+
+- Fixed problems with bracket matching not being activated when
+  switching between split panes.
+
+- Not all keyboard shortcuts worked in the Complete Word popup.
+
+- Closing a view did not close any cloned dockable windows.
+
+- Page Up/Page Down commands now scroll by the correct amount when soft
+  wrap is on.
+
+- Fixed I/O thread deadlock that could manifest when using the FTP
+  plugin.
+
+- Fixed initial position of options dialog box divider.
+
+- If the default edit mode had a tab size of 8, and the global default
+  was 4, a buffer-local property specifying a tab size of 8 would be
+  ignored.
+
+- "Spaces To Tabs" didn't work with non-leading tabs.
+
+- C+e v ENTER and C+e v TAB still did auto indent, instead of inserting
+  a literal ENTER and TAB like the documentation says.
+
+- Pressing ENTER with nothing selected in the File->Open dialog box no
+  longer closes the dialog box.
+
+- Nested { and } work in globs now.
+
+- Fixed problem with EOL_SPAN delegating to a ruleset with a
+  NO_LINE_BREAK rule.
+
+- Fixed horizontal scrolling when creating a rectangular selection in
+  virtual space.
+
+- Clicking in the text area before the buffer is loaded no longer throws
+  exceptions.
+
+}}}
+{{{ API Changes
+
+- You can a detailed guide on what has been broken, and what has been
+  added, in doc/news42/index.html.
+
+- The following plugins are known to be broken:
+
+  Background
+  Console
+  ErrorList
+  JDiff
+  WhiteSpace
+  SideKick
+  Templates
+  Vimulator
+  XML
+
+- Also, a lot of plugins that depend on ErrorList and Console will fail
+  to load, even if they are not broken themselves. So don't panic if you
+  see a huge list of plugin errors on startup; most of them won't need
+  fixing.
+
+}}}
+
+}}}
 
 jEdit buffer local properties:
 :wrap=hard:maxLineLen=72:indentSize=2:
+:folding=explicit:collapseFolds=2:

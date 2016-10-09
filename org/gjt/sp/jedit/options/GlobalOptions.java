@@ -66,53 +66,30 @@ public class GlobalOptions extends OptionsDialog
 		// initialize the jEdit branch of the options tree
 		jEditGroup = new OptionGroup("jedit");
 
-		addOptionPane(new AbbrevsOptionPane(), jEditGroup);
-		addOptionPane(new AppearanceOptionPane(), jEditGroup);
-		addOptionPane(new ContextOptionPane(), jEditGroup);
-		addOptionPane(new DockingOptionPane(), jEditGroup);
-		addOptionPane(new EditingOptionPane(), jEditGroup);
-		addOptionPane(new GeneralOptionPane(), jEditGroup);
-		addOptionPane(new GutterOptionPane(), jEditGroup);
-		addOptionPane(new LoadSaveOptionPane(), jEditGroup);
-		addOptionPane(new PrintOptionPane(), jEditGroup);
-		addOptionPane(new FirewallOptionPane(), jEditGroup);
-		addOptionPane(new ShortcutsOptionPane(), jEditGroup);
-		addOptionPane(new StatusBarOptionPane(), jEditGroup);
-		addOptionPane(new SyntaxHiliteOptionPane(), jEditGroup);
-		addOptionPane(new TextAreaOptionPane(), jEditGroup);
-		addOptionPane(new ToolBarOptionPane(), jEditGroup);
-		addOptionGroup(jEditGroup, rootGroup);
+		jEditGroup.addOptionPane("abbrevs");
+		jEditGroup.addOptionPane("appearance");
+		jEditGroup.addOptionPane("auto-back");
+		jEditGroup.addOptionPane("context");
+		jEditGroup.addOptionPane("docking");
+		jEditGroup.addOptionPane("editing");
+		jEditGroup.addOptionPane("general");
+		jEditGroup.addOptionPane("gutter");
+		jEditGroup.addOptionPane("mouse");
+		jEditGroup.addOptionPane("print");
+		jEditGroup.addOptionPane("plugin-manager");
+		jEditGroup.addOptionPane("firewall");
+		jEditGroup.addOptionPane("shortcuts");
+		jEditGroup.addOptionPane("status");
+		jEditGroup.addOptionPane("syntax");
+		jEditGroup.addOptionPane("textarea");
+		jEditGroup.addOptionPane("toolbar");
+		jEditGroup.addOptionPane("view");
+		rootGroup.addOptionGroup(jEditGroup);
 
 		browserGroup = new OptionGroup("browser");
-		addOptionPane(new BrowserColorsOptionPane(), browserGroup);
-		addOptionPane(new BrowserOptionPane(), browserGroup);
-		addOptionGroup(browserGroup, rootGroup);
-
-		// initialize the Plugins branch of the options tree
-		pluginsGroup = new OptionGroup("plugins");
-
-		// Query plugins for option panes
-		EditPlugin[] plugins = jEdit.getPlugins();
-		for(int i = 0; i < plugins.length; i++)
-		{
-			EditPlugin ep = plugins[i];
-			try
-			{
-				ep.createOptionPanes(this);
-			}
-			catch(Throwable t)
-			{
-				Log.log(Log.ERROR, ep,
-					"Error creating option pane");
-				Log.log(Log.ERROR, ep, t);
-			}
-		}
-
-		// only add the Plugins branch if there are OptionPanes
-		if (pluginsGroup.getMemberCount() > 0)
-		{
-			addOptionGroup(pluginsGroup, rootGroup);
-		}
+		browserGroup.addOptionPane("browser.general");
+		browserGroup.addOptionPane("browser.colors");
+		rootGroup.addOptionGroup(browserGroup);
 
 		return paneTreeModel;
 	} //}}}
@@ -120,12 +97,11 @@ public class GlobalOptions extends OptionsDialog
 	//{{{ getDefaultGroup() method
 	protected OptionGroup getDefaultGroup()
 	{
-		return pluginsGroup;
+		return null;
 	} //}}}
 
 	//{{{ Private members
 	private OptionGroup jEditGroup;
 	private OptionGroup browserGroup;
-	private OptionGroup pluginsGroup;
 	//}}}
 }

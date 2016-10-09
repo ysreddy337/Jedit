@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2001, 2002 Slava Pestov
+ * Copyright (C) 2001, 2003 Slava Pestov
  * Portions copyright (C) 2002 Thomas Dilts
  *
  * This program is free software; you can redistribute it and/or
@@ -38,7 +38,7 @@ import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.*;
 //}}}
 
-class BufferPrintable extends WorkRequest implements Printable
+class BufferPrintable implements Printable
 {
 	//{{{ BufferPrintable constructor
 	BufferPrintable(PrinterJob job, Object format,
@@ -58,18 +58,30 @@ class BufferPrintable extends WorkRequest implements Printable
 			jEdit.getIntegerProperty("print.fontsize",10),color);
 		styles[Token.NULL] = new SyntaxStyle(textColor,null,font);
 
+		// Change any white text to black
+		for(int i = 0; i < styles.length; i++)
+		{
+			SyntaxStyle s = styles[i];
+			if(s.getForegroundColor().equals(Color.WHITE)
+				&& s.getBackgroundColor() == null)
+			{
+				styles[i] = new SyntaxStyle(
+					Color.BLACK,
+					styles[i].getBackgroundColor(),
+					styles[i].getFont());
+			}
+		}
+
 		lineList = new ArrayList();
 
-		softWrap = new SoftWrapTokenHandler();
+		tokenHandler = new DisplayTokenHandler();
 	} //}}}
 
-	//{{{ run() method
-	public void run()
+	//{{{ print() method
+	public void print()
 	{
 		try
 		{
-			// can't use a read lock here since Buffer.markTokens()
-			// grabs a write lock
 			//buffer.readLock();
 
 			if(format == null)
@@ -108,37 +120,47 @@ class BufferPrintable extends WorkRequest implements Printable
 	public int print(Graphics _gfx, PageFormat pageFormat, int pageIndex)
 		throws PrinterException
 	{
-		if(pageIndex > currentPage + 1)
+		// we keep the first non-null frc we get, since sometimes
+		// we get invalid ones on subsequent pages on Windows
+		if(frc == null)
+		{
+			frc = ((Graphics2D)_gfx).getFontRenderContext();
+			Log.log(Log.DEBUG,this,"Font render context is " + frc);
+		}
+
+		Log.log(Log.DEBUG,this,"Asked to print page " + pageIndex);
+		Log.log(Log.DEBUG,this,"Current page is " + currentPage);
+
+		if(pageIndex > currentPage)
 		{
 			for(int i = currentPage; i < pageIndex; i++)
 			{
+				Log.log(Log.DEBUG,this,"Current physical line is now " + currentPageStart);
+				currentPhysicalLine = currentPageStart;
 				printPage(_gfx,pageFormat,i,true);
 			}
 
 			currentPage = pageIndex - 1;
+			Log.log(Log.DEBUG,this,"Current page is now " + currentPage);
 		}
 
 		if(pageIndex == currentPage + 1)
 		{
 			if(end)
 			{
-				view.getStatus().setMessage(null);
+				Log.log(Log.DEBUG,this,"The end");
 				return NO_SUCH_PAGE;
 			}
 
 			currentPageStart = currentPhysicalLine;
+			Log.log(Log.DEBUG,this,"#2 - Current physical line is now " + currentPageStart);
 			currentPage = pageIndex;
+			Log.log(Log.DEBUG,this,"#2 - Current page is now " + currentPage);
 		}
 		else if(pageIndex == currentPage)
 		{
 			currentPhysicalLine = currentPageStart;
-
-			// show the message in both the view's status bar, and the
-			// I/O progress monitor
-			Object[] args = new Object[] { new Integer(pageIndex + 1) };
-			String message = jEdit.getProperty("view.status.print",args);
-			view.getStatus().setMessage(message);
-			setStatus(message);
+			Log.log(Log.DEBUG,this,"#3 - Current physical line is now " + currentPageStart);
 		}
 
 		printPage(_gfx,pageFormat,pageIndex,true);
@@ -177,13 +199,16 @@ class BufferPrintable extends WorkRequest implements Printable
 	private LineMetrics lm;
 	private ArrayList lineList;
 
-	private SoftWrapTokenHandler softWrap;
+	private FontRenderContext frc;
+
+	private DisplayTokenHandler tokenHandler;
 	//}}}
 
 	//{{{ printPage() method
 	private void printPage(Graphics _gfx, PageFormat pageFormat, int pageIndex,
 		boolean actuallyPaint)
 	{
+		Log.log(Log.DEBUG,this,"printPage(" + pageIndex + "," + actuallyPaint + ")");
 		Graphics2D gfx = (Graphics2D)_gfx;
 		gfx.setFont(font);
 
@@ -191,6 +216,9 @@ class BufferPrintable extends WorkRequest implements Printable
 		double pageY = pageFormat.getImageableY();
 		double pageWidth = pageFormat.getImageableWidth();
 		double pageHeight = pageFormat.getImageableHeight();
+
+		Log.log(Log.DEBUG,this,"#1 - Page dimensions: " + pageWidth
+			+ "x" + pageHeight);
 
 		if(header)
 		{
@@ -207,8 +235,7 @@ class BufferPrintable extends WorkRequest implements Printable
 			pageHeight -= footerHeight;
 		}
 
-		FontRenderContext frc = gfx.getFontRenderContext();
-
+		boolean glyphVector = jEdit.getBooleanProperty("print.glyphVector");
 		double lineNumberWidth;
 
 		//{{{ determine line number width
@@ -230,6 +257,10 @@ class BufferPrintable extends WorkRequest implements Printable
 			lineNumberWidth = 0.0;
 		//}}}
 
+		Log.log(Log.DEBUG,this,"#2 - Page dimensions: "
+			+ (pageWidth - lineNumberWidth)
+			+ "x" + pageHeight);
+
 		//{{{ calculate tab size
 		int tabSize = jEdit.getIntegerProperty("print.tabSize",8);
 		char[] chars = new char[tabSize];
@@ -240,31 +271,34 @@ class BufferPrintable extends WorkRequest implements Printable
 		PrintTabExpander e = new PrintTabExpander(tabWidth);
 		//}}}
 
-		Segment seg = new Segment();
 		double y = 0.0;
 
 		lm = font.getLineMetrics("gGyYX",frc);
+		Log.log(Log.DEBUG,this,"Line height is " + lm.getHeight());
 
 print_loop:	for(;;)
 		{
 			if(currentPhysicalLine == buffer.getLineCount())
 			{
+				Log.log(Log.DEBUG,this,"Finished buffer");
 				end = true;
 				break print_loop;
 			}
 
 			lineList.clear();
 
-			buffer.getLineText(currentPhysicalLine,seg);
-			softWrap.init(seg,styles,frc,e,lineList,
+			tokenHandler.init(styles,frc,e,lineList,
 				(float)(pageWidth - lineNumberWidth));
 
-			buffer.markTokens(currentPhysicalLine,softWrap);
+			buffer.markTokens(currentPhysicalLine,tokenHandler);
 			if(lineList.size() == 0)
 				lineList.add(null);
 
 			if(y + (lm.getHeight() * lineList.size()) >= pageHeight)
+			{
+				Log.log(Log.DEBUG,this,"Finished page before line " + currentPhysicalLine);
 				break print_loop;
+			}
 
 			if(lineNumbers && actuallyPaint)
 			{
@@ -280,10 +314,12 @@ print_loop:	for(;;)
 				Chunk chunks = (Chunk)lineList.get(i);
 				if(chunks != null && actuallyPaint)
 				{
-					Chunk.paintChunkList(seg,chunks,gfx,
+					Chunk.paintChunkBackgrounds(chunks,gfx,
 						(float)(pageX + lineNumberWidth),
-						(float)(pageY + y),
-						Color.white,false);
+						(float)(pageY + y));
+					Chunk.paintChunkList(chunks,gfx,
+						(float)(pageX + lineNumberWidth),
+						(float)(pageY + y),glyphVector);
 				}
 			}
 
@@ -296,7 +332,7 @@ print_loop:	for(;;)
 		double pageWidth, boolean actuallyPaint)
 	{
 		String headerText = jEdit.getProperty("print.headerText",
-			new String[] { buffer.getPath() });
+			new String[] { buffer.getName() });
 		FontRenderContext frc = gfx.getFontRenderContext();
 		lm = font.getLineMetrics(headerText,frc);
 

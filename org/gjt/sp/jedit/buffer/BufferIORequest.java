@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2001 Slava Pestov
+ * Copyright (C) 2000, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -35,7 +35,7 @@ import org.gjt.sp.util.*;
 /**
  * A buffer I/O request.
  * @author Slava Pestov
- * @version $Id: BufferIORequest.java,v 1.5 2003/01/28 03:07:20 spestov Exp $
+ * @version $Id: BufferIORequest.java,v 1.28 2004/08/29 02:58:43 spestov Exp $
  */
 public class BufferIORequest extends WorkRequest
 {
@@ -86,6 +86,15 @@ public class BufferIORequest extends WorkRequest
 	public static final int GZIP_MAGIC_2 = 0x8b;
 	public static final int UNICODE_MAGIC_1 = 0xfe;
 	public static final int UNICODE_MAGIC_2 = 0xff;
+	public static final int UTF8_MAGIC_1 = 0xef;
+	public static final int UTF8_MAGIC_2 = 0xbb;
+	public static final int UTF8_MAGIC_3 = 0xbf;
+
+	/**
+	 * Length of longest XML PI used for encoding detection.<p>
+	 * &lt;?xml version="1.0" encoding="................"?&gt;
+	 */
+	public static final int XML_PI_LENGTH = 50;
 	//}}}
 
 	//{{{ BufferIORequest constructor
@@ -130,6 +139,8 @@ public class BufferIORequest extends WorkRequest
 		case INSERT:
 			insert();
 			break;
+		default:
+			throw new InternalError();
 		}
 	} //}}}
 
@@ -195,34 +206,12 @@ public class BufferIORequest extends WorkRequest
 				else
 					length = 0L;
 
-				in = vfs._createInputStream(session,path,false,view);
+				in = vfs._createInputStream(session,path,
+					false,view);
 				if(in == null)
 					return;
 
-				in = new BufferedInputStream(in);
-
-				if(in.markSupported())
-				{
-					in.mark(2);
-					int b1 = in.read();
-					int b2 = in.read();
-					in.reset();
-
-					if(b1 == GZIP_MAGIC_1 && b2 == GZIP_MAGIC_2)
-					{
-						in = new GZIPInputStream(in);
-						buffer.setBooleanProperty(Buffer.GZIPPED,true);
-					}
-					else if((b1 == UNICODE_MAGIC_1 && b2 == UNICODE_MAGIC_2)
-						|| (b1 == UNICODE_MAGIC_2 && b2 == UNICODE_MAGIC_1))
-					{
-						buffer.setProperty(Buffer.ENCODING,"Unicode");
-					}
-				}
-				else if(path.toLowerCase().endsWith(".gz"))
-					in = new GZIPInputStream(in);
-
-				read(buffer,in,length);
+				read(autodetect(in),length,false);
 				buffer.setNewFile(false);
 			}
 			catch(CharConversionException ch)
@@ -314,11 +303,128 @@ public class BufferIORequest extends WorkRequest
 		}
 	} //}}}
 
-	//{{{ read() method
-	private void read(Buffer buffer, InputStream _in, long length)
-		throws IOException
+	//{{{ autodetect() method
+	/**
+	 * Tries to detect if the stream is gzipped, and if it has an encoding
+	 * specified with an XML PI.
+	 */
+	private Reader autodetect(InputStream in) throws IOException
 	{
-		IntegerArray endOffsets = new IntegerArray();
+		in = new BufferedInputStream(in);
+
+		String encoding = buffer.getStringProperty(Buffer.ENCODING);
+		if(!in.markSupported())
+			Log.log(Log.WARNING,this,"Mark not supported: " + in);
+		else if(buffer.getBooleanProperty(Buffer.ENCODING_AUTODETECT))
+		{
+			in.mark(XML_PI_LENGTH);
+			int b1 = in.read();
+			int b2 = in.read();
+			int b3 = in.read();
+
+			if(encoding.equals(MiscUtilities.UTF_8_Y))
+			{
+				// Java does not support this encoding so
+				// we have to handle it manually.
+				if(b1 != UTF8_MAGIC_1 || b2 != UTF8_MAGIC_2
+					|| b3 != UTF8_MAGIC_3)
+				{
+					// file does not begin with UTF-8-Y
+					// signature. reset stream, read as
+					// UTF-8.
+					in.reset();
+				}
+				else
+				{
+					// file begins with UTF-8-Y signature.
+					// discard the signature, and read
+					// the remainder as UTF-8.
+				}
+
+				encoding = "UTF-8";
+			}
+			else if(b1 == GZIP_MAGIC_1 && b2 == GZIP_MAGIC_2)
+			{
+				in.reset();
+				in = new GZIPInputStream(in);
+				buffer.setBooleanProperty(Buffer.GZIPPED,true);
+				// auto-detect encoding within the gzip stream.
+				return autodetect(in);
+			}
+			else if((b1 == UNICODE_MAGIC_1
+				&& b2 == UNICODE_MAGIC_2)
+				|| (b1 == UNICODE_MAGIC_2
+				&& b2 == UNICODE_MAGIC_1))
+			{
+				in.reset();
+				encoding = "UTF-16";
+				buffer.setProperty(Buffer.ENCODING,encoding);
+			}
+			else if(b1 == UTF8_MAGIC_1 && b2 == UTF8_MAGIC_2
+				&& b3 == UTF8_MAGIC_3)
+			{
+				// do not reset the stream and just treat it
+				// like a normal UTF-8 file.
+				buffer.setProperty(Buffer.ENCODING,
+					MiscUtilities.UTF_8_Y);
+
+				encoding = "UTF-8";
+			}
+			else
+			{
+				in.reset();
+
+				byte[] _xmlPI = new byte[XML_PI_LENGTH];
+				int offset = 0;
+				int count;
+				while((count = in.read(_xmlPI,offset,
+					XML_PI_LENGTH - offset)) != -1)
+				{
+					offset += count;
+					if(offset == XML_PI_LENGTH)
+						break;
+				}
+
+				String xmlPI = new String(_xmlPI,0,offset,
+				"ASCII");
+				if(xmlPI.startsWith("<?xml"))
+				{
+					int index = xmlPI.indexOf("encoding=");
+					if(index != -1
+						&& index + 9 != xmlPI.length())
+					{
+						char ch = xmlPI.charAt(index
+						+ 9);
+						int endIndex = xmlPI.indexOf(ch,
+							index + 10);
+						encoding = xmlPI.substring(
+							index + 10,endIndex);
+	
+						if(MiscUtilities.isSupportedEncoding(encoding))
+						{
+							buffer.setProperty(Buffer.ENCODING,encoding);
+						}
+						else
+						{
+							Log.log(Log.WARNING,this,"XML PI specifies unsupported encoding: " + encoding);
+						}
+					}
+				}
+
+				in.reset();
+			}
+		}
+
+		return new InputStreamReader(in,encoding);
+	} //}}}
+
+	//{{{ read() method
+	private SegmentBuffer read(Reader in, long length,
+		boolean insert) throws IOException
+	{
+		/* we guess an initial size for the array */
+		IntegerArray endOffsets = new IntegerArray(
+			Math.max(1,(int)(length / 50)));
 
 		// only true if the file size is known
 		boolean trackProgress = (!buffer.isTemporary() && length != 0);
@@ -336,8 +442,6 @@ public class BufferIORequest extends WorkRequest
 
 		SegmentBuffer seg = new SegmentBuffer((int)length + 1);
 
-		InputStreamReader in = new InputStreamReader(_in,
-			buffer.getStringProperty(Buffer.ENCODING));
 		char[] buf = new char[IOBUFSIZE];
 
 		// Number of characters in 'buf' array.
@@ -395,8 +499,8 @@ public class BufferIORequest extends WorkRequest
 					// Insert a line
 					seg.append(buf,lastLine,i -
 						lastLine);
-					endOffsets.add(seg.count);
 					seg.append('\n');
+					endOffsets.add(seg.count);
 					if(trackProgress && lineCount++ % PROGRESS_INTERVAL == 0)
 						setProgressValue(seg.count);
 
@@ -433,8 +537,8 @@ public class BufferIORequest extends WorkRequest
 						CRLF = false;
 						seg.append(buf,lastLine,
 							i - lastLine);
-						endOffsets.add(seg.count);
 						seg.append('\n');
+						endOffsets.add(seg.count);
 						if(trackProgress && lineCount++ % PROGRESS_INTERVAL == 0)
 							setProgressValue(seg.count);
 						lastLine = i + 1;
@@ -466,7 +570,15 @@ public class BufferIORequest extends WorkRequest
 		setAbortable(false);
 
 		String lineSeparator;
-		if(CRLF)
+		if(seg.count == 0)
+		{
+			// fix for "[ 865589 ] 0-byte files should open using
+			// the default line seperator"
+			lineSeparator = jEdit.getProperty(
+				"buffer.lineSeparator",
+				System.getProperty("line.separator"));
+		}
+		else if(CRLF)
 			lineSeparator = "\r\n";
 		else if(CROnly)
 			lineSeparator = "\r";
@@ -496,13 +608,24 @@ public class BufferIORequest extends WorkRequest
 			}
 		}
 
+		// add a line marker at the end for proper offset manager
+		// operation
+		endOffsets.add(seg.count + 1);
+
 		// to avoid having to deal with read/write locks and such,
 		// we insert the loaded data into the buffer in the
 		// post-load cleanup runnable, which runs in the AWT thread.
-		buffer.setProperty(LOAD_DATA,seg);
-		buffer.setProperty(END_OFFSETS,endOffsets);
-		buffer.setProperty(NEW_PATH,path);
-		buffer.setProperty(Buffer.LINESEP,lineSeparator);
+		if(!insert)
+		{
+			buffer.setProperty(LOAD_DATA,seg);
+			buffer.setProperty(END_OFFSETS,endOffsets);
+			buffer.setProperty(NEW_PATH,path);
+			if(lineSeparator != null)
+				buffer.setProperty(Buffer.LINESEP,lineSeparator);
+		}
+
+		// used in insert()
+		return seg;
 	} //}}}
 
 	//{{{ readMarkers() method
@@ -514,21 +637,26 @@ public class BufferIORequest extends WorkRequest
 
 		BufferedReader in = new BufferedReader(new InputStreamReader(_in));
 
-		String line;
-		while((line = in.readLine()) != null)
+		try
 		{
-			// compatibility kludge for jEdit 3.1 and earlier
-			if(!line.startsWith("!"))
-				continue;
+			String line;
+			while((line = in.readLine()) != null)
+			{
+				// compatibility kludge for jEdit 3.1 and earlier
+				if(!line.startsWith("!"))
+					continue;
 
-			char shortcut = line.charAt(1);
-			int start = line.indexOf(';');
-			int end = line.indexOf(';',start + 1);
-			int position = Integer.parseInt(line.substring(start + 1,end));
-			buffer.addMarker(shortcut,position);
+				char shortcut = line.charAt(1);
+				int start = line.indexOf(';');
+				int end = line.indexOf(';',start + 1);
+				int position = Integer.parseInt(line.substring(start + 1,end));
+				buffer.addMarker(shortcut,position);
+			}
 		}
-
-		in.close();
+		finally
+		{
+			in.close();
+		}
 	} //}}}
 
 	//{{{ save() method
@@ -544,39 +672,42 @@ public class BufferIORequest extends WorkRequest
 			// the entire save operation can be aborted...
 			setAbortable(true);
 
+			path = vfs._canonPath(session,path,view);			if(!MiscUtilities.isURL(path))
+				path = MiscUtilities.resolveSymlinks(path);
+
+			// Only backup once per session
+			if(buffer.getProperty(Buffer.BACKED_UP) == null
+				|| jEdit.getBooleanProperty("backupEverySave"))
+			{
+				vfs._backup(session,path,view);
+				buffer.setBooleanProperty(Buffer.BACKED_UP,true);
+			}
+
+			/* if the VFS supports renaming files, we first
+			 * save to #<filename>#save#, then rename that
+			 * to <filename>, so that if the save fails,
+			 * data will not be lost.
+			 *
+			 * as of 4.1pre7 we now call vfs.getTwoStageSaveName()
+			 * instead of constructing the path directly
+			 * since some VFS's might not allow # in filenames.
+			 */
+			String savePath;
+
+			boolean twoStageSave = (vfs.getCapabilities() & VFS.RENAME_CAP) != 0
+				&& jEdit.getBooleanProperty("twoStageSave");
+			if(twoStageSave)
+				savePath = vfs.getTwoStageSaveName(path);
+			else
+				savePath = path;
+
+			out = vfs._createOutputStream(session,savePath,view);
+
 			try
 			{
-				path = vfs._canonPath(session,path,view);
-
+				// this must be after the stream is created or
+				// we deadlock with SSHTools.
 				buffer.readLock();
-
-				// Only backup once per session
-				if(buffer.getProperty(Buffer.BACKED_UP) == null
-					|| jEdit.getBooleanProperty("backupEverySave"))
-				{
-					vfs._backup(session,path,view);
-					buffer.setBooleanProperty(Buffer.BACKED_UP,true);
-				}
-
-				/* if the VFS supports renaming files, we first
-				 * save to #<filename>#save#, then rename that
-				 * to <filename>, so that if the save fails,
-				 * data will not be lost.
-				 *
-				 * as of 4.1pre7 we now call vfs.getTwoStageSaveName()
-				 * instead of constructing the path directly
-				 * since some VFS's might not allow # in filenames.
-				 */
-				String savePath;
-
-				boolean twoStageSave = (vfs.getCapabilities() & VFS.RENAME_CAP) != 0
-					&& jEdit.getBooleanProperty("twoStageSave");
-				if(twoStageSave)
-					savePath = vfs.getTwoStageSaveName(path);
-				else
-					savePath = path;
-
-				out = vfs._createOutputStream(session,savePath,view);
 				if(out != null)
 				{
 					// Can't use buffer.getName() here because
@@ -593,7 +724,7 @@ public class BufferIORequest extends WorkRequest
 					if(twoStageSave)
 					{
 						if(!vfs._rename(session,savePath,path,view))
-							throw new IOException(savePath);
+							throw new IOException("Rename failed: " + savePath);
 					}
 
 					// We only save markers to VFS's that support deletion.
@@ -619,18 +750,18 @@ public class BufferIORequest extends WorkRequest
 				if(!twoStageSave)
 					VFSManager.sendVFSUpdate(vfs,path,true);
 			}
-			catch(IOException io)
-			{
-				Log.log(Log.ERROR,this,io);
-				String[] pp = { io.toString() };
-				VFSManager.error(view,path,"ioerror.write-error",pp);
-
-				buffer.setBooleanProperty(ERROR_OCCURRED,true);
-			}
 			finally
 			{
 				buffer.readUnlock();
 			}
+		}
+		catch(IOException io)
+		{
+			Log.log(Log.ERROR,this,io);
+			String[] pp = { io.toString() };
+			VFSManager.error(view,path,"ioerror.write-error",pp);
+
+			buffer.setBooleanProperty(ERROR_OCCURRED,true);
 		}
 		catch(WorkThread.Abort a)
 		{
@@ -726,41 +857,62 @@ public class BufferIORequest extends WorkRequest
 	private void write(Buffer buffer, OutputStream _out)
 		throws IOException
 	{
-		BufferedWriter out = new BufferedWriter(
-			new OutputStreamWriter(_out,
-				buffer.getStringProperty(Buffer.ENCODING)),
-				IOBUFSIZE);
-		Segment lineSegment = new Segment();
-		String newline = buffer.getStringProperty(Buffer.LINESEP);
-		if(newline == null)
-			newline = System.getProperty("line.separator");
+		BufferedWriter out = null;
 
-		setProgressMaximum(buffer.getLineCount() / PROGRESS_INTERVAL);
-		setProgressValue(0);
-
-		int i = 0;
-		while(i < buffer.getLineCount())
+		try
 		{
-			buffer.getLineText(i,lineSegment);
-			out.write(lineSegment.array,lineSegment.offset,
-				lineSegment.count);
+			String encoding = buffer.getStringProperty(Buffer.ENCODING);
+			if(encoding.equals(MiscUtilities.UTF_8_Y))
+			{
+				// not supported by Java...
+				_out.write(UTF8_MAGIC_1);
+				_out.write(UTF8_MAGIC_2);
+				_out.write(UTF8_MAGIC_3);
+				_out.flush();
+				encoding = "UTF-8";
+			}
 
-			if(i != buffer.getLineCount() - 1)
+			out = new BufferedWriter(
+				new OutputStreamWriter(_out,encoding),
+				IOBUFSIZE);
+
+			Segment lineSegment = new Segment();
+			String newline = buffer.getStringProperty(Buffer.LINESEP);
+			if(newline == null)
+				newline = System.getProperty("line.separator");
+
+			setProgressMaximum(buffer.getLineCount() / PROGRESS_INTERVAL);
+			setProgressValue(0);
+
+			int i = 0;
+			while(i < buffer.getLineCount())
+			{
+				buffer.getLineText(i,lineSegment);
+				out.write(lineSegment.array,lineSegment.offset,
+					lineSegment.count);
+
+				if(i != buffer.getLineCount() - 1)
+				{
+					out.write(newline);
+				}
+
+				if(++i % PROGRESS_INTERVAL == 0)
+					setProgressValue(i / PROGRESS_INTERVAL);
+			}
+
+			if(jEdit.getBooleanProperty("stripTrailingEOL")
+				&& buffer.getBooleanProperty(Buffer.TRAILING_EOL))
 			{
 				out.write(newline);
 			}
-
-			if(++i % PROGRESS_INTERVAL == 0)
-				setProgressValue(i / PROGRESS_INTERVAL);
 		}
-
-		if(jEdit.getBooleanProperty("stripTrailingEOL")
-			&& buffer.getBooleanProperty(Buffer.TRAILING_EOL))
+		finally
 		{
-			out.write(newline);
+			if(out != null)
+				out.close();
+			else
+				_out.close();
 		}
-
-		out.close();
 	} //}}}
 
 	//{{{ writeMarkers() method
@@ -768,21 +920,27 @@ public class BufferIORequest extends WorkRequest
 		throws IOException
 	{
 		Writer o = new BufferedWriter(new OutputStreamWriter(out));
-		Vector markers = buffer.getMarkers();
-		for(int i = 0; i < markers.size(); i++)
+		try
 		{
-			Marker marker = (Marker)markers.elementAt(i);
-			o.write('!');
-			o.write(marker.getShortcut());
-			o.write(';');
+			Vector markers = buffer.getMarkers();
+			for(int i = 0; i < markers.size(); i++)
+			{
+				Marker marker = (Marker)markers.elementAt(i);
+				o.write('!');
+				o.write(marker.getShortcut());
+				o.write(';');
 
-			String pos = String.valueOf(marker.getPosition());
-			o.write(pos);
-			o.write(';');
-			o.write(pos);
-			o.write('\n');
+				String pos = String.valueOf(marker.getPosition());
+				o.write(pos);
+				o.write(';');
+				o.write(pos);
+				o.write('\n');
+			}
 		}
-		o.close();
+		finally
+		{
+			o.close();
+		}
 	} //}}}
 
 	//{{{ insert() method
@@ -812,10 +970,19 @@ public class BufferIORequest extends WorkRequest
 				if(in == null)
 					return;
 
-				if(path.endsWith(".gz"))
-					in = new GZIPInputStream(in);
+				final SegmentBuffer seg = read(
+					autodetect(in),length,true);
 
-				read(buffer,in,length);
+				/* we don't do this in Buffer.insert() so that
+				   we can insert multiple files at once */
+				VFSManager.runInAWTThread(new Runnable()
+				{
+					public void run()
+					{
+						view.getTextArea().setSelectedText(
+							seg.toString());
+					}
+				});
 			}
 			catch(IOException io)
 			{

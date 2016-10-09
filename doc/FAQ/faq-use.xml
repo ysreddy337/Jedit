@@ -5,7 +5,7 @@
 <!-- jEdit FAQ                                           -->
 <!-- Copyright (C) 2003 John Gellene, Kris Kopicki       -->
 
-<sect1 id="usage"><title>Usage</title>
+<sect1 id="usage"><title>Usage Questions</title>
 <para>
   This section deals general usage of jEdit, including customisation.
 </para>
@@ -44,7 +44,7 @@
         <answer><para>
           Select <guimenu>Utilities</guimenu>&gt;<guimenuitem>Global
           Options</guimenuitem>, then select the <guimenuitem>Abbreviations</guimenuitem>
-          option pane. You will see an checkbox option for <quote>Space bar expands
+          option pane. You will see a checkbox option for <quote>Space bar expands
           abbrevs</quote>.  Here you can also add, modify and delete abbreviations on
           a global basis or for individual editing modes.
         </para></answer>

@@ -26,6 +26,8 @@ package org.gjt.sp.jedit.io;
 //{{{ Imports
 import java.awt.Component;
 import java.io.*;
+import java.text.*;
+import java.util.Date;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 //}}}
@@ -33,7 +35,7 @@ import org.gjt.sp.util.Log;
 /**
  * Local filesystem VFS.
  * @author Slava Pestov
- * @version $Id: FileVFS.java,v 1.29 2003/02/19 01:36:50 spestov Exp $
+ * @version $Id: FileVFS.java,v 1.47 2004/06/09 16:48:40 spestov Exp $
  */
 public class FileVFS extends VFS
 {
@@ -42,8 +44,13 @@ public class FileVFS extends VFS
 	//{{{ FileVFS method
 	public FileVFS()
 	{
-		super("file",READ_CAP | WRITE_CAP | BROWSE_CAP | DELETE_CAP
-			| RENAME_CAP | MKDIR_CAP | LOW_LATENCY_CAP);
+		super("file",READ_CAP | WRITE_CAP | DELETE_CAP
+			| RENAME_CAP | MKDIR_CAP | LOW_LATENCY_CAP
+			| ((OperatingSystem.isMacOS()
+			|| OperatingSystem.isDOSDerived())
+			? CASE_INSENSITIVE_CAP : 0),
+			new String[] { EA_TYPE, EA_SIZE, EA_STATUS,
+			EA_MODIFIED });
 	} //}}}
 
 	//{{{ getParentOfPath() method
@@ -65,19 +72,11 @@ public class FileVFS extends VFS
 	//{{{ constructPath() method
 	public String constructPath(String parent, String path)
 	{
-		if(parent.endsWith(File.separator))
-			path = parent + path;
+		if(parent.endsWith(File.separator)
+			|| parent.endsWith("/"))
+			return parent + path;
 		else
-			path = parent + File.separator + path;
-
-		try
-		{
-			return new File(path).getCanonicalPath();
-		}
-		catch(IOException io)
-		{
-			return path;
-		}
+			return parent + File.separator + path;
 	} //}}}
 
 	//{{{ getFileSeparator() method
@@ -86,74 +85,16 @@ public class FileVFS extends VFS
 		return File.separatorChar;
 	} //}}}
 
-	//{{{ load() method
-	public boolean load(View view, Buffer buffer, String path)
-	{
-		File file = new File(MiscUtilities.canonPath(path));
-
-		//{{{ Check if file is valid
-		if(!file.exists())
-		{
-			buffer.setNewFile(true);
-			return true;
-		}
-		else
-			buffer.setReadOnly(!file.canWrite());
-
-		if(file.isDirectory())
-		{
-			VFSManager.error(view,file.getPath(),
-				"ioerror.open-directory",null);
-			buffer.setNewFile(false);
-			return false;
-		}
-
-		if(!file.canRead())
-		{
-			VFSManager.error(view,file.getPath(),
-				"ioerror.no-read",null);
-			buffer.setNewFile(false);
-			return false;
-		} //}}}
-
-		return super.load(view,buffer,path);
-	} //}}}
-
 	//{{{ save() method
 	public boolean save(View view, Buffer buffer, String path)
 	{
-		// can't call buffer.getFile() here because this
-		// method is called *before* setPath()
-		File file = new File(path);
-
-		//{{{ Check if file is valid
-
-		// Apparently, certain broken OSes (like Micro$oft Windows)
-		// can mess up directories if they are write()'n to
-		if(file.isDirectory())
-		{
-			VFSManager.error(view,file.getPath(),
-				"ioerror.save-directory",null);
-			return false;
-		}
-
-		// Check that we can actually write to the file
-		if((file.exists() && !file.canWrite())
-			|| (!file.exists() && !new File(file.getParent()).canWrite()))
-		{
-			VFSManager.error(view,file.getPath(),
-				"ioerror.no-write",null);
-			return false;
-		} //}}}
-
-		//{{{ On Unix, preserve permissions
 		if(OperatingSystem.isUnix())
 		{
 			int permissions = getPermissions(buffer.getPath());
 			Log.log(Log.DEBUG,this,buffer.getPath() + " has permissions 0"
 				+ Integer.toString(permissions,8));
 			buffer.setIntegerProperty(PERMISSIONS_PROPERTY,permissions);
-		} //}}}
+		}
 
 		return super.save(view,buffer,path);
 	} //}}}
@@ -200,6 +141,34 @@ public class FileVFS extends VFS
 		return MiscUtilities.canonPath(path);
 	} //}}}
 
+	//{{{ LocalDirectoryEntry class
+	public static class LocalDirectoryEntry extends VFS.DirectoryEntry
+	{
+		// use system default short format
+		public static DateFormat DATE_FORMAT
+			= DateFormat.getInstance();
+
+		public long modified;
+
+		public LocalDirectoryEntry(File file)
+		{
+			super(file.getName(),file.getPath(),
+				file.getPath(),file.isDirectory() ? DIRECTORY : FILE,file.length(),file.isHidden());
+			this.modified = file.lastModified();
+			this.canRead = file.canRead();
+			this.canWrite = file.canWrite();
+			this.symlinkPath = MiscUtilities.resolveSymlinks(path);
+		}
+
+		public String getExtendedAttribute(String name)
+		{
+			if(name.equals(EA_MODIFIED))
+				return DATE_FORMAT.format(new Date(modified));
+			else
+				return super.getExtendedAttribute(name);
+		}
+	} //}}}
+
 	//{{{ _listDirectory() method
 	public VFS.DirectoryEntry[] _listDirectory(Object session, String path,
 		Component comp)
@@ -229,19 +198,7 @@ public class FileVFS extends VFS
 
 		VFS.DirectoryEntry[] list2 = new VFS.DirectoryEntry[list.length];
 		for(int i = 0; i < list.length; i++)
-		{
-			File file = list[i];
-
-			int type;
-			if(file.isDirectory())
-				type = VFS.DirectoryEntry.DIRECTORY;
-			else
-				type = VFS.DirectoryEntry.FILE;
-
-			list2[i] = new VFS.DirectoryEntry(file.getName(),
-				file.getPath(),file.getPath(),type,
-				file.length(),file.isHidden());
-		}
+			list2[i] = new LocalDirectoryEntry(list[i]);
 
 		return list2;
 	} //}}}
@@ -256,31 +213,32 @@ public class FileVFS extends VFS
 				VFS.DirectoryEntry.DIRECTORY,0L,false);
 		}
 
-		// workaround for Java bug where paths with trailing / return
-		// null getName()
-		if(path.endsWith("/") || path.endsWith(File.separator))
-			path = path.substring(0,path.length() - 1);
-
 		File file = new File(path);
 		if(!file.exists())
 			return null;
 
-		int type;
-		if(file.isDirectory())
-			type = VFS.DirectoryEntry.DIRECTORY;
-		else
-			type = VFS.DirectoryEntry.FILE;
-
-		return new VFS.DirectoryEntry(file.getName(),path,path,type,
-			file.length(),file.isHidden());
+		return new LocalDirectoryEntry(file);
 	} //}}}
 
 	//{{{ _delete() method
 	public boolean _delete(Object session, String path, Component comp)
 	{
-		boolean retVal = new File(path).delete();
+		File file = new File(path);
+		// do some platforms throw exceptions if the file does not exist
+		// when we ask for the canonical path?
+		String canonPath;
+		try
+		{
+			canonPath = file.getCanonicalPath();
+		}
+		catch(IOException io)
+		{
+			canonPath = path;
+		}
+
+		boolean retVal = file.delete();
 		if(retVal)
-			VFSManager.sendVFSUpdate(this,path,true);
+			VFSManager.sendVFSUpdate(this,canonPath,true);
 		return retVal;
 	} //}}}
 
@@ -290,13 +248,50 @@ public class FileVFS extends VFS
 	{
 		File _to = new File(to);
 
+		String toCanonPath;
+		try
+		{
+			toCanonPath = _to.getCanonicalPath();
+		}
+		catch(IOException io)
+		{
+			toCanonPath = to;
+		}
+
+		// this is needed because on OS X renaming to a non-existent
+		// directory causes problems
+		File parent = new File(_to.getParent());
+		if(parent.exists())
+		{
+			if(!parent.isDirectory())
+				return false;
+		}
+		else
+		{
+			parent.mkdirs();
+			if(!parent.exists())
+				return false;
+		}
+
+		File _from = new File(from);
+
+		String fromCanonPath;
+		try
+		{
+			fromCanonPath = _from.getCanonicalPath();
+		}
+		catch(IOException io)
+		{
+			fromCanonPath = from;
+		}
+
 		// Case-insensitive fs workaround
-		if(!from.equalsIgnoreCase(to))
+		if(!fromCanonPath.equalsIgnoreCase(toCanonPath))
 			_to.delete();
 
-		boolean retVal = new File(from).renameTo(_to);
-		VFSManager.sendVFSUpdate(this,from,true);
-		VFSManager.sendVFSUpdate(this,to,true);
+		boolean retVal = _from.renameTo(_to);
+		VFSManager.sendVFSUpdate(this,fromCanonPath,true);
+		VFSManager.sendVFSUpdate(this,toCanonPath,true);
 		return retVal;
 	} //}}}
 
@@ -310,8 +305,19 @@ public class FileVFS extends VFS
 				return false;
 		}
 
-		boolean retVal = new File(directory).mkdir();
-		VFSManager.sendVFSUpdate(this,directory,true);
+		File file = new File(directory);
+
+		boolean retVal = file.mkdir();
+		String canonPath;
+		try
+		{
+			canonPath = file.getCanonicalPath();
+		}
+		catch(IOException io)
+		{
+			canonPath = directory;
+		}
+		VFSManager.sendVFSUpdate(this,canonPath,true);
 		return retVal;
 	} //}}}
 
@@ -328,9 +334,9 @@ public class FileVFS extends VFS
 		String backupPrefix = jEdit.getProperty("backup.prefix");
 		String backupSuffix = jEdit.getProperty("backup.suffix");
 
-		String backupDirectory = MiscUtilities.canonPath(
-			jEdit.getProperty("backup.directory"));
+		String backupDirectory = jEdit.getProperty("backup.directory");
 
+		int backupTimeDistance = jEdit.getIntegerProperty("backup.minTime",0);
 		File file = new File(path);
 
 		// Check for backup.directory, and create that
@@ -354,7 +360,7 @@ public class FileVFS extends VFS
 		}
 
 		MiscUtilities.saveBackup(file,backups,backupPrefix,
-			backupSuffix,backupDirectory);
+			backupSuffix,backupDirectory,backupTimeDistance);
 	} //}}}
 
 	//{{{ _createInputStream() method
@@ -378,12 +384,7 @@ public class FileVFS extends VFS
 	public OutputStream _createOutputStream(Object session, String path,
 		Component comp) throws IOException
 	{
-		OutputStream retVal = new FileOutputStream(path);
-
-		// commented out for now, because updating VFS browsers
-		// every time file is saved gets annoying
-		//VFSManager.sendVFSUpdate(this,path,true);
-		return retVal;
+		return new FileOutputStream(path);
 	} //}}}
 
 	//{{{ _saveComplete() method
@@ -408,6 +409,9 @@ public class FileVFS extends VFS
 	public static int getPermissions(String path)
 	{
 		int permissions = 0;
+
+		if(jEdit.getBooleanProperty("chmodDisabled"))
+			return permissions;
 
 		if(OperatingSystem.isUnix())
 		{
@@ -449,6 +453,9 @@ public class FileVFS extends VFS
 	 */
 	public static void setPermissions(String path, int permissions)
 	{
+		if(jEdit.getBooleanProperty("chmodDisabled"))
+			return;
+
 		if(permissions != 0)
 		{
 			if(OperatingSystem.isUnix())
@@ -461,9 +468,12 @@ public class FileVFS extends VFS
 					process.getInputStream().close();
 					process.getOutputStream().close();
 					process.getErrorStream().close();
-					int exitCode = process.waitFor();
+					// Jun 9 2004 12:40 PM
+					// waitFor() hangs on some Java
+					// implementations.
+					/* int exitCode = process.waitFor();
 					if(exitCode != 0)
-						Log.log(Log.NOTICE,FileVFS.class,"chmod exited with code " + exitCode);
+						Log.log(Log.NOTICE,FileVFS.class,"chmod exited with code " + exitCode); */
 				}
 
 				// Feb 4 2000 5:30 PM

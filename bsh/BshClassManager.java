@@ -37,6 +37,8 @@ import java.net.*;
 import java.util.*;
 import java.io.IOException;
 import java.io.*;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 /**
 	BshClassManager manages all classloading in BeanShell.
@@ -53,24 +55,18 @@ import java.io.*;
 	Bsh has a multi-tiered class loading architecture.  No class loader is
 	used unless/until the classpath is modified or a class is reloaded.
 	<p>
-
-	Note: currently class loading features affect all instances of the
-	Interpreter.  However the basic design of this class will allow for
-	per instance class management in the future if it is desired.
 */
 /*
 	Implementation notes:
 
 	Note: we may need some synchronization in here
 
-	Note on jdk1.2 dependency:
-	<p>
-
-	We are forced to use weak references here to accomodate all of the 
-	fleeting namespace listeners as they fall out of scope.  (NameSpaces must 
-	be informed if the class space changes so that they can un-cache names).  
-	I had the thought that a way around this would be to implement BeanShell's 
-	own garbage collector...  Then I came to my senses.
+	Note on version dependency:  This base class is JDK 1.1 compatible,
+	however we are forced to use weak references in the full featured
+	implementation (the optional bsh.classpath package) to accomodate all of
+	the fleeting namespace listeners as they fall out of scope.  (NameSpaces
+	must be informed if the class space changes so that they can un-cache
+	names).  
 	<p>
 
 	Perhaps a simpler idea would be to have entities that reference cached
@@ -81,67 +77,79 @@ import java.io.*;
 	references in this package.
 	<p>
 */
-public abstract class BshClassManager
+public class BshClassManager
 {
-	/** Singleton class manager */
-	private static BshClassManager manager;
-	private static boolean checkedForManager;
-	// Use a hashtable as a Set...
+	/** Identifier for no value item.  Use a hashtable as a Set. */
 	private static Object NOVALUE = new Object(); 
+	/** 
+		The interpreter which created the class manager 
+		This is used to load scripted classes from source files.
+	*/
+	private Interpreter declaringInterpreter;
 	
 	/**
 		An external classloader supplied by the setClassLoader() command.
 	*/
-	private static ClassLoader externalClassLoader;
+	private ClassLoader externalClassLoader;
 
 	/**
 		Global cache for things we know are classes.
 		Note: these should probably be re-implemented with Soft references.
 		(as opposed to strong or Weak)
 	*/
-    protected transient static Hashtable absoluteClassCache = new Hashtable();
+    protected transient Hashtable absoluteClassCache = new Hashtable();
 	/**
 		Global cache for things we know are *not* classes.
 		Note: these should probably be re-implemented with Soft references.
 		(as opposed to strong or Weak)
 	*/
-    protected transient static Hashtable absoluteNonClasses = new Hashtable();
-
-	// Begin static methods
+    protected transient Hashtable absoluteNonClasses = new Hashtable();
 
 	/**
-		@return the BshClassManager singleton or null, indicating no
-		class manager is available.
+		Caches for resolved object and static methods.
+		We keep these maps separate to support fast lookup in the general case
+		where the method may be either.
 	*/
-// Note: this should probably throw Capabilities.Unavailable instead of
-// returning null
-	public static BshClassManager getClassManager() 
+	protected transient Hashtable resolvedObjectMethods = new Hashtable();
+	protected transient Hashtable resolvedStaticMethods = new Hashtable();
+
+	protected transient Hashtable definingClasses = new Hashtable();
+	protected transient Hashtable definingClassesBaseNames = new Hashtable();
+
+	/**
+		Create a new instance of the class manager.  
+		Class manager instnaces are now associated with the interpreter.
+
+		@see bsh.Interpreter.getClassManager()
+		@see bsh.Interpreter.setClassLoader( ClassLoader )
+	*/
+	public static BshClassManager createClassManager( Interpreter interpreter ) 
 	{
-		// Bootstrap the class manager if it exists
+		BshClassManager manager;
 
-		// have we loaded it before?
-		if ( !checkedForManager && manager == null )
-			// Do we have the necessary jdk1.2 packages?
+		// Do we have the necessary jdk1.2 packages and optional package?
+		if ( Capabilities.classExists("java.lang.ref.WeakReference") 
+			&& Capabilities.classExists("java.util.HashMap") 
+			&& Capabilities.classExists("bsh.classpath.ClassManagerImpl") 
+		) 
 			try {
-				if ( plainClassForName("java.lang.ref.WeakReference") != null
-					&& plainClassForName("java.util.HashMap")  != null )
-				{
-					// try to load the implementation
-					Class bcm = plainClassForName(
-						"bsh.classpath.ClassManagerImpl");
-					manager = (BshClassManager)bcm.newInstance();
-				}
-			} catch ( ClassNotFoundException e ) {
-				//System.err.println("No class manager available.");
+				// Try to load the module
+				// don't refer to it directly here or we're dependent upon it
+				Class clas = Class.forName( "bsh.classpath.ClassManagerImpl" );
+				manager = (BshClassManager)clas.newInstance();
 			} catch ( Exception e ) {
-				System.err.println("Error loading classmanager: "+e);
+				throw new InterpreterError("Error loading classmanager: "+e);
 			}
+		else 
+			manager = new BshClassManager();
 
-		checkedForManager = true;
+		if ( interpreter == null )
+			interpreter = new Interpreter();
+		manager.declaringInterpreter = interpreter;
 		return manager;
 	}
 
-	public static boolean classExists( String name ) {
+	public boolean classExists( String name ) {
 		return ( classForName( name ) != null );
 	}
 
@@ -150,58 +158,117 @@ public abstract class BshClassManager
 		and reloaded classes, etc.
 		@return the class or null
 	*/
-	public static Class classForName( String name ) {
-		BshClassManager manager = getClassManager(); // prime the singleton
-		if ( manager != null )
-			return manager.getClassForName( name );
-		else
-			try {
-				return plainClassForName( name );
-			} catch ( ClassNotFoundException e ) {
-				return null;
-			}
+	public Class classForName( String name ) 
+	{
+		if ( isClassBeingDefined( name ) )
+			throw new InterpreterError(
+				"Attempting to load class in the process of being defined: "
+				+name );
+
+		Class clas = null;
+		try {
+			clas = plainClassForName( name );
+		} catch ( ClassNotFoundException e ) { /*ignore*/ }
+
+		// try scripted class
+		if ( clas == null ) 
+			clas = loadSourceClass( name );
+
+		return clas;
+	}
+	
+	// Move me to classpath/ClassManagerImpl???
+	protected Class loadSourceClass( String name )
+	{
+		String fileName = "/"+name.replace('.','/')+".java";
+		InputStream in = getResourceAsStream( fileName );
+		if ( in == null )
+			return null;
+
+		try {
+			System.out.println("Loading class from source file: "+fileName);
+			declaringInterpreter.eval( new InputStreamReader(in) );
+		} catch ( EvalError e ) {
+			// ignore
+			System.err.println( e );
+		}
+		try {
+			return plainClassForName( name );
+		} catch ( ClassNotFoundException e ) {
+			System.err.println("Class not found in source file: "+name );
+			return null;
+		}
 	}
 
 	/**
 		Perform a plain Class.forName() or call the externally provided
-		class loader.
+		classloader.
 		If a BshClassManager implementation is loaded the call will be 
 		delegated to it, to allow for additional hooks.
+		<p/>
 
 		This simply wraps that bottom level class lookup call and provides a 
 		central point for monitoring and handling certain Java version 
 		dependent bugs, etc.
 
-		@see #getPlainClassForName( String )
+		@see #classForName( String )
 		@return the class
 	*/
-	public static Class plainClassForName( String name ) 
-		throws ClassNotFoundException 
+	public Class plainClassForName( String name ) 
+		throws ClassNotFoundException
 	{
+		Class c = null;
+
 		try {
-			Class c;
 			if ( externalClassLoader != null )
 				c = externalClassLoader.loadClass( name );
-			else {
-				// If BCM exists, delegate to it.
-				BshClassManager bcm = manager; // Don't create if not there yet.
-				if ( bcm != null )
-					c = bcm.getPlainClassForName( name );				
-				else
-					c = Class.forName( name );
-			}
+			else
+				c = Class.forName( name );
 
 			cacheClassInfo( name, c );
-			return c;
+
 		/*
-			This is weird... jdk under Win is throwing these to
+			Original note: Jdk under Win is throwing these to
 			warn about lower case / upper case possible mismatch.
 			e.g. bsh.console bsh.Console
+	
+			Update: Prior to 1.3 we were squeltching NoClassDefFoundErrors 
+			which was very annoying.  I cannot reproduce the original problem 
+			and this was never a valid solution.  If there are legacy VMs that
+			have problems we can include a more specific test for them here.
 		*/
 		} catch ( NoClassDefFoundError e ) {
-			cacheClassInfo( name, null ); // non-class
-			throw new ClassNotFoundException( e.toString() );
+			throw noClassDefFound( name, e );
 		}
+
+		return c;
+	}
+
+	/**
+		Get a resource URL using the BeanShell classpath
+		@param path should be an absolute path
+	*/
+	public URL getResource( String path ) 
+	{
+		if ( externalClassLoader != null )
+		{
+			// classloader wants no leading slash
+			return externalClassLoader.getResource( path.substring(1) );
+		} else
+			return Interpreter.class.getResource( path );
+	}
+	/**
+		Get a resource stream using the BeanShell classpath
+		@param path should be an absolute path
+	*/
+	public InputStream getResourceAsStream( String path ) 
+	{
+		if ( externalClassLoader != null )
+		{
+			// classloader wants no leading slash
+			return externalClassLoader.getResourceAsStream( path.substring(1) );
+		} else
+			return Interpreter.class.getResourceAsStream( path );
 	}
 
 	/**
@@ -211,7 +278,7 @@ public abstract class BshClassManager
 			if value is null, set the flag that it is *not* a class to
 			speed later resolution
 	*/
-	public static void cacheClassInfo( String name, Class value ) {
+	public void cacheClassInfo( String name, Class value ) {
 		if ( value != null )
 			absoluteClassCache.put( name, value );
 		else
@@ -219,23 +286,63 @@ public abstract class BshClassManager
 	}
 
 	/**
-		Clear the static caches in BshClassManager
+		Cache a resolved (possibly overloaded) method based on the 
+		argument types used to invoke it, subject to classloader change.
+		Static and Object methods are cached separately to support fast lookup
+		in the general case where either will do.
 	*/
-	protected void clearCaches() {
-    	absoluteNonClasses = new Hashtable();
-    	absoluteClassCache = new Hashtable();
+	public void cacheResolvedMethod( 
+		Class clas, Class [] types, Method method ) 
+	{
+		if ( Interpreter.DEBUG )
+			Interpreter.debug(
+				"cacheResolvedMethod putting: " + clas +" "+ method );
+		
+		SignatureKey sk = new SignatureKey( clas, method.getName(), types );
+		if ( Modifier.isStatic( method.getModifiers() ) )
+			resolvedStaticMethods.put( sk, method );
+		else
+			resolvedObjectMethods.put( sk, method );
 	}
 
 	/**
-		Add a BshClassManager.Listener to the class manager.
-		The listener is informed upon changes to the classpath.
-		This is a static convenience form of BshClassManager addListener().
-		If there is no class manager the listener will be ignored.
+		Return a previously cached resolved method.
+		@param onlyStatic specifies that only a static method may be returned.
+		@return the Method or null
 	*/
-	public static void addCMListener( Listener l ) {
-		getClassManager(); // prime it
-		if ( manager != null )
-			manager.addListener( l );
+	protected Method getResolvedMethod( 
+		Class clas, String methodName, Class [] types, boolean onlyStatic  ) 
+	{
+		SignatureKey sk = new SignatureKey( clas, methodName, types );
+
+		// Try static and then object, if allowed
+		// Note that the Java compiler should not allow both.
+		Method method = (Method)resolvedStaticMethods.get( sk );
+		if ( method == null && !onlyStatic)
+			method = (Method)resolvedObjectMethods.get( sk );
+
+		if ( Interpreter.DEBUG )
+		{
+			if ( method == null )
+				Interpreter.debug(
+					"getResolvedMethod cache MISS: " + clas +" - "+methodName );
+			else
+				Interpreter.debug(
+					"getResolvedMethod cache HIT: " + clas +" - " +method );
+		}
+		return method;
+	}
+
+	/**
+		Clear the caches in BshClassManager
+		@see public void #reset() for external usage
+	*/
+	protected void clearCaches() 
+	{
+    	absoluteNonClasses = new Hashtable();
+    	absoluteClassCache = new Hashtable();
+    	resolvedObjectMethods = new Hashtable();
+    	resolvedStaticMethods = new Hashtable();
 	}
 
 	/**
@@ -249,50 +356,32 @@ public abstract class BshClassManager
 		However BeanShell is not currently able to reload
 		classes supplied through the external classloader.
 	*/
-	public static void setClassLoader( ClassLoader externalCL ) 
+	public void setClassLoader( ClassLoader externalCL ) 
 	{
 		externalClassLoader = externalCL;
-		BshClassManager bcm = getClassManager();
-		if ( bcm != null )
-			bcm.classLoaderChanged();
+		classLoaderChanged();
 	}
 
-	// end static methods
-
-	public static interface Listener 
-	{
-		public void classLoaderChanged();
+	public void addClassPath( URL path )
+		throws IOException {
 	}
-
-	// Begin interface methods
-
-	/** @see #classForName( String ) */
-	public abstract Class getClassForName( String name );
-
-	/** 
-		Delegate for plainClassForName.
-		@see #plainClassForName( String )
-	 */
-	public abstract Class getPlainClassForName( String name ) 
-		throws ClassNotFoundException ;
-
-	public abstract ClassLoader getBaseLoader();
-
-	public abstract ClassLoader getLoaderForClass( String name );
-
-	public abstract void addClassPath( URL path )
-		throws IOException;
 
 	/**
 		Clear all loaders and start over.  No class loading.
 	*/
-	public abstract void reset();
+	public void reset() { 
+		clearCaches();
+	}
 
 	/**
 		Set a new base classpath and create a new base classloader.
 		This means all types change. 
 	*/
-	public abstract void setClassPath( URL [] cp );
+	public void setClassPath( URL [] cp ) 
+		throws UtilEvalError
+	{
+		throw cmUnavailable();
+	}
 
 	/**
 		Overlay the entire path with a new class loader.
@@ -300,15 +389,20 @@ public abstract class BshClassManager
 
 		No point in including the boot class path (can't reload thos).
 	*/
-	public abstract void reloadAllClasses() throws ClassPathException;
+	public void reloadAllClasses() throws UtilEvalError {
+		throw cmUnavailable();
+	}
 
 	/**
 		Reloading classes means creating a new classloader and using it
 		whenever we are asked for classes in the appropriate space.
 		For this we use a DiscreteFilesClassLoader
 	*/
-	public abstract void reloadClasses( String [] classNames )
-		throws ClassPathException;
+	public void reloadClasses( String [] classNames )
+		throws UtilEvalError 
+	{
+		throw cmUnavailable();
+	}
 
 	/**
 		Reload all classes in the specified package: e.g. "com.sun.tools"
@@ -316,37 +410,225 @@ public abstract class BshClassManager
 		The special package name "<unpackaged>" can be used to refer 
 		to unpackaged classes.
 	*/
-	public abstract void reloadPackage( String pack ) 
-		throws ClassPathException ;
+	public void reloadPackage( String pack ) 
+		throws UtilEvalError 
+	{
+		throw cmUnavailable();
+	}
 
 	/**
 		This has been removed from the interface to shield the core from the
 		rest of the classpath package. If you need the classpath you will have
 		to cast the classmanager to its impl.
 
-		public abstract BshClassPath getClassPath() throws ClassPathException;
+		public BshClassPath getClassPath() throws ClassPathException;
 	*/
 
 	/**
 		Support for "import *;"
 		Hide details in here as opposed to NameSpace.
-	Note: this used to be package private...
 	*/
-	public abstract void doSuperImport() throws EvalError;
+	protected void doSuperImport() 
+		throws UtilEvalError 
+	{
+		throw cmUnavailable();
+	}
+
+	/**
+		A "super import" ("import *") operation has been performed.
+	*/
+	protected boolean hasSuperImport() 
+	{
+		return false;
+	}
 
 	/**
 		Return the name or null if none is found,
 		Throw an ClassPathException containing detail if name is ambigous.
-	Note: this used to be package private...
 	*/
-	public abstract String getClassNameByUnqName( String name ) 
-		throws ClassPathException;
+	protected String getClassNameByUnqName( String name ) 
+		throws UtilEvalError 
+	{
+		throw cmUnavailable();
+	}
 
-	public abstract void addListener( Listener l );
+	public void addListener( Listener l ) { }
 
-	public abstract void removeListener( Listener l );
+	public void removeListener( Listener l ) { }
 
-	public abstract void dump( PrintWriter pw );
+	public void dump( PrintWriter pw ) { 
+		pw.println("BshClassManager: no class manager."); 
+	}
 
-	protected abstract void classLoaderChanged();
+	/**
+		Flag the class name as being in the process of being defined.
+		The class manager will not attempt to load it.
+	*/
+	/*
+		Note: this implementation is temporary. We currently keep a flat
+		namespace of the base name of classes.  i.e. BeanShell cannot be in the
+		process of defining two classes in different packages with the same
+		base name.  To remove this limitation requires that we work through
+		namespace imports in an analogous (or using the same path) as regular
+		class import resolution.  This workaround should handle most cases 
+		so we'll try it for now.
+	*/
+	protected void definingClass( String className ) {
+		String baseName = Name.suffix(className,1);
+		int i = baseName.indexOf("$");
+		if ( i != -1 )
+			baseName = baseName.substring(i+1);
+		String cur = (String)definingClassesBaseNames.get( baseName );
+		if ( cur != null )
+			throw new InterpreterError("Defining class problem: "+className 
+				+": BeanShell cannot yet simultaneously define two or more "
+				+"dependant classes of the same name.  Attempt to define: "
+				+ className +" while defining: "+cur 
+			);
+		definingClasses.put( className, NOVALUE );
+		definingClassesBaseNames.put( baseName, className );
+	}
+
+	protected boolean isClassBeingDefined( String className ) {
+		return definingClasses.get( className ) != null;
+	}
+
+	/**
+		This method is a temporary workaround used with definingClass.
+		It is to be removed at some point.
+	*/
+	protected String getClassBeingDefined( String className ) {
+		String baseName = Name.suffix(className,1);
+		return (String)definingClassesBaseNames.get( baseName );
+	}
+
+	/**
+		Indicate that the specified class name has been defined and may be
+		loaded normally.
+	*/
+	protected void doneDefiningClass( String className ) {
+		String baseName = Name.suffix(className,1);
+		definingClasses.remove( className );
+		definingClassesBaseNames.remove( baseName );
+	}
+
+	/*
+		Issues to resolve here...
+		1) In which classloader should we define the class?
+		if there is a BshClassLoader should we define it there?
+		2) should we use reflection to set it in a non-bsh classloader
+		if there is one or should we always create a bsh classloader
+		(and expose its defineClass)?
+	*/
+	public Class defineClass( String name, byte [] code ) 
+	{
+		ClassLoader cl = this.getClass().getClassLoader();
+		Class clas;
+		try {
+			clas = (Class)Reflect.invokeObjectMethod( 
+				cl, "defineClass", 
+				new Object [] { 
+					name, code, 
+					new Primitive( (int)0 )/*offset*/, 
+					new Primitive( code.length )/*len*/ 
+				}, 
+				(Interpreter)null, (CallStack)null, (SimpleNode)null 
+			);
+		} catch ( Exception e ) {
+			e.printStackTrace();
+			throw new InterpreterError("Unable to define class: "+ e );
+		}
+		absoluteNonClasses.remove( name ); // may have been axed previously
+		return clas;
+	}
+
+	protected void classLoaderChanged() { }
+
+	/**
+		Annotate the NoClassDefFoundError with some info about the class
+		we were trying to load.
+	*/
+	protected static Error noClassDefFound( String className, Error e ) {
+		return new NoClassDefFoundError(
+			"A class required by class: "+className +" could not be loaded:\n"
+			+e.toString() );
+	}
+
+	protected static UtilEvalError cmUnavailable() {
+		return new Capabilities.Unavailable(
+			"ClassLoading features unavailable.");
+	}
+
+	public static interface Listener 
+	{
+		public void classLoaderChanged();
+	}
+
+	/**
+		SignatureKey serves as a hash of a method signature on a class 
+		for fast lookup of overloaded and general resolved Java methods. 
+		<p>
+	*/
+	/*
+		Note: is using SignatureKey in this way dangerous?  In the pathological
+		case a user could eat up memory caching every possible combination of
+		argument types to an untyped method.  Maybe we could be smarter about
+		it by ignoring the types of untyped parameter positions?  The method
+		resolver could return a set of "hints" for the signature key caching?
+
+		There is also the overhead of creating one of these for every method
+		dispatched.  What is the alternative?
+	*/
+	static class SignatureKey
+	{
+		Class clas;
+		Class [] types;
+		String methodName;
+		int hashCode = 0;
+
+		SignatureKey( Class clas, String methodName, Class [] types ) {
+			this.clas = clas;
+			this.methodName = methodName;
+			this.types = types;
+		}
+
+		public int hashCode() 
+		{ 
+			if ( hashCode == 0 ) 
+			{
+				hashCode = clas.hashCode() * methodName.hashCode();
+				if ( types == null ) // no args method
+					return hashCode; 
+				for( int i =0; i < types.length; i++ ) {
+					int hc = types[i] == null ? 21 : types[i].hashCode();
+					hashCode = hashCode*(i+1) + hc;
+				}
+			}
+			return hashCode;
+		}
+
+		public boolean equals( Object o ) { 
+			SignatureKey target = (SignatureKey)o;
+			if ( types == null )
+				return target.types == null;
+			if ( clas != target.clas )
+				return false;
+			if ( !methodName.equals( target.methodName ) )
+				return false;
+			if ( types.length != target.types.length )
+				return false;
+			for( int i =0; i< types.length; i++ )
+			{
+				if ( types[i]==null ) 
+				{
+					if ( !(target.types[i]==null) )
+						return false;
+				} else 
+					if ( !types[i].equals( target.types[i] ) )
+						return false;
+			}
+
+			return true;
+		}
+	}
 }

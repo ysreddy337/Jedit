@@ -31,81 +31,95 @@
  *                                                                           *
  *****************************************************************************/
 
-
 package bsh;
 
-import java.util.Vector;
-
-/*
-	This shouldn't have to be public.	
-	We should add to bsh.This allowing us to invoke a method.
-	If we do that we should probably use it in Reflect.java
-
-	Note: caching of the structure is done in BshMethod
-	no caching need be done here or in formal param, etc.
-*/
 class BSHMethodDeclaration extends SimpleNode
 {
-	String name;
-	BSHFormalParameters params;
-	BSHBlock block;
-	Object returnType; 	// null (none), Primitive.VOID, or a Class
+	public String name;
 
-	BSHMethodDeclaration(int id)
+	// Begin Child node structure evaluated by insureNodesParsed
+
+	BSHReturnType returnTypeNode;
+	BSHFormalParameters paramsNode;
+	BSHBlock blockNode;
+	// index of the first throws clause child node
+	int firstThrowsClause;
+
+	// End Child node structure evaluated by insureNodesParsed
+
+	public Modifiers modifiers;
+
+	// Unsafe caching of type here.
+	Class returnType;  // null (none), Void.TYPE, or a Class
+	int numThrows = 0;
+
+	BSHMethodDeclaration(int id) { super(id); }
+
+	/**
+		Set the returnTypeNode, paramsNode, and blockNode based on child
+		node structure.  No evaluation is done here.
+	*/
+	synchronized void insureNodesParsed() 
 	{
-		super(id);
+		if ( paramsNode != null ) // there is always a paramsNode
+			return;
+
+		Object firstNode = jjtGetChild(0);
+		firstThrowsClause = 1;
+		if ( firstNode instanceof BSHReturnType )
+		{
+			returnTypeNode = (BSHReturnType)firstNode;
+			paramsNode = (BSHFormalParameters)jjtGetChild(1);
+			if ( jjtGetNumChildren() > 2+numThrows )
+				blockNode = (BSHBlock)jjtGetChild(2+numThrows); // skip throws
+			++firstThrowsClause;
+		}
+		else
+		{
+			paramsNode = (BSHFormalParameters)jjtGetChild(0);
+			blockNode = (BSHBlock)jjtGetChild(1+numThrows); // skip throws
+		}
+	}
+
+	/**
+		Evaluate the return type node.
+		@return the type or null indicating loosely typed return
+	*/
+	Class evalReturnType( CallStack callstack, Interpreter interpreter )
+		throws EvalError
+	{
+		insureNodesParsed();
+		if ( returnTypeNode != null )
+			return returnTypeNode.evalReturnType( callstack, interpreter );
+		else 
+			return null;
+	}
+
+	String getReturnTypeDescriptor( 
+		CallStack callstack, Interpreter interpreter, String defaultPackage )
+	{
+		insureNodesParsed();
+		if ( returnTypeNode == null )
+			return null;
+		else
+			return returnTypeNode.getTypeDescriptor( 
+				callstack, interpreter, defaultPackage );
+	}
+
+	BSHReturnType getReturnTypeNode() {
+		insureNodesParsed();
+		return returnTypeNode;
 	}
 
 	/**
 		Evaluate the declaration of the method.  That is, determine the
 		structure of the method and install it into the caller's namespace.
-	
-		Since the structure of the method is only determined by type evaluation
-		(through eval of BSHFormalParameters) we do not need the interpreter 
-		or callstack.
 	*/
-	public Object eval( NameSpace namespace )  
+	public Object eval( CallStack callstack, Interpreter interpreter )
 		throws EvalError
 	{
-		if ( block == null ) 
-		{
-			// We will allow methods to be re-written.
-			/*  
-			if( namespace has method )
-				throw new EvalError(
-				"Method: " + name + " already defined in scope", this);
-			*/
-
-			if(jjtGetNumChildren() == 3)
-			{
-				returnType = 
-					((BSHReturnType)jjtGetChild(0)).getReturnType( namespace );
-				params = (BSHFormalParameters)jjtGetChild(1);
-				block = (BSHBlock)jjtGetChild(2);
-			}
-			else
-			{
-				params = (BSHFormalParameters)jjtGetChild(0);
-				block = (BSHBlock)jjtGetChild(1);
-			}
-			params.eval( namespace );
-
-			// if strictJava mode, check for loose parameters and return type
-			if ( Interpreter.strictJava )
-			{
-				for(int i=0; i<params.argTypes.length; i++)
-					if ( params.argTypes[i] == null )
-						throw new EvalError(
-					"(Strict Java Mode) Undeclared argument type, parameter: " +
-						params.argNames[i] + " in method: " 
-						+ name, this );
-
-				if ( returnType == null )
-					throw new EvalError(
-					"(Strict Java Mode) Undeclared return type for method: "
-						+ name, this );
-			}
-		}
+		returnType = evalReturnType( callstack, interpreter );
+		evalNodes( callstack, interpreter );
 
 		// Install an *instance* of this method in the namespace.
 		// See notes in BshMethod 
@@ -114,9 +128,49 @@ class BSHMethodDeclaration extends SimpleNode
 // need a way to update eval without re-installing...
 // so that we can re-eval params, etc. when classloader changes
 // look into this
-		namespace.setMethod( name, new BshMethod( this, namespace ) );
+
+		NameSpace namespace = callstack.top();
+		BshMethod bshMethod = new BshMethod( this, namespace, modifiers );
+		try {
+			namespace.setMethod( name, bshMethod );
+		} catch ( UtilEvalError e ) {
+			throw e.toEvalError(this,callstack);
+		}
 
 		return Primitive.VOID;
+	}
+
+	private void evalNodes( CallStack callstack, Interpreter interpreter ) 
+		throws EvalError
+	{
+		insureNodesParsed();
+		
+		// validate that the throws names are class names
+		for(int i=firstThrowsClause; i<numThrows+firstThrowsClause; i++)
+			((BSHAmbiguousName)jjtGetChild(i)).toClass( 
+				callstack, interpreter );
+
+		paramsNode.eval( callstack, interpreter );
+
+		// if strictJava mode, check for loose parameters and return type
+		if ( interpreter.getStrictJava() )
+		{
+			for(int i=0; i<paramsNode.paramTypes.length; i++)
+				if ( paramsNode.paramTypes[i] == null )
+					// Warning: Null callstack here.  Don't think we need
+					// a stack trace to indicate how we sourced the method.
+					throw new EvalError(
+				"(Strict Java Mode) Undeclared argument type, parameter: " +
+					paramsNode.getParamNames()[i] + " in method: " 
+					+ name, this, null );
+
+			if ( returnType == null )
+				// Warning: Null callstack here.  Don't think we need
+				// a stack trace to indicate how we sourced the method.
+				throw new EvalError(
+				"(Strict Java Mode) Undeclared return type for method: "
+					+ name, this, null );
+		}
 	}
 
 	public String toString() {

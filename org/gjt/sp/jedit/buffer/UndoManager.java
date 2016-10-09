@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2001, 2002 Slava Pestov
+ * Copyright (C) 2001, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,8 +23,6 @@
 package org.gjt.sp.jedit.buffer;
 
 //{{{ Imports
-import java.util.ArrayList;
-import org.gjt.sp.jedit.textarea.JEditTextArea;
 import org.gjt.sp.jedit.Buffer;
 import org.gjt.sp.util.Log;
 //}}}
@@ -37,7 +35,7 @@ import org.gjt.sp.util.Log;
  * called through, implements such protection.
  *
  * @author Slava Pestov
- * @version $Id: UndoManager.java,v 1.13 2003/01/31 18:28:51 spestov Exp $
+ * @version $Id: UndoManager.java,v 1.25 2004/07/04 06:56:17 spestov Exp $
  * @since jEdit 4.0pre1
  */
 public class UndoManager
@@ -46,7 +44,6 @@ public class UndoManager
 	public UndoManager(Buffer buffer)
 	{
 		this.buffer = buffer;
-		undos = new ArrayList(100);
 	} //}}}
 
 	//{{{ setLimit() method
@@ -58,43 +55,49 @@ public class UndoManager
 	//{{{ clear() method
 	public void clear()
 	{
-		undos.clear();
-		undoPos = undoCount = 0;
+		undosFirst = undosLast = redosFirst = redosLast = null;
+		undoCount = 0;
 	} //}}}
 
 	//{{{ undo() method
-	public boolean undo(JEditTextArea textArea)
+	public int undo()
 	{
 		if(insideCompoundEdit())
 			throw new InternalError("Unbalanced begin/endCompoundEdit()");
 
-		if(undoPos == 0)
-			return false;
+		if(undosLast == null)
+			return -1;
 		else
 		{
-			Edit edit = (Edit)undos.get(--undoPos);
-			int caret = edit.undo();
-			if(caret != -1)
-				textArea.setCaretPosition(caret);
-			return true;
+			undoCount--;
+
+			int caret = undosLast.undo();
+			redosFirst = undosLast;
+			undosLast = undosLast.prev;
+			if(undosLast == null)
+				undosFirst = null;
+			return caret;
 		}
 	} //}}}
 
 	//{{{ redo() method
-	public boolean redo(JEditTextArea textArea)
+	public int redo()
 	{
 		if(insideCompoundEdit())
 			throw new InternalError("Unbalanced begin/endCompoundEdit()");
 
-		if(undoPos == undoCount)
-			return false;
+		if(redosFirst == null)
+			return -1;
 		else
 		{
-			Edit edit = (Edit)undos.get(undoPos++);
-			int caret = edit.redo();
-			if(caret != -1)
-				textArea.setCaretPosition(caret);
-			return true;
+			undoCount++;
+
+			int caret = redosFirst.redo();
+			undosLast = redosFirst;
+			if(undosFirst == null)
+				undosFirst = undosLast;
+			redosFirst = redosFirst.next;
+			return caret;
 		}
 	} //}}}
 
@@ -117,17 +120,12 @@ public class UndoManager
 		}
 		else if(compoundEditCount == 1)
 		{
-			switch(compoundEdit.undos.size())
-			{
-			case 0:
+			if(compoundEdit.first == null)
 				/* nothing done between begin/end calls */;
-				break;
-			case 1:
-				addEdit((Edit)compoundEdit.undos.get(0));
-				break;
-			default:
+			else if(compoundEdit.first == compoundEdit.last)
+				addEdit(compoundEdit.first);
+			else
 				addEdit(compoundEdit);
-			}
 
 			compoundEdit = null;
 		}
@@ -144,9 +142,11 @@ public class UndoManager
 	//{{{ contentInserted() method
 	public void contentInserted(int offset, int length, String text, boolean clearDirty)
 	{
-		Edit toMerge = getLastEdit();
+		Edit last = getLastEdit();
+		Edit toMerge = getMergeEdit();
 
-		if(!clearDirty && toMerge instanceof Insert)
+		if(!clearDirty && toMerge instanceof Insert
+			&& redosFirst == null)
 		{
 			Insert ins = (Insert)toMerge;
 			if(ins.offset == offset)
@@ -163,16 +163,16 @@ public class UndoManager
 			}
 		}
 
-		Insert ins = new Insert(offset,length,text,clearDirty);
+		Insert ins = new Insert(this,offset,length,text);
+
 		if(clearDirty)
 		{
-			if(clearDirtyEdit != null)
-				clearDirtyEdit.clearDirty = false;
-			clearDirtyEdit = ins;
+			redoClearDirty = last;
+			undoClearDirty = ins;
 		}
 
 		if(compoundEdit != null)
-			compoundEdit.undos.add(ins);
+			compoundEdit.add(ins);
 		else
 			addEdit(ins);
 	} //}}}
@@ -180,110 +180,121 @@ public class UndoManager
 	//{{{ contentRemoved() method
 	public void contentRemoved(int offset, int length, String text, boolean clearDirty)
 	{
-		Edit toMerge = getLastEdit();
+		Edit last = getLastEdit();
+		Edit toMerge = getMergeEdit();
 
-		if(!clearDirty && toMerge instanceof Remove)
+		if(!clearDirty && toMerge instanceof Remove
+			&& redosFirst == null)
 		{
 			Remove rem = (Remove)toMerge;
 			if(rem.offset == offset)
 			{
 				rem.str = rem.str.concat(text);
+				rem.hashcode = rem.str.hashCode();
 				rem.length += length;
+				KillRing.changed(rem);
 				return;
 			}
 			else if(offset + length == rem.offset)
 			{
 				rem.str = text.concat(rem.str);
+				rem.hashcode = rem.str.hashCode();
 				rem.length += length;
 				rem.offset = offset;
+				KillRing.changed(rem);
 				return;
 			}
 		}
 
-		Remove rem = new Remove(offset,length,text,clearDirty);
+		Remove rem = new Remove(this,offset,length,text);
 		if(clearDirty)
 		{
-			if(clearDirtyEdit != null)
-				clearDirtyEdit.clearDirty = false;
-			clearDirtyEdit = rem;
+			redoClearDirty = last;
+			undoClearDirty = rem;
 		}
 
 		if(compoundEdit != null)
-			compoundEdit.undos.add(rem);
+			compoundEdit.add(rem);
 		else
 			addEdit(rem);
+
+		KillRing.add(rem);
 	} //}}}
 
 	//{{{ bufferSaved() method
 	public void bufferSaved()
 	{
-		if(clearDirtyEdit != null)
-		{
-			clearDirtyEdit.clearDirty = false;
-			clearDirtyEdit = null;
-		}
+		redoClearDirty = getLastEdit();
+		if(redosFirst instanceof CompoundEdit)
+			undoClearDirty = ((CompoundEdit)redosFirst).first;
+		else
+			undoClearDirty = redosFirst;
 	} //}}}
 
 	//{{{ Private members
 
 	//{{{ Instance variables
 	private Buffer buffer;
-	private ArrayList undos;
+
+	// queue of undos. last is most recent, first is oldest
+	private Edit undosFirst;
+	private Edit undosLast;
+
+	// queue of redos. first is most recent, last is oldest
+	private Edit redosFirst;
+	private Edit redosLast;
+
 	private int limit;
-	private int undoPos;
 	private int undoCount;
 	private int compoundEditCount;
 	private CompoundEdit compoundEdit;
-	private Edit clearDirtyEdit;
+	private Edit undoClearDirty, redoClearDirty;
 	//}}}
 
 	//{{{ addEdit() method
 	private void addEdit(Edit edit)
 	{
-		//System.err.println("adding undo with position " + undoPos);
-		undos.add(undoPos++,edit);
-
-		for(int i = undoCount - 1; i >= undoPos; i--)
+		if(undosFirst == null)
+			undosFirst = undosLast = edit;
+		else
 		{
-			//System.err.println("removing undo with position " + i);
-			undos.remove(i);
+			undosLast.next = edit;
+			edit.prev = undosLast;
+			undosLast = edit;
 		}
 
-		if(undoPos > limit)
-		{
-			//System.err.println("removing undo 0");
-			undos.remove(0);
-			undoPos--;
-		}
+		redosFirst = redosLast = null;
 
-		undoCount = undoPos;
+		undoCount++;
+
+		while(undoCount > limit)
+		{
+			undoCount--;
+
+			if(undosFirst == undosLast)
+				undosFirst = undosLast = null;
+			else
+			{
+				undosFirst.next.prev = null;
+				undosFirst = undosFirst.next;
+			}
+		}
+	} //}}}
+
+	//{{{ getMergeEdit() method
+	private Edit getMergeEdit()
+	{
+		Edit last = getLastEdit();
+		return (compoundEdit != null ? compoundEdit.last : last);
 	} //}}}
 
 	//{{{ getLastEdit() method
 	private Edit getLastEdit()
 	{
-		if(compoundEdit != null)
-		{
-			int size = compoundEdit.undos.size();
-			if(size != 0)
-				return (Edit)compoundEdit.undos.get(size - 1);
-			else
-				return null;
-		}
-		else if(undoCount != 0 && undoPos != 0)
-		{
-			Edit e = (Edit)undos.get(undoPos - 1);
-			if(e instanceof CompoundEdit)
-			{
-				CompoundEdit c = (CompoundEdit)e;
-				return (Edit)c.undos.get(c.undos.size() - 1);
-			}
-		}
-
-		if(undoPos != 0)
-			return (Edit)undos.get(undoPos - 1);
+		if(undosLast instanceof CompoundEdit)
+			return ((CompoundEdit)undosLast).last;
 		else
-			return null;
+			return undosLast;
 	} //}}}
 
 	//}}}
@@ -291,8 +302,10 @@ public class UndoManager
 	//{{{ Inner classes
 
 	//{{{ Edit class
-	abstract class Edit
+	abstract static class Edit
 	{
+		Edit prev, next;
+
 		//{{{ undo() method
 		abstract int undo();
 		//}}}
@@ -300,86 +313,101 @@ public class UndoManager
 		//{{{ redo() method
 		abstract int redo();
 		//}}}
-
-		boolean clearDirty;
 	} //}}}
 
 	//{{{ Insert class
-	class Insert extends Edit
+	static class Insert extends Edit
 	{
 		//{{{ Insert constructor
-		Insert(int offset, int length, String str, boolean clearDirty)
+		Insert(UndoManager mgr, int offset, int length, String str)
 		{
+			this.mgr = mgr;
 			this.offset = offset;
 			this.length = length;
 			this.str = str;
-			this.clearDirty = clearDirty;
 		} //}}}
 
 		//{{{ undo() method
 		int undo()
 		{
-			buffer.remove(offset,length);
-			if(clearDirty)
-				buffer.setDirty(false);
+			mgr.buffer.remove(offset,length);
+			if(mgr.undoClearDirty == this)
+				mgr.buffer.setDirty(false);
 			return offset;
 		} //}}}
 
 		//{{{ redo() method
 		int redo()
 		{
-			buffer.insert(offset,str);
+			mgr.buffer.insert(offset,str);
+			if(mgr.redoClearDirty == this)
+				mgr.buffer.setDirty(false);
 			return offset + length;
 		} //}}}
 
+		UndoManager mgr;
 		int offset;
 		int length;
 		String str;
 	} //}}}
 
 	//{{{ Remove class
-	class Remove extends Edit
+	static class Remove extends Edit
 	{
 		//{{{ Remove constructor
-		Remove(int offset, int length, String str, boolean clearDirty)
+		Remove(UndoManager mgr, int offset, int length, String str)
 		{
+			this.mgr = mgr;
 			this.offset = offset;
 			this.length = length;
 			this.str = str;
-			this.clearDirty = clearDirty;
+			hashcode = str.hashCode();
 		} //}}}
 
 		//{{{ undo() method
 		int undo()
 		{
-			buffer.insert(offset,str);
-			if(clearDirty)
-				buffer.setDirty(false);
+			mgr.buffer.insert(offset,str);
+			if(mgr.undoClearDirty == this)
+				mgr.buffer.setDirty(false);
 			return offset + length;
 		} //}}}
 
 		//{{{ redo() method
 		int redo()
 		{
-			buffer.remove(offset,length);
+			mgr.buffer.remove(offset,length);
+			if(mgr.redoClearDirty == this)
+				mgr.buffer.setDirty(false);
 			return offset;
 		} //}}}
 
+		//{{{ toString() method
+		public String toString()
+		{
+			return str;
+		} //}}}
+
+		UndoManager mgr;
 		int offset;
 		int length;
 		String str;
+		int hashcode;
+		boolean inKillRing;
 	} //}}}
 
 	//{{{ CompoundEdit class
-	class CompoundEdit extends Edit
+	static class CompoundEdit extends Edit
 	{
 		//{{{ undo() method
 		public int undo()
 		{
 			int retVal = -1;
-			for(int i = undos.size() - 1; i >= 0; i--)
+			Edit edit = last;
+			while(edit != null)
 			{
-				retVal = ((Edit)undos.get(i)).undo();
+				retVal = edit.undo();
+				edit = edit.prev;
 			}
 			return retVal;
 		} //}}}
@@ -388,14 +416,29 @@ public class UndoManager
 		public int redo()
 		{
 			int retVal = -1;
-			for(int i = 0; i < undos.size(); i++)
+			Edit edit = first;
+			while(edit != null)
 			{
-				retVal = ((Edit)undos.get(i)).redo();
+				retVal = edit.redo();
+				edit = edit.next;
 			}
 			return retVal;
 		} //}}}
 
-		ArrayList undos = new ArrayList();
+		//{{{ add() method
+		public void add(Edit edit)
+		{
+			if(first == null)
+				first = last = edit;
+			else
+			{
+				edit.prev = last;
+				last.next = edit;
+				last = edit;
+			}
+		} //}}}
+
+		Edit first, last;
 	} //}}}
 
 	//}}}

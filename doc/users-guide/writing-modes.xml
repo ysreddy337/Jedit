@@ -288,7 +288,7 @@
    </para>
   </sect2>
   
-  <sect2><title>Rule Ordering Requirements</title>
+  <sect2 id="rule-ordering"><title>Rule Ordering Requirements</title>
    <para>
     You might encounter this very common pitfall when writing your own modes.
    </para>
@@ -408,11 +408,23 @@
    <listitem><para><literal>EXCLUDE_MATCH</literal> - If set to
    <literal>TRUE</literal>, the start and end sequences will not be highlighted,
    only the text between them will.</para></listitem>
+   <listitem><para><literal>NO_ESCAPE</literal> - If set to
+   <literal>TRUE</literal>, the ruleset's escape character will have no
+   effect before the span's end string. Otherwise, the presence of the escape
+   character will cause that occurrence of the end string to be ignored.</para></listitem>
    <listitem><para><literal>NO_LINE_BREAK</literal> - If set to
    <literal>TRUE</literal>, the span will not cross line breaks.</para></listitem>
    <listitem><para><literal>NO_WORD_BREAK</literal> - If set to
    <literal>TRUE</literal>, the span will not cross word breaks.</para></listitem>
   </itemizedlist>
+  <para>
+   Note that the <literal>AT_LINE_START</literal>,
+   <literal>AT_WHITESPACE_END</literal> and
+   <literal>AT_WORD_START</literal> attributes can also be used on the
+   <literal>BEGIN</literal> and <literal>END</literal> elements. Setting these
+   attributes to the same value on both elements has the same effect as
+   setting them on the <literal>SPAN</literal> element.
+  </para>
   <para>
    Here is a <literal>SPAN</literal> that highlights Java string literals,
    which cannot include line breaks:
@@ -448,12 +460,25 @@
    the <literal>SPAN</literal> tag, the
    <literal>HASH_CHAR</literal> attribute must be specified. It must be set to
    the first character that
-   the regular expression matches. Note that this disallows regular expressions
-   which can match more than one character at the start position.
+   the regular expression matches.  This rules out using regular expressions
+   which can match more than one character at the start position. The regular expression match cannot span more than one line, either.
+  </para>
+  <para>
+   Any text matched by groups in the <literal>BEGIN</literal> regular
+   expression is substituted in the <literal>END</literal> string. See
+   below for an example of where this is useful.
   </para>
   <para>
    Regular expression syntax is described in <xref linkend="regexps" />.
   </para>
+  <para>
+   Here is a <literal>SPAN_REGEXP</literal> rule that highlights
+   <quote>read-ins</quote> in shell scripts:
+  </para>
+  <programlisting>&lt;SPAN_REGEXP HASH_CHAR="&lt;" TYPE="LITERAL1" DELEGATE="LITERAL"&gt;
+    &lt;BEGIN&gt;&lt;![CDATA[&lt;&lt;[[:space:]'"]*([[:alnum:]_]+)[[:space:]'"]*]]&gt;&lt;/BEGIN&gt;
+    &lt;END&gt;$1&lt;/END&gt;
+&lt;/SPAN_REGEXP&gt;</programlisting>
   <para>
    Here is a <literal>SPAN_REGEXP</literal> rule that highlights constructs
    placed between <literal>&lt;#ftl</literal> and <literal>&gt;</literal>,
@@ -510,12 +535,16 @@
    the <literal>EOL_SPAN</literal> tag, the
    <literal>HASH_CHAR</literal> attribute must be specified. It must be set to
    the first character that
-   the regular expression matches. Note that this disallows regular expressions
-   which can match more than one character at the start position.
+   the regular expression matches.  This rules out using regular expressions
+   which can match more than one character at the start position. The regular expression match cannot span more than one line, either.
   </para>
   <para>
    Regular expression syntax is described in <xref linkend="regexps" />.
   </para>
+  <para>
+   Here is an <literal>EOL_SPAN_REGEXP</literal> that highlights MS-DOS batch file comments, which start with <literal>REM</literal>, followed by any whitespace character, and extend until the end of the line:
+  </para>
+  <programlisting><![CDATA[<EOL_SPAN_REGEXP AT_WHITESPACE_END="TRUE" HASH_CHAR="R" TYPE="COMMENT1">REM\s</EOL_SPAN_REGEXP>]]></programlisting>
  </sect1>
  <sect1 id="mode-rule-mark-prev"><title>The MARK_PREVIOUS Tag</title>
   <para>
@@ -628,8 +657,8 @@
    the <literal>SEQ</literal> tag, the
    <literal>HASH_CHAR</literal> attribute must be specified. It must be set to
    the first character that
-   the regular expression matches. Note that this disallows regular expressions
-   which can match more than one character at the start position.
+   the regular expression matches. This rules out using regular expressions
+   which can match more than one character at the start position. The regular expression match cannot span more than one line, either.
   </para>
   <para>
    Here is an example of a <literal>SEQ_REGEXP</literal> rule that highlights
@@ -643,6 +672,45 @@
   <para>
    Regular expression syntax is described in <xref linkend="regexps" />.
   </para>
+ </sect1>
+ <sect1 id="mode-rule-import"><title>The IMPORT Tag</title>
+  <para>
+   The <literal>IMPORT</literal> tag, which must be placed inside a <literal>RULES</literal> tag, loads all rules defined in a given ruleset into the current ruleset; in other words, it has the same effect as copying and pasting the imported ruleset.
+  </para>
+  <para>
+   The only required attribute <literal>DELEGATE</literal> must be set to the name of a ruleset. To import a ruleset defined
+   in the current mode, just specify its name. To import a ruleset
+   defined in another mode, specify a name of the form
+   <literal><replaceable>mode</replaceable>::<replaceable>ruleset</replaceable></literal>.
+   Note that the first (unnamed) ruleset in a mode is called
+   <quote>MAIN</quote>.
+  </para>
+  <para>
+   One quirk is that the definition of the imported ruleset is not copied to the location of the <literal>IMPORT</literal> tag, but rather to the end of the containing ruleset. This has implications with rule-ordering; see <xref linkend="rule-ordering"/>.
+  </para>
+  <para>
+   Here is an example from the PHP mode, which extends the inline JavaScript highlighting to support embedded PHP:
+  </para>
+  <programlisting>
+   <![CDATA[<RULES SET="JAVASCRIPT+PHP">
+
+   <SPAN TYPE="MARKUP" DELEGATE="php::PHP">
+       <BEGIN>&lt;?php</BEGIN>
+       <END>?&gt;</END>
+   </SPAN>
+   
+   <SPAN TYPE="MARKUP" DELEGATE="php::PHP">
+       <BEGIN>&lt;?</BEGIN>
+       <END>?&gt;</END>
+   </SPAN>
+   
+   <SPAN TYPE="MARKUP" DELEGATE="php::PHP">
+       <BEGIN>&lt;%=</BEGIN>
+       <END>%&gt;</END>
+   </SPAN>
+
+   <IMPORT DELEGATE="javascript::MAIN"/>
+</RULES>]]></programlisting>
  </sect1>
  <sect1 id="mode-rule-keywords"><title>The KEYWORDS Tag</title>
   <para>
@@ -683,6 +751,10 @@
   </para></listitem>
   <listitem><para><literal>COMMENT2</literal>
   </para></listitem>
+  <listitem><para><literal>COMMENT3</literal>
+  </para></listitem>
+  <listitem><para><literal>COMMENT4</literal>
+  </para></listitem>
   <listitem><para><literal>FUNCTION</literal>
   </para></listitem>
   <listitem><para><literal>INVALID</literal><!--  - tokens of this type are
@@ -696,11 +768,17 @@
   </para></listitem>
   <listitem><para><literal>KEYWORD3</literal>
   </para></listitem>
+  <listitem><para><literal>KEYWORD4</literal>
+  </para></listitem>
   <listitem><para><literal>LABEL</literal>
   </para></listitem>
   <listitem><para><literal>LITERAL1</literal>
   </para></listitem>
   <listitem><para><literal>LITERAL2</literal>
+  </para></listitem>
+  <listitem><para><literal>LITERAL3</literal>
+  </para></listitem>
+  <listitem><para><literal>LITERAL4</literal>
   </para></listitem>
   <listitem><para><literal>MARKUP</literal>
   </para></listitem>

@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 2000, 2004 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,8 +24,10 @@ package org.gjt.sp.jedit;
 
 //{{{ Imports
 import bsh.*;
-import java.lang.reflect.InvocationTargetException;
 import java.io.*;
+import java.lang.ref.*;
+import java.lang.reflect.InvocationTargetException;
+import java.util.*;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.jedit.gui.BeanShellErrorDialog;
 import org.gjt.sp.jedit.textarea.*;
@@ -43,15 +45,19 @@ import org.gjt.sp.util.Log;
  * <li><code>editPane</code> - the currently active {@link EditPane}.</li>
  * <li><code>textArea</code> - the edit pane's {@link JEditTextArea}.</li>
  * <li><code>buffer</code> - the edit pane's {@link Buffer}.</li>
+ * <li><code>wm</code> - the view's {@link
+ * org.gjt.sp.jedit.gui.DockableWindowManager}.</li>
  * <li><code>scriptPath</code> - the path name of the currently executing
  * BeanShell script.</li>
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: BeanShell.java,v 1.31 2003/02/15 22:17:55 spestov Exp $
+ * @version $Id: BeanShell.java,v 1.44 2004/02/22 20:00:50 spestov Exp $
  */
 public class BeanShell
 {
+	private static final String REQUIRED_VERSION = "2.0b1.1-jedit-1";
+
 	//{{{ evalSelection() method
 	/**
 	 * Evaluates the text selected in the specified text area.
@@ -138,47 +144,30 @@ public class BeanShell
 		if(!command.endsWith(";"))
 			command = command + ";";
 
+		String script = "int[] lines = textArea.getSelectedLines();\n"
+			+ "for(int i = 0; i < lines.length; i++)\n"
+			+ "{\n"
+				+ "line = lines[i];\n"
+				+ "index = line - lines[0];\n"
+				+ "start = buffer.getLineStartOffset(line);\n"
+				+ "end = buffer.getLineEndOffset(line);\n"
+				+ "text = buffer.getText(start,end - start - 1);\n"
+				+ "newText = " + command + "\n"
+				+ "if(newText != null)\n"
+				+ "{\n"
+					+ "buffer.remove(start,end - start - 1);\n"
+					+ "buffer.insert(start,String.valueOf(newText));\n"
+				+ "}\n"
+			+ "}\n";
+
 		if(view.getMacroRecorder() != null)
-			view.getMacroRecorder().record(1,command);
+			view.getMacroRecorder().record(1,script);
 
 		try
 		{
 			buffer.beginCompoundEdit();
 
-			for(int i = 0; i < selection.length; i++)
-			{
-				Selection s = selection[i];
-				for(int j = s.getStartLine(); j <= s.getEndLine(); j++)
-				{
-					// if selection ends on the start of a
-					// line, don't filter that line
-					if(s.getEnd() == textArea.getLineStartOffset(j))
-						break;
-
-					global.setVariable("line",new Integer(j));
-					global.setVariable("index",new Integer(
-						j - s.getStartLine()));
-					int start = s.getStart(buffer,j);
-					int end = s.getEnd(buffer,j);
-					String text = buffer.getText(start,
-						end - start);
-					global.setVariable("text",text);
-
-					Object returnValue = _eval(view,global,command);
-					if(returnValue != null)
-					{
-						buffer.remove(start,end - start);
-						buffer.insert(start,
-							returnValue.toString());
-					}
-				}
-			}
-		}
-		catch(Throwable e)
-		{
-			Log.log(Log.ERROR,BeanShell.class,e);
-
-			handleException(view,null,e);
+			BeanShell.eval(view,global,script);
 		}
 		finally
 		{
@@ -228,6 +217,41 @@ public class BeanShell
 		}
 	} //}}}
 
+	//{{{ runScript() method
+	/**
+	 * Runs a BeanShell script. Errors are shown in a dialog box.<p>
+	 *
+	 * If the <code>in</code> parameter is non-null, the script is
+	 * read from that stream; otherwise it is read from the file identified
+	 * by <code>path</code>.<p>
+	 *
+	 * The <code>scriptPath</code> BeanShell variable is set to the path
+	 * name of the script.
+	 *
+	 * @param view The view. Within the script, references to
+	 * <code>buffer</code>, <code>textArea</code> and <code>editPane</code>
+	 * are determined with reference to this parameter.
+	 * @param path The script file's VFS path.
+	 * @param in The reader to read the script from, or <code>null</code>.
+	 * @param namespace The namespace to run the script in.
+	 *
+	 * @since jEdit 4.2pre5
+	 */
+	public static void runScript(View view, String path, Reader in,
+		NameSpace namespace)
+	{
+		try
+		{
+			_runScript(view,path,in,namespace);
+		}
+		catch(Throwable e)
+		{
+			Log.log(Log.ERROR,BeanShell.class,e);
+
+			handleException(view,path,e);
+		}
+	} //}}}
+
 	//{{{ _runScript() method
 	/**
 	 * Runs a BeanShell script. Errors are passed to the caller.<p>
@@ -257,13 +281,36 @@ public class BeanShell
 	public static void _runScript(View view, String path, Reader in,
 		boolean ownNamespace) throws Exception
 	{
-		Log.log(Log.MESSAGE,BeanShell.class,"Running script " + path);
+		_runScript(view,path,in,ownNamespace
+			? new NameSpace(global,"script namespace")
+			: global);
+	} //}}}
 
-		NameSpace namespace;
-		if(ownNamespace)
-			namespace = new NameSpace(global,"script namespace");
-		else
-			namespace = global;
+	//{{{ _runScript() method
+	/**
+	 * Runs a BeanShell script. Errors are passed to the caller.<p>
+	 *
+	 * If the <code>in</code> parameter is non-null, the script is
+	 * read from that stream; otherwise it is read from the file identified
+	 * by <code>path</code>.<p>
+	 *
+	 * The <code>scriptPath</code> BeanShell variable is set to the path
+	 * name of the script.
+	 *
+	 * @param view The view. Within the script, references to
+	 * <code>buffer</code>, <code>textArea</code> and <code>editPane</code>
+	 * are determined with reference to this parameter.
+	 * @param path The script file's VFS path.
+	 * @param in The reader to read the script from, or <code>null</code>.
+	 * @param namespace The namespace to run the script in.
+	 * @exception Exception instances are thrown when various BeanShell errors
+	 * occur
+	 * @since jEdit 4.2pre5
+	 */
+	public static void _runScript(View view, String path, Reader in,
+		NameSpace namespace) throws Exception
+	{
+		Log.log(Log.MESSAGE,BeanShell.class,"Running script " + path);
 
 		Interpreter interp = createInterpreter(namespace);
 
@@ -300,15 +347,7 @@ public class BeanShell
 				}
 			}
 
-			if(view != null)
-			{
-				interp.set("view",view);
-				EditPane editPane = view.getEditPane();
-				interp.set("editPane",editPane);
-				interp.set("buffer",editPane.getBuffer());
-				interp.set("textArea",editPane.getTextArea());
-			}
-
+			setupDefaultVariables(namespace,view);
 			interp.set("scriptPath",path);
 
 			running = true;
@@ -340,16 +379,9 @@ public class BeanShell
 			try
 			{
 				// no need to do this for macros!
-				if(!ownNamespace)
+				if(namespace == global)
 				{
-					if(view != null)
-					{
-						interp.unset("view");
-						interp.unset("editPane");
-						interp.unset("buffer");
-						interp.unset("textArea");
-					}
-
+					resetDefaultVariables(namespace);
 					interp.unset("scriptPath");
 				}
 			}
@@ -408,15 +440,9 @@ public class BeanShell
 
 		try
 		{
-			if(view != null)
-			{
-				EditPane editPane = view.getEditPane();
-				interp.set("view",view);
-				interp.set("editPane",editPane);
-				interp.set("buffer",editPane.getBuffer());
-				interp.set("textArea",editPane.getTextArea());
-			}
-
+			setupDefaultVariables(namespace,view);
+			if(Debug.BEANSHELL_DEBUG)
+				Log.log(Log.DEBUG,BeanShell.class,command);
 			return interp.eval(command);
 		}
 		catch(Exception e)
@@ -429,15 +455,9 @@ public class BeanShell
 		{
 			try
 			{
-				if(view != null)
-				{
-					interp.unset("view");
-					interp.unset("editPane");
-					interp.unset("buffer");
-					interp.unset("textArea");
-				}
+				resetDefaultVariables(namespace);
 			}
-			catch(EvalError e)
+			catch(UtilEvalError e)
 			{
 				// do nothing
 			}
@@ -498,14 +518,7 @@ public class BeanShell
 
 		try
 		{
-			if(view != null)
-			{
-				namespace.setVariable("view",view);
-				EditPane editPane = view.getEditPane();
-				namespace.setVariable("editPane",editPane);
-				namespace.setVariable("buffer",editPane.getBuffer());
-				namespace.setVariable("textArea",editPane.getTextArea());
-			}
+			setupDefaultVariables(namespace,view);
 
 			Object retVal = method.invoke(useNamespace
 				? new Object[] { namespace }
@@ -529,20 +542,7 @@ public class BeanShell
 		}
 		finally
 		{
-			if(view != null)
-			{
-				try
-				{
-					namespace.setVariable("view",null);
-					namespace.setVariable("editPane",null);
-					namespace.setVariable("buffer",null);
-					namespace.setVariable("textArea",null);
-				}
-				catch(EvalError e)
-				{
-					// can't do much
-				}
-			}
+			resetDefaultVariables(namespace);
 		}
 	} //}}}
 
@@ -621,15 +621,30 @@ public class BeanShell
 	//{{{ init() method
 	static void init()
 	{
-		BshClassManager.setClassLoader(new JARClassLoader());
+		try
+		{
+			NameSpace.class.getMethod("addCommandPath",
+				new Class[] { String.class, Class.class });
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,BeanShell.class,"You have BeanShell version " + Interpreter.VERSION + " in your CLASSPATH.");
+			Log.log(Log.ERROR,BeanShell.class,"Please remove it from the CLASSPATH since jEdit can only run with the bundled BeanShell version " + REQUIRED_VERSION);
+			System.exit(1);
+		}
 
-		global = new NameSpace("jEdit embedded BeanShell interpreter");
+		classManager = new CustomClassManager();
+		classManager.setClassLoader(new JARClassLoader());
+
+		global = new NameSpace(classManager,
+			"jEdit embedded BeanShell interpreter");
 		global.importPackage("org.gjt.sp.jedit");
 		global.importPackage("org.gjt.sp.jedit.browser");
 		global.importPackage("org.gjt.sp.jedit.buffer");
 		global.importPackage("org.gjt.sp.jedit.gui");
 		global.importPackage("org.gjt.sp.jedit.help");
 		global.importPackage("org.gjt.sp.jedit.io");
+		global.importPackage("org.gjt.sp.jedit.menu");
 		global.importPackage("org.gjt.sp.jedit.msg");
 		global.importPackage("org.gjt.sp.jedit.options");
 		global.importPackage("org.gjt.sp.jedit.pluginmgr");
@@ -640,9 +655,16 @@ public class BeanShell
 		global.importPackage("org.gjt.sp.util");
 
 		interpForMethods = createInterpreter(global);
+	} //}}}
 
-		Log.log(Log.DEBUG,BeanShell.class,"BeanShell interpreter version "
-			+ Interpreter.VERSION);
+	//{{{ resetClassManager() method
+	/**
+	 * Causes BeanShell internal structures to drop references to cached
+	 * Class instances.
+	 */
+	static void resetClassManager()
+	{
+		classManager.reset();
 	} //}}}
 
 	//}}}
@@ -651,10 +673,37 @@ public class BeanShell
 
 	//{{{ Static variables
 	private static final Object[] NO_ARGS = new Object[0];
+	private static CustomClassManager classManager;
 	private static Interpreter interpForMethods;
 	private static NameSpace global;
 	private static boolean running;
 	//}}}
+
+	//{{{ setupDefaultVariables() method
+	private static void setupDefaultVariables(NameSpace namespace, View view)
+		throws UtilEvalError
+	{
+		if(view != null)
+		{
+			EditPane editPane = view.getEditPane();
+			namespace.setVariable("view",view);
+			namespace.setVariable("editPane",editPane);
+			namespace.setVariable("buffer",editPane.getBuffer());
+			namespace.setVariable("textArea",editPane.getTextArea());
+			namespace.setVariable("wm",view.getDockableWindowManager());
+		}
+	} //}}}
+
+	//{{{ resetDefaultVariables() method
+	private static void resetDefaultVariables(NameSpace namespace)
+		throws UtilEvalError
+	{
+		namespace.setVariable("view",null);
+		namespace.setVariable("editPane",null);
+		namespace.setVariable("buffer",null);
+		namespace.setVariable("textArea",null);
+		namespace.setVariable("wm",null);
+	} //}}}
 
 	//{{{ unwrapException() method
 	/**
@@ -703,4 +752,61 @@ public class BeanShell
 	} //}}}
 
 	//}}}
+
+	//{{{ CustomClassManager class
+	static class CustomClassManager extends BshClassManager
+	{
+		private LinkedList listeners = new LinkedList();
+		private ReferenceQueue refQueue = new ReferenceQueue();
+
+		// copy and paste from bsh/classpath/ClassManagerImpl.java...
+		public synchronized void addListener( Listener l )
+		{
+			listeners.add( new WeakReference( l, refQueue) );
+
+			// clean up old listeners
+			Reference deadref;
+			while ( (deadref = refQueue.poll()) != null )
+			{
+				boolean ok = listeners.remove( deadref );
+				if ( ok )
+				{
+					//System.err.println("cleaned up weak ref: "+deadref);
+				}
+				else
+				{
+					if ( Interpreter.DEBUG ) Interpreter.debug(
+						"tried to remove non-existent weak ref: "+deadref);
+				}
+			}
+		}
+
+		public void removeListener( Listener l )
+		{
+			throw new Error("unimplemented");
+		}
+
+		public void reset()
+		{
+			classLoaderChanged();
+		}
+
+		protected synchronized void classLoaderChanged()
+		{
+			// clear the static caches in BshClassManager
+			clearCaches();
+
+			for (Iterator iter = listeners.iterator();
+				iter.hasNext(); )
+			{
+				WeakReference wr = (WeakReference)
+					iter.next();
+				Listener l = (Listener)wr.get();
+				if ( l == null )  // garbage collected
+					iter.remove();
+				else
+					l.classLoaderChanged();
+			}
+		}
+	} //}}}
 }

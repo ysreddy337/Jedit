@@ -26,13 +26,12 @@ package org.gjt.sp.jedit.syntax;
 //{{{ Imports
 import gnu.regexp.RE;
 import java.util.*;
-import org.gjt.sp.jedit.Mode;
 //}}}
 
 /**
  * A set of parser rules.
  * @author mike dillon
- * @version $Id: ParserRuleSet.java,v 1.20 2003/02/23 04:05:21 spestov Exp $
+ * @version $Id: ParserRuleSet.java,v 1.23 2003/06/05 00:01:49 spestov Exp $
  */
 public class ParserRuleSet
 {
@@ -48,24 +47,31 @@ public class ParserRuleSet
 	} //}}}
 
 	//{{{ ParserRuleSet constructor
-	public ParserRuleSet(String name, Mode mode)
+	public ParserRuleSet(String modeName, String setName)
 	{
-		this.name = name;
-		this.mode = mode;
+		this.modeName = modeName;
+		this.setName = setName;
 		ruleMapFirst = new ParserRule[RULE_BUCKET_COUNT];
 		ruleMapLast = new ParserRule[RULE_BUCKET_COUNT];
+		imports = new LinkedList();
+	} //}}}
+
+	//{{{ getModeName() method
+	public String getModeName()
+	{
+		return modeName;
+	} //}}}
+
+	//{{{ getSetName() method
+	public String getSetName()
+	{
+		return setName;
 	} //}}}
 
 	//{{{ getName() method
 	public String getName()
 	{
-		return name;
-	} //}}}
-
-	//{{{ getMode() method
-	public Mode getMode()
-	{
-		return mode;
+		return modeName + "::" + setName;
 	} //}}}
 
 	//{{{ getProperties() method
@@ -79,6 +85,48 @@ public class ParserRuleSet
 	{
 		this.props = props;
 		_noWordSep = null;
+	} //}}}
+
+	//{{{ resolveImports() method
+	/**
+	 * Resolves all rulesets added with {@link #addRuleSet(ParserRuleSet)}.
+	 * @since jEdit 4.2pre3
+	 */
+	public void resolveImports()
+	{
+		Iterator iter = imports.iterator();
+		while(iter.hasNext())
+		{
+			ParserRuleSet ruleset = (ParserRuleSet)iter.next();
+			for(int i = 0; i < ruleset.ruleMapFirst.length; i++)
+			{
+				ParserRule rule = ruleset.ruleMapFirst[i];
+				while(rule != null)
+				{
+					addRule(rule);
+					rule = rule.next;
+				}
+			}
+
+			if(ruleset.keywords != null)
+			{
+				if(keywords == null)
+					keywords = new KeywordMap(ignoreCase);
+				keywords.add(ruleset.keywords);
+			}
+		}
+		imports.clear();
+	} //}}}
+
+	//{{{ addRuleSet() method
+	/**
+	 * Adds all rules contained in the given ruleset.
+	 * @param ruleset The ruleset
+	 * @since jEdit 4.2pre3
+	 */
+	public void addRuleSet(ParserRuleSet ruleset)
+	{
+		imports.add(ruleset);
 	} //}}}
 
 	//{{{ addRule() method
@@ -218,12 +266,20 @@ public class ParserRuleSet
 		_noWordSep = null;
 	} //}}}
 
+	//{{{ isBuiltIn() method
+	/**
+	 * Returns if this is a built-in ruleset.
+	 * @since jEdit 4.2pre1
+	 */
+	public boolean isBuiltIn()
+	{
+		return builtIn;
+	} //}}}
+
 	//{{{ toString() method
 	public String toString()
 	{
-		return getClass().getName() + "[" + (mode == null ? ""
-			: mode.getName()) + "::"
-			+ name + "]";
+		return getClass().getName() + "[" + modeName + "::" + setName + "]";
 	} //}}}
 
 	//{{{ Private members
@@ -236,13 +292,13 @@ public class ParserRuleSet
 		{
 			standard[i] = new ParserRuleSet(null,null);
 			standard[i].setDefault(i);
+			standard[i].builtIn = true;
 		}
 	}
 
 	private static final int RULE_BUCKET_COUNT = 128;
 
-	private String name;
-	private Mode mode;
+	private String modeName, setName;
 	private Hashtable props;
 
 	private KeywordMap keywords;
@@ -251,6 +307,8 @@ public class ParserRuleSet
 
 	private ParserRule[] ruleMapFirst;
 	private ParserRule[] ruleMapLast;
+
+	private LinkedList imports;
 
 	private int terminateChar = -1;
 	private boolean ignoreCase = true;
@@ -262,5 +320,7 @@ public class ParserRuleSet
 
 	private String _noWordSep;
 	private String noWordSep;
+
+	private boolean builtIn;
 	//}}}
 }

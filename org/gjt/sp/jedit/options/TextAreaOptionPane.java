@@ -24,6 +24,8 @@ package org.gjt.sp.jedit.options;
 
 //{{{ Imports
 import javax.swing.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.*;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.*;
@@ -83,6 +85,12 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			jEdit.getColorProperty("view.selectionColor")),
 			GridBagConstraints.VERTICAL);
 
+		/* Multiple selection color */
+		addComponent(jEdit.getProperty("options.textarea.multipleSelection"),
+			multipleSelectionColor = new ColorWellButton(
+			jEdit.getColorProperty("view.multipleSelectionColor")),
+			GridBagConstraints.VERTICAL);
+
 		/* Line highlight */
 		lineHighlight = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".lineHighlight"));
@@ -91,13 +99,13 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			jEdit.getColorProperty("view.lineHighlightColor")),
 			GridBagConstraints.VERTICAL);
 
-		/* Bracket highlight */
-		bracketHighlight = new JCheckBox(jEdit.getProperty("options.textarea"
-			+ ".bracketHighlight"));
-		bracketHighlight.setSelected(jEdit.getBooleanProperty(
-			"view.bracketHighlight"));
-		addComponent(bracketHighlight,bracketHighlightColor = new ColorWellButton(
-			jEdit.getColorProperty("view.bracketHighlightColor")),
+		/* Structure highlight */
+		structureHighlight = new JCheckBox(jEdit.getProperty("options.textarea"
+			+ ".structureHighlight"));
+		structureHighlight.setSelected(jEdit.getBooleanProperty(
+			"view.structureHighlight"));
+		addComponent(structureHighlight,structureHighlightColor = new ColorWellButton(
+			jEdit.getColorProperty("view.structureHighlightColor")),
 			GridBagConstraints.VERTICAL);
 
 		/* EOL markers */
@@ -123,24 +131,22 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			"view.electricBorders")));
 		addComponent(electricBorders);
 
-		/* Non word character selection behavior */
-		joinNonWordChars = new JCheckBox(jEdit.getProperty(
-			"options.textarea.joinNonWordChars"));
-		joinNonWordChars.setSelected(jEdit.getBooleanProperty(
-			"view.joinNonWordChars"));
-		addComponent(joinNonWordChars);
-
-		/* Middle mouse button click pastes % register */
-		middleMousePaste = new JCheckBox(jEdit.getProperty("options.textarea"
-			+ ".middleMousePaste"));
-		middleMousePaste.setSelected(jEdit.getBooleanProperty(
-			"view.middleMousePaste"));
-		addComponent(middleMousePaste);
-
 		/* Anti-aliasing */
 		antiAlias = new JCheckBox(jEdit.getProperty("options.textarea"
 			+ ".antiAlias"));
-		antiAlias.setSelected(jEdit.getBooleanProperty("view.antiAlias"));
+		boolean antiAliasEnabled = jEdit.getBooleanProperty(
+			"view.antiAlias");
+		font.setAntiAliasEnabled(antiAliasEnabled);
+		antiAlias.addActionListener(new ActionListener()
+		{
+			public void actionPerformed(ActionEvent evt)
+			{
+				font.setAntiAliasEnabled(
+					antiAlias.isSelected());
+				font.repaint();
+			}
+		});
+		antiAlias.setSelected(antiAliasEnabled);
 		addComponent(antiAlias);
 
 		/* Fractional font metrics */
@@ -166,14 +172,16 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			.getSelectedColor());
 		jEdit.setColorProperty("view.selectionColor",selectionColor
 			.getSelectedColor());
+		jEdit.setColorProperty("view.multipleSelectionColor",multipleSelectionColor
+			.getSelectedColor());
 		jEdit.setBooleanProperty("view.lineHighlight",lineHighlight
 			.isSelected());
 		jEdit.setColorProperty("view.lineHighlightColor",
 			lineHighlightColor.getSelectedColor());
-		jEdit.setBooleanProperty("view.bracketHighlight",bracketHighlight
+		jEdit.setBooleanProperty("view.structureHighlight",structureHighlight
 			.isSelected());
-		jEdit.setColorProperty("view.bracketHighlightColor",
-			bracketHighlightColor.getSelectedColor());
+		jEdit.setColorProperty("view.structureHighlightColor",
+			structureHighlightColor.getSelectedColor());
 		jEdit.setBooleanProperty("view.eolMarkers",eolMarkers
 			.isSelected());
 		jEdit.setColorProperty("view.eolMarkerColor",
@@ -184,9 +192,6 @@ public class TextAreaOptionPane extends AbstractOptionPane
 			wrapGuideColor.getSelectedColor());
 		jEdit.setIntegerProperty("view.electricBorders",electricBorders
 			.isSelected() ? 3 : 0);
-		jEdit.setBooleanProperty("view.joinNonWordChars",joinNonWordChars.isSelected());
-		jEdit.setBooleanProperty("view.middleMousePaste",
-			middleMousePaste.isSelected());
 		jEdit.setBooleanProperty("view.antiAlias",antiAlias.isSelected());
 		jEdit.setBooleanProperty("view.fracFontMetrics",fracFontMetrics.isSelected());
 	} //}}}
@@ -199,18 +204,17 @@ public class TextAreaOptionPane extends AbstractOptionPane
 	private JCheckBox blockCaret;
 	private ColorWellButton caretColor;
 	private ColorWellButton selectionColor;
+	private ColorWellButton multipleSelectionColor;
 	private JCheckBox lineHighlight;
 	private ColorWellButton lineHighlightColor;
-	private JCheckBox bracketHighlight;
-	private ColorWellButton bracketHighlightColor;
+	private JCheckBox structureHighlight;
+	private ColorWellButton structureHighlightColor;
 	private JCheckBox eolMarkers;
 	private ColorWellButton eolMarkerColor;
 	private JCheckBox wrapGuide;
 	private ColorWellButton wrapGuideColor;
 	private JCheckBox electricBorders;
-	private JCheckBox middleMousePaste;
 	private JCheckBox antiAlias;
 	private JCheckBox fracFontMetrics;
-	private JCheckBox joinNonWordChars;
 	//}}}
 }

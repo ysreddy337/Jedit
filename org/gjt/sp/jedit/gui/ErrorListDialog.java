@@ -72,13 +72,24 @@ public class ErrorListDialog extends EnhancedDialog
 			messages = new String[tokenizedMessage.size()];
 			tokenizedMessage.copyInto(messages);
 		}
+
+		public boolean equals(Object o)
+		{
+			if(o instanceof ErrorEntry)
+			{
+				ErrorEntry e = (ErrorEntry)o;
+				return e.path.equals(path);
+			}
+			else
+				return false;
+		}
 	} //}}}
 
 	//{{{ ErrorListDialog constructor
 	public ErrorListDialog(Frame frame, String title, String caption,
-		Vector messages, boolean showPluginMgrButton)
+		Vector messages, boolean pluginError)
 	{
-		super(frame,title,true);
+		super(frame,title,!pluginError);
 
 		JPanel content = new JPanel(new BorderLayout(12,12));
 		content.setBorder(new EmptyBorder(12,12,12,12));
@@ -118,7 +129,7 @@ public class ErrorListDialog extends EnhancedDialog
 		ok = new JButton(jEdit.getProperty("common.ok"));
 		ok.addActionListener(new ActionHandler());
 
-		if(showPluginMgrButton)
+		if(pluginError)
 		{
 			pluginMgr = new JButton(jEdit.getProperty("error-list.plugin-manager"));
 			pluginMgr.addActionListener(new ActionHandler());
@@ -135,7 +146,7 @@ public class ErrorListDialog extends EnhancedDialog
 
 		pack();
 		setLocationRelativeTo(frame);
-		show();
+		setVisible(true);
 	} //}}}
 
 	//{{{ ok() method
@@ -164,8 +175,9 @@ public class ErrorListDialog extends EnhancedDialog
 				dispose();
 			else if(evt.getSource() == pluginMgr)
 			{
-				new org.gjt.sp.jedit.pluginmgr.PluginManager(
-					JOptionPane.getFrameForComponent(
+				org.gjt.sp.jedit.pluginmgr.PluginManager
+					.showPluginManager(JOptionPane
+					.getFrameForComponent(
 					ErrorListDialog.this));
 			}
 		} //}}}

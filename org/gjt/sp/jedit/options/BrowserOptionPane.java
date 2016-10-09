@@ -41,22 +41,25 @@ public class BrowserOptionPane extends AbstractOptionPane
 	{
 		/* Default directory */
 		String[] dirs = {
-			jEdit.getProperty("options.browser.general.defaultPath.buffer"),
-			jEdit.getProperty("options.browser.general.defaultPath.home"),
 			jEdit.getProperty("options.browser.general.defaultPath.favorites"),
-			jEdit.getProperty("options.browser.general.defaultPath.last")
+			jEdit.getProperty("options.browser.general.defaultPath.home"),
+			jEdit.getProperty("options.browser.general.defaultPath.last"),
+			jEdit.getProperty("options.browser.general.defaultPath.buffer"),
+			jEdit.getProperty("options.browser.general.defaultPath.working")
 		};
 
 		defaultDirectory = new JComboBox(dirs);
 		String defaultDir = jEdit.getProperty("vfs.browser.defaultPath");
-		if("buffer".equals(defaultDir))
+		if("favorites".equals(defaultDir))
 			defaultDirectory.setSelectedIndex(0);
 		else if("home".equals(defaultDir))
 			defaultDirectory.setSelectedIndex(1);
-		else if("favorites".equals(defaultDir))
-			defaultDirectory.setSelectedIndex(2);
 		else if("last".equals(defaultDir))
+			defaultDirectory.setSelectedIndex(2);
+		else if("buffer".equals(defaultDir))
 			defaultDirectory.setSelectedIndex(3);
+		else if("working".equals(defaultDir))
+			defaultDirectory.setSelectedIndex(4);
 		addComponent(jEdit.getProperty("options.browser.general.defaultPath"),
 			defaultDirectory);
 
@@ -66,6 +69,13 @@ public class BrowserOptionPane extends AbstractOptionPane
 		showToolbar.setSelected(jEdit.getBooleanProperty("vfs.browser"
 			+ ".showToolbar"));
 		addComponent(showToolbar);
+
+		/* Show menu bar */
+		showMenubar = new JCheckBox(jEdit.getProperty("options.browser"
+			+ ".general.showMenubar"));
+		showMenubar.setSelected(jEdit.getBooleanProperty("vfs.browser"
+			+ ".showMenubar"));
+		addComponent(showMenubar);
 
 		/* Show icons */
 		showIcons = new JCheckBox(jEdit.getProperty("options.browser"
@@ -103,21 +113,23 @@ public class BrowserOptionPane extends AbstractOptionPane
 		addComponent(doubleClickClose);
 
 		/* split VFSFileDialog horizontally */
-		splitHorizontally = new JCheckBox(jEdit.getProperty("options.browser"
-			+ ".general.splitHorizontally"));
-		splitHorizontally.setSelected(jEdit.getBooleanProperty("vfs.browser"
-			+ ".splitHorizontally"));
-		addComponent(splitHorizontally);
+		currentBufferFilter = new JCheckBox(jEdit.getProperty("options.browser"
+			+ ".general.currentBufferFilter"));
+		currentBufferFilter.setSelected(jEdit.getBooleanProperty("vfs.browser"
+			+ ".currentBufferFilter"));
+		addComponent(currentBufferFilter);
 	} //}}}
 
 	//{{{ _save() method
 	public void _save()
 	{
-		String[] dirs = { "buffer", "home", "favorites", "last" };
+		String[] dirs = { "favorites", "home", "last", "buffer", "working"};
 		jEdit.setProperty("vfs.browser.defaultPath",dirs[defaultDirectory
 			.getSelectedIndex()]);
 		jEdit.setBooleanProperty("vfs.browser.showToolbar",
 			showToolbar.isSelected());
+		jEdit.setBooleanProperty("vfs.browser.showMenubar",
+			showMenubar.isSelected());
 		jEdit.setBooleanProperty("vfs.browser.showIcons",
 			showIcons.isSelected());
 		jEdit.setBooleanProperty("vfs.browser.showHiddenFiles",
@@ -128,18 +140,19 @@ public class BrowserOptionPane extends AbstractOptionPane
 			sortMixFilesAndDirs.isSelected());
 		jEdit.setBooleanProperty("vfs.browser.doubleClickClose",
 			doubleClickClose.isSelected());
-		jEdit.setBooleanProperty("vfs.browser.splitHorizontally",
-			splitHorizontally.isSelected());
+		jEdit.setBooleanProperty("vfs.browser.currentBufferFilter",
+			currentBufferFilter.isSelected());
 	} //}}}
 
 	//{{{ Private members
 	private JComboBox defaultDirectory;
 	private JCheckBox showToolbar;
+	private JCheckBox showMenubar;
 	private JCheckBox showIcons;
 	private JCheckBox showHiddenFiles;
 	private JCheckBox sortIgnoreCase;
 	private JCheckBox sortMixFilesAndDirs;
 	private JCheckBox doubleClickClose;
-	private JCheckBox splitHorizontally;
+	private JCheckBox currentBufferFilter;
 	//}}}
 } //}}}

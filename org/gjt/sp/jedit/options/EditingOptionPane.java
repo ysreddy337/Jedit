@@ -41,17 +41,7 @@ public class EditingOptionPane extends AbstractOptionPane
 	protected void _init()
 	{
 		Mode[] modes = jEdit.getModes();
-
-		defaultMode = new JComboBox(modes);
-		defaultMode.setSelectedItem(jEdit.getMode(
-			jEdit.getProperty("buffer.defaultMode")));
-		addComponent(jEdit.getProperty("options.editing.defaultMode"),
-			defaultMode);
-
-		undoCount = new JTextField(jEdit.getProperty("buffer.undoCount"));
-		addComponent(jEdit.getProperty("options.editing.undoCount"),undoCount);
-
-		addSeparator();
+		MiscUtilities.quicksort(modes,new MiscUtilities.StringICaseCompare());
 
 		global = new ModeProperties();
 		modeProps = new ModeProperties[modes.length];
@@ -67,6 +57,9 @@ public class EditingOptionPane extends AbstractOptionPane
 
 		mode = new JComboBox(modeNames);
 		mode.addActionListener(new ActionHandler());
+
+		captionBox = new Box(BoxLayout.X_AXIS);
+		addComponent(captionBox);
 
 		addComponent(jEdit.getProperty("options.editing.mode"),mode);
 
@@ -91,11 +84,13 @@ public class EditingOptionPane extends AbstractOptionPane
 		};
 		addComponent(jEdit.getProperty("options.editing.wrap"),
 			wrap = new JComboBox(wrapModes));
+		wrap.addActionListener(new ActionHandler());
 
 		String[] lineLens = { "0", "72", "76", "80" };
 		addComponent(jEdit.getProperty("options.editing.maxLineLen"),
 			maxLineLen = new JComboBox(lineLens));
 		maxLineLen.setEditable(true);
+		maxLineLen.addActionListener(new ActionHandler());
 
 		String[] tabSizes = { "2", "4", "8" };
 		addComponent(jEdit.getProperty("options.editing.tabSize"),
@@ -109,6 +104,9 @@ public class EditingOptionPane extends AbstractOptionPane
 		addComponent(noTabs = new JCheckBox(jEdit.getProperty(
 			"options.editing.noTabs")));
 
+		addComponent(deepIndent = new JCheckBox(jEdit.getProperty(
+			"options.editing.deepIndent")));
+
 		addComponent(jEdit.getProperty("options.editing.filenameGlob"),
 			filenameGlob = new JTextField());
 
@@ -116,6 +114,17 @@ public class EditingOptionPane extends AbstractOptionPane
 			firstlineGlob = new JTextField());
 
 		selectMode();
+
+		addSeparator();
+
+		defaultMode = new JComboBox(modes);
+		defaultMode.setSelectedItem(jEdit.getMode(
+			jEdit.getProperty("buffer.defaultMode")));
+		addComponent(jEdit.getProperty("options.editing.defaultMode"),
+			defaultMode);
+
+		undoCount = new JTextField(jEdit.getProperty("buffer.undoCount"));
+		addComponent(jEdit.getProperty("options.editing.undoCount"),undoCount);
 	} //}}}
 
 	//{{{ _save() method
@@ -143,6 +152,7 @@ public class EditingOptionPane extends AbstractOptionPane
 	private ModeProperties global;
 	private ModeProperties[] modeProps;
 	private ModeProperties current;
+	private Box captionBox;
 	private JComboBox mode;
 	private JCheckBox useDefaults;
 	private JTextField filenameGlob;
@@ -155,6 +165,7 @@ public class EditingOptionPane extends AbstractOptionPane
 	private JComboBox tabSize;
 	private JComboBox indentSize;
 	private JCheckBox noTabs;
+	private JCheckBox deepIndent;
 	//}}}
 
 	//{{{ saveMode() method
@@ -171,6 +182,7 @@ public class EditingOptionPane extends AbstractOptionPane
 		current.tabSize = (String)tabSize.getSelectedItem();
 		current.indentSize = (String)indentSize.getSelectedItem();
 		current.noTabs = noTabs.isSelected();
+		current.deepIndent = deepIndent.isSelected();
 	} //}}}
 
 	//{{{ selectMode() method
@@ -180,6 +192,11 @@ public class EditingOptionPane extends AbstractOptionPane
 		current = (index == 0 ? global : modeProps[index - 1]);
 		current.edited = true;
 		current.load();
+
+		captionBox.removeAll();
+		captionBox.add(GUIUtilities.createMultilineLabel(
+			jEdit.getProperty("options.editing.caption-"
+			+ (index == 0 ? "0" : "1"))));
 
 		useDefaults.setSelected(current.useDefaults);
 		filenameGlob.setText(current.filenameGlob);
@@ -192,42 +209,41 @@ public class EditingOptionPane extends AbstractOptionPane
 		tabSize.setSelectedItem(current.tabSize);
 		indentSize.setSelectedItem(current.indentSize);
 		noTabs.setSelected(current.noTabs);
+		deepIndent.setSelected(current.deepIndent);
 
 		updateEnabled();
+		revalidate();
 	} //}}}
 
 	//{{{ updateEnabled() method
 	private void updateEnabled()
 	{
+		boolean enabled;
 		if(current == global)
 		{
+			enabled = true;
 			useDefaults.setEnabled(false);
 			filenameGlob.setEnabled(false);
 			firstlineGlob.setEnabled(false);
-			noWordSep.setEnabled(true);
-			folding.setEnabled(true);
-			collapseFolds.setEnabled(true);
-			wrap.setEnabled(true);
-			maxLineLen.setEnabled(true);
-			tabSize.setEnabled(true);
-			indentSize.setEnabled(true);
-			noTabs.setEnabled(true);
 		}
 		else
 		{
+			enabled = !modeProps[mode.getSelectedIndex() - 1]
+				.useDefaults;
 			useDefaults.setEnabled(true);
-			boolean enabled = !modeProps[mode.getSelectedIndex() - 1].useDefaults;
 			filenameGlob.setEnabled(enabled);
 			firstlineGlob.setEnabled(enabled);
-			noWordSep.setEnabled(enabled);
-			folding.setEnabled(enabled);
-			collapseFolds.setEnabled(enabled);
-			wrap.setEnabled(enabled);
-			maxLineLen.setEnabled(enabled);
-			tabSize.setEnabled(enabled);
-			indentSize.setEnabled(enabled);
-			noTabs.setEnabled(enabled);
 		}
+
+		noWordSep.setEnabled(enabled);
+		folding.setEnabled(enabled);
+		collapseFolds.setEnabled(enabled);
+		wrap.setEnabled(enabled);
+		maxLineLen.setEnabled(enabled);
+		tabSize.setEnabled(enabled);
+		indentSize.setEnabled(enabled);
+		noTabs.setEnabled(enabled);
+		deepIndent.setEnabled(enabled);
 	} //}}}
 
 	//}}}
@@ -237,16 +253,39 @@ public class EditingOptionPane extends AbstractOptionPane
 	{
 		public void actionPerformed(ActionEvent evt)
 		{
-			if(evt.getSource() == mode)
+			Object source = evt.getSource();
+			if(source == mode)
 			{
 				saveMode();
 				selectMode();
 			}
-			else if(evt.getSource() == useDefaults)
+			else if(source == useDefaults)
 			{
 				modeProps[mode.getSelectedIndex() - 1].useDefaults =
 					useDefaults.isSelected();
 				updateEnabled();
+			}
+			else if(source == wrap)
+			{
+				if(!wrap.getSelectedItem().equals("none"))
+				{
+					if(maxLineLen.getSelectedItem()
+						.equals("0"))
+					{
+						maxLineLen.setSelectedItem("80");
+					}
+				}
+			}
+			else if(source == maxLineLen)
+			{
+				if(!wrap.getSelectedItem().equals("none"))
+				{
+					if(maxLineLen.getSelectedItem()
+						.equals("0"))
+					{
+						wrap.setSelectedItem("none");
+					}
+				}
 			}
 		}
 	} //}}}
@@ -270,6 +309,7 @@ public class EditingOptionPane extends AbstractOptionPane
 		String tabSize;
 		String indentSize;
 		boolean noTabs;
+		boolean deepIndent;
 		//}}}
 
 		//{{{ ModeProperties constructor
@@ -307,6 +347,7 @@ public class EditingOptionPane extends AbstractOptionPane
 				tabSize = mode.getProperty("tabSize").toString();
 				indentSize = mode.getProperty("indentSize").toString();
 				noTabs = mode.getBooleanProperty("noTabs");
+				deepIndent = mode.getBooleanProperty("deepIndent");
 			}
 			else
 			{
@@ -318,6 +359,7 @@ public class EditingOptionPane extends AbstractOptionPane
 				tabSize = jEdit.getProperty("buffer.tabSize");
 				indentSize = jEdit.getProperty("buffer.indentSize");
 				noTabs = jEdit.getBooleanProperty("buffer.noTabs");
+				deepIndent = jEdit.getBooleanProperty("buffer.deepIndent");
 			}
 		} //}}}
 
@@ -351,10 +393,11 @@ public class EditingOptionPane extends AbstractOptionPane
 					jEdit.resetProperty(prefix + "tabSize");
 					jEdit.resetProperty(prefix + "indentSize");
 					jEdit.resetProperty(prefix + "noTabs");
+					jEdit.resetProperty(prefix + "deepIndent");
 	
-					if(!(MiscUtilities.stringsEqual(oldFilenameGlob,
+					if(!(MiscUtilities.objectsEqual(oldFilenameGlob,
 						(String)mode.getProperty("filenameGlob"))
-						&& MiscUtilities.stringsEqual(oldFirstlineGlob,
+						&& MiscUtilities.objectsEqual(oldFirstlineGlob,
 						(String)mode.getProperty("firstlineGlob"))))
 					{
 						mode.init();
@@ -367,9 +410,9 @@ public class EditingOptionPane extends AbstractOptionPane
 					jEdit.setProperty(prefix + "filenameGlob",filenameGlob);
 					jEdit.setProperty(prefix + "firstlineGlob",firstlineGlob);
 
-					if(!(MiscUtilities.stringsEqual(oldFilenameGlob,
+					if(!(MiscUtilities.objectsEqual(oldFilenameGlob,
 						filenameGlob)
-						&& MiscUtilities.stringsEqual(oldFirstlineGlob,
+						&& MiscUtilities.objectsEqual(oldFirstlineGlob,
 						firstlineGlob)))
 					{
 						mode.init();
@@ -389,6 +432,7 @@ public class EditingOptionPane extends AbstractOptionPane
 			jEdit.setProperty(prefix + "tabSize",tabSize);
 			jEdit.setProperty(prefix + "indentSize",indentSize);
 			jEdit.setBooleanProperty(prefix + "noTabs",noTabs);
+			jEdit.setBooleanProperty(prefix + "deepIndent",deepIndent);
 		} //}}}
 	} //}}}
 }

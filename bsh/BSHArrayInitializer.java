@@ -43,7 +43,8 @@ class BSHArrayInitializer extends SimpleNode
     public Object eval( CallStack callstack, Interpreter interpreter )
 		throws EvalError 
 	{
-		throw new EvalError( "Array initializer has no base type.");
+		throw new EvalError( "Array initializer has no base type.", 
+			this, callstack );
 	}
 
 	/**
@@ -75,7 +76,8 @@ class BSHArrayInitializer extends SimpleNode
 			if ( node instanceof BSHArrayInitializer ) {
 				if ( dimensions < 2 )
 					throw new EvalError(
-						"Invalid Location for Intializer, position: "+i, this);
+						"Invalid Location for Intializer, position: "+i, 
+						this, callstack );
             	currentInitializer = 
 					((BSHArrayInitializer)node).eval( 
 						baseType, dimensions-1, callstack, interpreter);
@@ -84,12 +86,42 @@ class BSHArrayInitializer extends SimpleNode
 
 			if ( currentInitializer == Primitive.VOID )
 				throw new EvalError(
-					"Void in array initializer, position"+i, this);
+					"Void in array initializer, position"+i, this, callstack );
 
 			// unwrap primitive to the wrapper type
 			Object value;
 			if ( currentInitializer instanceof Primitive )
-				value = ((Primitive)currentInitializer).getValue();
+			{
+				Primitive primValue = (Primitive)currentInitializer;
+				/*
+				TODO:
+					to get cast and boxing working e.g.
+					e.g. Byte [] ia = { 1, 2 }
+
+					If the baseType is a wrapper type then we need to get the 
+					primitive TYPE class for the base type here in order for 
+					the cast to allow it... Then boxing will happen naturally in
+					the Array.set().
+					e.g. Integer [] ia = { 1, 2 }
+				*/
+				/*
+				if ( Primitive.isWrapperType( baseType ) )
+					baseType = Primitive.getPrimitiveTypeForType( baseType );
+				*/
+
+				// don't deal with object types here... unless above
+				if ( baseType.isPrimitive() )
+					try {
+						primValue = primValue.castToType( 
+							baseType, Types.CAST );
+					} catch ( UtilEvalError e ) {
+					e.printStackTrace();
+						Interpreter.debug("error:"+e);
+						throwTypeError( baseType, primValue, i, callstack );
+					}
+
+				value = primValue.getValue();
+			}
 			else
 				value = currentInitializer;
 
@@ -99,10 +131,10 @@ class BSHArrayInitializer extends SimpleNode
 
             } catch( IllegalArgumentException e ) {
 				Interpreter.debug("illegal arg"+e);
-				throwTypeError( baseType, currentInitializer, i );
+				throwTypeError( baseType, currentInitializer, i, callstack );
             } catch( ArrayStoreException e ) { // I think this can happen
 				Interpreter.debug("arraystore"+e);
-				throwTypeError( baseType, currentInitializer, i );
+				throwTypeError( baseType, currentInitializer, i, callstack );
             }
         }
 
@@ -110,11 +142,9 @@ class BSHArrayInitializer extends SimpleNode
     }
 
 	private void throwTypeError( 
-		Class baseType, Object initializer, int argNum ) 
+		Class baseType, Object initializer, int argNum, CallStack callstack ) 
 		throws EvalError
 	{
-		String lhsType = Reflect.normalizeClassName(baseType);
-
 		String rhsType;
 		if (initializer instanceof Primitive)
 			rhsType = 
@@ -125,6 +155,7 @@ class BSHArrayInitializer extends SimpleNode
 
 		throw new EvalError ( "Incompatible type: " + rhsType 
 			+" in initializer of array type: "+ baseType
-			+" at position: "+argNum, this );
+			+" at position: "+argNum, this, callstack );
 	}
+
 }

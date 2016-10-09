@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1998, 2002 Slava Pestov
+ * Copyright (C) 1998, 2003 Slava Pestov
  * Copyright (C) 1999, 2000 mike dillon
  *
  * This program is free software; you can redistribute it and/or
@@ -27,8 +27,8 @@ package org.gjt.sp.jedit.syntax;
 import gnu.regexp.*;
 import javax.swing.text.Segment;
 import java.util.*;
-import org.gjt.sp.jedit.search.CharIndexedSegment;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.CharIndexedSegment;
 import org.gjt.sp.util.Log;
 //}}}
 
@@ -38,7 +38,7 @@ import org.gjt.sp.util.Log;
  * or font style for painting that token.
  *
  * @author Slava Pestov, mike dillon
- * @version $Id: TokenMarker.java,v 1.47 2003/01/31 04:49:31 spestov Exp $
+ * @version $Id: TokenMarker.java,v 1.62 2003/12/27 05:14:46 spestov Exp $
  *
  * @see org.gjt.sp.jedit.syntax.Token
  * @see org.gjt.sp.jedit.syntax.TokenHandler
@@ -51,34 +51,12 @@ public class TokenMarker
 		ruleSets = new Hashtable(64);
 	} //}}}
 
-	//{{{ getName() method
-	public String getName()
-	{
-		return name;
-	} //}}}
-
-	//{{{ setName() method
-	public void setName(String name)
-	{
-		if (name == null)
-			throw new NullPointerException();
-
-		this.name = name;
-		rulePfx = name.concat("::");
-	} //}}}
-
 	//{{{ addRuleSet() method
-	public void addRuleSet(String setName, ParserRuleSet rules)
+	public void addRuleSet(ParserRuleSet rules)
 	{
-		if (rules == null)
-			return;
+		ruleSets.put(rules.getSetName(), rules);
 
-		if (setName == null)
-			setName = "MAIN";
-
-		ruleSets.put(rulePfx.concat(setName), rules);
-
-		if (setName.equals("MAIN"))
+		if (rules.getSetName().equals("MAIN"))
 			mainRuleSet = rules;
 	} //}}}
 
@@ -91,48 +69,16 @@ public class TokenMarker
 	//{{{ getRuleSet() method
 	public ParserRuleSet getRuleSet(String setName)
 	{
-		ParserRuleSet rules;
+		return (ParserRuleSet) ruleSets.get(setName);
+	} //}}}
 
-		rules = (ParserRuleSet) ruleSets.get(setName);
-
-		if (rules == null && !setName.startsWith(rulePfx))
-		{
-			int delim = setName.indexOf("::");
-			if(delim == -1)
-			{
-				byte id = Token.stringToToken(setName);
-				rules = ParserRuleSet.getStandardRuleSet(id);
-			}
-			else
-			{
-				String modeName = setName.substring(0, delim);
-
-				Mode mode = jEdit.getMode(modeName);
-				if(mode == null)
-				{
-					Log.log(Log.ERROR,TokenMarker.class,
-						"Unknown edit mode: " + modeName);
-					rules = null;
-				}
-				else
-				{
-					TokenMarker marker = mode.getTokenMarker();
-					rules = marker.getRuleSet(setName);
-				}
-			}
-
-			// store external ParserRuleSet in the local hashtable
-			// for faster lookups later
-			ruleSets.put(setName, rules);
-		}
-
-		if (rules == null)
-		{
-			Log.log(Log.ERROR,this,"Unresolved delegate target: " + setName);
-			return ParserRuleSet.getStandardRuleSet(Token.INVALID);
-		}
-		else
-			return rules;
+	//{{{ getRuleSets() method
+	/**
+	 * @since jEdit 4.2pre3
+	 */
+	public ParserRuleSet[] getRuleSets()
+	{
+		return (ParserRuleSet[])ruleSets.values().toArray(new ParserRuleSet[ruleSets.size()]);
 	} //}}}
 
 	//{{{ markTokens() method
@@ -160,6 +106,7 @@ public class TokenMarker
 			context.parent = prevContext.parent;
 			context.inRule = prevContext.inRule;
 			context.rules = prevContext.rules;
+			context.spanEndSubst = prevContext.spanEndSubst;
 		}
 
 		keywords = context.rules.getKeywords();
@@ -213,7 +160,7 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 					seenWhitespaceEnd = true;
 					continue main_loop;
 				}
-	
+
 				rule = rule.next;
 			} //}}}
 
@@ -232,17 +179,16 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 
 				if(lastOffset != pos)
 				{
-					tokenHandler.handleToken(
+					tokenHandler.handleToken(line,
 						context.rules.getDefault(),
 						lastOffset - line.offset,
 						pos - lastOffset,
 						context);
 				}
 
-				tokenHandler.handleToken(
-					(ch == '\t' ? Token.TAB
-					: Token.WHITESPACE),pos - line.offset,1,
-					context);
+				tokenHandler.handleToken(line,
+					context.rules.getDefault(),
+					pos - line.offset,1,context);
 				lastOffset = pos + 1;
 
 				escaped = false;
@@ -263,7 +209,7 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 
 						markKeyword(true);
 
-						tokenHandler.handleToken(
+						tokenHandler.handleToken(line,
 							context.rules.getDefault(),
 							lastOffset - line.offset,1,
 							context);
@@ -284,11 +230,13 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 
 		handleNoWordBreak();
 		markKeyword(true);
+		//}}}
 
-		if(context.parent != null)
+		//{{{ Unwind any NO_LINE_BREAK parent delegates
+unwind:		while(context.parent != null)
 		{
 			rule = context.parent.inRule;
-			if((rule != null && (context.parent.inRule.action
+			if((rule != null && (rule.action
 				& ParserRule.NO_LINE_BREAK) == ParserRule.NO_LINE_BREAK)
 				|| terminated)
 			{
@@ -296,19 +244,22 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 				keywords = context.rules.getKeywords();
 				context.inRule = null;
 			}
+			else
+				break unwind;
 		} //}}}
 
-		tokenHandler.handleToken(Token.END,pos - line.offset,0,context);
+		tokenHandler.handleToken(line,Token.END,
+			pos - line.offset,0,context);
 
-		return context.intern();
+		context = context.intern();
+		tokenHandler.setLineContext(context);
+		return context;
 	} //}}}
 
 	//{{{ Private members
 
 	//{{{ Instance variables
 	private Hashtable ruleSets;
-	private String name;
-	private String rulePfx;
 	private ParserRuleSet mainRuleSet;
 
 	// Instead of passing these around to each method, we just store them
@@ -350,7 +301,7 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 
 			context = (LineContext)context.parent.clone();
 
-			tokenHandler.handleToken(
+			tokenHandler.handleToken(line,
 				(context.inRule.action & ParserRule.EXCLUDE_MATCH)
 				== ParserRule.EXCLUDE_MATCH
 				? context.rules.getDefault()
@@ -368,9 +319,12 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 		}
 
 		// check escape rule of parent
-		rule = context.parent.rules.getEscapeRule();
-		if(rule != null && handleRule(rule,false))
-			return true;
+		if((rule.action & ParserRule.NO_ESCAPE) == 0)
+		{
+			ParserRule escape = context.parent.rules.getEscapeRule();
+			if(escape != null && handleRule(escape,false))
+				return true;
+		}
 
 		return false;
 	} //}}}
@@ -390,31 +344,34 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 			{
 				return false;
 			}
+		}
 
-			if((checkRule.action & ParserRule.AT_LINE_START)
-				== ParserRule.AT_LINE_START)
-			{
-				if((((checkRule.action & ParserRule.MARK_PREVIOUS) != 0) ?
-					lastOffset : pos) != line.offset)
-					return false;
-			}
-			else if((checkRule.action & ParserRule.AT_WHITESPACE_END)
-				== ParserRule.AT_WHITESPACE_END)
-			{
-				if((((checkRule.action & ParserRule.MARK_PREVIOUS) != 0) ?
-					lastOffset : pos) != whitespaceEnd)
-					return false;
-			}
-			else if((checkRule.action & ParserRule.AT_WORD_START)
-				== ParserRule.AT_WORD_START)
-			{
-				if((((checkRule.action & ParserRule.MARK_PREVIOUS) != 0) ?
-					lastOffset : pos) != lastOffset)
-					return false;
-			}
+		int offset = ((checkRule.action & ParserRule.MARK_PREVIOUS) != 0) ?
+			lastOffset : pos;
+		int posMatch = (end ? checkRule.endPosMatch : checkRule.startPosMatch);
+
+		if((posMatch & ParserRule.AT_LINE_START)
+			== ParserRule.AT_LINE_START)
+		{
+			if(offset != line.offset)
+				return false;
+		}
+		else if((posMatch & ParserRule.AT_WHITESPACE_END)
+			== ParserRule.AT_WHITESPACE_END)
+		{
+			if(offset != whitespaceEnd)
+				return false;
+		}
+		else if((posMatch & ParserRule.AT_WORD_START)
+			== ParserRule.AT_WORD_START)
+		{
+			if(offset != lastOffset)
+				return false;
 		} //}}}
 
 		int matchedChars = 1;
+		CharIndexedSegment charIndexed = null;
+		REMatch match = null;
 
 		//{{{ See if the rule's start or end sequence matches here
 		if(!end || (checkRule.action & ParserRule.MARK_FOLLOWING) == 0)
@@ -422,12 +379,20 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 			// the end cannot be a regular expression
 			if((checkRule.action & ParserRule.REGEXP) == 0 || end)
 			{
-				pattern.array = (end ? checkRule.end : checkRule.start);
+				if(end)
+				{
+					if(context.spanEndSubst != null)
+						pattern.array = context.spanEndSubst;
+					else
+						pattern.array = checkRule.end;
+				}
+				else
+					pattern.array = checkRule.start;
 				pattern.offset = 0;
 				pattern.count = pattern.array.length;
 				matchedChars = pattern.count;
 
-				if(!TextUtilities.regionMatches(context.rules
+				if(!SyntaxUtilities.regionMatches(context.rules
 					.getIgnoreCase(),line,pos,pattern.array))
 				{
 					return false;
@@ -438,15 +403,22 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 				// note that all regexps start with \A so they only
 				// match the start of the string
 				int matchStart = pos - line.offset;
-				REMatch match = checkRule.startRegexp.getMatch(
-					new CharIndexedSegment(line,matchStart),
-					0,RE.REG_ANCHORINDEX);
+				charIndexed = new CharIndexedSegment(line,matchStart);
+				match = checkRule.startRegexp.getMatch(
+					charIndexed,0,RE.REG_ANCHORINDEX);
 				if(match == null)
 					return false;
 				else if(match.getStartIndex() != 0)
 					throw new InternalError("Can't happen");
 				else
+				{
 					matchedChars = match.getEndIndex();
+					/* workaround for hang if match was
+					 * zero-width. not sure if there is
+					 * a better way to handle this */
+					if(matchedChars == 0)
+						matchedChars = 1;
+				}
 			}
 		} //}}}
 
@@ -477,9 +449,11 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 			{
 			//{{{ SEQ
 			case ParserRule.SEQ:
+				context.spanEndSubst = null;
+
 				if((checkRule.action & ParserRule.REGEXP) != 0)
 				{
-					handleTokenWithTabs(tokenHandler,
+					handleTokenWithSpaces(tokenHandler,
 						checkRule.token,
 						pos - line.offset,
 						matchedChars,
@@ -487,16 +461,18 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 				}
 				else
 				{
-					tokenHandler.handleToken(checkRule.token,
-						pos - line.offset,matchedChars,context);
+					tokenHandler.handleToken(line,
+						checkRule.token,
+						pos - line.offset,
+						matchedChars,context);
 				}
 
 				// a DELEGATE attribute on a SEQ changes the
 				// ruleset from the end of the SEQ onwards
-				ParserRuleSet delegateSet = checkRule.getDelegateRuleSet(this);
-				if(delegateSet != null)
+				if(checkRule.delegate != null)
 				{
-					context = new LineContext(delegateSet,
+					context = new LineContext(
+						checkRule.delegate,
 						context.parent);
 					keywords = context.rules.getKeywords();
 				}
@@ -507,15 +483,13 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 			case ParserRule.EOL_SPAN:
 				context.inRule = checkRule;
 
-				delegateSet = checkRule.getDelegateRuleSet(this);
-
 				byte tokenType = ((checkRule.action & ParserRule.EXCLUDE_MATCH)
 					== ParserRule.EXCLUDE_MATCH
 					? context.rules.getDefault() : checkRule.token);
 
 				if((checkRule.action & ParserRule.REGEXP) != 0)
 				{
-					handleTokenWithTabs(tokenHandler,
+					handleTokenWithSpaces(tokenHandler,
 						tokenType,
 						pos - line.offset,
 						matchedChars,
@@ -523,53 +497,73 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 				}
 				else
 				{
-					tokenHandler.handleToken(tokenType,
-						pos - line.offset,matchedChars,context);
+					tokenHandler.handleToken(line,tokenType,
+						pos - line.offset,
+						matchedChars,context);
 				}
 
-				// XXX
-				/* String spanEndSubst = null;
-				if((checkRule.action & ParserRule.REGEXP) == ParserRule.REGEXP)
-					spanEndSubst = checkRule.startRegexp... */
-				context = new LineContext(delegateSet, context);
+				char[] spanEndSubst = null;
+				/* substitute result of matching the rule start
+				 * into the end string.
+				 *
+				 * eg, in shell script mode, <<\s*(\w+) is
+				 * matched into \<$1\> to construct rules for
+				 * highlighting read-ins like this <<EOF
+				 * ...
+				 * EOF
+				 */
+				if(charIndexed != null && checkRule.end != null)
+				{
+					spanEndSubst = substitute(match,
+						checkRule.end);
+				}
+
+				context.spanEndSubst = spanEndSubst;
+				context = new LineContext(
+					checkRule.delegate,
+					context);
 				keywords = context.rules.getKeywords();
 
 				break;
 			//}}}
 			//{{{ MARK_FOLLOWING
 			case ParserRule.MARK_FOLLOWING:
-				tokenHandler.handleToken((checkRule.action
+				tokenHandler.handleToken(line,(checkRule.action
 					& ParserRule.EXCLUDE_MATCH)
 					== ParserRule.EXCLUDE_MATCH ?
 					context.rules.getDefault()
 					: checkRule.token,pos - line.offset,
 					pattern.count,context);
 
+				context.spanEndSubst = null;
 				context.inRule = checkRule;
 				break;
 			//}}}
 			//{{{ MARK_PREVIOUS
 			case ParserRule.MARK_PREVIOUS:
+				context.spanEndSubst = null;
+
 				if ((checkRule.action & ParserRule.EXCLUDE_MATCH)
 					== ParserRule.EXCLUDE_MATCH)
 				{
 					if(pos != lastOffset)
 					{
-						tokenHandler.handleToken(
+						tokenHandler.handleToken(line,
 							checkRule.token,
 							lastOffset - line.offset,
 							pos - lastOffset,
 							context);
 					}
 
-					tokenHandler.handleToken(
+					tokenHandler.handleToken(line,
 						context.rules.getDefault(),
 						pos - line.offset,pattern.count,
 						context);
 				}
 				else
 				{
-					tokenHandler.handleToken(checkRule.token,
+					tokenHandler.handleToken(line,
+						checkRule.token,
 						lastOffset - line.offset,
 						pos - lastOffset + pattern.count,
 						context);
@@ -592,7 +586,7 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 		{
 			if(pos != lastOffset)
 			{
-				tokenHandler.handleToken(
+				tokenHandler.handleToken(line,
 					context.inRule.token,
 					lastOffset - line.offset,
 					pos - lastOffset,context);
@@ -616,7 +610,8 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 			{
 				if(pos != lastOffset)
 				{
-					tokenHandler.handleToken(rule.token,
+					tokenHandler.handleToken(line,
+						rule.token,
 						lastOffset - line.offset,
 						pos - lastOffset,context);
 				}
@@ -629,26 +624,32 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 		}
 	} //}}}
 
-	//{{{ handleTokenWithTabs() method
-	private void handleTokenWithTabs(TokenHandler tokenHandler, byte tokenType,
-		int start, int len, LineContext context)
+	//{{{ handleTokenWithSpaces() method
+	private void handleTokenWithSpaces(TokenHandler tokenHandler,
+		byte tokenType, int start, int len, LineContext context)
 	{
 		int last = start;
 		int end = start + len;
 
 		for(int i = start; i < end; i++)
 		{
-			if(line.array[i] == '\t')
+			if(Character.isWhitespace(line.array[i + line.offset]))
 			{
 				if(last != i)
-					tokenHandler.handleToken(tokenType,last,i - last,context);
-				tokenHandler.handleToken(tokenType,i,1,context);
+				{
+					tokenHandler.handleToken(line,
+					tokenType,last,i - last,context);
+				}
+				tokenHandler.handleToken(line,tokenType,i,1,context);
 				last = i + 1;
 			}
 		}
 
 		if(last != end)
-			tokenHandler.handleToken(tokenType,last,end - last,context);
+		{
+			tokenHandler.handleToken(line,tokenType,last,
+				end - last,context);
+		}
 	} //}}}
 
 	//{{{ markKeyword() method
@@ -706,7 +707,7 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 
 			if(digit)
 			{
-				tokenHandler.handleToken(Token.DIGIT,
+				tokenHandler.handleToken(line,Token.DIGIT,
 					lastOffset - line.offset,
 					len,context);
 				lastOffset = pos;
@@ -722,7 +723,7 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 
 			if(id != Token.NULL)
 			{
-				tokenHandler.handleToken(id,
+				tokenHandler.handleToken(line,id,
 					lastOffset - line.offset,
 					len,context);
 				lastOffset = pos;
@@ -733,10 +734,43 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 		//{{{ Handle any remaining crud
 		if(addRemaining)
 		{
-			tokenHandler.handleToken(context.rules.getDefault(),
+			tokenHandler.handleToken(line,context.rules.getDefault(),
 				lastOffset - line.offset,len,context);
 			lastOffset = pos;
 		} //}}}
+	} //}}}
+
+	//{{{ substitute() method
+	private char[] substitute(REMatch match, char[] end)
+	{
+		StringBuffer buf = new StringBuffer();
+		for(int i = 0; i < end.length; i++)
+		{
+			char ch = end[i];
+			if(ch == '$')
+			{
+				if(i == end.length - 1)
+					buf.append(ch);
+				else
+				{
+					char digit = end[i + 1];
+					if(!Character.isDigit(digit))
+						buf.append(ch);
+					else
+					{
+						buf.append(match.toString(
+							digit - '0'));
+						i++;
+					}
+				}
+			}
+			else
+				buf.append(ch);
+		}
+
+		char[] returnValue = new char[buf.length()];
+		buf.getChars(0,buf.length(),returnValue,0);
+		return returnValue;
 	} //}}}
 
 	//}}}
@@ -753,16 +787,7 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 		public ParserRule inRule;
 		public ParserRuleSet rules;
 		// used for SPAN_REGEXP rules; otherwise null
-		public String spanEndSubst;
-
-		//{{{ LineContext constructor
-		public LineContext(ParserRule r, ParserRuleSet rs,
-			String spanEndSubst)
-		{
-			inRule = r;
-			rules = rs;
-			this.spanEndSubst = spanEndSubst;
-		} //}}}
+		public char[] spanEndSubst;
 
 		//{{{ LineContext constructor
 		public LineContext(ParserRuleSet rs, LineContext lc)
@@ -806,33 +831,9 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 			if(obj instanceof LineContext)
 			{
 				LineContext lc = (LineContext)obj;
-				if(lc.parent == null)
-				{
-					if(parent != null)
-						return false;
-				}
-				else //if(lc.parent != null)
-				{
-					if(parent == null)
-						return false;
-					else if(!lc.parent.equals(parent))
-						return false;
-				}
-
-				if(lc.spanEndSubst == null)
-				{
-					if(spanEndSubst != null)
-						return false;
-				}
-				else
-				{
-					if(spanEndSubst == null)
-						return false;
-					else if(!lc.spanEndSubst.equals(spanEndSubst))
-						return false;
-				}
-
-				return lc.inRule == inRule && lc.rules == rules;
+				return lc.inRule == inRule && lc.rules == rules
+					&& MiscUtilities.objectsEqual(parent,lc.parent)
+					&& charArraysEqual(spanEndSubst,lc.spanEndSubst);
 			}
 			else
 				return false;
@@ -848,6 +849,26 @@ main_loop:	for(pos = line.offset; pos < lineLength; pos++)
 			lc.spanEndSubst = spanEndSubst;
 
 			return lc;
+		} //}}}
+
+		//{{{ charArraysEqual() method
+		private boolean charArraysEqual(char[] c1, char[] c2)
+		{
+			if(c1 == null)
+				return (c2 == null);
+			else if(c2 == null)
+				return (c1 == null);
+
+			if(c1.length != c2.length)
+				return false;
+
+			for(int i = 0; i < c1.length; i++)
+			{
+				if(c1[i] != c2[i])
+					return false;
+			}
+
+			return true;
 		} //}}}
 	} //}}}
 }

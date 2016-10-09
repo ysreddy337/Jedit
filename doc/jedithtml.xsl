@@ -7,7 +7,7 @@
                 xmlns="http://www.w3.org/TR/xhtml1/transitional"
                 exclude-result-prefixes="#default">
 
-<xsl:import href="docbook-wrapper.xsl"/>
+<xsl:import href="docbook-wrapper-html.xsl"/>
 
 <!-- {{{ Various customizations -->
 
@@ -36,11 +36,11 @@
 </xsl:template>
 
 <xsl:template match="keycap">
-  <xsl:call-template name="inline.boldseq"/>
+  <xsl:call-template name="inline.monoseq"/>
 </xsl:template>
 
-<xsl:template match="keycombo/keycap">
-  <xsl:call-template name="inline.boldseq"/>
+<xsl:template match="property">
+  <xsl:call-template name="inline.monoseq"/>
 </xsl:template>
 
 <xsl:variable name="use.id.as.filename">1</xsl:variable>

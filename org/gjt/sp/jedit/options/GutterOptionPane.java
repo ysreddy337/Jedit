@@ -114,17 +114,17 @@ public class GutterOptionPane extends AbstractOptionPane
 
 		addComponent(gutterHighlightBox,gutterHighlightColor
 			= new ColorWellButton(jEdit.getColorProperty(
-			"view.gutter.bracketHighlightColor")),
+			"view.gutter.highlightColor")),
 			GridBagConstraints.VERTICAL);
 
-		/* Bracket highlight */
-		gutterBracketHighlightEnabled = new JCheckBox(jEdit.getProperty(
-			"options.gutter.bracketHighlight"));
-		gutterBracketHighlightEnabled.setSelected(jEdit.getBooleanProperty(
-			"view.gutter.bracketHighlight"));
-		addComponent(gutterBracketHighlightEnabled,
-			gutterBracketHighlight = new ColorWellButton(
-			jEdit.getColorProperty("view.gutter.bracketHighlightColor")),
+		/* Structure highlight */
+		gutterStructureHighlightEnabled = new JCheckBox(jEdit.getProperty(
+			"options.gutter.structureHighlight"));
+		gutterStructureHighlightEnabled.setSelected(jEdit.getBooleanProperty(
+			"view.gutter.structureHighlight"));
+		addComponent(gutterStructureHighlightEnabled,
+			gutterStructureHighlight = new ColorWellButton(
+			jEdit.getColorProperty("view.gutter.structureHighlightColor")),
 			GridBagConstraints.VERTICAL);
 
 		/* Marker highlight */
@@ -154,44 +154,6 @@ public class GutterOptionPane extends AbstractOptionPane
 			gutterNoFocusBorder = new ColorWellButton(
 			jEdit.getColorProperty("view.gutter.noFocusBorderColor")),
 			GridBagConstraints.VERTICAL);
-
-		/* Mouse actions */
-		addSeparator("options.gutter.actions");
-
-		int c = clickActionKeys.length;
-		String[] clickActionNames = new String[c];
-		for(int i = 0; i < c; i++)
-		{
-			clickActionNames[i] = jEdit.getProperty(
-				"options.gutter."+clickActionKeys[i]);
-		}
-
-		c = clickModifierKeys.length;
-		String[] clickModifierNames = new String[c];
-		for(int i = 0; i < c; i++)
-		{
-			clickModifierNames[i] = jEdit.getProperty(
-				"options.gutter."+clickModifierKeys[i]);
-		}
-
-		gutterClickActions = new JComboBox[c];
-
-		for(int i = 0; i < c; i++)
-		{
-			JComboBox cb = new JComboBox(clickActionNames);
-			gutterClickActions[i] = cb;
-
-			String val = jEdit.getProperty("view.gutter."+clickModifierKeys[i]);
-			for(int j = 0; j < clickActionKeys.length; j++)
-			{
-				if(val.equals(clickActionKeys[j]))
-				{
-					cb.setSelectedIndex(j);
-				}
-			}
-
-			addComponent(clickModifierNames[i],cb);
-		}
 	} //}}}
 
 	//{{{ _save() method
@@ -232,10 +194,10 @@ public class GutterOptionPane extends AbstractOptionPane
 		jEdit.setColorProperty("view.gutter.highlightColor",
 			gutterHighlightColor.getSelectedColor());
 
-		jEdit.setBooleanProperty("view.gutter.bracketHighlight",
-			gutterBracketHighlightEnabled.isSelected());
-		jEdit.setColorProperty("view.gutter.bracketHighlightColor",
-			gutterBracketHighlight.getSelectedColor());
+		jEdit.setBooleanProperty("view.gutter.structureHighlight",
+			gutterStructureHighlightEnabled.isSelected());
+		jEdit.setColorProperty("view.gutter.structureHighlightColor",
+			gutterStructureHighlight.getSelectedColor());
 		jEdit.setBooleanProperty("view.gutter.markerHighlight",
 			gutterMarkerHighlightEnabled.isSelected());
 		jEdit.setColorProperty("view.gutter.markerColor",
@@ -246,48 +208,23 @@ public class GutterOptionPane extends AbstractOptionPane
 			gutterFocusBorder.getSelectedColor());
 		jEdit.setColorProperty("view.gutter.noFocusBorderColor",
 			gutterNoFocusBorder.getSelectedColor());
-
-		int c = clickModifierKeys.length;
-		for(int i = 0; i < c; i++)
-		{
-			int idx = gutterClickActions[i].getSelectedIndex();
-			jEdit.setProperty("view.gutter."+clickModifierKeys[i],
-				clickActionKeys[idx]);
-		}
 	} //}}}
 
 	//{{{ Private members
 	private FontSelector gutterFont;
 	private ColorWellButton gutterForeground;
 	private ColorWellButton gutterBackground;
-	private JTextField gutterBorderWidth;
 	private JTextField gutterHighlightInterval;
 	private ColorWellButton gutterHighlightColor;
-	private JComboBox gutterNumberAlignment;
 	private JCheckBox lineNumbersEnabled;
 	private JCheckBox gutterCurrentLineHighlightEnabled;
 	private ColorWellButton gutterCurrentLineHighlight;
-	private JCheckBox gutterBracketHighlightEnabled;
-	private ColorWellButton gutterBracketHighlight;
+	private JCheckBox gutterStructureHighlightEnabled;
+	private ColorWellButton gutterStructureHighlight;
 	private JCheckBox gutterMarkerHighlightEnabled;
 	private ColorWellButton gutterMarkerHighlight;
 	private ColorWellButton gutterFoldMarkers;
 	private ColorWellButton gutterFocusBorder;
 	private ColorWellButton gutterNoFocusBorder;
-
-	private JComboBox[] gutterClickActions;
-
-	// simplified these settings a little...
-	private static final String[] clickActionKeys = new String[] {
-		"toggleFold",
-		"toggleFoldFully" /* ,
-		"selectFold" */
-	};
-	
-	private static final String[] clickModifierKeys = new String[] {
-		"gutterClick",
-		"gutterShiftClick" /* ,
-		"gutterControlClick",
-		"gutterAltClick" */
-	}; //}}}
+	//}}}
 }

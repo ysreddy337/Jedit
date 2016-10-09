@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1998, 1999, 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 1998, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,20 +26,19 @@ package org.gjt.sp.jedit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.Component;
+import org.gjt.sp.jedit.gui.InputHandler;
+import org.gjt.sp.util.Log;
 //}}}
 
 /**
- * An action.<p>
- *
- * Instead of subclassing EditAction directly, you should now write an
- * <code>actions.xml</code> file.
+ * An action that can be bound to a menu item, tool bar button or keystroke.
  *
  * @see jEdit#getAction(String)
- * @see jEdit#getActions()
+ * @see jEdit#getActionNames()
  * @see ActionSet
  *
  * @author Slava Pestov
- * @version $Id: EditAction.java,v 1.16 2003/02/11 02:31:05 spestov Exp $
+ * @version $Id: EditAction.java,v 1.23 2003/05/01 04:17:13 spestov Exp $
  */
 public abstract class EditAction
 {
@@ -64,25 +63,24 @@ public abstract class EditAction
 
 	//{{{ getLabel() method
 	/**
-	 * Returns the action's label. The default implementation returns the
+	 * Returns the action's label. This returns the
 	 * value of the property named by {@link #getName()} suffixed
 	 * with <code>.label</code>.
 	 */
-	public String getLabel()
+	public final String getLabel()
 	{
 		return jEdit.getProperty(name + ".label");
 	} //}}}
 
 	//{{{ getMouseOverText() method
 	/**
-	 * Returns the text that should be shown when the mouse is placed over
-	 * this action's menu item or tool bar button. Currently only used by
-	 * the macro system.
-	 * @since jEdit 4.0pre5
+	 * Returns the action's mouse over message. This returns the
+	 * value of the property named by {@link #getName()} suffixed
+	 * with <code>.mouse-over</code>.
 	 */
-	public String getMouseOverText()
+	public final String getMouseOverText()
 	{
-		return null;
+		return jEdit.getProperty(name + ".mouse-over");
 	} //}}}
 
 	//{{{ invoke() method
@@ -91,8 +89,9 @@ public abstract class EditAction
 	 * @param view The view
 	 * @since jEdit 2.7pre2
 	 */
-	public abstract void invoke(View view);
-	//}}}
+	public void invoke(View view)
+	{
+	} //}}}
 
 	//{{{ getView() method
 	/**
@@ -107,21 +106,24 @@ public abstract class EditAction
 	//{{{ isToggle() method
 	/**
 	 * Returns if this edit action should be displayed as a check box
-	 * in menus.
+	 * in menus. This returns the
+	 * value of the property named by {@link #getName()} suffixed
+	 * with <code>.toggle</code>.
+	 *
 	 * @since jEdit 2.2pre4
 	 */
-	public boolean isToggle()
+	public final boolean isToggle()
 	{
-		return false;
+		return jEdit.getBooleanProperty(name + ".toggle");
 	} //}}}
 
 	//{{{ isSelected() method
 	/**
 	 * If this edit action is a toggle, returns if it is selected or not.
-	 * @param view The view
-	 * @since jEdit 3.2pre5
+	 * @param comp The component
+	 * @since jEdit 4.2pre1
 	 */
-	public boolean isSelected(View view)
+	public boolean isSelected(Component comp)
 	{
 		return false;
 	} //}}}
@@ -144,6 +146,17 @@ public abstract class EditAction
 	 * @since jEdit 2.7pre2
 	 */
 	public boolean noRecord()
+	{
+		return false;
+	} //}}}
+
+	//{{{ noRememberLast() method
+	/**
+	 * Returns if this edit action should not be remembered as the most
+	 * recently invoked action.
+	 * @since jEdit 4.2pre1
+	 */
+	public boolean noRememberLast()
 	{
 		return false;
 	} //}}}
@@ -173,9 +186,14 @@ public abstract class EditAction
 	 */
 	public static class Wrapper implements ActionListener
 	{
-		public Wrapper(EditAction action)
+		/**
+		 * Creates a new action listener wrapper.
+		 * @since jEdit 4.2pre1
+		 */
+		public Wrapper(ActionContext context, String actionName)
 		{
-			this.action = action;
+			this.context = context;
+			this.actionName = actionName;
 		}
 
 		/**
@@ -188,9 +206,17 @@ public abstract class EditAction
 		 */
 		public void actionPerformed(ActionEvent evt)
 		{
-			jEdit.getActiveView().getInputHandler().invokeAction(action);
+			EditAction action = context.getAction(actionName);
+			if(action == null)
+			{
+				Log.log(Log.WARNING,this,"Unknown action: "
+					+ actionName);
+			}
+			else
+				context.invokeAction(evt,action);
 		}
 
-		private EditAction action;
+		private ActionContext context;
+		private String actionName;
 	} //}}}
 }

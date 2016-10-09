@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * Copyright (C) 1999, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,6 +23,7 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
+import com.microstar.xml.*;
 import java.awt.datatransfer.*;
 import java.awt.Toolkit;
 import java.io.*;
@@ -54,7 +55,7 @@ import org.gjt.sp.util.Log;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: Registers.java,v 1.10 2003/02/08 18:53:02 spestov Exp $
+ * @version $Id: Registers.java,v 1.21 2004/05/29 01:55:24 spestov Exp $
  */
 public class Registers
 {
@@ -218,11 +219,45 @@ public class Registers
 
 			if(vertical && textArea.getSelectionCount() == 0)
 			{
-				int caret = textArea.getCaretPosition();
-				int caretLine = textArea.getCaretLine();
-				Selection.Rect rect = new Selection.Rect(
-					caretLine,caret,caretLine,caret);
-				textArea.setSelectedText(rect,selection);
+				Buffer buffer = textArea.getBuffer();
+
+				try
+				{
+					buffer.beginCompoundEdit();
+
+					int caret = textArea.getCaretPosition();
+					int caretLine = textArea.getCaretLine();
+					Selection.Rect rect = new Selection.Rect(
+						caretLine,caret,caretLine,caret);
+					textArea.setSelectedText(rect,selection);
+					caretLine = textArea.getCaretLine();
+
+					if(caretLine != textArea.getLineCount() - 1)
+					{
+						int startColumn = rect.getStartColumn(
+							buffer);
+						int offset = buffer
+							.getOffsetOfVirtualColumn(
+							caretLine + 1,startColumn,null);
+						if(offset == -1)
+						{
+							buffer.insertAtColumn(caretLine + 1,startColumn,"");
+							textArea.setCaretPosition(
+								buffer.getLineEndOffset(
+								caretLine + 1) - 1);
+						}
+						else
+						{
+							textArea.setCaretPosition(
+								buffer.getLineStartOffset(
+								caretLine + 1) + offset);
+						}
+					}
+				}
+				finally
+				{
+					buffer.endCompoundEdit();
+				}
 			}
 			else
 				textArea.setSelectedText(selection);
@@ -238,6 +273,12 @@ public class Registers
 	 */
 	public static Register getRegister(char name)
 	{
+		if(name != '$' && name != '%')
+		{
+			if(!loaded)
+				loadRegisters();
+		}
+
 		if(registers == null || name >= registers.length)
 			return null;
 		else
@@ -252,6 +293,15 @@ public class Registers
 	 */
 	public static void setRegister(char name, Register newRegister)
 	{
+		if(name != '%' && name != '$')
+		{
+			if(!loaded)
+				loadRegisters();
+
+			if(!loading)
+				modified = true;
+		}
+
 		if(name >= registers.length)
 		{
 			Register[] newRegisters = new Register[
@@ -272,24 +322,11 @@ public class Registers
 	 */
 	public static void setRegister(char name, String value)
 	{
-		if(name >= registers.length)
-		{
-			Register[] newRegisters = new Register[
-				Math.min(1<<16,name * 2)];
-			System.arraycopy(registers,0,newRegisters,0,
-				registers.length);
-			registers = newRegisters;
-			registers[name] = new StringRegister(value);
-		}
+		Register register = getRegister(name);
+		if(register != null)
+			register.setValue(value);
 		else
-		{
-			Register register = registers[name];
-
-			if(register != null)
-				register.setValue(value);
-			else
-				registers[name] = new StringRegister(value);
-		}
+			setRegister(name,new StringRegister(value));
 	} //}}}
 
 	//{{{ clearRegister() method
@@ -316,8 +353,216 @@ public class Registers
 	 */
 	public static Register[] getRegisters()
 	{
+		if(!loaded)
+			loadRegisters();
 		return registers;
 	} //}}}
+
+	//{{{ getRegisterStatusPrompt() method
+	/**
+	 * Returns the status prompt for the given register action. Only
+	 * intended to be called from <code>actions.xml</code>.
+	 * @since jEdit 4.2pre2
+	 */
+	public static String getRegisterStatusPrompt(String action)
+	{
+		return jEdit.getProperty("view.status." + action,
+			new String[] { getRegisterNameString() });
+	} //}}}
+
+	//{{{ getRegisterNameString() method
+	/**
+	 * Returns a string of all defined registers, used by the status bar
+	 * (eg, "a b $ % ^").
+	 * @since jEdit 4.2pre2
+	 */
+	public static String getRegisterNameString()
+	{
+		if(!loaded)
+			loadRegisters();
+
+		StringBuffer buf = new StringBuffer();
+		for(int i = 0; i < registers.length; i++)
+		{
+			if(registers[i] != null)
+			{
+				if(buf.length() != 0)
+					buf.append(' ');
+				buf.append((char)i);
+			}
+		}
+
+		if(buf.length() == 0)
+			return jEdit.getProperty("view.status.no-registers");
+		else
+			return buf.toString();
+	} //}}}
+
+	//{{{ saveRegisters() method
+	public static void saveRegisters()
+	{
+		if(!loaded || !modified)
+			return;
+
+		Log.log(Log.MESSAGE,Registers.class,"Saving registers.xml");
+		File file1 = new File(MiscUtilities.constructPath(
+			jEdit.getSettingsDirectory(), "#registers.xml#save#"));
+		File file2 = new File(MiscUtilities.constructPath(
+			jEdit.getSettingsDirectory(), "registers.xml"));
+		if(file2.exists() && file2.lastModified() != registersModTime)
+		{
+			Log.log(Log.WARNING,Registers.class,file2 + " changed"
+				+ " on disk; will not save registers");
+			return;
+		}
+
+		jEdit.backupSettingsFile(file2);
+
+		String lineSep = System.getProperty("line.separator");
+
+		BufferedWriter out = null;
+
+		boolean ok = false;
+
+		try
+		{
+			out = new BufferedWriter(new FileWriter(file1));
+
+			out.write("<?xml version=\"1.0\"?>");
+			out.write(lineSep);
+			out.write("<!DOCTYPE REGISTERS SYSTEM \"registers.dtd\">");
+			out.write(lineSep);
+			out.write("<REGISTERS>");
+			out.write(lineSep);
+
+			Register[] registers = getRegisters();
+			for(int i = 0; i < registers.length; i++)
+			{
+				Register register = registers[i];
+				if(register == null || i == '$' || i == '%')
+					continue;
+
+				out.write("<REGISTER NAME=\"");
+				if(i == '"')
+					out.write("&quot;");
+				else
+					out.write((char)i);
+				out.write("\">");
+
+				out.write(MiscUtilities.charsToEntities(
+					register.toString()));
+
+				out.write("</REGISTER>");
+				out.write(lineSep);
+			}
+
+			out.write("</REGISTERS>");
+			out.write(lineSep);
+
+			ok = true;
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,Registers.class,e);
+		}
+		finally
+		{
+			try
+			{
+				if(out != null)
+					out.close();
+			}
+			catch(IOException e)
+			{
+			}
+		}
+
+		if(ok)
+		{
+			/* to avoid data loss, only do this if the above
+			 * completed successfully */
+			file2.delete();
+			file1.renameTo(file2);
+		}
+
+		registersModTime = file2.lastModified();
+		modified = false;
+	} //}}}
+
+	//{{{ Private members
+	private static Register[] registers;
+	private static long registersModTime;
+	private static boolean loaded, loading, modified;
+
+	private Registers() {}
+
+	static
+	{
+		registers = new Register[256];
+		registers['$'] = new ClipboardRegister(Toolkit
+			.getDefaultToolkit().getSystemClipboard());
+	}
+
+	//{{{ loadRegisters() method
+	private static void loadRegisters()
+	{
+		String settingsDirectory = jEdit.getSettingsDirectory();
+		if(settingsDirectory == null)
+			return;
+
+		File registerFile = new File(MiscUtilities.constructPath(
+			jEdit.getSettingsDirectory(),"registers.xml"));
+		if(!registerFile.exists())
+			return;
+
+		registersModTime = registerFile.lastModified();
+		loaded = true;
+
+		Log.log(Log.MESSAGE,jEdit.class,"Loading registers.xml");
+
+		RegistersHandler handler = new RegistersHandler();
+		XmlParser parser = new XmlParser();
+		parser.setHandler(handler);
+		Reader in = null;
+		try
+		{
+			loading = true;
+			in = new BufferedReader(new FileReader(registerFile));
+			parser.parse(null, null, in);
+		}
+		catch(XmlException xe)
+		{
+			int line = xe.getLine();
+			String message = xe.getMessage();
+			Log.log(Log.ERROR,Registers.class,registerFile + ":"
+				+ line + ": " + message);
+		}
+		catch(FileNotFoundException fnf)
+		{
+			//Log.log(Log.DEBUG,Registers.class,fnf);
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,Registers.class,e);
+		}
+		finally
+		{
+			loading = false;
+			try
+			{
+				if(in != null)
+					in.close();
+			}
+			catch(IOException io)
+			{
+				Log.log(Log.ERROR,Registers.class,io);
+			}
+		}
+	} //}}}
+
+	//}}}
+
+	//{{{ Inner classes
 
 	//{{{ Register interface
 	/**
@@ -383,11 +628,18 @@ public class Registers
 				String line;
 				while((line = in.readLine()) != null)
 				{
+					// broken Eclipse workaround!
+					// 24 Febuary 2004
+					if(line.endsWith("\0"))
+					{
+						line = line.substring(0,
+							line.length() - 1);
+					}
 					buf.append(line);
 					buf.append('\n');
 				}
 				// remove trailing \n
-				if(!trailingEOL)
+				if(!trailingEOL && buf.length() != 0)
 					buf.setLength(buf.length() - 1);
 				return buf.toString();
 			}
@@ -439,15 +691,75 @@ public class Registers
 		public void dispose() {}
 	} //}}}
 
-	//{{{ Private members
-	private static Register[] registers;
-
-	private Registers() {}
-
-	static
+	//{{{ RegistersHandler class
+	static class RegistersHandler extends HandlerBase
 	{
-		registers = new Register[256];
-		registers['$'] = new ClipboardRegister(Toolkit
-			.getDefaultToolkit().getSystemClipboard());
+		//{{{ resolveEntity() method
+		public Object resolveEntity(String publicId, String systemId)
+		{
+			if("registers.dtd".equals(systemId))
+			{
+				// this will result in a slight speed up, since we
+				// don't need to read the DTD anyway, as AElfred is
+				// non-validating
+				return new StringReader("<!-- -->");
+
+				/* try
+				{
+					return new BufferedReader(new InputStreamReader(
+						getClass().getResourceAsStream("registers.dtd")));
+				}
+				catch(Exception e)
+				{
+					Log.log(Log.ERROR,this,"Error while opening"
+						+ " recent.dtd:");
+					Log.log(Log.ERROR,this,e);
+				} */
+			}
+
+			return null;
+		} //}}}
+
+		//{{{ attribute() method
+		public void attribute(String aname, String value, boolean isSpecified)
+		{
+			if(aname.equals("NAME"))
+				registerName = value;
+		} //}}}
+
+		//{{{ doctypeDecl() method
+		public void doctypeDecl(String name, String publicId,
+			String systemId) throws Exception
+		{
+			if("REGISTERS".equals(name))
+				return;
+
+			Log.log(Log.ERROR,this,"registers.xml: DOCTYPE must be REGISTERS");
+		} //}}}
+
+		//{{{ endElement() method
+		public void endElement(String name)
+		{
+			if(name.equals("REGISTER"))
+			{
+				if(registerName == null || registerName.length() != 1)
+					Log.log(Log.ERROR,this,"Malformed NAME: " + registerName);
+				else
+					setRegister(registerName.charAt(0),charData);
+			}
+		} //}}}
+
+		//{{{ charData() method
+		public void charData(char[] ch, int start, int length)
+		{
+			charData = new String(ch,start,length);
+		} //}}}
+
+		//{{{ Private members
+		private String registerName;
+		private String charData;
+		//}}}
 	} //}}}
+
+	//}}}
 }

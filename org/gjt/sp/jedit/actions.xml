@@ -3,7 +3,7 @@
 <!DOCTYPE ACTIONS SYSTEM "actions.dtd">
 
 <!-- jEdit action table                                                      -->
-<!-- Copyright (C) 2000, 2001, 2002 Slava Pestov                             -->
+<!-- Copyright (C) 2000, 2003 Slava Pestov                                   -->
 
 <!-- :tabSize=8:indentSize=8:noTabs=false:                                   -->
 <!-- :folding=indent:collapseFolds=1:                                        -->
@@ -20,9 +20,27 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="action-bar" NO_REPEAT="TRUE" NO_RECORD="TRUE" NO_REMEMBER_LAST="TRUE">
+	<CODE>
+		view.actionBar();
+	</CODE>
+</ACTION>
+
 <ACTION NAME="add-explicit-fold">
 	<CODE>
 		textArea.addExplicitFold();
+	</CODE>
+</ACTION>
+
+<ACTION NAME="add-buffer-to-favorites">
+	<CODE>
+		FavoritesVFS.addToFavorites(buffer.getPath(),VFS.DirectoryEntry.FILE);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="add-dir-to-favorites">
+	<CODE>
+		FavoritesVFS.addToFavorites(buffer.getDirectory(),VFS.DirectoryEntry.DIRECTORY);
 	</CODE>
 </ACTION>
 
@@ -35,7 +53,7 @@
 <ACTION NAME="add-marker-shortcut" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.add-marker"),
+			buffer.getMarkerStatusPrompt("add-marker"),
 			"buffer.addMarker(__char__,textArea.getCaretPosition());");
 	</CODE>
 </ACTION>
@@ -52,9 +70,15 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="backspace-word-std">
+	<CODE>
+		textArea.backspaceWord(true);
+	</CODE>
+</ACTION>
+
 <ACTION NAME="bottom-docking-area">
 	<CODE>
-		view.getDockableWindowManager().getBottomDockingArea().showMostRecent();
+		wm.getBottomDockingArea().showMostRecent();
 	</CODE>
 </ACTION>
 
@@ -84,7 +108,7 @@
 
 <ACTION NAME="close-docking-area">
 	<CODE>
-		view.getDockableWindowManager().closeCurrentArea();
+		wm.closeCurrentArea();
 	</CODE>
 </ACTION>
 
@@ -96,7 +120,7 @@
 
 <ACTION NAME="collapse-all-folds">
 	<CODE>
-		textArea.getFoldVisibilityManager().expandFolds(1);
+		textArea.getDisplayManager().expandFolds(1);
 	</CODE>
 </ACTION>
 
@@ -127,7 +151,7 @@
 <ACTION NAME="copy-append-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.copy-append-string-register"),
+			Registers.getRegisterStatusPrompt("copy-append-string-register"),
 			"Registers.append(textArea,__char__,\"\\n\",false);");
 	</CODE>
 </ACTION>
@@ -135,7 +159,7 @@
 <ACTION NAME="copy-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.copy-string-register"),
+			Registers.getRegisterStatusPrompt("copy-string-register"),
 			"Registers.copy(textArea,__char__);");
 	</CODE>
 </ACTION>
@@ -155,7 +179,7 @@
 <ACTION NAME="cut-append-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.cut-append-string-register"),
+			Registers.getRegisterStatusPrompt("cut-append-string-register"),
 			"Registers.append(textArea,__char__,\"\\n\",true);");
 	</CODE>
 </ACTION>
@@ -163,7 +187,7 @@
 <ACTION NAME="cut-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.cut-string-register"),
+			Registers.getRegisterStatusPrompt("cut-string-register"),
 			"Registers.cut(textArea,__char__);");
 	</CODE>
 </ACTION>
@@ -204,6 +228,12 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="delete-word-std">
+	<CODE>
+		textArea.deleteWord(true);
+	</CODE>
+</ACTION>
+
 <ACTION NAME="document-end">
 	<CODE>
 		textArea.goToBufferEnd(false);
@@ -213,6 +243,12 @@
 <ACTION NAME="document-home">
 	<CODE>
 		textArea.goToBufferStart(false);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="edit-favorites">
+	<CODE>
+		VFSBrowser.browseDirectory(view,"favorites:");
 	</CODE>
 </ACTION>
 
@@ -248,7 +284,7 @@
 
 <ACTION NAME="expand-all-folds">
 	<CODE>
-		textArea.getFoldVisibilityManager().expandAllFolds();
+		textArea.getDisplayManager().expandAllFolds();
 		textArea.scrollToCaret(false);
 	</CODE>
 </ACTION>
@@ -275,7 +311,7 @@
 	<CODE>
 		view.getInputHandler().readNextChar(
 			jEdit.getProperty("view.status.expand-folds"),
-			"textArea.getFoldVisibilityManager().expandFolds(__char__);\n"
+			"textArea.getDisplayManager().expandFolds(__char__);\n"
 			+ "textArea.scrollToCaret(false);");
 	</CODE>
 </ACTION>
@@ -321,14 +357,8 @@
 <ACTION NAME="goto-marker" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.goto-marker"),
+			buffer.getMarkerStatusPrompt("goto-marker"),
 			"textArea.goToMarker(__char__,false);");
-	</CODE>
-</ACTION>
-
-<ACTION NAME="goto-textarea">
-	<CODE>
-		textArea.requestFocus();
 	</CODE>
 </ACTION>
 
@@ -356,15 +386,18 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="ignore-case">
+	<CODE>
+		SearchAndReplace.setIgnoreCase(!SearchAndReplace.getIgnoreCase());
+	</CODE>
+	<IS_SELECTED>
+		SearchAndReplace.getIgnoreCase();
+	</IS_SELECTED>
+</ACTION>
+
 <ACTION NAME="indent-lines">
 	<CODE>
 		textArea.indentSelectedLines();
-	</CODE>
-</ACTION>
-
-<ACTION NAME="insert-file">
-	<CODE>
-		buffer.showInsertFileDialog(view);
 	</CODE>
 </ACTION>
 
@@ -418,9 +451,15 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="last-action" NO_RECORD="TRUE" NO_REMEMBER_LAST="TRUE">
+	<CODE>
+		view.getInputHandler().invokeLastAction();
+	</CODE>
+</ACTION>
+
 <ACTION NAME="left-docking-area">
 	<CODE>
-		view.getDockableWindowManager().getLeftDockingArea().showMostRecent();
+		wm.getLeftDockingArea().showMostRecent();
 	</CODE>
 </ACTION>
 
@@ -556,7 +595,7 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="overwrite">
+<ACTION NAME="overwrite" NO_RECORD="TRUE">
 	<CODE>
 		textArea.toggleOverwriteEnabled();
 	</CODE>
@@ -586,23 +625,37 @@
 	</CODE>
 </ACTION>
 
+<ACTION NAME="paste-deleted">
+	<CODE>
+		new PasteFromListDialog("paste-deleted",view,
+			KillRing.getListModel());
+	</CODE>
+</ACTION>
+
 <ACTION NAME="paste-previous">
 	<CODE>
-		new PastePrevious(view);
+		new PasteFromListDialog("paste-previous",view,
+			HistoryModel.getModel("clipboard"));
 	</CODE>
 </ACTION>
 
 <ACTION NAME="paste-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.paste-string-register"),
+			Registers.getRegisterStatusPrompt("paste-string-register"),
 			"Registers.paste(textArea,__char__,false);");
 	</CODE>
 </ACTION>
 
 <ACTION NAME="plugin-manager">
 	<CODE>
-		new PluginManager(view);
+		PluginManager.showPluginManager(view);
+	</CODE>
+</ACTION>
+
+<ACTION NAME="plugin-options">
+	<CODE>
+		new PluginOptions(view);
 	</CODE>
 </ACTION>
 
@@ -675,7 +728,8 @@
 <ACTION NAME="print">
 	<CODE>
 
-	if(OperatingSystem.hasJava14())
+	if(OperatingSystem.hasJava14() &amp;&amp;
+		!jEdit.getBooleanProperty("print.force13"))
 		BufferPrinter1_4.print(view,buffer,false);
 	else
 		BufferPrinter1_3.print(view,buffer,false);
@@ -730,6 +784,15 @@
 	<CODE>
 		buffer.redo(textArea);
 	</CODE>
+</ACTION>
+
+<ACTION NAME="regexp">
+	<CODE>
+		SearchAndReplace.setRegexp(!SearchAndReplace.getRegexp());
+	</CODE>
+	<IS_SELECTED>
+		SearchAndReplace.getRegexp();
+	</IS_SELECTED>
 </ACTION>
 
 <ACTION NAME="reload">
@@ -787,12 +850,6 @@
 	</CODE>
 </ACTION>
 
-<ACTION NAME="repeat" NO_REPEAT="TRUE" NO_RECORD="TRUE">
-	<CODE>
-		view.getInputHandler().setRepeatEnabled(true);
-	</CODE>
-</ACTION>
-
 <ACTION NAME="rescan-macros">
 	<CODE>
 		Macros.loadMacros();
@@ -801,13 +858,7 @@
 
 <ACTION NAME="right-docking-area">
 	<CODE>
-		view.getDockableWindowManager().getRightDockingArea().showMostRecent();
-	</CODE>
-</ACTION>
-
-<ACTION NAME="run-last-macro" NO_RECORD="TRUE">
-	<CODE>
-		Macros.runLastMacro(view);
+		wm.getRightDockingArea().showMostRecent();
 	</CODE>
 </ACTION>
 
@@ -831,7 +882,7 @@
 
 <ACTION NAME="save-all">
 	<CODE>
-		jEdit.saveAllBuffers(view,true);
+		jEdit.saveAllBuffers(view);
 	</CODE>
 </ACTION>
 
@@ -861,7 +912,14 @@
 
 <ACTION NAME="scroll-to-current-line">
 	<CODE>
+		if(!textArea.getDisplayManager().isLineVisible(
+			textArea.getCaretLine()))
+		{
+			textArea.getDisplayManager().expandFold(
+				textArea.getCaretLine(),true);
+		}
 		textArea.scrollToCaret(true);
+		textArea.requestFocus();
 	</CODE>
 </ACTION>
 
@@ -972,7 +1030,7 @@
 <ACTION NAME="select-marker" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.select-marker"),
+			buffer.getMarkerStatusPrompt("select-marker"),
 			"textArea.goToMarker(__char__,true);");
 	</CODE>
 </ACTION>
@@ -1152,7 +1210,7 @@
 <ACTION NAME="swap-marker" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.swap-marker"),
+			buffer.getMarkerStatusPrompt("swap-marker"),
 			"textArea.swapMarkerAndCaret(__char__);");
 	</CODE>
 </ACTION>
@@ -1183,7 +1241,7 @@
 
 <ACTION NAME="top-docking-area">
 	<CODE>
-		view.getDockableWindowManager().getTopDockingArea().showMostRecent();
+		wm.getTopDockingArea().showMostRecent();
 	</CODE>
 </ACTION>
 
@@ -1211,12 +1269,12 @@
 	</IS_SELECTED>
 </ACTION>
 
-<ACTION NAME="toggle-synchro-scroll">
+<ACTION NAME="toggle-rect-select">
 	<CODE>
-		view.toggleSynchroScrollEnabled();
+		textArea.toggleRectangularSelectionEnabled();
 	</CODE>
 	<IS_SELECTED>
-		return view.isSynchroScrollEnabled();
+		return textArea.isRectangularSelectionEnabled();
 	</IS_SELECTED>
 </ACTION>
 
@@ -1259,7 +1317,7 @@
 <ACTION NAME="vertical-paste-string-register" NO_REPEAT="TRUE" NO_RECORD="TRUE">
 	<CODE>
 		view.getInputHandler().readNextChar(
-			jEdit.getProperty("view.status.vertical-paste-string-register"),
+			Registers.getRegisterStatusPrompt("vertical-paste-string-register"),
 			"Registers.paste(textArea,__char__,true);");
 	</CODE>
 </ACTION>

@@ -30,7 +30,7 @@ import org.gjt.sp.jedit.Buffer;
  * embedded in the text.
  *
  * @author Slava Pestov
- * @version $Id: ExplicitFoldHandler.java,v 1.6 2003/01/31 04:49:30 spestov Exp $
+ * @version $Id: ExplicitFoldHandler.java,v 1.8 2003/11/18 20:51:57 spestov Exp $
  * @since jEdit 4.0pre1
  */
 public class ExplicitFoldHandler extends FoldHandler
@@ -57,7 +57,6 @@ public class ExplicitFoldHandler extends FoldHandler
 			return 0;
 		else
 		{
-			int tabSize = buffer.getTabSize();
 			int foldLevel = buffer.getFoldLevel(lineIndex - 1);
 
 			buffer.getLineText(lineIndex - 1,seg);
@@ -75,7 +74,7 @@ public class ExplicitFoldHandler extends FoldHandler
 					openingBrackets++;
 					if(openingBrackets == 3)
 					{
-						foldLevel += tabSize;
+						foldLevel++;
 						openingBrackets = 0;
 					}
 					break;
@@ -84,8 +83,8 @@ public class ExplicitFoldHandler extends FoldHandler
 					closingBrackets++;
 					if(closingBrackets == 3)
 					{
-						if(foldLevel >= tabSize)
-							foldLevel -= tabSize;
+						if(foldLevel > 0)
+							foldLevel--;
 						closingBrackets = 0;
 					}
 					break;

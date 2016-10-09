@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2001 Slava Pestov
+ * Copyright (C) 2000, 2004 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,11 +26,14 @@ package org.gjt.sp.jedit;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
+import java.lang.reflect.Method;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.msg.*;
 import org.gjt.sp.jedit.options.GlobalOptions;
+import org.gjt.sp.jedit.syntax.SyntaxStyle;
 import org.gjt.sp.jedit.textarea.*;
+import org.gjt.sp.util.Log;
 //}}}
 
 /**
@@ -53,7 +56,7 @@ import org.gjt.sp.jedit.textarea.*;
  * @see View#getEditPanes()
  *
  * @author Slava Pestov
- * @version $Id: EditPane.java,v 1.34 2003/02/07 21:57:28 spestov Exp $
+ * @version $Id: EditPane.java,v 1.51 2004/08/17 06:37:35 spestov Exp $
  */
 public class EditPane extends JPanel implements EBComponent
 {
@@ -85,6 +88,9 @@ public class EditPane extends JPanel implements EBComponent
 	 */
 	public void setBuffer(final Buffer buffer)
 	{
+		if(buffer == null)
+			throw new NullPointerException();
+
 		if(this.buffer == buffer)
 			return;
 
@@ -121,7 +127,7 @@ public class EditPane extends JPanel implements EBComponent
 					&& (bufferSwitcher == null
 					|| !bufferSwitcher.isPopupVisible()))
 				{
-					focusOnTextArea();
+					textArea.requestFocus();
 				}
 			}
 		});
@@ -131,8 +137,10 @@ public class EditPane extends JPanel implements EBComponent
 		{
 			public void run()
 			{
-				loadCaretInfo();
-				buffer.checkModTime(EditPane.this);
+				// avoid a race condition
+				// see bug #834338
+				if(buffer == getBuffer())
+					loadCaretInfo();
 			}
 		};
 
@@ -190,14 +198,13 @@ public class EditPane extends JPanel implements EBComponent
 	 */
 	public void focusOnTextArea()
 	{
-		textArea.grabFocus();
-		// trying to work around buggy focus handling in some
-		// Java versions
-//		if(!textArea.hasFocus())
-//		{
-//			textArea.processFocusEvent(new FocusEvent(textArea,
-//				FocusEvent.FOCUS_GAINED));
-//		}
+		SwingUtilities.invokeLater(new Runnable()
+		{
+			public void run()
+			{
+				textArea.requestFocus();
+			}
+		});
 	} //}}}
 
 	//{{{ getTextArea() method
@@ -243,6 +250,9 @@ public class EditPane extends JPanel implements EBComponent
 	 */
 	public void saveCaretInfo()
 	{
+		if(!buffer.isLoaded())
+			return;
+
 		buffer.setIntegerProperty(Buffer.CARET,
 			textArea.getCaretPosition());
 
@@ -279,7 +289,7 @@ public class EditPane extends JPanel implements EBComponent
 			textArea.setSelection(selection);*/
 
 		if(firstLine != null)
-			textArea.setFirstLine(textArea.physicalToVirtual(firstLine.intValue()));
+			textArea.setFirstPhysicalLine(firstLine.intValue());
 
 		if(horizontalOffset != null)
 			textArea.setHorizontalOffset(horizontalOffset.intValue());
@@ -319,6 +329,15 @@ public class EditPane extends JPanel implements EBComponent
 		return new Dimension(0,0);
 	} //}}}
 
+	//{{{ toString() method
+	public String toString()
+	{
+		return getClass().getName() + "["
+			+ (view.getEditPane() == this
+			? "active" : "inactive")
+			+ "]";
+	} //}}}
+
 	//{{{ Package-private members
 
 	//{{{ EditPane constructor
@@ -354,11 +373,32 @@ public class EditPane extends JPanel implements EBComponent
 		saveCaretInfo();
 		EditBus.send(new EditPaneUpdate(this,EditPaneUpdate.DESTROYED));
 		EditBus.removeFromBus(this);
+		textArea.dispose();
 	} //}}}
 
 	//}}}
 
 	//{{{ Private members
+
+	private static Method initBufferSwitcher;
+
+	static
+	{
+		if(OperatingSystem.hasJava14())
+		{
+			try
+			{
+				initBufferSwitcher = Java14.class
+					.getMethod("initBufferSwitcher",
+					new Class[] { EditPane.class,
+					BufferSwitcher.class });
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,EditPane.class,e);
+			}
+		}
+	}
 
 	//{{{ Instance variables
 	private boolean init;
@@ -374,11 +414,11 @@ public class EditPane extends JPanel implements EBComponent
 	{
 		TextAreaPainter painter = textArea.getPainter();
 
-		painter.setFont(UIManager.getFont("TextArea.font"));
-		painter.setBracketHighlightEnabled(jEdit.getBooleanProperty(
-			"view.bracketHighlight"));
-		painter.setBracketHighlightColor(
-			jEdit.getColorProperty("view.bracketHighlightColor"));
+		painter.setFont(jEdit.getFontProperty("view.font"));
+		painter.setStructureHighlightEnabled(jEdit.getBooleanProperty(
+			"view.structureHighlight"));
+		painter.setStructureHighlightColor(
+			jEdit.getColorProperty("view.structureHighlightColor"));
 		painter.setEOLMarkersPainted(jEdit.getBooleanProperty(
 			"view.eolMarkers"));
 		painter.setEOLMarkerColor(
@@ -391,6 +431,8 @@ public class EditPane extends JPanel implements EBComponent
 			jEdit.getColorProperty("view.caretColor"));
 		painter.setSelectionColor(
 			jEdit.getColorProperty("view.selectionColor"));
+		painter.setMultipleSelectionColor(
+			jEdit.getColorProperty("view.multipleSelectionColor"));
 		painter.setBackground(
 			jEdit.getColorProperty("view.bgColor"));
 		painter.setForeground(
@@ -405,14 +447,19 @@ public class EditPane extends JPanel implements EBComponent
 			"view.antiAlias"));
 		painter.setFractionalFontMetricsEnabled(jEdit.getBooleanProperty(
 			"view.fracFontMetrics"));
-		painter.setStyles(GUIUtilities.loadStyles(
-			jEdit.getProperty("view.font"),
-			jEdit.getIntegerProperty("view.fontsize",12)));
 
-		painter.setFoldLineStyle(GUIUtilities.parseStyle(
-			jEdit.getProperty("view.style.foldLine"),
-			jEdit.getProperty("view.font"),
-			jEdit.getIntegerProperty("view.fontsize",12)));
+		String defaultFont = jEdit.getProperty("view.font");
+		int defaultFontSize = jEdit.getIntegerProperty("view.fontsize",12);
+		painter.setStyles(GUIUtilities.loadStyles(defaultFont,defaultFontSize));
+
+		SyntaxStyle[] foldLineStyle = new SyntaxStyle[4];
+		for(int i = 0; i <= 3; i++)
+		{
+			foldLineStyle[i] = GUIUtilities.parseStyle(
+				jEdit.getProperty("view.style.foldLine." + i),
+				defaultFont,defaultFontSize);
+		}
+		painter.setFoldLineStyle(foldLineStyle);
 		Gutter gutter = textArea.getGutter();
 		gutter.setExpanded(jEdit.getBooleanProperty(
 			"view.gutter.lineNumbers"));
@@ -421,10 +468,10 @@ public class EditPane extends JPanel implements EBComponent
 		gutter.setHighlightInterval(interval);
 		gutter.setCurrentLineHighlightEnabled(jEdit.getBooleanProperty(
 			"view.gutter.highlightCurrentLine"));
-		gutter.setBracketHighlightEnabled(jEdit.getBooleanProperty(
-			"view.gutter.bracketHighlight"));
-		gutter.setBracketHighlightColor(
-			jEdit.getColorProperty("view.gutter.bracketHighlightColor"));
+		gutter.setStructureHighlightEnabled(jEdit.getBooleanProperty(
+			"view.gutter.structureHighlight"));
+		gutter.setStructureHighlightColor(
+			jEdit.getColorProperty("view.gutter.structureHighlightColor"));
 		gutter.setBackground(
 			jEdit.getColorProperty("view.gutter.bgColor"));
 		gutter.setForeground(
@@ -488,6 +535,9 @@ public class EditPane extends JPanel implements EBComponent
 		textArea.setQuickCopyEnabled(jEdit.getBooleanProperty(
 			"view.middleMousePaste"));
 
+		textArea.setDragEnabled(jEdit.getBooleanProperty(
+			"view.dragAndDrop"));
+
 		textArea.propertiesChanged();
 	} //}}}
 
@@ -499,6 +549,21 @@ public class EditPane extends JPanel implements EBComponent
 			if(bufferSwitcher == null)
 			{
 				bufferSwitcher = new BufferSwitcher(this);
+				if(initBufferSwitcher != null)
+				{
+					try
+					{
+						initBufferSwitcher.invoke(
+							null,new Object[] {
+								EditPane.this,
+								bufferSwitcher
+							});
+					}
+					catch(Exception e)
+					{
+						Log.log(Log.ERROR,this,e);
+					}
+				}
 				add(BorderLayout.NORTH,bufferSwitcher);
 				bufferSwitcher.updateBufferList();
 				revalidate();
@@ -565,7 +630,6 @@ public class EditPane extends JPanel implements EBComponent
 			if(_buffer == buffer)
 			{
 				textArea.repaint();
-				textArea.updateScrollBars();
 				if(bufferSwitcher != null)
 					bufferSwitcher.updateBufferList();
 
@@ -603,11 +667,7 @@ public class EditPane extends JPanel implements EBComponent
 		{
 			if(_buffer == buffer)
 			{
-				textArea.getFoldVisibilityManager()
-					.foldStructureChanged();
 				textArea.propertiesChanged();
-				textArea.repaint();
-
 				if(view.getEditPane() == this)
 					view.getStatus().updateBufferStatus();
 			}

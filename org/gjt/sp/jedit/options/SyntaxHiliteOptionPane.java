@@ -30,7 +30,7 @@ import javax.swing.*;
 import java.awt.event.*;
 import java.awt.*;
 import java.util.Vector;
-import org.gjt.sp.jedit.syntax.SyntaxStyle;
+import org.gjt.sp.jedit.syntax.*;
 import org.gjt.sp.jedit.gui.ColorWellButton;
 import org.gjt.sp.jedit.gui.EnhancedDialog;
 import org.gjt.sp.jedit.*;
@@ -40,7 +40,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Style option pane.
  * @author Slava Pestov
- * @version $Id: SyntaxHiliteOptionPane.java,v 1.4 2003/01/12 03:08:24 spestov Exp $
+ * @version $Id: SyntaxHiliteOptionPane.java,v 1.9 2004/06/28 06:45:27 spestov Exp $
  */
 public class SyntaxHiliteOptionPane extends AbstractOptionPane
 {
@@ -130,22 +130,24 @@ class StyleTableModel extends AbstractTableModel
 	//{{{ StyleTableModel constructor
 	StyleTableModel()
 	{
-		styleChoices = new Vector(13);
-		addStyleChoice("options.syntax.comment1Style","view.style.comment1");
-		addStyleChoice("options.syntax.comment2Style","view.style.comment2");
-		addStyleChoice("options.syntax.literal1Style","view.style.literal1");
-		addStyleChoice("options.syntax.literal2Style","view.style.literal2");
-		addStyleChoice("options.syntax.labelStyle","view.style.label");
-		addStyleChoice("options.syntax.keyword1Style","view.style.keyword1");
-		addStyleChoice("options.syntax.keyword2Style","view.style.keyword2");
-		addStyleChoice("options.syntax.keyword3Style","view.style.keyword3");
-		addStyleChoice("options.syntax.functionStyle","view.style.function");
-		addStyleChoice("options.syntax.markupStyle","view.style.markup");
-		addStyleChoice("options.syntax.operatorStyle","view.style.operator");
-		addStyleChoice("options.syntax.digitStyle","view.style.digit");
-		addStyleChoice("options.syntax.invalidStyle","view.style.invalid");
-		addStyleChoice("options.syntax.foldLine","view.style.foldLine");
-		MiscUtilities.quicksort(styleChoices,new MiscUtilities.StringCompare());
+		styleChoices = new Vector(Token.ID_COUNT + 4);
+		// start at 1 not 0 to skip Token.NULL
+		for(int i = 1; i < Token.ID_COUNT; i++)
+		{
+			String tokenName = Token.tokenToString((byte)i);
+			addStyleChoice(tokenName,"view.style." + tokenName.toLowerCase());
+		}
+
+		addStyleChoice(jEdit.getProperty("options.syntax.foldLine.1"),
+			"view.style.foldLine.1");
+		addStyleChoice(jEdit.getProperty("options.syntax.foldLine.2"),
+			"view.style.foldLine.2");
+		addStyleChoice(jEdit.getProperty("options.syntax.foldLine.3"),
+			"view.style.foldLine.3");
+		addStyleChoice(jEdit.getProperty("options.syntax.foldLine.0"),
+			"view.style.foldLine.0");
+
+		MiscUtilities.quicksort(styleChoices,new MiscUtilities.StringICaseCompare());
 	} //}}}
 
 	//{{{ getColumnCount() method
@@ -213,7 +215,7 @@ class StyleTableModel extends AbstractTableModel
 	//{{{ addStyleChoice() method
 	private void addStyleChoice(String label, String property)
 	{
-		styleChoices.addElement(new StyleChoice(jEdit.getProperty(label),
+		styleChoices.addElement(new StyleChoice(label,
 			property,
 			GUIUtilities.parseStyle(jEdit.getProperty(property),
 			"Dialog",12)));
@@ -297,58 +299,37 @@ class StyleEditor extends EnhancedDialog implements ActionListener
 		content.setBorder(new EmptyBorder(12,12,12,12));
 		setContentPane(content);
 
-		GridBagLayout layout = new GridBagLayout();
-		JPanel panel = new JPanel(layout);
-
-		GridBagConstraints cons = new GridBagConstraints();
-		cons.gridx = cons.gridy = 0;
-		cons.gridwidth = 2;
-		cons.gridheight = 1;
-		cons.fill = GridBagConstraints.BOTH;
-		cons.weightx = 0.0f;
+		JPanel panel = new JPanel(new GridLayout(4,2,12,12));
 
 		italics = new JCheckBox(jEdit.getProperty("style-editor.italics"));
 		italics.setSelected(style.getFont().isItalic());
-		layout.setConstraints(italics,cons);
 		panel.add(italics);
+		panel.add(new JLabel());
 
-		cons.gridy++;
 		bold = new JCheckBox(jEdit.getProperty("style-editor.bold"));
 		bold.setSelected(style.getFont().isBold());
-		layout.setConstraints(bold,cons);
 		panel.add(bold);
+		panel.add(new JLabel());
 
-		cons.gridy++;
-		cons.gridwidth = 1;
 		Color fg = style.getForegroundColor();
 
 		fgColorCheckBox = new JCheckBox(jEdit.getProperty("style-editor.fgColor"));
 		fgColorCheckBox.setSelected(fg != null);
 		fgColorCheckBox.addActionListener(this);
-		fgColorCheckBox.setBorder(new EmptyBorder(0,0,0,12));
-		layout.setConstraints(fgColorCheckBox,cons);
 		panel.add(fgColorCheckBox);
 
-		cons.gridx++;
 		fgColor = new ColorWellButton(fg);
 		fgColor.setEnabled(fg != null);
-		layout.setConstraints(fgColor,cons);
 		panel.add(fgColor);
 
-		cons.gridx = 0;
-		cons.gridy++;
 		Color bg = style.getBackgroundColor();
 		bgColorCheckBox = new JCheckBox(jEdit.getProperty("style-editor.bgColor"));
 		bgColorCheckBox.setSelected(bg != null);
 		bgColorCheckBox.addActionListener(this);
-		bgColorCheckBox.setBorder(new EmptyBorder(0,0,0,12));
-		layout.setConstraints(bgColorCheckBox,cons);
 		panel.add(bgColorCheckBox);
 
-		cons.gridx++;
 		bgColor = new ColorWellButton(bg);
 		bgColor.setEnabled(bg != null);
-		layout.setConstraints(bgColor,cons);
 		panel.add(bgColor);
 
 		content.add(BorderLayout.CENTER,panel);
@@ -369,7 +350,7 @@ class StyleEditor extends EnhancedDialog implements ActionListener
 		setLocationRelativeTo(GUIUtilities.getParentDialog(comp));
 
 		setResizable(false);
-		show();
+		setVisible(true);
 	} //}}}
 
 	//{{{ actionPerformed() method

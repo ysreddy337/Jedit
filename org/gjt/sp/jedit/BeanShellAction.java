@@ -1,6 +1,9 @@
 /*
  * BeanShellAction.java - BeanShell action
- * Copyright (C) 2000, 2001 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 2000, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,19 +22,29 @@
 
 package org.gjt.sp.jedit;
 
-import bsh.BshMethod;
+import bsh.*;
+import java.awt.Component;
 import org.gjt.sp.jedit.gui.BeanShellErrorDialog;
 import org.gjt.sp.util.Log;
 
 /**
- * An action that evaluates BeanShell code when invoked.
+ * An action that evaluates BeanShell code when invoked. BeanShell actions are
+ * usually loaded from <code>actions.xml</code> and
+ * <code>browser.actions.xml</code> files; see {@link ActionSet} for syntax
+ * information.
+ *
+ * @see jEdit#getAction(String)
+ * @see jEdit#getActionNames()
+ * @see ActionSet
+ *
  * @author Slava Pestov
- * @version $Id: BeanShellAction.java,v 1.10 2003/02/17 01:04:27 spestov Exp $
+ * @version $Id: BeanShellAction.java,v 1.17 2003/07/17 23:49:44 spestov Exp $
  */
 public class BeanShellAction extends EditAction
 {
+	//{{{ BeanShellAction constructor
 	public BeanShellAction(String name, String code, String isSelected,
-		boolean noRepeat, boolean noRecord)
+		boolean noRepeat, boolean noRecord, boolean noRememberLast)
 	{
 		super(name);
 
@@ -39,30 +52,17 @@ public class BeanShellAction extends EditAction
 		this.isSelected = isSelected;
 		this.noRepeat = noRepeat;
 		this.noRecord = noRecord;
+		this.noRememberLast = noRememberLast;
 
 		/* Some characters that we like to use in action names
 		 * ('.', '-') are not allowed in BeanShell identifiers. */
 		sanitizedName = name.replace('.','_').replace('-','_');
 
-		// evaluate isSelected now so that menus don't take a long
-		// time to first come up
-		if(isSelected != null)
-		{
-			String cachedIsSelectedName = "selected_" + sanitizedName;
-			try
-			{
-				cachedIsSelected = BeanShell.cacheBlock(cachedIsSelectedName,
-					isSelected,false);
-			}
-			catch(Exception e)
-			{
-				Log.log(Log.ERROR,this,e);
+		jEdit.setTemporaryProperty(name + ".toggle",
+			isSelected != null ? "true" : "false");
+	} //}}}
 
-				new BeanShellErrorDialog(null,e);
-			}
-		}
-	}
-
+	//{{{ invoke() method
 	public void invoke(View view)
 	{
 		try
@@ -70,10 +70,12 @@ public class BeanShellAction extends EditAction
 			if(cachedCode == null)
 			{
 				String cachedCodeName = "action_" + sanitizedName;
-				cachedCode = BeanShell.cacheBlock(cachedCodeName,code,false);
+				cachedCode = BeanShell.cacheBlock(cachedCodeName,code,true);
 			}
 
-			BeanShell.runCachedBlock(cachedCode,view,null);
+			BeanShell.runCachedBlock(cachedCode,view,
+				new NameSpace(BeanShell.getNameSpace(),
+				"BeanShellAction.invoke()"));
 		}
 		catch(Throwable e)
 		{
@@ -81,54 +83,99 @@ public class BeanShellAction extends EditAction
 
 			new BeanShellErrorDialog(view,e);
 		}
-	}
+	} //}}}
 
-	public boolean isToggle()
-	{
-		return isSelected != null;
-	}
-
-	public boolean isSelected(View view)
+	//{{{ isSelected() method
+	public boolean isSelected(Component comp)
 	{
 		if(isSelected == null)
 			return false;
 
+		NameSpace global = BeanShell.getNameSpace();
+
 		try
 		{
+			if(cachedIsSelected == null)
+			{
+				String cachedIsSelectedName = "selected_" + sanitizedName;
+				cachedIsSelected = BeanShell.cacheBlock(cachedIsSelectedName,
+					isSelected,true);
+			}
+
+			View view = GUIUtilities.getView(comp);
+
+			// undocumented hack to allow browser actions to work.
+			// XXX - clean up in 4.3
+			global.setVariable("_comp",comp);
+
 			return Boolean.TRUE.equals(BeanShell.runCachedBlock(
-				cachedIsSelected,view,null));
+				cachedIsSelected,view,
+				new NameSpace(BeanShell.getNameSpace(),
+				"BeanShellAction.isSelected()")));
 		}
 		catch(Throwable e)
 		{
 			Log.log(Log.ERROR,this,e);
 
-			new BeanShellErrorDialog(view,e);
+			// dialogs fuck things up if a menu is visible, etc!
+			//new BeanShellErrorDialog(view,e);
+
+			// so that in the future we don't see streams of
+			// exceptions
+			isSelected = null;
 
 			return false;
 		}
-	}
+		finally
+		{
+			try
+			{
+				global.setVariable("_comp",null);
+			}
+			catch(UtilEvalError err)
+			{
+				Log.log(Log.ERROR,this,err);
+			}
+		}
+	} //}}}
 
+	//{{{ noRepeat() method
 	public boolean noRepeat()
 	{
 		return noRepeat;
-	}
+	} //}}}
 
+	//{{{ noRecord() method
 	public boolean noRecord()
 	{
 		return noRecord;
-	}
+	} //}}}
 
+	//{{{ noRememberLast() method
+	/**
+	 * Returns if this edit action should not be remembered as the most
+	 * recently invoked action.
+	 * @since jEdit 4.2pre1
+	 */
+	public boolean noRememberLast()
+	{
+		return noRememberLast;
+	} //}}}
+
+	//{{{ getCode() method
 	public String getCode()
 	{
 		return code.trim();
-	}
+	} //}}}
 
-	// private members
+	//{{{ Private members
 	private boolean noRepeat;
 	private boolean noRecord;
+	private boolean noRememberLast;
 	private String code;
 	private String isSelected;
 	private BshMethod cachedCode;
 	private BshMethod cachedIsSelected;
 	private String sanitizedName;
+	//}}}
 }

@@ -48,6 +48,18 @@ public class StatusBarOptionPane extends AbstractOptionPane
 		statusVisible.addActionListener(new ActionHandler());
 		addComponent(statusVisible);
 
+		/* Foreground color */
+		addComponent(jEdit.getProperty("options.status.foreground"),
+			foregroundColor = new ColorWellButton(
+			jEdit.getColorProperty("view.status.foreground")),
+			GridBagConstraints.VERTICAL);
+
+		/* Background color */
+		addComponent(jEdit.getProperty("options.status.background"),
+			backgroundColor = new ColorWellButton(
+			jEdit.getColorProperty("view.status.background")),
+			GridBagConstraints.VERTICAL);
+
 		/* Caret status */
 		showCaretStatus = new JCheckBox(jEdit.getProperty(
 			"options.status.show-caret-status"));
@@ -90,6 +102,13 @@ public class StatusBarOptionPane extends AbstractOptionPane
 			"view.status.show-multi-select"));
 		addComponent(showMultiSelect);
 
+		/* Rect select */
+		showRectSelect = new JCheckBox(jEdit.getProperty(
+			"options.status.show-rect-select"));
+		showRectSelect.setSelected(jEdit.getBooleanProperty(
+			"view.status.show-rect-select"));
+		addComponent(showRectSelect);
+
 		/* Overwrite */
 		showOverwrite = new JCheckBox(jEdit.getProperty(
 			"options.status.show-overwrite"));
@@ -124,6 +143,14 @@ public class StatusBarOptionPane extends AbstractOptionPane
 			jEdit.getColorProperty("view.status.memory.background")),
 			GridBagConstraints.VERTICAL);
 
+		/* Clock */
+		showClock = new JCheckBox(jEdit.getProperty(
+			"options.status.show-clock"));
+		showClock.setSelected(jEdit.getBooleanProperty(
+			"view.status.show-clock"));
+		showClock.addActionListener(new ActionHandler());
+		addComponent(showClock);
+
 		updateEnabled();
 	} //}}}
 
@@ -132,6 +159,10 @@ public class StatusBarOptionPane extends AbstractOptionPane
 	{
 		jEdit.setBooleanProperty("view.status.visible",
 			statusVisible.isSelected());
+		jEdit.setColorProperty("view.status.foreground",foregroundColor
+			.getSelectedColor());
+		jEdit.setColorProperty("view.status.background",backgroundColor
+			.getSelectedColor());
 		jEdit.setBooleanProperty("view.status.show-caret-status",
 			showCaretStatus.isSelected());
 		jEdit.setBooleanProperty("view.status.show-edit-mode",
@@ -144,6 +175,8 @@ public class StatusBarOptionPane extends AbstractOptionPane
 			showWrap.isSelected());
 		jEdit.setBooleanProperty("view.status.show-multi-select",
 			showMultiSelect.isSelected());
+		jEdit.setBooleanProperty("view.status.show-rect-select",
+			showRectSelect.isSelected());
 		jEdit.setBooleanProperty("view.status.show-overwrite",
 			showOverwrite.isSelected());
 		jEdit.setBooleanProperty("view.status.show-line-seperator",
@@ -154,21 +187,27 @@ public class StatusBarOptionPane extends AbstractOptionPane
 			.getSelectedColor());
 		jEdit.setColorProperty("view.status.memory.background",memBackgroundColor
 			.getSelectedColor());
+		jEdit.setBooleanProperty("view.status.show-clock",
+			showClock.isSelected());
 	} //}}}
 
 	//{{{ Private members
 	private JCheckBox statusVisible;
+	private ColorWellButton foregroundColor;
+	private ColorWellButton backgroundColor;
 	private JCheckBox showCaretStatus;
 	private JCheckBox showEditMode;
 	private JCheckBox showFoldMode;
 	private JCheckBox showEncoding;
 	private JCheckBox showWrap;
 	private JCheckBox showMultiSelect;
+	private JCheckBox showRectSelect;
 	private JCheckBox showOverwrite;
 	private JCheckBox showLineSeperator;
 	private JCheckBox showMemory;
 	private ColorWellButton memForegroundColor;
 	private ColorWellButton memBackgroundColor;
+	private JCheckBox showClock;
 
 	private void updateEnabled()
 	{
@@ -179,11 +218,13 @@ public class StatusBarOptionPane extends AbstractOptionPane
 		showEncoding.setEnabled(enabled);
 		showWrap.setEnabled(enabled);
 		showMultiSelect.setEnabled(enabled);
+		showRectSelect.setEnabled(enabled);
 		showOverwrite.setEnabled(enabled);
 		showLineSeperator.setEnabled(enabled);
 		showMemory.setEnabled(enabled);
 		memForegroundColor.setEnabled(enabled && showMemory.isSelected());
 		memBackgroundColor.setEnabled(enabled && showMemory.isSelected());
+		showClock.setEnabled(enabled);
 	}
 	//}}}
 

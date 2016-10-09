@@ -112,7 +112,7 @@
 
     <qandaentry>
       <question id="problems-out-of-memory"><para>
-        During an editing session I get a error message about an
+        During an editing session I get an error message about an
         <quote>OutOfMemoryError</quote> while working with a large file or
         performing a lengthy operation. The message reappears every time
         I retry the operation.  How can I prevent this?
@@ -148,6 +148,20 @@
         many cases parse the output for error information.
       </para></answer>
     </qandaentry>
+	
+	<qandaentry>
+		<question id="general-borders">
+			<para>
+			    Why is jEdit's window movement and resizing so buggy?
+			</para>
+		</question>
+		<answer>
+			<para>
+			    Perhaps the option to let Java draw window borders is
+				enabled. This option can lead to strange behavior on some Java versions and operating systems. Disable it in the <guilabel>Appearance</guilabel> tab of the <guimenu>Utilities</guimenu>&gt;<guimenuitem>Global Options</guimenuitem> dialog box.
+			</para>
+		</answer>
+	</qandaentry>
 	
     <qandaentry>
       <question id="install-no-such-file"><para>
@@ -276,7 +290,7 @@
         </question>
 		<answer>
 			<para>
-				The plugin is missing a <methodname>requestDefautlFocus()</methodname> method.
+				The plugin is missing a <methodname>requestDefaultFocus()</methodname> method.
 				Plugin updates will be available from time to time, or you can email the author
 				of the plugin to let them know of the problem.
 			</para>
@@ -486,6 +500,20 @@
 				in the value of your <filename>PATH</filename> environment variable.
 				Otherwise you should give the full path to the chosen loader on your command line.
 			</para>
+		</answer>
+	</qandaentry>
+	
+	<qandaentry>
+		<question id="general-windows-ddraw">
+			<para>
+			    When I run jEdit on Windows, it flashes, blinks, and doesn't display correctly! Why is your program so buggy?
+			</para>
+		</question>
+		<answer>
+			<para>
+			    A frequent cause of this problem is buggy video drivers and/or a buggy DirectDraw implementation. A workaround is to disable Java's use of DirectDraw by adding the following option to the Java virtual machine command line:
+			</para>
+			<programlisting>-Dsun.java2d.noddraw=true</programlisting>
 		</answer>
 	</qandaentry>
 </qandadiv>

@@ -1,6 +1,9 @@
 /*
  * Autosave.java - Autosave manager
- * Copyright (C) 1998, 1999, 2000 Slava Pestov
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 1998, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,17 +22,20 @@
 
 package org.gjt.sp.jedit;
 
+//{{{ Imports
 import javax.swing.Timer;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import org.gjt.sp.util.Log;
+//}}}
 
 /**
  * @author Slava Pestov
- * @version $Id: Autosave.java,v 1.7 2003/01/31 04:49:30 spestov Exp $
+ * @version $Id: Autosave.java,v 1.13 2004/05/06 22:35:11 spestov Exp $
  */
 class Autosave implements ActionListener
 {
+	//{{{ setInterval() method
 	public static void setInterval(int interval)
 	{
 		if(interval == 0)
@@ -52,14 +58,16 @@ class Autosave implements ActionListener
 		}
 		else
 			timer.setDelay(interval);
-	}
+	} //}}}
 
+	//{{{ stop() method
 	public static void stop()
 	{
 		if(timer != null)
 			timer.stop();
-	}
+	} //}}}
 
+	//{{{ actionPerformed() method
 	public void actionPerformed(ActionEvent evt)
 	{
 		// might come in handy useful some time
@@ -73,16 +81,24 @@ class Autosave implements ActionListener
 			+ "%"); */
 
 		// save list of open files
-		if(jEdit.getFirstView() != null)
-			jEdit.saveOpenFiles(jEdit.getFirstView());
+		if(jEdit.getViewCount() != 0
+			&& PerspectiveManager.isPerspectiveDirty())
+		{
+			PerspectiveManager.setPerspectiveDirty(false);
+			PerspectiveManager.savePerspective(true);
+		}
 
 		Buffer[] bufferArray = jEdit.getBuffers();
 		for(int i = 0; i < bufferArray.length; i++)
 			bufferArray[i].autosave();
-	}
 
-	// private members
+		// flush log
+		Log.flushStream();
+	} //}}}
+
+	//{{{ Private members
 	private static Timer timer;
 
 	private Autosave() {}
+	//}}}
 }

@@ -3,8 +3,9 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2001 Slava Pestov
+ * Copyright (C) 2000, 2003 Slava Pestov
  * Portions copyright (C) 1999 Jason Ginchereau
+ * Portions copyright (C) 2003 mike dillon
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -31,26 +32,63 @@ import javax.swing.border.*;
 import javax.swing.event.*;
 import javax.swing.*;
 import org.gjt.sp.jedit.*;
+import org.gjt.sp.util.Log;
 //}}}
 
 //{{{ FontSelector class
 /**
  * A font chooser widget.
  * @author Slava Pestov
- * @version $Id: FontSelector.java,v 1.4 2002/12/15 00:23:53 spestov Exp $
+ * @version $Id: FontSelector.java,v 1.8 2004/06/28 06:45:27 spestov Exp $
  */
 public class FontSelector extends JButton
 {
 	//{{{ FontSelector constructor
+	/**
+	 * Creates a new font selector control.
+	 * @param font The font
+	 */
 	public FontSelector(Font font)
 	{
+		this(font,false);
+	} //}}}
+
+	//{{{ FontSelector constructor
+	/**
+	 * Creates a new font selector control.
+	 * @param font The font
+	 * @param antiAlias Is anti-aliasing enabled?
+	 * @since jEdit 4.2pre7
+	 */
+	public FontSelector(Font font, boolean antiAlias)
+	{
 		setFont(font);
+		this.antiAlias = antiAlias;
 
 		updateText();
 
 		setRequestFocusEnabled(false);
 
 		addActionListener(new ActionHandler());
+	} //}}}
+
+	//{{{ paintComponent() method
+	public void paintComponent(Graphics g)
+	{
+		setAntiAliasEnabled(g);
+		super.paintComponent(g);
+	} //}}}
+
+	//{{{ isAntiAliasEnabled() method
+	public boolean isAntiAliasEnabled()
+	{
+		return antiAlias;
+	} //}}}
+
+	//{{{ setAntiAliasEnabled() method
+	public void setAntiAliasEnabled(boolean antiAlias)
+	{
+		this.antiAlias = antiAlias;
 	} //}}}
 
 	//{{{ updateText() method
@@ -80,6 +118,19 @@ public class FontSelector extends JButton
 		setText(font.getName() + " " + font.getSize() + " " + styleString);
 	} //}}}
 
+	//{{{ setAntiAliasEnabled() method
+	void setAntiAliasEnabled(Graphics g)
+	{
+		if (antiAlias)
+		{
+			Graphics2D g2 = (Graphics2D)g;
+			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+				RenderingHints.VALUE_ANTIALIAS_ON);
+		}
+	} //}}}
+
+	private boolean antiAlias;
+
 	//{{{ ActionHandler class
 	class ActionHandler implements ActionListener
 	{
@@ -92,12 +143,14 @@ public class FontSelector extends JButton
 			{
 				font = new FontSelectorDialog(
 					JOptionPane.getFrameForComponent(
-					FontSelector.this),getFont())
+					FontSelector.this),getFont(),
+					FontSelector.this)
 					.getSelectedFont();
 			}
 			else
 			{
-				font = new FontSelectorDialog(dialog,getFont())
+				font = new FontSelectorDialog(dialog,getFont(),
+					FontSelector.this)
 					.getSelectedFont();
 			}
 
@@ -124,6 +177,24 @@ class FontSelectorDialog extends EnhancedDialog
 	public FontSelectorDialog(Dialog parent, Font font)
 	{
 		super(parent,jEdit.getProperty("font-selector.title"),true);
+		init(font);
+	} //}}}
+
+	//{{{ FontSelectorDialog constructor
+	public FontSelectorDialog(Frame parent, Font font,
+		FontSelector fontSelector)
+	{
+		super(parent,jEdit.getProperty("font-selector.title"),true);
+		this.fontSelector = fontSelector;
+		init(font);
+	} //}}}
+
+	//{{{ FontSelectorDialog constructor
+	public FontSelectorDialog(Dialog parent, Font font,
+		FontSelector fontSelector)
+	{
+		super(parent,jEdit.getProperty("font-selector.title"),true);
+		this.fontSelector = fontSelector;
 		init(font);
 	} //}}}
 
@@ -163,6 +234,7 @@ class FontSelectorDialog extends EnhancedDialog
 	//{{{ Private members
 
 	//{{{ Instance variables
+	private FontSelector fontSelector;
 	private boolean isOK;
 	private JTextField familyField;
 	private JList familyList;
@@ -193,10 +265,25 @@ class FontSelectorDialog extends EnhancedDialog
 
 		JPanel listPanel = new JPanel(new GridLayout(1,3,6,6));
 
+		String[] fonts;
+		try
+		{
+			fonts = getFontList();
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,this,"Broken Java implementation!");
+			/* Log.log(Log.ERROR,this,"Using deprecated Toolkit.getFontList()"); */
+			Log.log(Log.ERROR,this,e);
+
+			/* fonts = getToolkit().getFontList(); */
+			fonts = new String[] { "Broken Java implementation!" };
+		}
+
 		JPanel familyPanel = createTextFieldAndListPanel(
 			"font-selector.family",
 			familyField = new JTextField(),
-			familyList = new JList(getFontList()));
+			familyList = new JList(fonts));
 		listPanel.add(familyPanel);
 
 		String[] sizes = { "9", "10", "12", "14", "16", "18", "24" };
@@ -234,7 +321,14 @@ class FontSelectorDialog extends EnhancedDialog
 
 		content.add(BorderLayout.NORTH,listPanel);
 
-		preview = new JLabel(jEdit.getProperty("font-selector.long-text"));
+		preview = new JLabel(jEdit.getProperty("font-selector.long-text")) {
+			public void paintComponent(Graphics g)
+			{
+				if(fontSelector != null)
+					fontSelector.setAntiAliasEnabled(g);
+				super.paintComponent(g);
+			}
+		};
 		preview.setBorder(new TitledBorder(jEdit.getProperty(
 			"font-selector.preview")));
 
@@ -268,7 +362,7 @@ class FontSelectorDialog extends EnhancedDialog
 
 		pack();
 		setLocationRelativeTo(getParent());
-		show();
+		setVisible(true);
 	} //}}}
 
 	//{{{ getFontList() method
@@ -397,4 +491,4 @@ class FontSelectorDialog extends EnhancedDialog
 			updatePreview();
 		}
 	} //}}}
-}
+} //}}}

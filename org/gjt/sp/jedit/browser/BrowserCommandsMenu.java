@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 2000, 2003 Slava Pestov
  * Portions copyright (C) 1999 Jason Ginchereau
  *
  * This program is free software; you can redistribute it and/or
@@ -33,7 +33,7 @@ import org.gjt.sp.jedit.*;
 //}}}
 
 /**
- * @version $Id: BrowserCommandsMenu.java,v 1.17 2003/02/18 22:03:19 spestov Exp $
+ * @version $Id: BrowserCommandsMenu.java,v 1.25 2004/07/12 19:25:07 spestov Exp $
  * @author Slava Pestov and Jason Ginchereau
  */
 public class BrowserCommandsMenu extends JPopupMenu
@@ -45,8 +45,6 @@ public class BrowserCommandsMenu extends JPopupMenu
 
 		if(files != null)
 		{
-			this.files = files;
-
 			VFS vfs = VFSManager.getVFSForPath(files[0].deletePath);
 			int type = files[0].type;
 			boolean fileOpen = (jEdit.getBuffer(files[0].path) != null);
@@ -92,25 +90,23 @@ public class BrowserCommandsMenu extends JPopupMenu
 				|| browser.getMode() == VFSBrowser.BROWSER_DIALOG))
 			{
 				add(createMenuItem("open"));
-				JMenu openIn = new JMenu(jEdit.getProperty(
-					"vfs.browser.commands.open-in.label"));
-				openIn.add(createMenuItem("open-view"));
-				openIn.add(createMenuItem("open-plain-view"));
-				openIn.add(createMenuItem("open-split"));
-				add(openIn);
+				add(GUIUtilities.loadMenu(
+					VFSBrowser.getActionContext(),
+					"vfs.browser.open-in"));
 				add(createMenuItem("insert"));
 
 				if(fileOpen)
 					add(createMenuItem("close"));
 			}
 			else if(type != -1)
-				add(createMenuItem("choose"));
+				add(createMenuItem("open"));
 
 			if(rename)
 				add(createMenuItem("rename"));
 			if(delete)
 				add(createMenuItem("delete"));
 
+			add(createMenuItem("copy-path"));
 			addSeparator();
 		}
 
@@ -129,16 +125,12 @@ public class BrowserCommandsMenu extends JPopupMenu
 		if(browser.getMode() == VFSBrowser.BROWSER)
 		{
 			addSeparator();
-			add(createMenuItem("search-in-directory"));
+			add(createMenuItem("search-directory"));
 		}
 
 		addSeparator();
 
-		showHiddenFiles = new JCheckBoxMenuItem(
-			jEdit.getProperty("vfs.browser.commands.show-hidden-files.label"));
-		showHiddenFiles.setActionCommand("show-hidden-files");
-		showHiddenFiles.addActionListener(new ActionHandler());
-		add(showHiddenFiles);
+		add(createMenuItem("show-hidden-files"));
 
 		if(browser.getMode() == VFSBrowser.BROWSER
 			|| browser.getMode() == VFSBrowser.BROWSER_DIALOG)
@@ -153,7 +145,6 @@ public class BrowserCommandsMenu extends JPopupMenu
 	//{{{ update() method
 	public void update()
 	{
-		showHiddenFiles.setSelected(browser.getShowHiddenFiles());
 		if(encodingMenuItems != null)
 		{
 			JRadioButtonMenuItem mi = (JRadioButtonMenuItem)
@@ -162,13 +153,13 @@ public class BrowserCommandsMenu extends JPopupMenu
 			{
 				mi.setSelected(true);
 				otherEncoding.setText(jEdit.getProperty(
-					"vfs.browser.commands.other-encoding.label"));
+					"vfs.browser.other-encoding.label"));
 			}
 			else
 			{
 				otherEncoding.setSelected(true);
 				otherEncoding.setText(jEdit.getProperty(
-					"vfs.browser.commands.other-encoding-2.label",
+					"vfs.browser.other-encoding-2.label",
 					new String[] { browser.currentEncoding }));
 			}
 		}
@@ -176,21 +167,15 @@ public class BrowserCommandsMenu extends JPopupMenu
 
 	//{{{ Private members
 	private VFSBrowser browser;
-	private VFS.DirectoryEntry[] files;
-	private VFS vfs;
-	private JCheckBoxMenuItem showHiddenFiles;
 	private HashMap encodingMenuItems;
-	private JRadioButtonMenuItem defaultEncoding;
+	private JCheckBoxMenuItem autoDetect;
 	private JRadioButtonMenuItem otherEncoding;
 
 	//{{{ createMenuItem() method
 	private JMenuItem createMenuItem(String name)
 	{
-		String label = jEdit.getProperty("vfs.browser.commands." + name + ".label");
-		JMenuItem mi = new JMenuItem(label);
-		mi.setActionCommand(name);
-		mi.addActionListener(new ActionHandler());
-		return mi;
+		return GUIUtilities.loadMenuItem(VFSBrowser.getActionContext(),
+			"vfs.browser." + name,false);
 	} //}}}
 
 	//{{{ createEncodingMenu() method
@@ -202,19 +187,30 @@ public class BrowserCommandsMenu extends JPopupMenu
 		JMenu encodingMenu = new JMenu(jEdit.getProperty(
 			"vfs.browser.commands.encoding.label"));
 
+		JMenu menu = encodingMenu;
+
+		autoDetect = new JCheckBoxMenuItem(
+			jEdit.getProperty(
+			"vfs.browser.commands.encoding.auto-detect"));
+		autoDetect.setSelected(browser.autoDetectEncoding);
+		autoDetect.setActionCommand("auto-detect");
+		autoDetect.addActionListener(actionHandler);
+		menu.add(autoDetect);
+		menu.addSeparator();
+
 		ButtonGroup grp = new ButtonGroup();
 
-		StringTokenizer st = new StringTokenizer(
-			jEdit.getProperty("encodings"));
-		while(st.hasMoreTokens())
+		List encodingMenuItemList = new ArrayList();
+		String[] encodings = MiscUtilities.getEncodings();
+		for(int i = 0; i < encodings.length; i++)
 		{
-			String encoding = st.nextToken();
+			String encoding = encodings[i];
 			JRadioButtonMenuItem mi = new JRadioButtonMenuItem(encoding);
 			mi.setActionCommand("encoding@" + encoding);
 			mi.addActionListener(actionHandler);
 			grp.add(mi);
 			encodingMenuItems.put(encoding,mi);
-			encodingMenu.add(mi);
+			encodingMenuItemList.add(mi);
 		}
 
 		String systemEncoding = System.getProperty("file.encoding");
@@ -226,16 +222,35 @@ public class BrowserCommandsMenu extends JPopupMenu
 			mi.addActionListener(actionHandler);
 			grp.add(mi);
 			encodingMenuItems.put(systemEncoding,mi);
-			encodingMenu.add(mi);
+			encodingMenuItemList.add(mi);
 		}
 
-		encodingMenu.addSeparator();
+		Collections.sort(encodingMenuItemList,
+			new MiscUtilities.MenuItemCompare());
+
+		Iterator iter = encodingMenuItemList.iterator();
+		while(iter.hasNext())
+		{
+			JRadioButtonMenuItem mi = (JRadioButtonMenuItem)
+				iter.next();
+
+			if(menu.getMenuComponentCount() > 20)
+			{
+				JMenu newMenu = new JMenu(
+					jEdit.getProperty("common.more"));
+				menu.add(newMenu);
+				menu = newMenu;
+			}
+
+			menu.add(mi);
+		}
+		menu.addSeparator();
 
 		otherEncoding = new JRadioButtonMenuItem();
 		otherEncoding.setActionCommand("other-encoding");
 		otherEncoding.addActionListener(actionHandler);
 		grp.add(otherEncoding);
-		encodingMenu.add(otherEncoding);
+		menu.add(otherEncoding);
 
 		return encodingMenu;
 	} //}}}
@@ -247,10 +262,14 @@ public class BrowserCommandsMenu extends JPopupMenu
 	{
 		public void actionPerformed(ActionEvent evt)
 		{
-			View view = browser.getView();
 			String actionCommand = evt.getActionCommand();
 
-			if(actionCommand.equals("other-encoding"))
+			if(actionCommand.equals("auto-detect"))
+			{
+				browser.autoDetectEncoding
+					= autoDetect.isSelected();
+			}
+			else if(actionCommand.equals("other-encoding"))
 			{
 				String encoding = GUIUtilities.input(browser,
 					"encoding-prompt",null,
@@ -263,74 +282,6 @@ public class BrowserCommandsMenu extends JPopupMenu
 			else if(actionCommand.startsWith("encoding@"))
 			{
 				browser.currentEncoding = actionCommand.substring(9);
-			}
-			else if(actionCommand.equals("open"))
-				browser.filesActivated(VFSBrowser.M_OPEN,false);
-			else if(actionCommand.equals("open-view"))
-				browser.filesActivated(VFSBrowser.M_OPEN_NEW_VIEW,false);
-			else if(actionCommand.equals("open-plain-view"))
-				browser.filesActivated(VFSBrowser.M_OPEN_NEW_PLAIN_VIEW,false);
-			else if(actionCommand.equals("open-split"))
-				browser.filesActivated(VFSBrowser.M_OPEN_NEW_SPLIT,false);
-			else if(actionCommand.equals("insert"))
-			{
-				for(int i = 0; i < files.length; i++)
-				{
-					view.getBuffer().insertFile(view,files[i].path);
-				}
-			}
-			else if(actionCommand.equals("choose"))
-				browser.filesActivated(VFSBrowser.M_OPEN,false);
-			else if(actionCommand.equals("close"))
-			{
-				for(int i = 0; i < files.length; i++)
-				{
-					Buffer buffer = jEdit.getBuffer(files[i].path);
-					if(buffer != null)
-						jEdit.closeBuffer(view,buffer);
-				}
-			}
-			else if(actionCommand.equals("browse"))
-				browser.setDirectory(files[0].path);
-			else if(actionCommand.equals("browse-window"))
-			{
-				for(int i = 0; i < files.length; i++)
-				{
-					VFSBrowser.browseDirectoryInNewWindow(view,
-						files[i].path);
-				}
-			}
-			else if(actionCommand.equals("rename"))
-				browser.rename(files[0].path);
-			else if(actionCommand.equals("delete"))
-				browser.delete(files);
-			else if(actionCommand.equals("up"))
-			{
-				String path = browser.getDirectory();
-				VFS vfs = VFSManager.getVFSForPath(path);
-				browser.setDirectory(vfs.getParentOfPath(path));
-			}
-			else if(actionCommand.equals("reload"))
-				browser.reloadDirectory();
-			else if(actionCommand.equals("roots"))
-				browser.rootDirectory();
-			else if(actionCommand.equals("home"))
-				browser.setDirectory(System.getProperty("user.home"));
-			else if(actionCommand.equals("synchronize"))
-			{
-				Buffer buffer = browser.getView().getBuffer();
-				browser.setDirectory(buffer.getDirectory());
-			}
-			else if(actionCommand.equals("new-file"))
-				browser.newFile();
-			else if(actionCommand.equals("new-directory"))
-				browser.mkdir();
-			else if(actionCommand.equals("search-in-directory"))
-				browser.searchInDirectory();
-			else if(actionCommand.equals("show-hidden-files"))
-			{
-				browser.setShowHiddenFiles(!browser.getShowHiddenFiles());
-				browser.reloadDirectory();
 			}
 		}
 	} //}}}

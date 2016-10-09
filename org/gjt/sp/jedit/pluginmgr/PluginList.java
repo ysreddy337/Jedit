@@ -1,6 +1,9 @@
 /*
- * PluginList.java - Plugin list
- * Copyright (C) 2001 Slava Pestov
+ * PluginList.java - Plugin list downloaded from server
+ * :tabSize=8:indentSize=8:noTabs=false:
+ * :folding=explicit:collapseFolds=1:
+ *
+ * Copyright (C) 2001, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,6 +22,7 @@
 
 package org.gjt.sp.jedit.pluginmgr;
 
+//{{{ Imports
 import com.microstar.xml.*;
 import java.io.*;
 import java.net.URL;
@@ -27,6 +31,7 @@ import java.util.Vector;
 import java.util.zip.GZIPInputStream;
 import org.gjt.sp.util.Log;
 import org.gjt.sp.jedit.*;
+//}}}
 
 /**
  * Plugin list downloaded from server.
@@ -34,37 +39,68 @@ import org.gjt.sp.jedit.*;
  */
 class PluginList
 {
+	/**
+	 * Magic numbers used for auto-detecting GZIP files.
+	 */
+	public static final int GZIP_MAGIC_1 = 0x1f;
+	public static final int GZIP_MAGIC_2 = 0x8b;
+
 	Vector plugins;
 	Hashtable pluginHash;
 	Vector pluginSets;
 
+	//{{{ PluginList constructor
 	PluginList() throws Exception
 	{
 		plugins = new Vector();
 		pluginHash = new Hashtable();
 		pluginSets = new Vector();
 
-		String path = jEdit.getProperty("plugin-manager.url");
+		String path = jEdit.getProperty("plugin-manager.export-url");
+		String id = jEdit.getProperty("plugin-manager.mirror.id");
+		if (!id.equals(MirrorList.Mirror.NONE))
+			path += "?mirror="+id;
 		PluginListHandler handler = new PluginListHandler(this,path);
 		XmlParser parser = new XmlParser();
 		parser.setHandler(handler);
 
-		parser.parse(null,null,new BufferedReader(new InputStreamReader(
-			new GZIPInputStream(new URL(path).openStream()),"UTF8")));
-	}
+		InputStream in = new BufferedInputStream(new URL(path).openStream());
+		try
+		{
+			if(in.markSupported())
+			{
+				in.mark(2);
+				int b1 = in.read();
+				int b2 = in.read();
+				in.reset();
 
+				if(b1 == GZIP_MAGIC_1 && b2 == GZIP_MAGIC_2)
+					in = new GZIPInputStream(in);
+			}
+
+			parser.parse(null,null,new InputStreamReader(in,"UTF8"));
+		}
+		finally
+		{
+			in.close();
+		}
+	} //}}}
+
+	//{{{ addPlugin() method
 	void addPlugin(Plugin plugin)
 	{
 		plugin.checkIfInstalled();
 		plugins.addElement(plugin);
 		pluginHash.put(plugin.name,plugin);
-	}
+	} //}}}
 
+	//{{{ addPluginSet() method
 	void addPluginSet(PluginSet set)
 	{
 		pluginSets.addElement(set);
-	}
+	} //}}}
 
+	//{{{ finished() method
 	void finished()
 	{
 		// after the entire list is loaded, fill out plugin field
@@ -83,8 +119,9 @@ class PluginList
 				}
 			}
 		}
-	}
+	} //}}}
 
+	//{{{ dump() method
 	void dump()
 	{
 		for(int i = 0; i < plugins.size(); i++)
@@ -92,8 +129,9 @@ class PluginList
 			System.err.println((Plugin)plugins.elementAt(i));
 			System.err.println();
 		}
-	}
+	} //}}}
 
+	//{{{ PluginSet class
 	static class PluginSet
 	{
 		String name;
@@ -104,23 +142,24 @@ class PluginList
 		{
 			return plugins.toString();
 		}
-	}
+	} //}}}
 
-	static class Plugin
+	//{{{ Plugin class
+	static public class Plugin
 	{
 		String jar;
 		String name;
 		String description;
 		String author;
 		Vector branches = new Vector();
-		String installed;
-		String installedVersion;
+		//String installed;
+		//String installedVersion;
 
 		void checkIfInstalled()
 		{
-			// check if the plugin is already installed.
+			/* // check if the plugin is already installed.
 			// this is a bit of hack
-			EditPlugin.JAR[] jars = jEdit.getPluginJARs();
+			PluginJAR[] jars = jEdit.getPluginJARs();
 			for(int i = 0; i < jars.length; i++)
 			{
 				String path = jars[i].getPath();
@@ -131,11 +170,11 @@ class PluginList
 				{
 					installed = path;
 
-					EditPlugin[] plugins = jars[i].getPlugins();
-					if(plugins.length >= 1)
+					EditPlugin plugin = jars[i].getPlugin();
+					if(plugin != null)
 					{
 						installedVersion = jEdit.getProperty(
-							"plugin." + plugins[0].getClassName()
+							"plugin." + plugin.getClassName()
 							+ ".version");
 					}
 					break;
@@ -152,7 +191,45 @@ class PluginList
 					installed = path;
 					break;
 				}
+			} */
+		}
+
+		String getInstalledVersion()
+		{
+			PluginJAR[] jars = jEdit.getPluginJARs();
+			for(int i = 0; i < jars.length; i++)
+			{
+				String path = jars[i].getPath();
+
+				if(MiscUtilities.getFileName(path).equals(jar))
+				{
+					EditPlugin plugin = jars[i].getPlugin();
+					if(plugin != null)
+					{
+						return jEdit.getProperty(
+							"plugin." + plugin.getClassName()
+							+ ".version");
+					}
+					else
+						return null;
+				}
 			}
+
+			return null;
+		}
+
+		String getInstalledPath()
+		{
+			PluginJAR[] jars = jEdit.getPluginJARs();
+			for(int i = 0; i < jars.length; i++)
+			{
+				String path = jars[i].getPath();
+
+				if(MiscUtilities.getFileName(path).equals(jar))
+					return path;
+			}
+
+			return null;
 		}
 
 		/**
@@ -179,15 +256,18 @@ class PluginList
 
 		void install(Roster roster, String installDirectory, boolean downloadSource)
 		{
-			if(installed != null)
-				roster.addOperation(new Roster.Remove(installed));
+			String installed = getInstalledPath();
 
 			Branch branch = getCompatibleBranch();
 			if(branch.obsolete)
+			{
+				if(installed != null)
+					roster.addRemove(installed);
 				return;
+			}
 
-			branch.satisfyDependencies(roster,installDirectory,
-				downloadSource);
+			//branch.satisfyDependencies(roster,installDirectory,
+			//	downloadSource);
 
 			if(installed != null)
 			{
@@ -195,10 +275,11 @@ class PluginList
 					installed);
 			}
 
-			roster.addOperation(new Roster.Install(
+			roster.addInstall(
+				installed,
 				(downloadSource ? branch.downloadSource : branch.download),
 				installDirectory,
-				(downloadSource ? branch.downloadSourceSize : branch.downloadSize)));
+				(downloadSource ? branch.downloadSourceSize : branch.downloadSize));
 
 		}
 
@@ -206,8 +287,9 @@ class PluginList
 		{
 			return name;
 		}
-	}
+	} //}}}
 
+	//{{{ Branch class
 	static class Branch
 	{
 		String version;
@@ -246,8 +328,9 @@ class PluginList
 			return "[version=" + version + ",download=" + download
 				+ ",obsolete=" + obsolete + ",deps=" + deps + "]";
 		}
-	}
+	} //}}}
 
+	//{{{ Dependency class
 	static class Dependency
 	{
 		String what;
@@ -271,13 +354,14 @@ class PluginList
 			{
 				for(int i = 0; i < plugin.branches.size(); i++)
 				{
-					if(plugin.installedVersion != null
+					String installedVersion = plugin.getInstalledVersion();
+					if(installedVersion != null
 						&&
 					(from == null || MiscUtilities.compareStrings(
-						plugin.installedVersion,from,false) >= 0)
+						installedVersion,from,false) >= 0)
 						&&
 					   (to == null || MiscUtilities.compareStrings(
-					   	plugin.installedVersion,to,false) <= 0))
+					   	installedVersion,to,false) <= 0))
 					{
 						return true;
 					}
@@ -335,14 +419,15 @@ class PluginList
 		{
 			if(what.equals("plugin"))
 			{
+				String installedVersion = plugin.getInstalledVersion();
 				for(int i = 0; i < plugin.branches.size(); i++)
 				{
 					Branch branch = (Branch)plugin.branches
 						.elementAt(i);
-					if((plugin.installedVersion == null
+					if((installedVersion == null
 						||
 					MiscUtilities.compareStrings(
-						plugin.installedVersion,branch.version,false) < 0)
+						installedVersion,branch.version,false) < 0)
 						&&
 					(from == null || MiscUtilities.compareStrings(
 						branch.version,from,false) >= 0)
@@ -363,5 +448,5 @@ class PluginList
 			return "[what=" + what + ",from=" + from
 				+ ",to=" + to + ",plugin=" + plugin + "]";
 		}
-	}
+	} //}}}
 }

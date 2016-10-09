@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 2000, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,6 +29,7 @@ import java.awt.event.*;
 import java.awt.*;
 import java.util.Vector;
 import org.gjt.sp.jedit.gui.*;
+import org.gjt.sp.jedit.msg.DockableWindowUpdate;
 import org.gjt.sp.jedit.*;
 //}}}
 
@@ -44,79 +45,19 @@ public class DockingOptionPane extends AbstractOptionPane
 	//{{{ _init() method
 	public void _init()
 	{
-		addSeparator("options.docking.viewLayout");
-
-		layoutIcon1 = GUIUtilities.loadIcon("dock_layout1.png");
-		layoutIcon2 = GUIUtilities.loadIcon("dock_layout2.png");
-		layoutIcon3 = GUIUtilities.loadIcon("dock_layout3.png");
-		layoutIcon4 = GUIUtilities.loadIcon("dock_layout4.png");
-
-		JPanel layoutPanel = new JPanel(new VariableGridLayout(
-			VariableGridLayout.FIXED_NUM_COLUMNS,1,
-			6,6));
-
-		if(jEdit.getBooleanProperty("view.docking.alternateLayout"))
-		{
-			layout = new JLabel(jEdit.getBooleanProperty(
-				"view.toolbar.alternateLayout")
-				? layoutIcon4 : layoutIcon2);
-		}
-		else
-		{
-			layout = new JLabel(jEdit.getBooleanProperty(
-				"view.toolbar.alternateLayout")
-				? layoutIcon3 : layoutIcon1);
-		}
-
-		layoutPanel.add(layout);
-
-		layoutPanel.add(alternateDockingLayout = new JButton(jEdit.getProperty(
-			"options.docking.alternateDockingLayout")));
-		alternateDockingLayout.addActionListener(new ActionHandler());
-		layoutPanel.add(alternateToolBarLayout = new JButton(jEdit.getProperty(
-			"options.docking.alternateToolBarLayout")));
-		alternateToolBarLayout.addActionListener(new ActionHandler());
-
-		// center the layout panel
-		GridBagConstraints cons = new GridBagConstraints();
-		cons.gridy = y++;
-		cons.gridwidth = GridBagConstraints.REMAINDER;
-		cons.fill = GridBagConstraints.BOTH;
-		cons.weightx = 1.0f;
-		gridBag.setConstraints(layoutPanel,cons);
-		add(layoutPanel);
-
-		addSeparator("options.docking.windowDocking");
-
-		cons = new GridBagConstraints();
-		cons.gridy = y++;
-		cons.gridwidth = cons.gridheight = GridBagConstraints.REMAINDER;
-		cons.fill = GridBagConstraints.BOTH;
-		cons.weightx = cons.weighty = 1.0f;
-
-		JScrollPane windowScroller = createWindowTableScroller();
-		gridBag.setConstraints(windowScroller,cons);
-		add(windowScroller);
+		setLayout(new BorderLayout());
+		add(BorderLayout.CENTER,createWindowTableScroller());
 	} //}}}
 
 	//{{{ _save() method
 	public void _save()
 	{
-		jEdit.setBooleanProperty("view.docking.alternateLayout",
-			layout.getIcon() == layoutIcon2
-			|| layout.getIcon() == layoutIcon4);
-		jEdit.setBooleanProperty("view.toolbar.alternateLayout",
-			layout.getIcon() == layoutIcon3
-			|| layout.getIcon() == layoutIcon4);
 		windowModel.save();
 	} //}}}
 
 	//{{{ Private members
 
 	//{{{ Instance variables
-	private JLabel layout;
-	private Icon layoutIcon1, layoutIcon2, layoutIcon3, layoutIcon4;
-	private JButton alternateDockingLayout, alternateToolBarLayout;
 	private JTable windowTable;
 	private WindowTableModel windowModel;
 	//}}}
@@ -151,36 +92,6 @@ public class DockingOptionPane extends AbstractOptionPane
 	} //}}}
 
 	//}}}
-
-	//{{{ ActionHandler class
-	class ActionHandler implements ActionListener
-	{
-		public void actionPerformed(ActionEvent evt)
-		{
-			if(evt.getSource() == alternateDockingLayout)
-			{
-				if(layout.getIcon() == layoutIcon1)
-					layout.setIcon(layoutIcon2);
-				else if(layout.getIcon() == layoutIcon2)
-					layout.setIcon(layoutIcon1);
-				else if(layout.getIcon() == layoutIcon3)
-					layout.setIcon(layoutIcon4);
-				else if(layout.getIcon() == layoutIcon4)
-					layout.setIcon(layoutIcon3);
-			}
-			else if(evt.getSource() == alternateToolBarLayout)
-			{
-				if(layout.getIcon() == layoutIcon1)
-					layout.setIcon(layoutIcon3);
-				else if(layout.getIcon() == layoutIcon3)
-					layout.setIcon(layoutIcon1);
-				else if(layout.getIcon() == layoutIcon2)
-					layout.setIcon(layoutIcon4);
-				else if(layout.getIcon() == layoutIcon4)
-					layout.setIcon(layoutIcon2);
-			}
-		}
-	} //}}}
 
 	//{{{ DockPositionCellRenderer class
 	class DockPositionCellRenderer extends JComboBox

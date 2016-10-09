@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2000, 2002 Slava Pestov
+ * Copyright (C) 2000, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -37,7 +37,19 @@ import org.gjt.sp.util.Log;
 /**
  * A virtual filesystem implementation.<p>
  *
- * <b>Session objects:</b><p>
+ * Plugins can provide virtual file systems by defining entries in their
+ * <code>services.xml</code> files like so:
+ *
+ * <pre>&lt;SERVICE CLASS="org.gjt.sp.jedit.io.VFS" NAME="<i>name</i>"&gt;
+ *    new <i>MyVFS</i>();
+ *&lt;/SERVICE&gt;</pre>
+ *
+ * URLs of the form <code><i>name</i>:<i>path</i></code> will then be handled
+ * by the VFS named <code><i>name</i></code>.<p>
+ *
+ * See {@link org.gjt.sp.jedit.ServiceManager} for details.<p>
+ *
+ * <h3>Session objects:</h3>
  *
  * A session is used to persist things like login information, any network
  * sockets, etc. File system implementations that do not need this kind of
@@ -55,7 +67,7 @@ import org.gjt.sp.util.Log;
  * When done, the session must be disposed of using
  * {@link #_endVFSSession(Object,Component)}.<p>
  *
- * <b>Thread safety:</b><p>
+ * <h3>Thread safety:</h3>
  *
  * The following methods cannot be called from an I/O thread:
  *
@@ -67,15 +79,19 @@ import org.gjt.sp.util.Log;
  * <li>{@link #showBrowseDialog(Object[],Component)}</li>
  * </ul>
  *
- * All remaining methods are (required to be) thread-safe.
+ * All remaining methods are required to be thread-safe in subclasses.
  *
- * @see VFSManager#registerVFS(String,VFS)
- * @see VFSManager#getVFSByName(String)
+ * <h3>Implementing a VFS</h3>
+ *
+ * You can override as many or as few methods as you want. Make sure
+ * {@link #getCapabilities()} returns a value reflecting the functionality
+ * implemented by your VFS.
+ *
  * @see VFSManager#getVFSForPath(String)
  * @see VFSManager#getVFSForProtocol(String)
  *
  * @author Slava Pestov
- * @author $Id: VFS.java,v 1.25 2003/02/11 02:31:06 spestov Exp $
+ * @author $Id: VFS.java,v 1.39 2003/09/08 01:24:11 spestov Exp $
  */
 public abstract class VFS
 {
@@ -94,19 +110,15 @@ public abstract class VFS
 	public static final int WRITE_CAP = 1 << 1;
 
 	/**
-	 * If set, a menu item for this VFS will appear in the browser's
-	 * <b>Plugins</b> menu. The property <code>vfs.<i>name</i>.label</code>
-	 * is used as a menu item label.<p>
+	 * @deprecated Do not define this capability.<p>
 	 *
-	 * When invoked, the menu item calls the
-	 * {@link #showBrowseDialog(Object[],Component)} method of the VFS,
-	 * and then lists the directory returned by that method.<p>
-	 *
-	 * If this capability is not set, it will still be possible to type in
-	 * URLs for this VFS in the browser, but there won't be a user-visible
-	 * way of doing this.
-	 *
-	 * @since jEdit 2.6pre2
+	 * This was the official API for adding items to a file
+	 * system browser's <b>Plugins</b> menu in jEdit 4.1 and earlier. In
+	 * jEdit 4.2, there is a different way of doing this, you must provide
+	 * a <code>browser.actions.xml</code> file in your plugin JAR, and
+	 * define <code>plugin.<i>class</i>.browser-menu-item</code>
+	 * or <code>plugin.<i>class</i>.browser-menu</code> properties.
+	 * See {@link org.gjt.sp.jedit.EditPlugin} for details.
 	 */
 	public static final int BROWSE_CAP = 1 << 2;
 
@@ -135,16 +147,48 @@ public abstract class VFS
 	 */
 	public static final int LOW_LATENCY_CAP = 1 << 6;
 
+	/**
+	 * Case insensitive file system capability.
+	 * @since jEdit 4.1pre1
+	 */
+	public static final int CASE_INSENSITIVE_CAP = 1 << 7;
+
+	//}}}
+
+	//{{{ Extended attributes
+	/**
+	 * File type.
+	 * @since jEdit 4.2pre1
+	 */
+	public static final String EA_TYPE = "type";
+
+	/**
+	 * File status (read only, read write, etc).
+	 * @since jEdit 4.2pre1
+	 */
+	public static final String EA_STATUS = "status";
+
+	/**
+	 * File size.
+	 * @since jEdit 4.2pre1
+	 */
+	public static final String EA_SIZE = "size";
+
+	/**
+	 * File last modified date.
+	 * @since jEdit 4.2pre1
+	 */
+	public static final String EA_MODIFIED = "modified";
 	//}}}
 
 	//{{{ VFS constructor
 	/**
-	 * Creates a new virtual filesystem.
-	 * @param name The name
+	 * @deprecated Use the form where the constructor takes a capability
+	 * list.
 	 */
 	public VFS(String name)
 	{
-		this.name = name;
+		this(name,0);
 	} //}}}
 
 	//{{{ VFS constructor
@@ -157,6 +201,23 @@ public abstract class VFS
 	{
 		this.name = name;
 		this.caps = caps;
+		// reasonable defaults (?)
+		this.extAttrs = new String[] { EA_SIZE, EA_TYPE };
+	} //}}}
+
+	//{{{ VFS constructor
+	/**
+	 * Creates a new virtual filesystem.
+	 * @param name The name
+	 * @param caps The capabilities
+	 * @param extAttrs The extended attributes
+	 * @since jEdit 4.2pre1
+	 */
+	public VFS(String name, int caps, String[] extAttrs)
+	{
+		this.name = name;
+		this.caps = caps;
+		this.extAttrs = extAttrs;
 	} //}}}
 
 	//{{{ getName() method
@@ -178,6 +239,16 @@ public abstract class VFS
 	public int getCapabilities()
 	{
 		return caps;
+	} //}}}
+
+	//{{{ getExtendedAttributes() method
+	/**
+	 * Returns the extended attributes supported by this VFS.
+	 * @since jEdit 4.2pre1
+	 */
+	public String[] getExtendedAttributes()
+	{
+		return extAttrs;
 	} //}}}
 
 	//{{{ showBrowseDialog() method
@@ -205,9 +276,11 @@ public abstract class VFS
 		if(path.equals("/"))
 			return path;
 
-		int count = Math.max(0,path.length() - 2);
-		int index = Math.max(path.lastIndexOf('/',count),
-			path.lastIndexOf(File.separatorChar,count));
+		if(path.endsWith("/") || path.endsWith(File.separator))
+			path = path.substring(0,path.length() - 1);
+
+		int index = Math.max(path.lastIndexOf('/'),
+			path.lastIndexOf(File.separatorChar));
 		if(index == -1)
 			index = path.indexOf(':');
 
@@ -408,7 +481,7 @@ public abstract class VFS
 		return true;
 	} //}}}
 
-	// the remaining methods are called from the I/O thread
+	// A method name that starts with _ requires a session object
 
 	//{{{ _canonPath() method
 	/**
@@ -523,11 +596,27 @@ public abstract class VFS
 		//{{{ Instance variables
 		public String name;
 		public String path;
+
+		/**
+		 * @since jEdit 4.2pre5
+		 */
+		public String symlinkPath;
+
 		public String deletePath;
 		public int type;
 		public long length;
 		public boolean hidden;
+		public boolean canRead;
+		public boolean canWrite;
 		//}}}
+
+		//{{{ DirectoryEntry constructor
+		/**
+		 * @since jEdit 4.2pre2
+		 */
+		public DirectoryEntry()
+		{
+		} //}}}
 
 		//{{{ DirectoryEntry constructor
 		public DirectoryEntry(String name, String path, String deletePath,
@@ -536,13 +625,74 @@ public abstract class VFS
 			this.name = name;
 			this.path = path;
 			this.deletePath = deletePath;
+			this.symlinkPath = path;
 			this.type = type;
 			this.length = length;
 			this.hidden = hidden;
+			if(path != null)
+			{
+				// maintain backwards compatibility
+				VFS vfs = VFSManager.getVFSForPath(path);
+				canRead = ((vfs.getCapabilities() & READ_CAP) != 0);
+				canWrite = ((vfs.getCapabilities() & WRITE_CAP) != 0);
+			}
 		} //}}}
 
 		protected boolean colorCalculated;
 		protected Color color;
+
+		//{{{ getExtendedAttribute() method
+		/**
+		 * Returns the value of an extended attribute. Note that this
+		 * returns formatted strings (eg, "10 Mb" for a file size of
+		 * 1048576 bytes). If you need access to the raw data, access
+		 * fields and methods of this class.
+		 * @param name The extended attribute name
+		 * @since jEdit 4.2pre1
+		 */
+		public String getExtendedAttribute(String name)
+		{
+			if(name.equals(EA_TYPE))
+			{
+				switch(type)
+				{
+				case FILE:
+					return jEdit.getProperty("vfs.browser.type.file");
+				case DIRECTORY:
+					return jEdit.getProperty("vfs.browser.type.directory");
+				case FILESYSTEM:
+					return jEdit.getProperty("vfs.browser.type.filesystem");
+				default:
+					throw new IllegalArgumentException();
+				}
+			}
+			else if(name.equals(EA_STATUS))
+			{
+				if(canRead)
+				{
+					if(canWrite)
+						return jEdit.getProperty("vfs.browser.status.rw");
+					else
+						return jEdit.getProperty("vfs.browser.status.ro");
+				}
+				else
+				{
+					if(canWrite)
+						return jEdit.getProperty("vfs.browser.status.append");
+					else
+						return jEdit.getProperty("vfs.browser.status.no");
+				}
+			}
+			else if(name.equals(EA_SIZE))
+			{
+				if(type != FILE)
+					return null;
+				else
+					return MiscUtilities.formatFileSize(length);
+			}
+			else
+				return null;
+		} //}}}
 
 		//{{{ getColor() method
 		public Color getColor()
@@ -718,9 +868,50 @@ public abstract class VFS
 		}
 	} //}}}
 
+	//{{{ DirectoryEntryCompare class
+	/**
+	 * Implementation of {@link org.gjt.sp.jedit.MiscUtilities.Compare}
+	 * interface that compares {@link VFS.DirectoryEntry} instances.
+	 * @since jEdit 4.2pre1
+	 */
+	public static class DirectoryEntryCompare implements MiscUtilities.Compare
+	{
+		private boolean sortIgnoreCase, sortMixFilesAndDirs;
+
+		/**
+		 * Creates a new <code>DirectoryEntryCompare</code>.
+		 * @param sortMixFilesAndDirs If false, directories are
+		 * put at the top of the listing.
+		 * @param sortIgnoreCase If false, upper case comes before
+		 * lower case.
+		 */
+		public DirectoryEntryCompare(boolean sortMixFilesAndDirs,
+			boolean sortIgnoreCase)
+		{
+			this.sortMixFilesAndDirs = sortMixFilesAndDirs;
+			this.sortIgnoreCase = sortIgnoreCase;
+		}
+
+		public int compare(Object obj1, Object obj2)
+		{
+			VFS.DirectoryEntry file1 = (VFS.DirectoryEntry)obj1;
+			VFS.DirectoryEntry file2 = (VFS.DirectoryEntry)obj2;
+
+			if(!sortMixFilesAndDirs)
+			{
+				if(file1.type != file2.type)
+					return file2.type - file1.type;
+			}
+
+			return MiscUtilities.compareStrings(file1.name,
+				file2.name,sortIgnoreCase);
+		}
+	} //}}}
+
 	//{{{ Private members
 	private String name;
 	private int caps;
+	private String[] extAttrs;
 	private static Vector colors;
 	private static Object lock = new Object();
 
@@ -773,6 +964,8 @@ public abstract class VFS
 				{
 					// resolve symlinks to avoid loops
 					String canonPath = _canonPath(session,file.path,comp);
+					if(!MiscUtilities.isURL(canonPath))
+						canonPath = MiscUtilities.resolveSymlinks(canonPath);
 
 					_listDirectory(session,stack,files,
 						canonPath,glob,recursive,
@@ -812,7 +1005,6 @@ public abstract class VFS
 						jEdit.getColorProperty(
 						"vfs.browser.colors." + i + ".color",
 						Color.black)));
-					i++;
 				}
 				catch(REException e)
 				{
@@ -820,6 +1012,8 @@ public abstract class VFS
 						+ glob);
 					Log.log(Log.ERROR,VFS.class,e);
 				}
+
+				i++;
 			}
 		}
 	} //}}}

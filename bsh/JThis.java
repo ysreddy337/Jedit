@@ -80,21 +80,23 @@ class JThis extends This implements
 	}
 
 	public String toString() {
-		return "'this' reference (JThis) to Bsh object: " + namespace.name;
+		return "'this' reference (JThis) to Bsh object: " + namespace.getName();
 	}
 
 	void event(String name, Object event)
 	{
-		CallStack callstack = newCallStack();
-		BshMethod method;
+		CallStack callstack = new CallStack( namespace );
+		BshMethod method = null;
 
 		// handleEvent gets all events
-		method = namespace.getMethod( 
-			"handleEvent", new Class [] { null } );
+		try {
+			method = namespace.getMethod( 
+				"handleEvent", new Class [] { null } );
+		} catch ( UtilEvalError e ) {/*squeltch*/  }
 
 		if (method != null)
 			try {
-				method.invokeDeclaredMethod( 
+				method.invoke( 
 					new Object[] { event }, declaringInterpreter, callstack, null );
 			} catch(EvalError e) {
 				declaringInterpreter.error(
@@ -102,10 +104,12 @@ class JThis extends This implements
 			}
 
 		// send to specific event handler
-		method = namespace.getMethod( name, new Class [] { null } );
+		try {
+			method = namespace.getMethod( name, new Class [] { null } );
+		} catch ( UtilEvalError e ) { /*squeltch*/ }
 		if (method != null)
 			try {
-				method.invokeDeclaredMethod( 
+				method.invoke( 
 					new Object[] { event }, declaringInterpreter, callstack, null );
 			} catch(EvalError e) {
 				declaringInterpreter.error(
@@ -206,12 +210,16 @@ class JThis extends This implements
     public boolean imageUpdate(java.awt.Image img, int infoflags,
                                int x, int y, int width, int height) {
 
-		BshMethod method = namespace.getMethod( "imageUpdate",
-			new Class [] { null, null, null, null, null, null } );
+		BshMethod method = null;
+		try {
+			method = namespace.getMethod( "imageUpdate",
+				new Class [] { null, null, null, null, null, null } );
+		} catch ( UtilEvalError e ) {/*squeltch*/ }
+
 		if(method != null)
 			try {
-				CallStack callstack = newCallStack();
-				method.invokeDeclaredMethod( 
+				CallStack callstack = new CallStack( namespace );
+				method.invoke( 
 					new Object[] { 
 						img, new Primitive(infoflags), new Primitive(x), 
 						new Primitive(y), new Primitive(width), 

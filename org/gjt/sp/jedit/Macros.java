@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * Copyright (C) 1999, 2004 Slava Pestov
  * Portions copyright (C) 2002 mike dillon
  *
  * This program is free software; you can redistribute it and/or
@@ -52,7 +52,7 @@ import org.gjt.sp.util.Log;
  * the methods in the {@link GUIUtilities} class instead.
  *
  * @author Slava Pestov
- * @version $Id: Macros.java,v 1.29 2003/02/08 18:53:02 spestov Exp $
+ * @version $Id: Macros.java,v 1.40 2004/07/12 19:25:07 spestov Exp $
  */
 public class Macros
 {
@@ -250,13 +250,9 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		macroHierarchy.removeAllElements();
 		macroHash.clear();
 
-		if(jEdit.getJEditHome() != null)
-		{
-			systemMacroPath = MiscUtilities.constructPath(
-				jEdit.getJEditHome(),"macros");
-			loadMacros(macroHierarchy,"",new File(systemMacroPath));
-		}
-
+		// since subsequent macros with the same name are ignored,
+		// load user macros first so that they override the system
+		// macros.
 		String settings = jEdit.getSettingsDirectory();
 
 		if(settings != null)
@@ -266,7 +262,14 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 			loadMacros(macroHierarchy,"",new File(userMacroPath));
 		}
 
-		EditBus.send(new MacrosChanged(null));
+		if(jEdit.getJEditHome() != null)
+		{
+			systemMacroPath = MiscUtilities.constructPath(
+				jEdit.getJEditHome(),"macros");
+			loadMacros(macroHierarchy,"",new File(systemMacroPath));
+		}
+
+		EditBus.send(new DynamicMenuChanged("macros"));
 	} //}}}
 
 	//{{{ registerHandler() method
@@ -380,10 +383,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		//{{{ Macro constructor
 		public Macro(Handler handler, String name, String label, String path)
 		{
-			// in case macro file name has a space in it.
-			// spaces break the view.toolBar property, for instance,
-			// since it uses spaces to delimit action names.
-			super(name.replace(' ','_'));
+			super(name);
 			this.handler = handler;
 			this.label = label;
 			this.path = path;
@@ -396,18 +396,6 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		}
 		//}}}
 
-		//{{{ getLabel() method
-		public String getLabel()
-		{
-			return label;
-		} //}}}
-
-		//{{{ getMouseOverText() method
-		public String getMouseOverText()
-		{
-			return handler.getLabel() + " - " + path;
-		} //}}}
-
 		//{{{ getPath() method
 		public String getPath()
 		{
@@ -417,8 +405,6 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		//{{{ invoke() method
 		public void invoke(View view)
 		{
-			lastMacro = this;
-
 			if(view == null)
 				handler.runMacro(null,this);
 			else
@@ -454,7 +440,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		//{{{ Private members
 		private Handler handler;
 		private String path;
-		private String label;
+		String label;
 		//}}}
 	} //}}}
 
@@ -565,13 +551,19 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 
 		if(settings == null)
 		{
-			GUIUtilities.error(view,"no-settings",new String[0]);
+			GUIUtilities.error(view,"no-settings",null);
 			return;
 		}
 
 		String path = MiscUtilities.constructPath(
 			jEdit.getSettingsDirectory(),"macros",
 			"Temporary_Macro.bsh");
+
+		if(jEdit.getBuffer(path) == null)
+		{
+			GUIUtilities.error(view,"no-temp-macro",null);
+			return;
+		}
 
 		Handler handler = getHandler("beanshell");
 		Macro temp = handler.createMacro(path,path);
@@ -592,20 +584,6 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		}
 	} //}}}
 
-	//{{{ runLastMacro() method
-	/**
-	 * Runs the most recently run or recorded macro.
-	 * @param view The view
-	 * @since jEdit 2.7pre2
-	 */
-	public static void runLastMacro(View view)
-	{
-		if(lastMacro == null)
-			view.getToolkit().beep();
-		else
-			lastMacro.invoke(view);
-	} //}}}
-
 	//{{{ Private members
 
 	//{{{ Static variables
@@ -617,7 +595,6 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	private static ActionSet macroActionSet;
 	private static Vector macroHierarchy;
 	private static Hashtable macroHash;
-	private static Macro lastMacro;
 	//}}}
 
 	//{{{ Class initializer
@@ -676,25 +653,47 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 			}
 			else
 			{
-				Handler handler = getHandlerForPathName(file.getPath());
-
-				if(handler == null)
-					continue;
-
-				try
-				{
-					Macro newMacro = handler.createMacro(
-						path + fileName, file.getPath());
-					vector.addElement(newMacro);
-					macroActionSet.addAction(newMacro);
-					macroHash.put(newMacro.getName(),newMacro);
-				}
-				catch (Exception e)
-				{
-					Log.log(Log.ERROR, Macros.class, e);
-					macroHandlers.remove(handler);
-				}
+				addMacro(file,path,vector);
 			}
+		}
+	} //}}}
+
+	//{{{ addMacro() method
+	private static void addMacro(File file, String path, Vector vector)
+	{
+		String fileName = file.getName();
+		Handler handler = getHandlerForPathName(file.getPath());
+
+		if(handler == null)
+			return;
+
+		try
+		{
+			// in case macro file name has a space in it.
+			// spaces break the view.toolBar property, for instance,
+			// since it uses spaces to delimit action names.
+			String macroName = (path + fileName).replace(' ','_');
+			Macro newMacro = handler.createMacro(macroName,
+				file.getPath());
+			// ignore if already added.
+			// see comment in loadMacros().
+			if(macroHash.get(newMacro.getName()) != null)
+				return;
+
+			vector.addElement(newMacro.getName());
+			jEdit.setTemporaryProperty(newMacro.getName()
+				+ ".label",
+				newMacro.label);
+			jEdit.setTemporaryProperty(newMacro.getName()
+				+ ".mouse-over",
+				handler.getLabel() + " - " + file.getPath());
+			macroActionSet.addAction(newMacro);
+			macroHash.put(newMacro.getName(),newMacro);
+		}
+		catch (Exception e)
+		{
+			Log.log(Log.ERROR, Macros.class, e);
+			macroHandlers.remove(handler);
 		}
 	} //}}}
 
@@ -708,10 +707,6 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 	 */
 	private static void recordMacro(View view, Buffer buffer, boolean temporary)
 	{
-		Handler handler = getHandler("beanshell");
-		String path = buffer.getPath();
-		lastMacro = handler.createMacro(path,path);
-
 		view.setMacroRecorder(new Recorder(view,buffer,temporary));
 
 		// setting the message to 'null' causes the status bar to check
@@ -732,6 +727,8 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		boolean temporary;
 
 		boolean lastWasInput;
+		boolean lastWasOverwrite;
+		int overwriteCount;
 
 		//{{{ Recorder constructor
 		public Recorder(View view, Buffer buffer, boolean temporary)
@@ -745,11 +742,7 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		//{{{ record() method
 		public void record(String code)
 		{
-			if(lastWasInput)
-			{
-				lastWasInput = false;
-				append("\");");
-			}
+			flushInput();
 
 			append("\n");
 			append(code);
@@ -769,8 +762,11 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 			}
 		} //}}}
 
-		//{{{ record() method
-		public void record(int repeat, char ch)
+		//{{{ recordInput() method
+		/**
+		 * @since jEdit 4.2pre5
+		 */
+		public void recordInput(int repeat, char ch, boolean overwrite)
 		{
 			// record \n and \t on lines specially so that auto indent
 			// can take place
@@ -783,14 +779,42 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 				StringBuffer buf = new StringBuffer();
 				for(int i = 0; i < repeat; i++)
 					buf.append(ch);
-				String charStr = MiscUtilities.charsToEscapes(buf.toString());
+				recordInput(buf.toString(),overwrite);
+			}
+		} //}}}
 
+		//{{{ recordInput() method
+		/**
+		 * @since jEdit 4.2pre5
+		 */
+		public void recordInput(String str, boolean overwrite)
+		{
+			String charStr = MiscUtilities.charsToEscapes(str);
+
+			if(overwrite)
+			{
+				if(lastWasOverwrite)
+				{
+					overwriteCount++;
+					append(charStr);
+				}
+				else
+				{
+					flushInput();
+					overwriteCount = 1;
+					lastWasOverwrite = true;
+					append("\ntextArea.setSelectedText(\"" + charStr);
+				}
+			}
+			else
+			{
 				if(lastWasInput)
 					append(charStr);
 				else
 				{
-					append("\ntextArea.setSelectedText(\"" + charStr);
+					flushInput();
 					lastWasInput = true;
+					append("\ntextArea.setSelectedText(\"" + charStr);
 				}
 			}
 		} //}}}
@@ -818,15 +842,11 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 		//{{{ dispose() method
 		private void dispose()
 		{
-			if(lastWasInput)
-			{
-				lastWasInput = false;
-				append("\");");
-			}
+			flushInput();
 
 			for(int i = 0; i < buffer.getLineCount(); i++)
 			{
-				buffer.indentLine(i,true,true);
+				buffer.indentLine(i,true);
 			}
 
 			EditBus.removeFromBus(this);
@@ -834,6 +854,32 @@ file_loop:			for(int i = 0; i < paths.length; i++)
 			// setting the message to 'null' causes the status bar to
 			// check if a recording is in progress
 			view.getStatus().setMessage(null);
+		} //}}}
+
+		//{{{ flushInput() method
+		/**
+		 * We try to merge consecutive inputs. This helper method is
+		 * called when something other than input is to be recorded.
+		 */
+		private void flushInput()
+		{
+			if(lastWasInput)
+			{
+				lastWasInput = false;
+				append("\");");
+			}
+
+			if(lastWasOverwrite)
+			{
+				lastWasOverwrite = false;
+				append("\");\n");
+				append("offset = buffer.getLineEndOffset("
+					+ "textArea.getCaretLine()) - 1;\n");
+				append("buffer.remove(textArea.getCaretPosition(),"
+					+ "Math.min(" + overwriteCount
+					+ ",offset - "
+					+ "textArea.getCaretPosition()));");
+			}
 		} //}}}
 	} //}}}
 

@@ -36,6 +36,8 @@ package bsh;
 
 class BSHBlock extends SimpleNode
 {
+	public boolean isSynchronized = false;
+
 	BSHBlock(int id) { super(id); }
 
 	public Object eval( CallStack callstack, Interpreter interpreter) 
@@ -59,9 +61,34 @@ class BSHBlock extends SimpleNode
 		boolean overrideNamespace ) 
 		throws EvalError
 	{
-		Object ret = Primitive.VOID;
-		int statements = jjtGetNumChildren();
+		Object syncValue = null;
+		if ( isSynchronized ) 
+		{
+			// First node is the expression on which to sync
+			SimpleNode exp = ((SimpleNode)jjtGetChild(0));
+			syncValue = exp.eval(callstack, interpreter);
+		}
 
+		Object ret;
+		if ( isSynchronized ) // Do the actual synchronization
+			synchronized( syncValue )
+			{
+				ret = evalBlock( 
+					callstack, interpreter, overrideNamespace, null/*filter*/);
+			}
+		else
+				ret = evalBlock( 
+					callstack, interpreter, overrideNamespace, null/*filter*/ );
+
+		return ret;
+	}
+
+	Object evalBlock( 
+		CallStack callstack, Interpreter interpreter, 
+		boolean overrideNamespace, NodeFilter nodeFilter ) 
+		throws EvalError
+	{	
+		Object ret = Primitive.VOID;
 		NameSpace enclosingNameSpace = null;
 		if ( !overrideNamespace ) 
 		{
@@ -69,22 +96,41 @@ class BSHBlock extends SimpleNode
 			BlockNameSpace bodyNameSpace = 
 				new BlockNameSpace( enclosingNameSpace );
 
-/*
-// Experiment - clone callstack before swap for thread safety
-callstack = (CallStack)callstack.clone();
-*/
-
 			callstack.swap( bodyNameSpace );
 		}
 
+		int startChild = isSynchronized ? 1 : 0;
+		int numChildren = jjtGetNumChildren();
+
 		try {
-			for(int i=0; i<statements; i++)
+			/*
+				Evaluate block in two passes: 
+				First do class declarations then do everything else.
+			*/
+			for(int i=startChild; i<numChildren; i++)
 			{
 				SimpleNode node = ((SimpleNode)jjtGetChild(i));
+
+				if ( nodeFilter != null && !nodeFilter.isVisible( node ) )
+					continue;
+
+				if ( node instanceof BSHClassDeclaration )
+					node.eval( callstack, interpreter );
+			}
+			for(int i=startChild; i<numChildren; i++)
+			{
+				SimpleNode node = ((SimpleNode)jjtGetChild(i));
+				if ( node instanceof BSHClassDeclaration )
+					continue;
+
+				// filter nodes
+				if ( nodeFilter != null && !nodeFilter.isVisible( node ) )
+					continue;
+
 				ret = node.eval( callstack, interpreter );
 
-				// some statement or embedded block evaluated a return statement
-				if (ret instanceof ReturnControl)
+				// statement or embedded block evaluated a return statement
+				if ( ret instanceof ReturnControl )
 					break;
 			}
 		} finally {
@@ -92,8 +138,12 @@ callstack = (CallStack)callstack.clone();
 			if ( !overrideNamespace ) 
 				callstack.swap( enclosingNameSpace );
 		}
-
 		return ret;
 	}
+
+	public interface NodeFilter {
+		public boolean isVisible( SimpleNode node );
+	}
+
 }
 

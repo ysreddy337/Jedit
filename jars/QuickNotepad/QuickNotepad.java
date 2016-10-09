@@ -18,7 +18,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: QuickNotepad.java,v 1.3 2001/11/11 12:26:20 jgellene Exp $
+ * $Id: QuickNotepad.java,v 1.8 2004/04/30 20:23:08 spestov Exp $
  */
 
 // from Java:
@@ -35,13 +35,12 @@ import javax.swing.event.*;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.io.*;
-//import org.gjt.sp.jedit.msg.CreateDockableWindow;
 import org.gjt.sp.jedit.msg.PropertiesChanged;
 import org.gjt.sp.jedit.msg.ViewUpdate;
 import org.gjt.sp.util.Log;
 
 
-public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadActions
+public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadActions, DefaultFocusComponent
 {
 	private String filename;
 	private String defaultFilename;
@@ -62,17 +61,20 @@ public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadAct
 		this.view = view;
 		this.floating  = position.equals(DockableWindowManager.FLOATING);
 
-		this.filename = jEdit.getProperty(
-			QuickNotepadPlugin.OPTION_PREFIX + "filepath");
-		if(this.filename == null || this.filename.length() == 0)
+		if(jEdit.getSettingsDirectory() != null)
 		{
-			this.filename = new String(jEdit.getSettingsDirectory()
-				+ File.separator + "qn.txt");
-			jEdit.setProperty(
-				QuickNotepadPlugin.OPTION_PREFIX + "filepath",
-				this.filename);
+			this.filename = jEdit.getProperty(
+				QuickNotepadPlugin.OPTION_PREFIX + "filepath");
+			if(this.filename == null || this.filename.length() == 0)
+			{
+				this.filename = new String(jEdit.getSettingsDirectory()
+					+ File.separator + "qn.txt");
+				jEdit.setProperty(
+					QuickNotepadPlugin.OPTION_PREFIX + "filepath",
+					this.filename);
+			}
+			this.defaultFilename = this.filename;
 		}
-		this.defaultFilename = new String(this.filename);
 
 		this.toolPanel = new QuickNotepadToolPanel(this);
 		add(BorderLayout.NORTH, this.toolPanel);
@@ -83,12 +85,16 @@ public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadAct
 		textArea = new QuickNotepadTextArea();
 		textArea.setFont(QuickNotepadOptionPane.makeFont());
 		textArea.addKeyListener(new KeyHandler());
-		textArea.addAncestorListener(new AncestorHandler());
 
 		JScrollPane pane = new JScrollPane(textArea);
 		add(BorderLayout.CENTER, pane);
 
 		readFile();
+	}
+
+	public void focusOnDefaultComponent()
+	{
+		textArea.requestFocus();
 	}
 
 	//
@@ -118,19 +124,18 @@ public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadAct
 	{
 		String propertyFilename = jEdit.getProperty(
 			QuickNotepadPlugin.OPTION_PREFIX + "filepath");
-		if(!defaultFilename.equals(propertyFilename))
+		if(!MiscUtilities.objectsEqual(defaultFilename,propertyFilename))
 		{
 			saveFile();
 			toolPanel.propertiesChanged();
-			defaultFilename = new String(propertyFilename);
-			filename = new String(defaultFilename);
+			defaultFilename = propertyFilename;
+			filename = defaultFilename;
 			readFile();
 		}
 		Font newFont = QuickNotepadOptionPane.makeFont();
 		if(!newFont.equals(textArea.getFont()))
 		{
 			textArea.setFont(newFont);
-			textArea.invalidate();
 		}
 	}
 
@@ -158,13 +163,12 @@ public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadAct
 
 	public void saveFile()
 	{
-		if(filename.length() == 0) return;
+		if(filename == null || filename.length() == 0) return;
 		try
 		{
-			DataOutputStream dos = new DataOutputStream(
-			new FileOutputStream(filename));
-			dos.writeBytes(textArea.getText());
-			dos.close();
+			FileWriter out = new FileWriter(filename);
+			out.write(textArea.getText());
+			out.close();
 		}
 		catch (IOException ioe)
 		{
@@ -199,12 +203,12 @@ public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadAct
 
 	private void readFile()
 	{
-		FileInputStream fis = null;
+		if(filename == null || filename.length() == 0) return;
+
 		BufferedReader bf = null;
 		try
 		{
-			fis = new FileInputStream(filename);
-			bf = new BufferedReader(new InputStreamReader(fis));
+			bf = new BufferedReader(new FileReader(filename));
 			StringBuffer sb = new StringBuffer(2048);
 			String str;
 			while((str = bf.readLine()) != null)
@@ -212,7 +216,6 @@ public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadAct
 				sb.append(str).append('\n');
 			}
 			bf.close();
-			fis.close();
 			textArea.setText(sb.toString());
 		}
 		catch (FileNotFoundException fnf)
@@ -242,20 +245,6 @@ public class QuickNotepad extends JPanel implements EBComponent, QuickNotepadAct
 				wm.removeDockableWindow(QuickNotepadPlugin.NAME);
 			}
 		}
-	}
-
-	private class AncestorHandler implements AncestorListener
-	{
-		public void ancestorAdded(AncestorEvent e)
-		{
-			if(e.getSource() == QuickNotepad.this.textArea)
-			{
-				if(QuickNotepad.this.floating)
-					QuickNotepad.this.textArea.requestFocus();
-			}
-		}
-		public void ancestorMoved(AncestorEvent e) {}
-		public void ancestorRemoved(AncestorEvent e) {}
 	}
 
 }

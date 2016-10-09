@@ -81,17 +81,6 @@ public class SearchBar extends JPanel
 		hyperSearch.setMargin(margin);
 		hyperSearch.setRequestFocusEnabled(false);
 
-		if(temp)
-		{
-			close = new RolloverButton(new ImageIcon(
-				getClass().getResource(
-				"/org/gjt/sp/jedit/icons/closebox.gif")));
-			close.addActionListener(actionHandler);
-			close.setToolTipText(jEdit.getProperty(
-				"view.search.close-tooltip"));
-			add(close);
-		}
-
 		update();
 
 		//{{{ Create the timer used by incremental search
@@ -117,6 +106,8 @@ public class SearchBar extends JPanel
 
 		// if 'temp' is true, hide search bar after user is done with it
 		this.temp = temp;
+
+		propertiesChanged();
 	} //}}}
 
 	//{{{ getField() method
@@ -139,6 +130,24 @@ public class SearchBar extends JPanel
 		regexp.setSelected(SearchAndReplace.getRegexp());
 		hyperSearch.setSelected(jEdit.getBooleanProperty(
 			"view.search.hypersearch.toggle"));
+	} //}}}
+
+	//{{{ propertiesChanged() method
+	public void propertiesChanged()
+	{
+		if(temp)
+		{
+			if(close == null)
+			{
+				close = new RolloverButton(GUIUtilities.loadIcon("closebox.gif"));
+				close.addActionListener(new ActionHandler());
+				close.setToolTipText(jEdit.getProperty(
+					"view.search.close-tooltip"));
+			}
+			add(close);
+		}
+		else if(close != null)
+			remove(close);
 	} //}}}
 
 	//{{{ Private members
@@ -168,7 +177,7 @@ public class SearchBar extends JPanel
 		{
 			jEdit.setBooleanProperty("search.hypersearch.toggle",
 				hyperSearch.isSelected());
-			new SearchDialog(view,null);
+			SearchDialog.showSearchDialog(view,null,SearchDialog.CURRENT_BUFFER);
 		} //}}}
 		//{{{ HyperSearch
 		else if(hyperSearch.isSelected())
@@ -187,6 +196,12 @@ public class SearchBar extends JPanel
 		//{{{ Incremental search
 		else
 		{
+			if(reverse && SearchAndReplace.getRegexp())
+			{
+				GUIUtilities.error(view,"regexp-reverse",null);
+				return;
+			}
+
 			// on enter, start search from end
 			// of current match to find next one
 			int start;
@@ -302,13 +317,7 @@ public class SearchBar extends JPanel
 			else if(source == close)
 			{
 				view.removeToolBar(SearchBar.this);
-				SwingUtilities.invokeLater(new Runnable()
-				{
-					public void run()
-					{
-						view.getEditPane().focusOnTextArea();
-					}
-				});
+				view.getEditPane().focusOnTextArea();
 			}
 		} //}}}
 	} //}}}
@@ -385,48 +394,19 @@ public class SearchBar extends JPanel
 		{
 			switch(evt.getKeyCode())
 			{
-			case KeyEvent.VK_LEFT:
-			case KeyEvent.VK_RIGHT:
-				if(!hyperSearch.isSelected())
-				{
-					if(temp)
-					{
-						view.removeToolBar(SearchBar.this);
-					}
-
-					evt.consume();
-					SwingUtilities.invokeLater(new Runnable()
-					{
-						public void run()
-						{
-							view.getEditPane().focusOnTextArea();
-						}
-					});
-					view.getEditPane().getTextArea()
-						.processKeyEvent(evt);
-				}
-				break;
 			case KeyEvent.VK_ESCAPE:
 				if(temp)
 				{
 					view.removeToolBar(SearchBar.this);
 				}
 				evt.consume();
-				SwingUtilities.invokeLater(new Runnable()
-				{
-					public void run()
-					{
-						view.getEditPane().focusOnTextArea();
-					}
-				});
+				view.getEditPane().focusOnTextArea();
 				break;
 			case KeyEvent.VK_ENTER:
 				if(evt.isShiftDown())
 				{
 					evt.consume();
-					// reverse search with regexps not
-					// supported yet
-					find(regexp.isSelected() ? false : true);
+					find(true);
 				}
 				break;
 			}

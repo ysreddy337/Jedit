@@ -34,12 +34,23 @@ package org.gjt.sp.jedit;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: EBMessage.java,v 1.4 2003/02/07 21:57:27 spestov Exp $
+ * @version $Id: EBMessage.java,v 1.7 2003/05/02 21:12:43 spestov Exp $
  *
  * @since jEdit 2.2pre6
  */
 public abstract class EBMessage
 {
+	//{{{ EBMessage constructor
+	/**
+	 * Creates a new message.
+	 * @param source The message source
+	 * @since jEdit 4.2pre1
+	 */
+	public EBMessage(Object source)
+	{
+		this.source = source;
+	} //}}}
+
 	//{{{ EBMessage constructor
 	/**
 	 * Creates a new message.
@@ -53,8 +64,9 @@ public abstract class EBMessage
 	//{{{ getSource() method
 	/**
 	 * Returns the sender of this message.
+	 * @since jEdit 4.2pre1
 	 */
-	public EBComponent getSource()
+	public Object getSource()
 	{
 		return source;
 	} //}}}
@@ -65,7 +77,10 @@ public abstract class EBMessage
 	 */
 	public String toString()
 	{
-		return getClass().getName() + "[" + paramString() + "]";
+		String className = getClass().getName();
+		int index = className.lastIndexOf('.');
+		return className.substring(index + 1)
+			+ "[" + paramString() + "]";
 	} //}}}
 
 	//{{{ paramString() method
@@ -78,7 +93,7 @@ public abstract class EBMessage
 	} //}}}
 
 	//{{{ Private members
-	private EBComponent source;
+	private Object source;
 	//}}}
 
 	//{{{ Deprecated methods

@@ -4,6 +4,7 @@
  * :folding=explicit:collapseFolds=1:
  *
  * Copyright (C) 2002 Kris Kopicki
+ * Portions copyright (C) 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,8 +26,12 @@ package org.gjt.sp.jedit.gui;
 //{{{ Imports
 import java.awt.*;
 import java.awt.event.*;
+import java.lang.reflect.Method;
 import javax.swing.*;
 import javax.swing.border.*;
+import javax.swing.plaf.basic.BasicButtonUI;
+import org.gjt.sp.jedit.OperatingSystem;
+import org.gjt.sp.util.Log;
 //}}}
 
 /**
@@ -47,13 +52,24 @@ public class RolloverButton extends JButton
 	 */
 	public RolloverButton()
 	{
-		setBorder(new EtchedBorder());
-		setBorderPainted(false);
-		setMargin(new Insets(0,0,0,0));
+		if(OperatingSystem.hasJava15())
+			setContentAreaFilled(false);
 
-		setRequestFocusEnabled(false);
-
-		addMouseListener(new MouseOverHandler());
+		if(method != null)
+		{
+			try
+			{
+				method.invoke(this,new Boolean[] { Boolean.TRUE });
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,this,e);
+			}
+		}
+		else
+		{
+			addMouseListener(new MouseOverHandler());
+		}
 	} //}}}
 
 	//{{{ RolloverButton constructor
@@ -67,6 +83,24 @@ public class RolloverButton extends JButton
 		setIcon(icon);
 	} //}}}
 
+	//{{{ updateUI() method
+	public void updateUI()
+	{
+		if(OperatingSystem.isWindows())
+		{
+			/* Workaround for uncooperative Windows L&F */
+			setUI(new BasicButtonUI());
+		}
+		else
+			super.updateUI();
+
+		setBorder(new EtchedBorder());
+		setBorderPainted(false);
+		setMargin(new Insets(1,1,1,1));
+
+		setRequestFocusEnabled(false);
+	} //}}}
+
 	//{{{ isOpaque() method
 	public boolean isOpaque()
 	{
@@ -77,14 +111,42 @@ public class RolloverButton extends JButton
 	public void setEnabled(boolean b)
 	{
 		super.setEnabled(b);
-		setBorderPainted(false);
-		repaint();
+		if(method == null)
+		{
+			setBorderPainted(false);
+			repaint();
+		}
+	} //}}}
+
+	//{{{ setBorderPainted() method
+	public void setBorderPainted(boolean b)
+	{
+		try
+		{
+			revalidateBlocked = true;
+			super.setBorderPainted(b);
+		}
+		finally
+		{
+			revalidateBlocked = false;
+		}
+	} //}}}
+
+	//{{{ revalidate() method
+	/**
+	 * We block calls to revalidate() from a setBorderPainted(), for
+	 * performance reasons.
+	 */
+	public void revalidate()
+	{
+		if(!revalidateBlocked)
+			super.revalidate();
 	} //}}}
 
 	//{{{ paint() method
 	public void paint(Graphics g)
 	{
-		if (isEnabled())
+		if(method != null || isEnabled())
 			super.paint(g);
 		else
 		{
@@ -94,8 +156,32 @@ public class RolloverButton extends JButton
 		}
 	} //}}}
 
+	//{{{ Private members
 	private static AlphaComposite c = AlphaComposite.getInstance(
 		AlphaComposite.SRC_OVER, 0.5f);
+
+	private static Method method;
+
+	private boolean revalidateBlocked;
+
+	static
+	{
+		/* if(OperatingSystem.hasJava14())
+		{
+			try
+			{
+				method = RolloverButton.class
+					.getMethod("setRolloverEnabled",new Class[]
+					{ boolean.class });
+				Log.log(Log.DEBUG,RolloverButton.class,
+					"Java 1.4 setRolloverEnabled() method enabled");
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,RolloverButton.class,e);
+			}
+		} */
+	} //}}}
 
 	//{{{ MouseHandler class
 	/**

@@ -38,6 +38,34 @@ import org.gjt.sp.util.Log;
  */
 public class GrabKeyDialog extends JDialog
 {
+	//{{{ toString() method
+	public static String toString(KeyEvent evt)
+	{
+		String id;
+		switch(evt.getID())
+		{
+		case KeyEvent.KEY_PRESSED:
+			id = "KEY_PRESSED";
+			break;
+		case KeyEvent.KEY_RELEASED:
+			id = "KEY_RELEASED";
+			break;
+		case KeyEvent.KEY_TYPED:
+			id = "KEY_TYPED";
+			break;
+		default:
+			id = "unknown type";
+			break;
+		}
+
+		return id + ",keyCode=0x"
+			+ Integer.toString(evt.getKeyCode(),16)
+			+ ",keyChar=0x"
+			+ Integer.toString(evt.getKeyChar(),16)
+			+ ",modifiers=0x"
+			+ Integer.toString(evt.getModifiers(),16);
+	} //}}}
+
 	//{{{ GrabKeyDialog constructor
 	/**
 	 * Create and show a new modal dialog.
@@ -229,7 +257,7 @@ public class GrabKeyDialog extends JDialog
 		pack();
 		setLocationRelativeTo(getParent());
 		setResizable(false);
-		show();
+		setVisible(true);
 	} //}}}
 
 	//{{{ getSymbolicName() method
@@ -296,11 +324,11 @@ public class GrabKeyDialog extends JDialog
 			return null;
 
 		String spacedShortcut = shortcut + " ";
-		Enumeration enum = allBindings.elements();
+		Enumeration e = allBindings.elements();
 
-		while(enum.hasMoreElements())
+		while(e.hasMoreElements())
 		{
-			KeyBinding kb = (KeyBinding)enum.nextElement();
+			KeyBinding kb = (KeyBinding)e.nextElement();
 
 			if(!kb.isAssigned())
 				continue;
@@ -370,68 +398,51 @@ public class GrabKeyDialog extends JDialog
 		protected void processKeyEvent(KeyEvent _evt)
 		{
 			KeyEvent evt = KeyEventWorkaround.processKeyEvent(_evt);
-			if(evt == null)
+			if(debugBuffer != null)
 			{
-				if(debugBuffer != null)
-				{
-					debugBuffer.insert(debugBuffer.getLength(),
-						"Event " + _evt + " filtered\n");
-				}
-				return;
-			}
-			else
-			{
-				if(debugBuffer != null)
-				{
-					debugBuffer.insert(debugBuffer.getLength(),
-						"Event " + _evt + " passed\n");
-				}
+				debugBuffer.insert(debugBuffer.getLength(),
+					"Event " + GrabKeyDialog.toString(_evt)
+					+ (evt == null ? " filtered\n"
+					: " passed\n"));
 			}
 
+			if(evt == null)
+				return;
+
 			evt.consume();
+
+			KeyEventTranslator.Key key = KeyEventTranslator
+				.translateKeyEvent(evt);
+			if(key == null)
+				return;
+
+			if(debugBuffer != null)
+			{
+				debugBuffer.insert(debugBuffer.getLength(),
+					"==> Translated to " + key + "\n");
+			}
 
 			StringBuffer keyString = new StringBuffer(getText());
 
 			if(getDocument().getLength() != 0)
 				keyString.append(' ');
 
-			if(evt.getID() == KeyEvent.KEY_TYPED)
+			if(key.modifiers != null)
+				keyString.append(key.modifiers).append('+');
+
+			if(key.input == ' ')
+				keyString.append("SPACE");
+			else if(key.input != '\0')
+				keyString.append(key.input);
+			else
 			{
-				if(!Character.isLetterOrDigit(evt.getKeyChar())
-					&& !Character.isUpperCase(evt.getKeyChar()))
-					return;
-
-				keyString.append(evt.getKeyChar());
-			}
-			else if(evt.getID() == KeyEvent.KEY_PRESSED)
-			{
-				String modifiers = DefaultInputHandler
-					.getModifierString(evt);
-				if(modifiers.length() != 0)
-				{
-					keyString.append(modifiers);
-					keyString.append('+');
-				}
-
-				int keyCode = evt.getKeyCode();
-
-				if(((keyCode >= KeyEvent.VK_A && keyCode <= KeyEvent.VK_Z)
-					|| (keyCode >= KeyEvent.VK_0 && keyCode <= KeyEvent.VK_9))
-					&& modifiers.length() == 0)
-				{
-					// will be handled by KEY_TYPED
-					return;
-				}
-
-				String symbolicName = getSymbolicName(keyCode);
+				String symbolicName = getSymbolicName(key.key);
 
 				if(symbolicName == null)
 					return;
 
 				keyString.append(symbolicName);
 			}
-			else if(evt.getID() == KeyEvent.KEY_RELEASED)
-				return;
 
 			setText(keyString.toString());
 			if(debugBuffer == null)
@@ -479,16 +490,15 @@ public class GrabKeyDialog extends JDialog
 					GrabKeyDialog.this,
 					"grab-key.remove-ask",
 					null,
-					JOptionPane.YES_NO_CANCEL_OPTION,
+					JOptionPane.YES_NO_OPTION,
 					JOptionPane.QUESTION_MESSAGE);
 				if(answer == JOptionPane.YES_OPTION)
 				{
 					shortcut.setText(null);
 					isOK = true;
 				}
-				else if(answer == JOptionPane.CANCEL_OPTION)
+				else
 					return false;
-				return true;
 			}
 
 			// check whether this shortcut already exists
@@ -523,7 +533,7 @@ public class GrabKeyDialog extends JDialog
 			int answer = GUIUtilities.confirm(GrabKeyDialog.this,
 				"grab-key.duplicate-shortcut",
 				new Object[] { other.label },
-				JOptionPane.YES_NO_CANCEL_OPTION,
+				JOptionPane.YES_NO_OPTION,
 				JOptionPane.QUESTION_MESSAGE);
 			if(answer == JOptionPane.YES_OPTION)
 			{
@@ -535,10 +545,8 @@ public class GrabKeyDialog extends JDialog
 				isOK = true;
 				return true;
 			}
-			else if(answer == JOptionPane.CANCEL_OPTION)
+			else
 				return false;
-
-			return true;
 		} //}}}
 	} //}}}
 }

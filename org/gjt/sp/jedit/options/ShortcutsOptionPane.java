@@ -31,7 +31,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Key binding editor.
  * @author Slava Pestov
- * @version $Id: ShortcutsOptionPane.java,v 1.6 2002/12/15 00:23:53 spestov Exp $
+ * @version $Id: ShortcutsOptionPane.java,v 1.10 2004/05/12 20:44:17 spestov Exp $
  */
 public class ShortcutsOptionPane extends AbstractOptionPane
 {
@@ -92,24 +92,29 @@ public class ShortcutsOptionPane extends AbstractOptionPane
 			ActionSet actionSet = actionSets[i];
 			if(actionSet.getActionCount() != 0)
 			{
-				models.addElement(createModel(actionSet.getLabel(),
-					actionSet.getActions()));
+				String modelLabel = actionSet.getLabel();
+				if(modelLabel == null)
+				{
+					System.err.println("Empty action set: "
+						+ actionSet.getPluginJAR());
+				}
+				models.addElement(createModel(modelLabel,
+					actionSet.getActionNames()));
 			}
 		}
+		Collections.sort(models,new MiscUtilities.StringICaseCompare());
 		currentModel = (ShortcutsModel)models.elementAt(0);
 	}
 
-	private ShortcutsModel createModel(String modelLabel, EditAction[] actions)
+	private ShortcutsModel createModel(String modelLabel, String[] actions)
 	{
 		Vector bindings = new Vector(actions.length);
 
 		for(int i = 0; i < actions.length; i++)
 		{
-			EditAction action = actions[i];
-
-			String name = action.getName();
-			String label = action.getLabel();
-			// Skip certain actions this way (ENTER, TAB)
+			String name = actions[i];
+			String label = jEdit.getProperty(actions[i] + ".label");
+			// Skip certain actions this way
 			if(label == null)
 				continue;
 
@@ -278,12 +283,12 @@ public class ShortcutsOptionPane extends AbstractOptionPane
 
 		public void save()
 		{
-			Enumeration enum = bindings.elements();
-			while(enum.hasMoreElements())
+			Enumeration e = bindings.elements();
+			while(e.hasMoreElements())
 			{
 				GrabKeyDialog.KeyBinding binding[]
 					= (GrabKeyDialog.KeyBinding[])
-						enum.nextElement();
+						e.nextElement();
 				jEdit.setProperty(
 					binding[0].name + ".shortcut",
 					binding[0].shortcut);

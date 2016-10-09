@@ -23,17 +23,16 @@
 package org.gjt.sp.jedit.browser;
 
 //{{{ Imports
-import javax.swing.tree.DefaultMutableTreeNode;
 import java.io.*;
 import org.gjt.sp.jedit.io.*;
-import org.gjt.sp.jedit.jEdit;
+import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.*;
 //}}}
 
 /**
  * A browser I/O request.
  * @author Slava Pestov
- * @version $Id: BrowserIORequest.java,v 1.15 2003/01/12 03:08:23 spestov Exp $
+ * @version $Id: BrowserIORequest.java,v 1.20 2004/05/29 01:55:24 spestov Exp $
  */
 class BrowserIORequest extends WorkRequest
 {
@@ -66,12 +65,12 @@ class BrowserIORequest extends WorkRequest
 	 * @param browser The VFS browser instance
 	 * @param path1 The first path name to operate on
 	 * @param path2 The second path name to operate on
-	 * @param node Only used for type == LIST_DIRECTORY
-	 * @param loadingRoot Is this the root node?
+	 * @param loadInfo A two-element array filled out by the request;
+	 * element 1 is the canonical path, element 2 is the file list.
 	 */
-	public BrowserIORequest(int type, VFSBrowser browser,
+	BrowserIORequest(int type, VFSBrowser browser,
 		Object session, VFS vfs, String path1, String path2,
-		DefaultMutableTreeNode node, boolean loadingRoot)
+		Object[] loadInfo)
 	{
 		this.type = type;
 		this.browser = browser;
@@ -79,8 +78,7 @@ class BrowserIORequest extends WorkRequest
 		this.vfs = vfs;
 		this.path1 = path1;
 		this.path2 = path2;
-		this.node = node;
-		this.loadingRoot = loadingRoot;
+		this.loadInfo = loadInfo;
 	} //}}}
 
 	//{{{ run() method
@@ -101,9 +99,6 @@ class BrowserIORequest extends WorkRequest
 			mkdir();
 			break;
 		}
-
-		if(type != LIST_DIRECTORY)
-			browser.endRequest();
 	} //}}}
 
 	//{{{ toString() method
@@ -143,8 +138,7 @@ class BrowserIORequest extends WorkRequest
 	private VFS vfs;
 	private String path1;
 	private String path2;
-	private DefaultMutableTreeNode node;
-	private boolean loadingRoot;
+	private Object[] loadInfo;
 	//}}}
 
 	//{{{ listDirectory() method
@@ -191,7 +185,8 @@ class BrowserIORequest extends WorkRequest
 
 		setAbortable(false);
 
-		browser.directoryLoaded(node,loadingRoot,canonPath,directory);
+		loadInfo[0] = canonPath;
+		loadInfo[1] = directory;
 	} //}}}
 
 	//{{{ delete() method
@@ -255,14 +250,26 @@ class BrowserIORequest extends WorkRequest
 				VFS.DirectoryEntry file = vfs._getDirectoryEntry(
 					session,path2,browser);
 				if(file != null)
-					VFSManager.error(browser,path1,"ioerror.rename-exists",
-						new String[] { path2 });
-				else
 				{
-					if(!vfs._rename(session,path1,path2,browser))
-						VFSManager.error(browser,path1,"ioerror.rename-error",
+					if((OperatingSystem.isDOSDerived()
+						|| OperatingSystem.isMacOS())
+						&& path1.equalsIgnoreCase(path2))
+					{
+						// allow user to change name
+						// case
+					}
+					else
+					{
+						VFSManager.error(browser,path1,
+							"ioerror.rename-exists",
 							new String[] { path2 });
+						return;
+					}
 				}
+
+				if(!vfs._rename(session,path1,path2,browser))
+					VFSManager.error(browser,path1,"ioerror.rename-error",
+						new String[] { path2 });
 			}
 			catch(IOException io)
 			{

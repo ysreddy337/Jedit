@@ -26,7 +26,9 @@ package org.gjt.sp.jedit.gui;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.Vector;
+import java.util.HashSet;
+import java.util.TreeSet;
+import java.util.Set;
 import org.gjt.sp.jedit.syntax.*;
 import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.jedit.*;
@@ -49,47 +51,68 @@ public class CompleteWord extends JWindow
 		}
 
 		KeywordMap keywordMap = buffer.getKeywordMapAtOffset(caret);
-		String noWordSep = getNonAlphaNumericWordChars(buffer,keywordMap,caret);
-		String word = getWordToComplete(buffer,caretLine,caret,noWordSep);
+		String noWordSep = getNonAlphaNumericWordChars(
+			buffer,keywordMap);
+		String word = getWordToComplete(buffer,caretLine,
+			caret,noWordSep);
 		if(word == null)
 		{
 			textArea.getToolkit().beep();
 			return;
 		}
 
-		Vector completions = getCompletions(buffer,word,keywordMap,
-			noWordSep,caret);
+		Completion[] completions = getCompletions(buffer,word,caret);
 
-		if(completions.size() == 0
-			|| (completions.size() == 1 &&
-			((Completion)completions.get(0)).text.equals(word)))
+		if(completions.length == 0)
 		{
 			textArea.getToolkit().beep();
 		}
 		//{{{ if there is only one competion, insert in buffer
-		else if(completions.size() == 1)
+		else if(completions.length == 1)
 		{
-			textArea.setSelectedText(completions
-				.elementAt(0).toString()
-				.substring(word.length()));
+			Completion c = completions[0];
+
+			if(c.text.equals(word))
+			{
+				textArea.getToolkit().beep();
+			}
+			else
+			{
+				textArea.setSelectedText(c.text.substring(
+					word.length()));
+			}
 		} //}}}
 		//{{{ show popup if > 1
 		else
 		{
+			String longestPrefix = MiscUtilities.getLongestPrefix(
+				completions,
+				keywordMap != null
+				? keywordMap.getIgnoreCase()
+				: false);
+
+			if (word.length() < longestPrefix.length())
+			{
+				buffer.insert(caret,longestPrefix.substring(
+					word.length()));
+			}
+
 			textArea.scrollToCaret(false);
-			Point location = textArea.offsetToXY(caret - word.length());
+			Point location = textArea.offsetToXY(
+				caret - word.length());
 			location.y += textArea.getPainter().getFontMetrics()
 				.getHeight();
 
 			SwingUtilities.convertPointToScreen(location,
 				textArea.getPainter());
-			new CompleteWord(view,word,completions,location,noWordSep);
+			new CompleteWord(view,longestPrefix,
+				completions,location,noWordSep);
 		} //}}}
 	} //}}}
 
 	//{{{ CompleteWord constructor
-	public CompleteWord(View view, String word, Vector completions, Point location,
-		String noWordSep)
+	public CompleteWord(View view, String word, Completion[] completions,
+		Point location, String noWordSep)
 	{
 		super(view);
 
@@ -121,9 +144,8 @@ public class CompleteWord extends JWindow
 		this.word = word;
 
 		words = new JList(completions);
-		words.setFont(UIManager.getFont("TextArea.font"));
 
-		words.setVisibleRowCount(Math.min(completions.size(),8));
+		words.setVisibleRowCount(Math.min(completions.length,8));
 
 		words.addMouseListener(new MouseHandler());
 		words.setSelectedIndex(0);
@@ -142,7 +164,7 @@ public class CompleteWord extends JWindow
 
 		pack();
 		setLocation(location);
-		show();
+		setVisible(true);
 
 		KeyHandler keyHandler = new KeyHandler();
 		addKeyListener(keyHandler);
@@ -168,7 +190,7 @@ public class CompleteWord extends JWindow
 
 	//{{{ getNonAlphaNumericWordChars() method
 	private static String getNonAlphaNumericWordChars(Buffer buffer,
-		KeywordMap keywordMap, int caret)
+		KeywordMap keywordMap)
 	{
 		// figure out what constitutes a word character and what
 		// doesn't
@@ -211,11 +233,58 @@ public class CompleteWord extends JWindow
 	} //}}}
 
 	//{{{ getCompletions() method
-	private static Vector getCompletions(Buffer buffer, String word,
-		KeywordMap keywordMap, String noWordSep, int caret)
+	private static Completion[] getCompletions(Buffer buffer, String word,
+		int caret)
 	{
-		Vector completions = new Vector();
+		// build a list of unique words in all visible buffers
+		Set completions = new TreeSet(new MiscUtilities
+			.StringCompare());
+		Set buffers = new HashSet();
 
+		// only complete current buffer's keyword map
+		KeywordMap keywordMap = buffer.getKeywordMapAtOffset(caret);
+		String noWordSep = getNonAlphaNumericWordChars(
+			buffer,keywordMap);
+
+		View views = jEdit.getFirstView();
+		while(views != null)
+		{
+			EditPane[] panes = views.getEditPanes();
+			for(int i = 0; i < panes.length; i++)
+			{
+				Buffer b = panes[i].getBuffer();
+				if(buffers.contains(b))
+					continue;
+
+				buffers.add(b);
+
+				// only complete current buffer's keyword map
+				KeywordMap _keywordMap;
+				if(b == buffer)
+					_keywordMap = keywordMap;
+				else
+					_keywordMap = null;
+
+				int offset = (b == buffer ? caret : 0);
+
+				getCompletions(b,word,keywordMap,noWordSep,
+					offset,completions);
+			}
+
+			views = views.getNext();
+		}
+
+		Completion[] completionArray = (Completion[])completions
+			.toArray(new Completion[completions.size()]);
+
+		return completionArray;
+	} //}}}
+
+	//{{{ getCompletions() method
+	private static void getCompletions(Buffer buffer, String word,
+		KeywordMap keywordMap, String noWordSep, int caret,
+		Set completions)
+	{
 		int wordLen = word.length();
 
 		//{{{ try to find matching keywords
@@ -229,8 +298,10 @@ public class CompleteWord extends JWindow
 					0,word,0,wordLen))
 				{
 					Completion keyword = new Completion(_keyword,true);
-					if(completions.indexOf(keyword) == -1)
-						completions.addElement(keyword);
+					if(!completions.contains(keyword))
+					{
+						completions.add(keyword);
+					}
 				}
 			}
 		} //}}}
@@ -249,8 +320,10 @@ public class CompleteWord extends JWindow
 				Completion comp = new Completion(_word,false);
 
 				// remove duplicates
-				if(completions.indexOf(comp) == -1)
-					completions.addElement(comp);
+				if(!completions.contains(comp))
+				{
+					completions.add(comp);
+				}
 			}
 
 			// check for match inside line
@@ -267,17 +340,14 @@ public class CompleteWord extends JWindow
 						Completion comp = new Completion(_word,false);
 
 						// remove duplicates
-						if(completions.indexOf(comp) == -1)
-							completions.addElement(comp);
+						if(!completions.contains(comp))
+						{
+							completions.add(comp);
+						}
 					}
 				}
 			}
 		} //}}}
-
-		// sort completion list
-		MiscUtilities.quicksort(completions,new MiscUtilities.StringICaseCompare());
-
-		return completions;
 	} //}}}
 
 	//{{{ completeWord() method
@@ -324,6 +394,11 @@ public class CompleteWord extends JWindow
 			return text;
 		}
 
+		public int hashCode()
+		{
+			return text.hashCode();
+		}
+
 		public boolean equals(Object obj)
 		{
 			if(obj instanceof Completion)
@@ -339,10 +414,18 @@ public class CompleteWord extends JWindow
 		public Component getListCellRendererComponent(JList list, Object value,
 			int index, boolean isSelected, boolean cellHasFocus)
 		{
-			super.getListCellRendererComponent(list,value,index,
+			super.getListCellRendererComponent(list,null,index,
 				isSelected,cellHasFocus);
 
 			Completion comp = (Completion)value;
+
+			if(index < 9)
+				setText((index + 1) + ": " + comp.text);
+			else if(index == 9)
+				setText("0: " + comp.text);
+			else
+				setText(comp.text);
+
 			if(comp.keyword)
 				setFont(list.getFont().deriveFont(Font.BOLD));
 			else
@@ -411,17 +494,20 @@ public class CompleteWord extends JWindow
 					word = word.substring(0,word.length() - 1);
 					textArea.backspace();
 					int caret = textArea.getCaretPosition();
-					KeywordMap keywordMap = buffer.getKeywordMapAtOffset(caret);
 
-					Vector completions = getCompletions(buffer,word,
-						keywordMap,noWordSep,caret);
+					Completion[] completions
+						= getCompletions(buffer,word,
+						caret);
 
-					if(completions.size() == 0)
+					if(completions.length == 0)
+					{
 						dispose();
+						return;
+					}
 
 					words.setListData(completions);
 					words.setSelectedIndex(0);
-					words.setVisibleRowCount(Math.min(completions.size(),8));
+					words.setVisibleRowCount(Math.min(completions.length,8));
 
 					pack();
 
@@ -429,7 +515,10 @@ public class CompleteWord extends JWindow
 				}
 				break;
 			default:
-				if(evt.isActionKey())
+				if(evt.isActionKey()
+					|| evt.isControlDown()
+					|| evt.isAltDown()
+					|| evt.isMetaDown())
 				{
 					dispose();
 					view.processKeyEvent(evt);
@@ -445,24 +534,48 @@ public class CompleteWord extends JWindow
 			evt = KeyEventWorkaround.processKeyEvent(evt);
 			if(evt == null)
 				return;
-			else if(ch != '\b')
-			{
-				textArea.userInput(ch);
 
+			if(Character.isDigit(ch))
+			{
+				int index = ch - '0';
+				if(index == 0)
+					index = 9;
+				else
+					index--;
+				if(index < words.getModel().getSize())
+				{
+					words.setSelectedIndex(index);
+					textArea.setSelectedText(words.getModel()
+						.getElementAt(index).toString()
+						.substring(word.length()));
+					dispose();
+					return;
+				}
+				else
+					/* fall through */;
+			}
+
+			// \t handled above
+			if(ch != '\b' && ch != '\t')
+			{
+				/* eg, foo<C+b>, will insert foobar, */
 				if(!Character.isLetterOrDigit(ch) && noWordSep.indexOf(ch) == -1)
 				{
+					insertSelected();
+					textArea.userInput(ch);
 					dispose();
 					return;
 				}
 
+				textArea.userInput(ch);
+
 				word = word + ch;
 				int caret = textArea.getCaretPosition();
-				KeywordMap keywordMap = buffer.getKeywordMapAtOffset(caret);
 
-				Vector completions = getCompletions(buffer,word,keywordMap,
-					noWordSep,caret);
+				Completion[] completions = getCompletions(
+					buffer,word,caret);
 
-				if(completions.size() == 0)
+				if(completions.length == 0)
 				{
 					dispose();
 					return;
@@ -470,6 +583,7 @@ public class CompleteWord extends JWindow
 
 				words.setListData(completions);
 				words.setSelectedIndex(0);
+				words.setVisibleRowCount(Math.min(completions.length,8));
 			}
 		} //}}}
 	} //}}}

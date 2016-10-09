@@ -5,7 +5,7 @@
 <!-- :indentSize=1:noTabs=yes:maxLineLen=72:tabSize=2:           -->
 <!-- :xml.root=users-guide.xml:                                  -->
 
-<chapter id="beanshell-commands"><title>BeanShell Commands</title>
+<chapter id="bsh-commands"><title>BeanShell Commands</title>
 
 <para>
   BeanShell includes a set of <firstterm>commands</firstterm>;
@@ -16,12 +16,11 @@
 
 <note>
  <para>
-  Plugins, because they are written in Java and not BeanShell,
-  cannot make use of BeanShell commands.
+  Java classes in plugins cannot make use of BeanShell commands directly. However, these commands can be called from BeanShell code that is part of a plugin, for example the snippets in <filename>actions.xml</filename>, or any BeanShell scripts shipped with the plugin and loaded on startup.
  </para>
 </note>
 
-<sect1 id="beanshell-commands-output"><title>Output Commands</title>
+<sect1 id="bsh-commands-output"><title>Output Commands</title>
 
   <itemizedlist>
 
@@ -86,7 +85,7 @@
 
 </sect1>
 
-<sect1 id="beanshell-commands-file"><title>File Management Commands</title>
+<sect1 id="bsh-commands-file"><title>File Management Commands</title>
 
   <itemizedlist>
 
@@ -100,6 +99,19 @@
       <para>
         Changes the working directory of the BeanShell interpreter
         to <parameter>dirname</parameter>.
+      </para>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>cp</function></funcdef>
+          <paramdef>String <parameter>fromFile</parameter></paramdef>
+          <paramdef>String <parameter>toFile</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Copy <parameter>fromFile</parameter> to <parameter>toFile</parameter>.
       </para>
     </listitem>
 
@@ -174,7 +186,7 @@
   </itemizedlist>
 
 </sect1>
-<sect1 id="beanshell-commands-serial"><title>Component Commands</title>
+<sect1 id="bsh-commands-serial"><title>Component Commands</title>
 
   <itemizedlist>
 
@@ -238,7 +250,7 @@
 </sect1>
 
 
-<sect1 id="beanshell-commands-resource">
+<sect1 id="bsh-commands-resource">
 <title>Resource Management Commands</title>
 
   <itemizedlist>
@@ -252,7 +264,7 @@
       </funcsynopsis>
       <para>
         Returns the resource specified by <parameter>path</parameter>.
-        A absolute path must be used to return any resource available in
+        An absolute path must be used to return any resource available in
         the current classpath.
       </para>
     </listitem>
@@ -350,7 +362,7 @@
 
 </sect1>
 
-<sect1 id="beanshell-commands-script"><title>Script Execution Commands</title>
+<sect1 id="bsh-commands-script"><title>Script Execution Commands</title>
 
   <itemizedlist>
 
@@ -412,6 +424,32 @@
       </para>
     </listitem>
 
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>setAccessibility</function></funcdef>
+          <paramdef>boolean <parameter>flag</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        If <parameter>flag</parameter> is <literal>true</literal>,
+        BeanShell scripts are allowed to change and modify private variables, and call private methods. The default is <literal>false</literal>.
+      </para>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>setStrictJava</function></funcdef>
+          <paramdef>boolean <parameter>flag</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        If <parameter>flag</parameter> is <literal>true</literal>,
+        BeanShell scripts must follow a much more strict, Java-like syntax, and are not able to use the convenience features described in <xref linkend="macro-tips-BeanShell-convenience" />.
+      </para>
+    </listitem>
+
     <!-- <listitem>
       <funcsynopsis>
         <funcprototype>
@@ -454,7 +492,7 @@
 
 </sect1>
 
-<sect1 id="beanshell-commands-object">
+<sect1 id="bsh-commands-object">
 <title>BeanShell Object Management Commands</title>
 
   <itemizedlist>
@@ -498,6 +536,23 @@
         Creates a new BeanShell <classname>This</classname> scripted object
         that is a child of the parameter <parameter>object</parameter>.
       </para>
+    </listitem>
+
+    <listitem>
+      <funcsynopsis>
+        <funcprototype>
+          <funcdef>void <function>importObject</function></funcdef>
+           <paramdef>Object <parameter>object</parameter></paramdef>
+        </funcprototype>
+      </funcsynopsis>
+      <para>
+        Import an object into this namespace. This is somewhat similar to Java 1.5 static class imports, except you can import the methods and fields of a Java object instance into
+        a BeanShell namespace, for example:
+      </para>
+      <informalexample><programlisting><![CDATA[Map map = new HashMap();
+    importObject( map );
+    put("foo", "bar");
+    print( get("foo") ); // "bar"]]></programlisting></informalexample>
     </listitem>
 
     <listitem>
@@ -565,7 +620,7 @@ crufties.counter = 5;
 
 </sect1>
 
-<sect1 id="beanshell-commands-other"><title>Other Commands</title>
+<sect1 id="bsh-commands-other"><title>Other Commands</title>
 
   <itemizedlist>
     <!-- <listitem>

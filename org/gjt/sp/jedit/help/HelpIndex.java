@@ -79,22 +79,40 @@ class HelpIndex
 
 	//{{{ indexEditorHelp() method
 	/**
-	 * Indexes all available help, including the jEdit user's guide, FAQ, and
-	 * plugin documentation.
+	 * Indexes all available help, including the jEdit user's guide, FAQ,]
+	 * and plugin documentation.
 	 */
-	public void indexEditorHelp() throws Exception
+	public void indexEditorHelp()
 	{
-		String jEditHome = jEdit.getJEditHome();
-		if(jEditHome != null)
+		try
 		{
-			indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","users-guide"));
-			indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","FAQ"));
+			String jEditHome = jEdit.getJEditHome();
+			if(jEditHome != null)
+			{
+				indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","users-guide"));
+				indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","FAQ"));
+				indexDirectory(MiscUtilities.constructPath(jEditHome,"doc","news42"));
+			}
+		}
+		catch(Throwable e)
+		{
+			Log.log(Log.ERROR,this,"Error indexing editor help");
+			Log.log(Log.ERROR,this,e);
 		}
 
-		EditPlugin.JAR[] jars = jEdit.getPluginJARs();
+		PluginJAR[] jars = jEdit.getPluginJARs();
 		for(int i = 0; i < jars.length; i++)
 		{
-			indexJAR(jars[i].getZipFile());
+			try
+			{
+				indexJAR(jars[i].getZipFile());
+			}
+			catch(Throwable e)
+			{
+				Log.log(Log.ERROR,this,"Error indexing JAR: "
+					+ jars[i].getPath());
+				Log.log(Log.ERROR,this,e);
+			}
 		}
 
 		Log.log(Log.DEBUG,this,"Indexed " + words.size() + " words");
@@ -123,10 +141,10 @@ class HelpIndex
 	 */
 	public void indexJAR(ZipFile jar) throws Exception
 	{
-		Enumeration enum = jar.entries();
-		while(enum.hasMoreElements())
+		Enumeration e = jar.entries();
+		while(e.hasMoreElements())
 		{
-			ZipEntry entry = (ZipEntry)enum.nextElement();
+			ZipEntry entry = (ZipEntry)e.nextElement();
 			String name = entry.getName();
 			String lname = name.toLowerCase();
 			if(lname.endsWith(".html")/*  || lname.endsWith(".txt") */)
@@ -180,7 +198,6 @@ class HelpIndex
 	} //}}}
 
 	//{{{ Private members
-	private static Word.Occurrence[] EMPTY_ARRAY = new Word.Occurrence[0];
 	// used to mark words to ignore (see constructor for the list)
 	private static Object IGNORE = new Object();
 	private HashMap words;
@@ -199,15 +216,17 @@ class HelpIndex
 	 * @param _in The input stream
 	 * @param file The file
 	 */
-	private void indexStream(InputStream _in, String fileName) throws Exception
+	private void indexStream(InputStream _in, String fileName)
+		throws Exception
 	{
 		HelpFile file = new HelpFile(fileName);
 		files.add(file);
 		int index = files.size() - 1;
 
-		BufferedReader in = new BufferedReader(new InputStreamReader(_in));
-
 		StringBuffer titleText = new StringBuffer();
+
+		BufferedReader in = new BufferedReader(
+			new InputStreamReader(_in));
 
 		try
 		{
@@ -245,7 +264,7 @@ class HelpIndex
 
 					if(word.length() != 0)
 					{
-						addWord(word.toString(),index);
+						addWord(word.toString(),index,title);
 						word.setLength(0);
 					}
 
@@ -259,7 +278,7 @@ class HelpIndex
 				{
 					if(word.length() != 0)
 					{
-						addWord(word.toString(),index);
+						addWord(word.toString(),index,title);
 						word.setLength(0);
 					}
 				}
@@ -279,7 +298,7 @@ class HelpIndex
 	} //}}}
 
 	//{{{ addWord() method
-	private void addWord(String word, int file)
+	private void addWord(String word, int file, boolean title)
 	{
 		word = word.toLowerCase();
 
@@ -288,9 +307,9 @@ class HelpIndex
 			return;
 
 		if(o == null)
-			words.put(word,new Word(word,file));
+			words.put(word,new Word(word,file,title));
 		else
-			((Word)o).addOccurrence(file);
+			((Word)o).addOccurrence(file,title);
 	} //}}}
 
 	//}}}
@@ -298,6 +317,9 @@ class HelpIndex
 	//{{{ Word class
 	static class Word
 	{
+		// how much an occurrence in the title is worth
+		static final int TITLE_OCCUR = 10;
+
 		// the word
 		String word;
 
@@ -305,20 +327,20 @@ class HelpIndex
 		int occurCount = 0;
 		Occurrence[] occurrences;
 
-		Word(String word, int file)
+		Word(String word, int file, boolean title)
 		{
 			this.word = word;
 			occurrences = new Occurrence[5];
-			addOccurrence(file);
+			addOccurrence(file,title);
 		}
 
-		void addOccurrence(int file)
+		void addOccurrence(int file, boolean title)
 		{
 			for(int i = 0; i < occurCount; i++)
 			{
 				if(occurrences[i].file == file)
 				{
-					occurrences[i].count++;
+					occurrences[i].count += (title ? TITLE_OCCUR : 1);
 					return;
 				}
 			}
@@ -330,7 +352,7 @@ class HelpIndex
 				occurrences = newOccur;
 			}
 
-			occurrences[occurCount++] = new Occurrence(file);
+			occurrences[occurCount++] = new Occurrence(file,title);
 		}
 
 		static class Occurrence
@@ -338,10 +360,10 @@ class HelpIndex
 			int file;
 			int count;
 
-			Occurrence(int file)
+			Occurrence(int file, boolean title)
 			{
 				this.file = file;
-				this.count = 1;
+				this.count = (title ? TITLE_OCCUR : 1);
 			}
 		}
 	} //}}}
@@ -355,7 +377,6 @@ class HelpIndex
 		HelpFile(String file)
 		{
 			this.file = file;
-			this.title = title;
 		}
 
 		public String toString()

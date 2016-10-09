@@ -65,6 +65,7 @@ class HyperSearchRequest extends WorkRequest
 				public void run()
 				{
 					GUIUtilities.error(view,"empty-fileset",null);
+					results.searchDone(rootSearchNode);
 				}
 			});
 			return;
@@ -96,10 +97,8 @@ loop:				for(int i = 0; i < files.length; i++)
 					current++;
 
 					long currentTime = System.currentTimeMillis();
-					if(currentTime - lastStatusTime > 500)
+					if(currentTime - lastStatusTime > 250)
 					{
-						setStatus(jEdit.getProperty("hypersearch-status-file",
-							new String[] { file }));
 						setProgressValue(current);
 						lastStatusTime = currentTime;
 					}
@@ -119,8 +118,7 @@ loop:				for(int i = 0; i < files.length; i++)
 			{
 				public void run()
 				{
-					GUIUtilities.error(view,"searcherror",
-						new String[] { e.toString() });
+					SearchAndReplace.handleError(view,e);
 				}
 			});
 		}
@@ -234,7 +232,8 @@ loop:				for(int i = 0; i < files.length; i++)
 
 			Segment text = new Segment();
 			int offset = start;
-			int line = -1;
+
+			HyperSearchResult lastResult = null;
 
 loop:			for(int counter = 0; ; counter++)
 			{
@@ -242,33 +241,30 @@ loop:			for(int counter = 0; ; counter++)
 					buffer.getLineOfOffset(offset)) == offset);
 
 				buffer.getText(offset,end - offset,text);
-				int[] match = matcher.nextMatch(
+				SearchMatcher.Match match = matcher.nextMatch(
 					new CharIndexedSegment(text,false),
 					startOfLine,endOfLine,counter == 0,
 					false);
 				if(match == null)
 					break loop;
 
-				int matchStart = offset + match[0];
-				int matchEnd = offset + match[1];
-
-				offset += match[1];
-
-				int newLine = buffer.getLineOfOffset(offset);
-				if(line == newLine)
+				int newLine = buffer.getLineOfOffset(
+					offset + match.start);
+				if(lastResult == null || lastResult.line != newLine)
 				{
-					// already had a result on this
-					// line, skip
-					continue loop;
+					lastResult = new HyperSearchResult(
+						buffer,newLine);
+					bufferNode.add(
+						new DefaultMutableTreeNode(
+						lastResult,false));
 				}
 
-				line = newLine;
+				lastResult.addOccur(offset + match.start,
+					offset + match.end);
+
+				offset += match.end;
 
 				resultCount++;
-
-				bufferNode.add(new DefaultMutableTreeNode(
-					new HyperSearchResult(buffer,line,
-					matchStart,matchEnd),false));
 			}
 		}
 		finally

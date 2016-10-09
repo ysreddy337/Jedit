@@ -3,12 +3,74 @@ TO DO
 Note that this is not a complete to do list. It mostly only lists bugs
 and quirks that I need to fix eventually.
 
-- delete line magic caret w/ block caret
-- replace with lookahead/lookbehind doesn't work
-- don't show 'new directory' in favorites:
-- jedit -background -nogui && jedit -norestore opens "Untitled 2"
-- need a new jEditLauncher
-- plugin error dialog -- if > 1 error per plugin
+goToBuffer() and 0-height edit panes
+check tips of the day
+- document optional dependencies
+- help:
+  - titles in search are fucked
+- sidebars: need a border or some sort
+
+[error] WorkThread: java.lang.ClassCastException
+[error] WorkThread:  at archive.ArchiveVFS.getDirectories(Unknown Source)
+[error] WorkThread:  at archive.ArchiveVFS.cacheDirectories(Unknown Source)
+[error] WorkThread:  at archive.ArchiveVFS._listDirectory(Unknown Source)
+[error] WorkThread:  at org.gjt.sp.jedit.browser.BrowserIORequest.listDirectory(BrowserIORequest.java:159)
+[error] WorkThread:  at org.gjt.sp.jedit.browser.BrowserIORequest.run(BrowserIORequest.java:90)
+[error] WorkThread:  at org.gjt.sp.util.WorkThread.doRequest(WorkThread.java:194)
+[error] WorkThread:  at org.gjt.sp.util.WorkThread.doRequests(WorkThread.java:161)
+[error] WorkThread:  at org.gjt.sp.util.WorkThread.run(WorkThread.java:135)
+
+- drag and drop, not at caret position?
+- sidekick out of memory error!
+[error] ChunkCache: BUG: skew=1,out.size()=0
+[error] ChunkCache: BUG: skew=1,out.size()=1
+
+[error] EditBus: java.lang.ArrayIndexOutOfBoundsException: 1
+[error] EditBus:  at org.gjt.sp.jedit.buffer.LineManager.isScreenLineCountValid(LineManager.java:145)
+[error] EditBus:  at org.gjt.sp.jedit.textarea.DisplayManager.getScreenLineCount(DisplayManager.java:223)
+[error] EditBus:  at org.gjt.sp.jedit.textarea.DisplayManager$ScrollLineCount.reset(DisplayManager.java:1098)
+[error] EditBus:  at org.gjt.sp.jedit.textarea.DisplayManager._notifyScreenLineChanges(DisplayManager.java:650)
+[error] EditBus:  at org.gjt.sp.jedit.textarea.JEditTextArea.propertiesChanged(JEditTextArea.java:4968)
+[error] EditBus:  at org.gjt.sp.jedit.EditPane.handleBufferUpdate(EditPane.java:667)
+[error] EditBus:  at org.gjt.sp.jedit.EditPane.handleMessage(EditPane.java:317)
+[error] EditBus:  at org.gjt.sp.jedit.EditBus.send(EditBus.java:148)
+[error] EditBus:  at org.gjt.sp.jedit.Buffer.propertiesChanged(Buffer.java:1530)
+[error] EditBus:  at org.gjt.sp.jedit.Buffer.setMode(Buffer.java:2025)
+[error] EditBus:  at org.gjt.sp.jedit.Buffer.setMode(Buffer.java:2058)
+[error] EditBus:  at org.gjt.sp.jedit.Buffer.finishLoading(Buffer.java:3866)
+[error] EditBus:  at org.gjt.sp.jedit.Buffer.access$800(Buffer.java:71)
+[error] EditBus:  at org.gjt.sp.jedit.Buffer$1.run(Buffer.java:280)
+[error] EditBus:  at org.gjt.sp.util.WorkThreadPool.doAWTRequest(WorkThreadPool.java:392)
+
+- SLASH -vs- / shortcut issue
+- wrapped dock buttons broken
+- VFS browser pathsEqual(): case sensitivity!
+- DnD still dosn't work as expected when draging from the same buffer,
+but differen text area (for example droping at the position where drag
+was started erases text)- no support for vertical pasting
+- anoying cursor blinking (responsible for this is scrolling option :
+textArea.moveCaretPosition(pos,JEditTextArea.ELECTRIC_SCROLL) in
+dragOver() method)
+- C+d & killring
+- jEdit.checkBufferStatus() fucks with split panes
+- complete word not wide enough
+- test keyboard completion with expanded/collapsed tree
+- test keyboard completion with high latency VFS
+- option to disable context menu
+- plugin mgr inspection of not-loaded plugins
+- history text field tweak
+- tall caret and tab
+- printing: check default printer setting
+- fsb default size
+
++ docs:
+
+- deferred loading mention.
+- addCommandPath()
+- API thread safety
+- add note to documentation about exponential-time regexps
+- document deep indent
+- note about dependencies
 - plugin tutorial:
   - plugin build environment docs
   - auto-created actions
@@ -17,6 +79,7 @@ and quirks that I need to fix eventually.
   - functions - links to API docs
   - quicknotepad docs
 - plugin tips and techniques:
+  - common. properties, using properties for UI strings
   - cutting down on startup time
   - canned dialog boxes in GUIUtilities
   - tools.jar
@@ -41,24 +104,33 @@ and quirks that I need to fix eventually.
   - text area extensions
   - text area caret & scroll listeners
   - status bar messages & readNextChar()
-- links to API docs in macro guide
 - vfs javadoc: invokeAndWait() example for createVFSSession()
-- files with names of the form foo: are not handled very well in some
-  cases since jEdit thinks they are URLs.
-- <script> in javadoc
-- user's guide:
-  - vertical paste & rect select insertion
-  - part III
-    - non-beanshell languages
-    - after canned dialog description: sidebar about full-blown GUIs -- mention
-      upcoming dialog macro
-    - describe alternative ways to obtain buffers, edit panes, text areas,
-      in a sidebar about changing them
-    - is Log described elsewhere? move to API guide and link from 15.5.2
-      (using activity log as a tracing tool).
-- wheel mouse -- option: jEdit mods -vs- system-wide mods
-- rect select and trailing whitespace
-- final optimization for OffsetManager: scan to zero or scan to end
+
++ obscure:
+
+- bsh bugs:
+  ; after else if()
+  longs not read correctly if prefixed with 0x
+- no need to wait for requests after newFile()
+- class loading problems
+- motif l&f: shortcuts in menu items
+- some JLists do not auto-scroll on keystroke
+- C+b -- click -- keys don't work
+- how to handle S+0-9?
+- clean up VFSManager.errorOccurred() -vs- BufferIORequest.ERROR_OCCURRED
+- auto indent: don't de-indent on enter if no leading indent at all?
+- remove-marker, select-next/prev-marker/bracket
+- gzip & unicode, or gzip & <?xml encoding...
+- new macro handler api
+- invoking action bar command twice
+- backup time distance setting
+- if A depends on B but A is loaded before B and B breaks, A ends up
+  being loaded. Solution: load plugins in order of dependencies?
+- expand fold: try to expand even if already expanded
+- format -- instead of \n\n, what if it has \n   \n?
+- C+ENTER 3 C+2
+- tall caret and tab
+- don't show 'new directory' in favorites:
 - auto indent:
   if(foo)
     while(bar)
@@ -66,119 +138,33 @@ and quirks that I need to fix eventually.
       //
     }
   <--- cursor here
-- examples of EOL_SPAN_REGEXP matching in docs
-- respond to shortcuts on KeyTyped only, track KeyPressed/KeyReleased to
-  know mod status
-- some JLists do not auto-scroll on keystroke
-- line 2112 -- isNarrowed() check of moveCaretPosition()
-- format -- instead of \n\n, what if it has \n   \n?
-- if A depends on B but A is loaded before B and B breaks, A ends up
-  being loaded. Solution: load plugins in order of dependencies?
-- A+# on OS X, need better modifier mapping on OS X
-- change indentPrevLine to indentOneLine and indentSubsequentLines
-- scrolling horizontally when dragging into virtual space: a bit quirky
-- eval-for-selected-lines doesn't work with rectangular selection
-- focus problem with hypersearch in floating window
-- plugin manager: install plugins, no restart, install another: deps bad
-- plugin deps need JAR name, not plugin name
-- first focus: show all files that were modified on disk, in a list
-- support multi-screen systems properly
-  - windows need to be created on the same screen as their parent if
-    possible.
-  - setLocationRelativeTo(): ok
-  - loadGeometry(): bad
-  - dockable windows
-  - getCenterPoint()
-  - popup menus
-- maximisation state bug: open window, resize to size X. close window,
-  open window again, resize to size Y. maximise. close window, open
-  window again, it has size X not size Y.
-- C+ENTER 1 ...
-- fs browser: scroll to visible after setting divider location
-- expand fold: try to expand even if already expanded
-- openFile(): can open two copies of the same buffer if a) remote b)
-  canonPath != path
-- recording 'evaluate for selected lines'
-- how to handle S+0-9?
-- aborts not always fired
-- globalColors setting:
-  - help viewer looks ugly
-  - selected borders in list, tree, table wrong colors
-- evalutate for selected lines: > 1 selection per line
-- undo: redo doesn't clear dirty flag if necessary
-- C+e , and . insert , and . in the buffer, ditto for [ and ]
-- motif l&f: shortcuts in menu items
-- fix pg up/down with soft wrap
-
-+ verify:
-
-- status bar still fooling around
-- popups still positioned poorly
-- mouse pressed ignored sometimes?
-- poor performance sometimes
-- searching in a buffer w/ narrowed fold
-- sometimes trying to extend a selection creates one all the way to the
-  end of the buffer
-- narrow to one line: select all: blows up
-- dwm: not always focused correctly
-- JDK 1.4 focus bugs
-- if loadMode() throws error, save of a mode file fails?
-
-[error] AWT-EventQueue-0: Exception occurred during event dispatching:
-[error] AWT-EventQueue-0: java.lang.ClassCastException: javax.swing.JButton
-[error] AWT-EventQueue-0:       at
-org.gjt.sp.jedit.gui.PanelWindowContainer.show(PanelWindowContainer.java:200)
-
-  -- trying to show a non-existent dockable
-
-+ cleanups:
-
-- clean up VFSManager.errorOccurred() -vs- BufferIORequest.ERROR_OCCURRED
-- BrowserView.reloadDirectory(): hardcoded design decisions
-- finish persistent splits code
-- custom stylesheet: no xmlns
-- NO_WORD_BREAK and NO_LINE_BREAK: need to think about this, is it worth
-  keeping INVALID? report errors in some other manner?
-- clean up the way macro hierarchy is stored
-- dialog parenting for fsb colors pane, vfs browser dialog
-- move text utility methods to TextUtilities
-- minor quicknotepad changes -- update docs
-- requestDefaultFocus() is bad
-
-+ features:
-
-- close current area w/ dockables that don't implement
-  requestDefaultFocus()
-- add dockable window state change msg
-- range-comment & rect select
-- support rect start in virtual space too
 
 + performance:
 
-- insert/remove lines with a lot of folds below is slow for two reasons:
-  - getNext/PrevVisibleLine() is a linear scan
-  - markTokens(x) tokenizes all lines y < x s.t. line context of y is
-    not valid
+- closing lots of files is slow -- esp. with close all dialog box!
+- menu drag: slow
+- bracket matching: no delay for current line match??
+- final optimization for OffsetManager: scan to zero or scan to end
 - do buffer load AWT half immediately after work thread half
-- prioritize work requests so that active buffers get loaded first?
-  too much of a hack?
 - replace all in a directory could be faster
-- faster smooth text
-- logging is slow
 - buffer.setMode() slow
-- inserting new lines -- why repaint entire text area?
-- positions should be gapped too
-- try typing foo), put cursor after foo, type some more -- slowdown
 - eliminate redundant scans and events when loading buffer
 - make vfs listing faster
 - don't repaint whole selection when resizing
-- background tokens are slow
-- backward virtual line scan
-- do not call foldVisibilityManager.getLastVisibleLine() on every change
-  w/ soft wrap. kills performance if also narrowed.
+- could make non-soft wrap chunk merge even faster!
+- syntax SPAN::END substitution: String --> char[] --> String
+- is getScreenLineOfOffset() called often?
 - if caret is at the end of a buffer when doing a replace all, a lot of
-  repaint() and getLineOfOffset() calls are made, however this doesn't
-  seem to affect performance that much.
+  repaint() and getLineOfOffset() calls are made
+- optimize for no folding & no soft wrap case:
+  - reset() and changed() don't need to scan
+  - scroll/physUp/Down() simpler
+- inserting lines repaints whole text area
+- see if getLineOfOffset() can be optimized
+- optimize 1 long line case
+- two repaints in line insert
+- redundant calls to recalculateLastPhysicalLines()/updateScrollBars()
+- redundant updateChunksUpTo() calls
 
 jEdit buffer local properties:
 :wrap=hard:maxLineLen=72:indentSize=2:

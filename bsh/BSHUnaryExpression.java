@@ -46,14 +46,24 @@ class BSHUnaryExpression extends SimpleNode implements ParserConstants
     {
         SimpleNode node = (SimpleNode)jjtGetChild(0);
 
-        if(node instanceof BSHLHSPrimaryExpression)
-            return lhsUnaryOperation(
-				((BSHLHSPrimaryExpression)node).toLHS(callstack, interpreter));
-        else
-            return unaryOperation(node.eval(callstack, interpreter), kind);
+		// If this is a unary increment of decrement (either pre or postfix)
+		// then we need an LHS to which to assign the result.  Otherwise
+		// just do the unary operation for the value.
+		try {
+			if ( kind == INCR || kind == DECR ) {
+				LHS lhs = ((BSHPrimaryExpression)node).toLHS( 
+					callstack, interpreter );
+				return lhsUnaryOperation( lhs, interpreter.getStrictJava() );
+			} else
+				return 
+					unaryOperation( node.eval(callstack, interpreter), kind );
+		} catch ( UtilEvalError e ) {
+			throw e.toEvalError( this, callstack );
+		}
     }
 
-    private Object lhsUnaryOperation(LHS lhs) throws EvalError
+    private Object lhsUnaryOperation( LHS lhs, boolean strictJava ) 
+		throws UtilEvalError
     {
         if ( Interpreter.DEBUG ) Interpreter.debug("lhsUnaryOperation");
         Object prevalue, postvalue;
@@ -66,32 +76,35 @@ class BSHUnaryExpression extends SimpleNode implements ParserConstants
 		else
 			retVal = postvalue;
 
-		lhs.assign(postvalue);
+		lhs.assign( postvalue, strictJava );
 		return retVal;
     }
 
-    private Object unaryOperation(Object op, int kind) throws EvalError
+    private Object unaryOperation( Object op, int kind ) throws UtilEvalError
     {
-        if(op instanceof Boolean || op instanceof Character || op instanceof Number)
-            return primitiveWrapperUnaryOperation(op, kind);
+        if (op instanceof Boolean || op instanceof Character 
+			|| op instanceof Number)
+            return primitiveWrapperUnaryOperation( op, kind );
 
-        if(!(op instanceof Primitive))
-            throw new EvalError("Unary operation " + tokenImage[kind]
-                + " inappropriate for object", this);
+        if ( !(op instanceof Primitive) )
+            throw new UtilEvalError( "Unary operation " + tokenImage[kind]
+                + " inappropriate for object" );
 
+		
         return Primitive.unaryOperation((Primitive)op, kind);
     }
 
     private Object primitiveWrapperUnaryOperation(Object val, int kind)
-        throws EvalError
+        throws UtilEvalError
     {
         Class operandType = val.getClass();
         Object operand = Primitive.promoteToInteger(val);
 
-        if(operand instanceof Boolean)
-            return new Boolean(
+        if ( operand instanceof Boolean )
+			return new Boolean(
 				Primitive.booleanUnaryOperation((Boolean)operand, kind));
-        else if(operand instanceof Integer)
+        else 
+		if ( operand instanceof Integer )
         {
             int result = Primitive.intUnaryOperation((Integer)operand, kind);
 

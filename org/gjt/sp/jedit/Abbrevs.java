@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * Copyright (C) 1999, 2004 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -33,10 +33,12 @@ import org.gjt.sp.util.Log;
 /**
  * Abbreviation manager.
  * @author Slava Pestov
- * @version $Id: Abbrevs.java,v 1.10 2003/01/12 03:08:23 spestov Exp $
+ * @version $Id: Abbrevs.java,v 1.15 2004/07/05 18:25:23 spestov Exp $
  */
 public class Abbrevs
 {
+	public static final String ENCODING = "UTF8";
+
 	//{{{ getExpandOnInput() method
 	/**
 	 * Returns if abbreviations should be expanded after the
@@ -51,8 +53,8 @@ public class Abbrevs
 	/**
 	 * Sets if abbreviations should be expanded after the
 	 * user finishes typing a word.
-	 * @param true If true, typing a non-alphanumeric characater will
-	 * automatically attempt to expand the current abbrev
+	 * @param expandOnInput If true, typing a non-alphanumeric character
+	 * will automatically attempt to expand the current abbrev
 	 */
 	public static void setExpandOnInput(boolean expandOnInput)
 	{
@@ -157,39 +159,22 @@ public class Abbrevs
 		//{{{ Insert the expansion
 		else
 		{
-			buffer.beginCompoundEdit();
-			try
+			buffer.remove(lineStart + wordStart,
+				pos - wordStart);
+
+			int whitespace = buffer.insertIndented(
+				lineStart + wordStart,
+				expand.text);
+
+			int newlines = countNewlines(expand.text,
+				expand.caretPosition);
+
+			if(expand.caretPosition != -1)
 			{
-				// obtain the leading indent for later use
-				lineText = buffer.getText(lineStart,wordStart);
-				int leadingIndent = MiscUtilities.getLeadingWhiteSpaceWidth(
-					lineText,buffer.getTabSize());
-
-				buffer.remove(lineStart + wordStart,pos - wordStart);
-				buffer.insert(lineStart + wordStart,expand.text);
-				if(expand.caretPosition != -1)
-				{
-					textArea.setCaretPosition(lineStart + wordStart
-						+ expand.caretPosition);
-				}
-
-				String whiteSpace = MiscUtilities.createWhiteSpace(
-					leadingIndent,buffer.getBooleanProperty("noTabs")
-					? 0 : buffer.getTabSize());
-
-				// note that if expand.lineCount is 0, we
-				// don't do any indentation at all
-				for(int i = line + 1; i <= line + expand.lineCount; i++)
-				{
-					buffer.insert(buffer.getLineStartOffset(i),
-						whiteSpace);
-				}
+				textArea.setCaretPosition(lineStart + wordStart
+					+ expand.caretPosition
+					+ newlines * whitespace);
 			}
-			finally
-			{
-				buffer.endCompoundEdit();
-			}
-
 			if(expand.posParamCount != pp.size())
 			{
 				view.getStatus().setMessageAndClear(
@@ -244,7 +229,7 @@ public class Abbrevs
 	//{{{ setModeAbbrevs() method
 	/**
 	 * Sets the mode-specific abbreviation set.
-	 * @param globalAbbrevs The new global abbrev set
+	 * @param modes The new mode abbrev set
 	 * @since jEdit 2.3pre1
 	 */
 	public static void setModeAbbrevs(Hashtable modes)
@@ -313,15 +298,17 @@ public class Abbrevs
 
 				try
 				{
-					saveAbbrevs(new FileWriter(file1));
+					saveAbbrevs(new OutputStreamWriter(
+						new FileOutputStream(file1),
+						ENCODING));
+					file2.delete();
+					file1.renameTo(file2);
 				}
 				catch(Exception e)
 				{
 					Log.log(Log.ERROR,Abbrevs.class,"Error while saving " + file1);
 					Log.log(Log.ERROR,Abbrevs.class,e);
 				}
-				file2.delete();
-				file1.renameTo(file2);
 				abbrevsModTime = file2.lastModified();
 			}
 		}
@@ -360,7 +347,8 @@ public class Abbrevs
 
 			try
 			{
-				loadAbbrevs(new FileReader(file));
+				loadAbbrevs(new InputStreamReader(
+					new FileInputStream(file),ENCODING));
 				loaded = true;
 			}
 			catch(FileNotFoundException fnf)
@@ -379,7 +367,8 @@ public class Abbrevs
 			try
 			{
 				loadAbbrevs(new InputStreamReader(Abbrevs.class
-					.getResourceAsStream("default.abbrevs")));
+					.getResourceAsStream("default.abbrevs"),
+					ENCODING));
 			}
 			catch(Exception e)
 			{
@@ -388,6 +377,20 @@ public class Abbrevs
 			}
 			loaded = true;
 		}
+	} //}}}
+
+	//{{{ countNewlines() method
+	private static int countNewlines(String s, int end)
+	{
+		int counter = 0;
+
+		for(int i = 0; i < end; i++)
+		{
+			if(s.charAt(i) == '\n')
+				counter++;
+		}
+
+		return counter;
 	} //}}}
 
 	//{{{ expandAbbrev() method
@@ -417,38 +420,44 @@ public class Abbrevs
 	{
 		BufferedReader in = new BufferedReader(_in);
 
-		Hashtable currentAbbrevs = null;
-
-		String line;
-		while((line = in.readLine()) != null)
+		try
 		{
-			if(line.length() == 0)
-				continue;
-			else if(line.startsWith("[") && line.indexOf('|') == -1)
-			{
-				if(line.equals("[global]"))
-					currentAbbrevs = globalAbbrevs;
-				else
-				{
-					String mode = line.substring(1,
-						line.length() - 1);
-					currentAbbrevs = (Hashtable)modes.get(mode);
-					if(currentAbbrevs == null)
-					{
-						currentAbbrevs = new Hashtable();
-						modes.put(mode,currentAbbrevs);
-					}
-				}
-			}
-			else
+			Hashtable currentAbbrevs = globalAbbrevs;
+
+			String line;
+			while((line = in.readLine()) != null)
 			{
 				int index = line.indexOf('|');
-				currentAbbrevs.put(line.substring(0,index),
-					line.substring(index + 1));
+
+				if(line.length() == 0)
+					continue;
+				else if(line.startsWith("[") && index == -1)
+				{
+					if(line.equals("[global]"))
+						currentAbbrevs = globalAbbrevs;
+					else
+					{
+						String mode = line.substring(1,
+							line.length() - 1);
+						currentAbbrevs = (Hashtable)modes.get(mode);
+						if(currentAbbrevs == null)
+						{
+							currentAbbrevs = new Hashtable();
+							modes.put(mode,currentAbbrevs);
+						}
+					}
+				}
+				else if(index != -1)
+				{
+					currentAbbrevs.put(line.substring(0,index),
+						line.substring(index + 1));
+				}
 			}
 		}
-
-		in.close();
+		finally
+		{
+			in.close();
+		}
 	} //}}}
 
 	//{{{ saveAbbrevs() method

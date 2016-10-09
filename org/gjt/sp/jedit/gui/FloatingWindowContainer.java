@@ -24,6 +24,7 @@ package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
 import javax.swing.*;
+import java.awt.event.*;
 import java.awt.*;
 import org.gjt.sp.jedit.*;
 //}}}
@@ -31,17 +32,30 @@ import org.gjt.sp.jedit.*;
 /**
  * A container for dockable windows. This class should never be used
  * directly.
- * @version $Id: FloatingWindowContainer.java,v 1.9 2003/01/12 03:08:24 spestov Exp $
+ * @version $Id: FloatingWindowContainer.java,v 1.18 2004/06/28 06:45:27 spestov Exp $
  * @since jEdit 4.0pre1
  */
 public class FloatingWindowContainer extends JFrame implements DockableWindowContainer
 {
 	//{{{ FloatingWindowContainer constructor
-	public FloatingWindowContainer(DockableWindowManager dockableWindowManager)
+	public FloatingWindowContainer(DockableWindowManager dockableWindowManager,
+		boolean clone)
 	{
 		this.dockableWindowManager = dockableWindowManager;
+		this.clone = clone;
 		setIconImage(GUIUtilities.getPluginIcon());
 		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+
+		Box caption = new Box(BoxLayout.X_AXIS);
+		caption.add(menu = new RolloverButton(GUIUtilities
+			.loadIcon("ToolbarMenu.gif")));
+		menu.addMouseListener(new MouseHandler());
+		Box separatorBox = new Box(BoxLayout.Y_AXIS);
+		separatorBox.add(Box.createVerticalStrut(3));
+		separatorBox.add(new JSeparator(JSeparator.HORIZONTAL));
+		separatorBox.add(Box.createVerticalStrut(3));
+		caption.add(separatorBox);
+		getContentPane().add(BorderLayout.NORTH,caption);
 	} //}}}
 
 	//{{{ register() method
@@ -54,38 +68,47 @@ public class FloatingWindowContainer extends JFrame implements DockableWindowCon
 
 		pack();
 		GUIUtilities.loadGeometry(this,entry.factory.name);
-		show();
-	} //}}}
-
-	//{{{ add() method
-	public void add(DockableWindowManager.Entry entry)
-	{
-	} //}}}
-
-	//{{{ save() method
-	public void save(DockableWindowManager.Entry entry)
-	{
-		GUIUtilities.saveGeometry(this,entry.factory.name);
+		setVisible(true);
 	} //}}}
 
 	//{{{ remove() method
 	public void remove(DockableWindowManager.Entry entry)
 	{
-		super.dispose();
+		entry.container = null;
+		dispose();
+	} //}}}
+
+	//{{{ unregister() method
+	public void unregister(DockableWindowManager.Entry entry)
+	{
+		dispose();
 	} //}}}
 
 	//{{{ show() method
 	public void show(final DockableWindowManager.Entry entry)
 	{
-		toFront();
-		requestFocus();
-		SwingUtilities.invokeLater(new Runnable()
+		if(entry == null)
+			dispose();
+		else
 		{
-			public void run()
+			toFront();
+			requestFocus();
+			SwingUtilities.invokeLater(new Runnable()
 			{
-				entry.win.requestDefaultFocus();
-			}
-		});
+				public void run()
+				{
+					if(entry.win instanceof DefaultFocusComponent)
+					{
+						((DefaultFocusComponent)entry.win)
+							.focusOnDefaultComponent();
+					}
+					else
+					{
+						entry.win.requestDefaultFocus();
+					}
+				}
+			});
+		}
 	} //}}}
 
 	//{{{ isVisible() method
@@ -97,10 +120,16 @@ public class FloatingWindowContainer extends JFrame implements DockableWindowCon
 	//{{{ dispose() method
 	public void dispose()
 	{
-		save(entry);
+		GUIUtilities.saveGeometry(this,entry.factory.name);
 		entry.container = null;
 		entry.win = null;
 		super.dispose();
+	} //}}}
+
+	//{{{ getDockableWindowManager() method
+	public DockableWindowManager getDockableWindowManager()
+	{
+		return dockableWindowManager;
 	} //}}}
 
 	//{{{ getMinimumSize() method
@@ -111,6 +140,29 @@ public class FloatingWindowContainer extends JFrame implements DockableWindowCon
 
 	//{{{ Private members
 	private DockableWindowManager dockableWindowManager;
+	private boolean clone;
 	private DockableWindowManager.Entry entry;
+	private JButton menu;
 	//}}}
+
+	//{{{ MouseHandler class
+	class MouseHandler extends MouseAdapter
+	{
+		JPopupMenu popup;
+
+		public void mousePressed(MouseEvent evt)
+		{
+			if(popup != null && popup.isVisible())
+				popup.setVisible(false);
+			else
+			{
+				popup = dockableWindowManager.createPopupMenu(
+					FloatingWindowContainer.this,
+					entry.factory.name,clone);
+				GUIUtilities.showPopupMenu(popup,
+					menu,menu.getX(),menu.getY() + menu.getHeight(),
+					false);
+			}
+		}
+	} //}}}
 }

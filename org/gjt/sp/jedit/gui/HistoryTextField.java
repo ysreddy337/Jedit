@@ -36,7 +36,7 @@ import org.gjt.sp.jedit.*;
 /**
  * Text field with an arrow-key accessable history.
  * @author Slava Pestov
- * @version $Id: HistoryTextField.java,v 1.8 2002/10/17 21:26:14 spestov Exp $
+ * @version $Id: HistoryTextField.java,v 1.13 2004/04/19 05:59:31 spestov Exp $
  */
 public class HistoryTextField extends JTextField
 {
@@ -64,7 +64,7 @@ public class HistoryTextField extends JTextField
 	/**
 	 * Creates a new history text field.
 	 * @param name The history model name
-	 * @param instantPopup If true, selecting a value from the history
+	 * @param instantPopups If true, selecting a value from the history
 	 * popup will immediately fire an ActionEvent. If false, the user
 	 * will have to press 'Enter' first
 	 *
@@ -90,10 +90,7 @@ public class HistoryTextField extends JTextField
 	public HistoryTextField(String name, boolean instantPopups,
 		boolean enterAddsToHistory)
 	{
-		setBorder(new CompoundBorder(getBorder(),new HistoryBorder()));
-
-		if(name != null)
-			historyModel = HistoryModel.getModel(name);
+		setModel(name);
 
 		MouseHandler mouseHandler = new MouseHandler();
 		addMouseListener(mouseHandler);
@@ -169,6 +166,15 @@ public class HistoryTextField extends JTextField
 		return selectAllOnFocus;
 	} //}}}
 
+	//{{{ getModel() method
+	/**
+	 * Returns the underlying history model.
+	 */
+	public HistoryModel getModel()
+	{
+		return historyModel;
+	} //}}}
+
 	//{{{ setModel() method
 	/**
 	 * Sets the history list model.
@@ -177,10 +183,23 @@ public class HistoryTextField extends JTextField
 	 */
 	public void setModel(String name)
 	{
+		Border textFieldBorder = UIManager.getBorder("TextField.border");
+
 		if(name == null)
+		{
 			historyModel = null;
+			if(textFieldBorder != null)
+				setBorder(textFieldBorder);
+		}
 		else
+		{
 			historyModel = HistoryModel.getModel(name);
+			if(textFieldBorder != null)
+			{
+				setBorder(new CompoundBorder(textFieldBorder,
+					new HistoryBorder()));
+			}
+		}
 		index = -1;
 		repaint();
 	} //}}}
@@ -204,15 +223,6 @@ public class HistoryTextField extends JTextField
 	{
 		super.setText(text);
 		index = -1;
-	} //}}}
-
-	//{{{ getModel() method
-	/**
-	 * Returns the underlying history model.
-	 */
-	public HistoryModel getModel()
-	{
-		return historyModel;
 	} //}}}
 
 	//{{{ fireActionPerformed() method
@@ -239,8 +249,9 @@ public class HistoryTextField extends JTextField
 
 		if(evt.getID() == KeyEvent.KEY_PRESSED)
 		{
-			if(evt.getKeyCode() == KeyEvent.VK_ENTER)
+			switch(evt.getKeyCode())
 			{
+			case KeyEvent.VK_ENTER:
 				if(enterAddsToHistory)
 					addCurrentToHistory();
 
@@ -249,28 +260,30 @@ public class HistoryTextField extends JTextField
 					fireActionPerformed();
 					evt.consume();
 				}
-			}
-			else if(evt.getKeyCode() == KeyEvent.VK_UP)
-			{
+				break;
+			case KeyEvent.VK_UP:
 				if(evt.isShiftDown())
 					doBackwardSearch();
 				else
 					historyPrevious();
 				evt.consume();
-			}
-			else if(evt.getKeyCode() == KeyEvent.VK_DOWN)
-			{
+				break;
+			case KeyEvent.VK_DOWN:
 				if(evt.isShiftDown())
 					doForwardSearch();
+				else if(evt.isAltDown())
+					showPopupMenu(evt.isShiftDown());
 				else
 					historyNext();
 				evt.consume();
-			}
-			else if(evt.getKeyCode() == KeyEvent.VK_TAB
-				&& evt.isControlDown())
-			{
-				doBackwardSearch();
-				evt.consume();
+				break;
+			case KeyEvent.VK_TAB:
+				if(evt.isControlDown())
+				{
+					doBackwardSearch();
+					evt.consume();
+				}
+				break;
 			}
 		}
 
@@ -293,11 +306,7 @@ public class HistoryTextField extends JTextField
 			if(evt.getX() >= getWidth() - insets.right
 				|| GUIUtilities.isPopupTrigger(evt))
 			{
-				if(evt.isShiftDown())
-					showPopupMenu(getText().substring(0,
-						getSelectionStart()),0,getHeight());
-				else
-					showPopupMenu("",0,getHeight());
+				showPopupMenu(evt.isShiftDown());
 			}
 			else
 				super.processMouseEvent(evt);
@@ -471,6 +480,16 @@ public class HistoryTextField extends JTextField
 		}
 
 		GUIUtilities.showPopupMenu(popup,this,x,y,false);
+	} //}}}
+
+	//{{{ showPopupMenu() method
+	private void showPopupMenu(boolean search)
+	{
+		if(search)
+			showPopupMenu(getText().substring(0,
+				getSelectionStart()),0,getHeight());
+		else
+			showPopupMenu("",0,getHeight());
 	} //}}}
 
 	//}}}

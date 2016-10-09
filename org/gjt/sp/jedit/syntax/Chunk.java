@@ -29,6 +29,7 @@ import java.awt.font.*;
 import java.awt.geom.*;
 import java.awt.*;
 import org.gjt.sp.jedit.syntax.*;
+import org.gjt.sp.jedit.Debug;
 //}}}
 
 /**
@@ -38,99 +39,107 @@ import org.gjt.sp.jedit.syntax.*;
  */
 public class Chunk extends Token
 {
-	public static boolean DEBUG = false;
-
 	//{{{ paintChunkList() method
 	/**
 	 * Paints a chunk list.
-	 * @param lineText The line text
 	 * @param chunks The chunk list
 	 * @param gfx The graphics context
 	 * @param x The x co-ordinate
 	 * @param y The y co-ordinate
-	 * @param background The background color of the painting area,
-	 * used for the background color hack
 	 * @return The width of the painted text
-	 * @since jEdit 4.1pre1
+	 * @since jEdit 4.2pre1
 	 */
-	public static float paintChunkList(Segment lineText, Chunk chunks,
-		Graphics2D gfx, float x, float y, Color background,
-		boolean glyphVector)
+	public static float paintChunkList(Chunk chunks,
+		Graphics2D gfx, float x, float y, boolean glyphVector)
 	{
-		FontMetrics forBackground = gfx.getFontMetrics();
+		Rectangle clipRect = gfx.getClipBounds();
 
 		float _x = 0.0f;
 
-		for(;;)
+		while(chunks != null)
 		{
-			if(chunks == null)
-				return _x;
-
-			//{{{ find run of chunks with the same token type
-			Chunk start = chunks;
-			float width = 0.0f;
-			int length = 0;
-			while(chunks != null
-				&& start.style == chunks.style
-				&& (start.visible == chunks.visible)
-				&& (start.accessable == chunks.accessable))
+			// only paint visible chunks
+			if(x + _x + chunks.width > clipRect.x
+				&& x + _x < clipRect.x + clipRect.width)
 			{
-				length += chunks.length;
-				width += chunks.width;
-				chunks = (Chunk)chunks.next;
-			} //}}}
-
-			// Useful for debugging purposes
-			if(DEBUG)
-			{
-				gfx.draw(new Rectangle2D.Float(x + _x,y - 10,
-					width,10));
-			}
-
-			if(start.accessable)
-			{
-				//{{{ Paint token background color if necessary
-				Color bgColor = start.style.getBackgroundColor();
-				if(bgColor != null)
+				// Useful for debugging purposes
+				if(Debug.CHUNK_PAINT_DEBUG)
 				{
-					// Workaround for bug in Graphics2D in
-					// JDK1.4 under Windows; calling
-					// setPaintMode() does not reset
-					// graphics mode.
-					Graphics2D xorGfx = (Graphics2D)gfx.create();
-					xorGfx.setXORMode(background);
-					xorGfx.setColor(bgColor);
+					gfx.draw(new Rectangle2D.Float(x + _x,y - 10,
+						chunks.width,10));
+				}
 
-					xorGfx.fill(new Rectangle2D.Float(
-						x + _x,y - forBackground.getAscent(),
-						_x + width - _x,forBackground.getHeight()));
-
-					xorGfx.dispose();
-				} //}}}
-
-				//{{{ If there is text in this chunk, paint it
-				if(start.visible)
+				if(chunks.accessable && chunks.visible)
 				{
-					gfx.setFont(start.style.getFont());
-					gfx.setColor(start.style.getForegroundColor());
+					gfx.setFont(chunks.style.getFont());
+					gfx.setColor(chunks.style.getForegroundColor());
 
-					if(glyphVector && start.gv != null
-						&& start.next == chunks)
-						gfx.drawGlyphVector(start.gv,x + _x,y);
-					else
+					if(glyphVector && chunks.gv != null)
+						gfx.drawGlyphVector(chunks.gv,x + _x,y);
+					else if(chunks.str != null)
 					{
-						gfx.drawChars(lineText.array,
-							lineText.offset
-							+ start.offset,length,
+						gfx.drawString(chunks.str,
 							(int)(x + _x),(int)y);
 					}
-				} //}}}
+				}
 			}
 
-			_x += width;
+			_x += chunks.width;
+			chunks = (Chunk)chunks.next;
 		}
 
-		// for return statement see top of for() loop...
+		return _x;
+	} //}}}
+
+	//{{{ paintChunkBackgrounds() method
+	/**
+	 * Paints the background highlights of a chunk list.
+	 * @param chunks The chunk list
+	 * @param gfx The graphics context
+	 * @param x The x co-ordinate
+	 * @param y The y co-ordinate
+	 * @return The width of the painted backgrounds
+	 * @since jEdit 4.2pre1
+	 */
+	public static float paintChunkBackgrounds(Chunk chunks,
+		Graphics2D gfx, float x, float y)
+	{
+		Rectangle clipRect = gfx.getClipBounds();
+
+		float _x = 0.0f;
+
+		FontMetrics forBackground = gfx.getFontMetrics();
+
+		int ascent = forBackground.getAscent();
+		int height = forBackground.getHeight();
+
+		while(chunks != null)
+		{
+			// only paint visible chunks
+			if(x + _x + chunks.width > clipRect.x
+				&& x + _x < clipRect.x + clipRect.width)
+			{
+				if(chunks.accessable)
+				{
+					//{{{ Paint token background color if necessary
+					Color bgColor = chunks.background;
+					if(bgColor != null)
+					{
+						gfx.setColor(bgColor);
+
+						gfx.fill(new Rectangle2D.Float(
+							x + _x,y - ascent,
+							_x + chunks.width - _x,
+							height));
+					} //}}}
+				}
+			}
+
+			_x += chunks.width;
+			chunks = (Chunk)chunks.next;
+		}
+
+		return _x;
 	} //}}}
 
 	//{{{ offsetToX() method
@@ -191,14 +200,19 @@ public class Chunk extends Token
 	//{{{ Instance variables
 	public boolean accessable;
 	public boolean visible;
+	public boolean initialized;
 
 	public boolean monospaced;
-	public float charWidth;
+	public int charWidth;
 
 	// set up after init()
 	public SyntaxStyle style;
+	// this is either style.getBackgroundColor() or
+	// styles[defaultID].getBackgroundColor()
+	public Color background;
 	public float width;
 	public GlyphVector gv;
+	public String str;
 	//}}}
 
 	//{{{ Chunk constructor
@@ -209,10 +223,15 @@ public class Chunk extends Token
 	} //}}}
 
 	//{{{ Chunk constructor
-	public Chunk(byte id, int offset, int length, ParserRuleSet rules)
+	public Chunk(byte id, int offset, int length, ParserRuleSet rules,
+		SyntaxStyle[] styles, byte defaultID)
 	{
 		super(id,offset,length,rules);
 		accessable = true;
+		style = styles[id];
+		background = style.getBackgroundColor();
+		if(background == null)
+			background = styles[defaultID].getBackgroundColor();
 	} //}}}
 
 	//{{{ getPositions() method
@@ -284,28 +303,32 @@ public class Chunk extends Token
 
 	//{{{ init() method
 	public void init(Segment seg, TabExpander expander, float x,
-		SyntaxStyle[] styles, FontRenderContext fontRenderContext,
-		byte defaultID, float charWidth)
+		FontRenderContext fontRenderContext)
 	{
-		style = styles[(id == Token.WHITESPACE || id == Token.TAB)
-			? defaultID : id];
+		initialized = true;
+		if(style != null)
+			charWidth = style.getCharWidth();
 
-		if(length == 1 && seg.array[seg.offset + offset] == '\t')
+		if(!accessable)
+		{
+			// do nothing
+		}
+		else if(length == 1 && seg.array[seg.offset + offset] == '\t')
 		{
 			visible = false;
 			float newX = expander.nextTabStop(x,offset + length);
 			width = newX - x;
 		}
-		else if(charWidth != 0.0f)
+		else if(charWidth != 0 && !Debug.DISABLE_MONOSPACE_HACK)
 		{
 			visible = monospaced = true;
-			this.charWidth = charWidth;
+			str = new String(seg.array,seg.offset + offset,length);
 			width = charWidth * length;
 		}
 		else
 		{
 			visible = true;
-			String str = new String(seg.array,seg.offset + offset,length);
+			str = new String(seg.array,seg.offset + offset,length);
 			gv = style.getFont().createGlyphVector(
 				fontRenderContext,str);
 			width = (float)gv.getLogicalBounds().getWidth();

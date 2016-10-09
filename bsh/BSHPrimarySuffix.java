@@ -32,9 +32,6 @@
  *****************************************************************************/
 
 
-/*
-	Warning: this is a hack... should be unified with BSHLHSPrimarySuffix
-*/
 package bsh;
 
 import java.util.Hashtable;
@@ -58,175 +55,219 @@ class BSHPrimarySuffix extends SimpleNode
 	/*
 		Perform a suffix operation on the given object and return the 
 		new value.
+		<p>
 
 		obj will be a Node when suffix evaluation begins, allowing us to
 		interpret it contextually. (e.g. for .class) Thereafter it will be 
-		a normal object.
+		an value object or LHS (as determined by toLHS).
+		<p>
+		
+		We must handle the toLHS case at each point here.
+		<p>
 	*/
 	public Object doSuffix(
-		Object obj, CallStack callstack, Interpreter interpreter) 
+		Object obj, boolean toLHS, 
+		CallStack callstack, Interpreter interpreter) 
 		throws EvalError
 	{
 		// Handle ".class" suffix operation
-		/*
-		if ( operation == CLASS )
-			if ( obj instanceof BSHAmbiguousName ) {
-				NameSpace namespace = callstack.top();
-				return ((BSHAmbiguousName)obj).toClass( namespace );
-			} else
-				throw new EvalError(
-					"Attemp to .class on non class...", this);
-		*/
+		// Prefix must be a BSHType
 		if ( operation == CLASS )
 			if ( obj instanceof BSHType ) {
+				if ( toLHS )
+					throw new EvalError("Can't assign .class", 
+						this, callstack );
 				NameSpace namespace = callstack.top();
-				return ((BSHType)obj).getType( namespace );
+				return ((BSHType)obj).getType( callstack, interpreter );
 			} else
 				throw new EvalError(
-					"Attemp to invoke .class on non class.", this);
-
-		// Handle other suffix operations
+					"Attempt to use .class suffix on non class.", 
+					this, callstack );
 
 		/*
-			eval( ) the node to an object
+			Evaluate our prefix if it needs evaluating first.
+			If this is the first evaluation our prefix mayb be a Node 
+			(directly from the PrimaryPrefix) - eval() it to an object.  
+			If it's an LHS, resolve to a value.
 
-			Note: This construct is now necessary where the node may be
-			an ambiguous name.  If this becomes common we might want to 
-			make a static method nodeToObject() or something.
+			Note: The ambiguous name construct is now necessary where the node 
+			may be an ambiguous name.  If this becomes common we might want to 
+			make a static method nodeToObject() or something.  The point is 
+			that we can't just eval() - we need to direct the evaluation to 
+			the context sensitive type of result; namely object, class, etc.
 		*/
 		if ( obj instanceof SimpleNode )
 			if ( obj instanceof BSHAmbiguousName )
 				obj = ((BSHAmbiguousName)obj).toObject(callstack, interpreter);
 			else
 				obj = ((SimpleNode)obj).eval(callstack, interpreter);	
+		else
+			if ( obj instanceof LHS )
+				try {
+					obj = ((LHS)obj).getValue();
+				} catch ( UtilEvalError e ) {
+					throw e.toEvalError( this, callstack );
+				}
 
 		try
 		{
 			switch(operation)
 			{
 				case INDEX:
-					return doIndex(obj, callstack, interpreter );
+					return doIndex( obj, toLHS, callstack, interpreter );
 
 				case NAME:
-					return doName(obj, callstack, interpreter );
+					return doName( obj, toLHS, callstack, interpreter );
 
 				case PROPERTY:
-					return doProperty(obj, callstack, interpreter );
+					return doProperty( toLHS, obj, callstack, interpreter );
 
 				default:
-					throw new InterpreterError("LHS suffix");
+					throw new InterpreterError( "Unknown suffix type" );
 			} 
 		}
 		catch(ReflectError e)
 		{
-			throw new EvalError("reflection error: " + e, this);
+			throw new EvalError("reflection error: " + e, this, callstack );
 		}
 		catch(InvocationTargetException e)
 		{
-			throw new TargetError(
-				"target exception", e.getTargetException(), this, true);
+			throw new TargetError( "target exception", e.getTargetException(), 
+				this, callstack, true);
 		}
 	}
 
 	/*
-		Field access or a method invocation
-		Field access might be .length on an array
+		Field access, .length on array, or a method invocation
+		Must handle toLHS case for each.
 	*/
 	private Object doName(
-		Object obj, CallStack callstack, Interpreter interpreter) 
+		Object obj, boolean toLHS, 
+		CallStack callstack, Interpreter interpreter) 
 		throws EvalError, ReflectError, InvocationTargetException
 	{
-		if(field.equals("length") && obj.getClass().isArray())
-			return new Primitive(Array.getLength(obj));
-		
-		if (jjtGetNumChildren() == 0)
+		try {
+			// .length on array
+			if ( field.equals("length") && obj.getClass().isArray() )
+				if ( toLHS )
+					throw new EvalError(
+						"Can't assign array length", this, callstack );
+				else
+					return new Primitive(Array.getLength(obj));
+			
 			// field access
-			return Reflect.getObjectField(obj, field);
-		else
-		{
-			// method invocation
+			if ( jjtGetNumChildren() == 0 ) 
+				if ( toLHS )
+					return Reflect.getLHSObjectField(obj, field);
+				else
+					return Reflect.getObjectField( obj, field );
+
+			// Method invocation
+			// (LHS or non LHS evaluation can both encounter method calls)
 			Object[] oa = ((BSHArguments)jjtGetChild(0)).getArguments(
 				callstack, interpreter);
-			try {
-				return Reflect.invokeObjectMethod(interpreter, obj, field, oa, this);
-			} catch ( EvalError ee ) {
-				// catch and re-throw to get line number right
-				throw new EvalError( ee.getMessage(), this );
-			}
+			return Reflect.invokeObjectMethod( 
+				obj, field, oa, interpreter, callstack, this );
+
+		} catch ( UtilEvalError e ) {
+			throw e.toEvalError( this, callstack );
 		}
 	}
 
 	/**
-		Just factoring out some common code for the two suffix classes...
-		later need to complete factoring of these classes
-		(BSHPrimarySuffix, BSHLHSPrimarySuffix)
 	*/
 	static int getIndexAux(
 		Object obj, CallStack callstack, Interpreter interpreter, 
-		SimpleNode callerNode ) 
+		SimpleNode callerInfo ) 
 		throws EvalError
 	{
 		if ( !obj.getClass().isArray() )
-			throw new EvalError("Not an array", callerNode );
+			throw new EvalError("Not an array", callerInfo, callstack );
 
 		int index;
 		try {
 			Object indexVal = 
-				((SimpleNode)callerNode.jjtGetChild(0)).eval( 
+				((SimpleNode)callerInfo.jjtGetChild(0)).eval( 
 					callstack, interpreter );
 			if ( !(indexVal instanceof Primitive) )
-				indexVal = NameSpace.getAssignableForm( indexVal, Integer.TYPE);
+				indexVal = Types.getAssignableForm( indexVal, Integer.TYPE);
 			index = ((Primitive)indexVal).intValue();
-		} catch( EvalError e ) {
+		} catch( UtilEvalError e ) {
 			Interpreter.debug("doIndex: "+e);
-			e.reThrow(
-				"You can only index arrays by integer types", callerNode );
-			throw new Error("can't get here");
+			throw e.toEvalError( 
+				"Arrays may only be indexed by integer types.", 
+				callerInfo, callstack );
 		}
 
 		return index;
 	}
 
-	private Object doIndex(
-		Object obj, CallStack callstack, Interpreter interpreter) 
+	/**
+		array index.
+		Must handle toLHS case.
+	*/
+	private Object doIndex( 
+		Object obj, boolean toLHS, 
+		CallStack callstack, Interpreter interpreter ) 
 		throws EvalError, ReflectError
 	{
 		int index = getIndexAux( obj, callstack, interpreter, this );
-		return Reflect.getIndex(obj, index);
+		if ( toLHS )
+			return new LHS(obj, index);
+		else
+			try {
+				return Reflect.getIndex(obj, index);
+			} catch ( UtilEvalError e ) {
+				throw e.toEvalError( this, callstack );
+			}
 	}
 
-	private Object doProperty( 
+	/**
+		Property access.
+		Must handle toLHS case.
+	*/
+	private Object doProperty( boolean toLHS,
 		Object obj, CallStack callstack, Interpreter interpreter ) 
 		throws EvalError
 	{
 		if(obj == Primitive.VOID)
-			throw new EvalError("Attempt to access property on undefined variable or class name", this);
+			throw new EvalError( 
+			"Attempt to access property on undefined variable or class name", 
+				this, callstack );
 
-		if(obj instanceof Primitive)
-			throw new EvalError("Attempt to access property on a primitive", this);
+		if ( obj instanceof Primitive )
+			throw new EvalError("Attempt to access property on a primitive", 
+				this, callstack );
 
 		Object value = ((SimpleNode)jjtGetChild(0)).eval(
 			callstack, interpreter);
-		if(!(value instanceof String))
-			throw new EvalError("Property expression must be a String or identifier.", this);
 
-		// property style access to hashtable
-		if(obj instanceof Hashtable)
+		if ( !( value instanceof String ) )
+			throw new EvalError(
+				"Property expression must be a String or identifier.", 
+				this, callstack );
+
+		if ( toLHS )
+			return new LHS(obj, (String)value);
+
+		// Property style access to Hashtable or Map
+		CollectionManager cm = CollectionManager.getCollectionManager();
+		if ( cm.isMap( obj ) )
 		{
-			Object val = ((Hashtable)obj).get((String)value);
-			if(val == null)
-				val = Primitive.NULL;
-			return val;
+			Object val = cm.getFromMap( obj, value/*key*/ );
+			return ( val == null ?  val = Primitive.NULL : val );
 		}
 
-		try
-		{
-			return Reflect.getObjectProperty(obj, (String)value);
+		try {
+			return Reflect.getObjectProperty( obj, (String)value );
 		}
-		catch(ReflectError e)
+		catch ( UtilEvalError e)  
 		{
-			Interpreter.debug(e.toString());
-			throw new EvalError("No such property: " + value, this);
+			throw e.toEvalError( "Property: "+value, this, callstack );
+		}
+		catch (ReflectError e) 
+		{
+			throw new EvalError("No such property: " + value, this, callstack );
 		}
 	}
 }

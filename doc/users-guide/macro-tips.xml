@@ -6,7 +6,7 @@
 <!-- :xml.root=users-guide.xml:                               -->
 <!--                                                          -->
 <!-- This file covers the chapter "Macro tips and techniques" -->
-<!-- $Id: macro-tips.xml,v 1.16 2003/02/18 01:46:34 spestov Exp $
+<!-- $Id: macro-tips.xml,v 1.18 2004/03/17 05:15:52 spestov Exp $
  -->
 
 <chapter id="macro-tips"><title>Macro Tips and Techniques</title>
@@ -375,12 +375,12 @@ combo.setSelectedItem(STARTING_SET); // defined as "global"
   </para>
 
   <para>
-    The jEdit class <classname>InputHandler</classname> is an abstract class
+    The jEdit class <ulink url="../api/org/gjt/sp/jedit/gui/InputHandler.html">InputHandler</ulink> is an abstract class
     that that manages associations between keyboard input and editing
     actions, along with the recording of macros. Keyboard input
     in jEdit is normally managed by the derived class
-    <classname>DefaultInputHandler</classname>. One of the methods in
-    the <classname>InputHandler</classname> class handles input from a
+    <ulink url="../api/org/gjt/sp/jedit/gui/DefaultInputHandler.html">DefaultInputHandler</ulink>. One of the methods in
+    the <ulink url="../api/org/gjt/sp/jedit/gui/InputHandler.html">InputHandler</ulink> class handles input from a
     single keypress:
   </para>
 
@@ -471,7 +471,7 @@ view.getInputHandler().readNextChar("Enter a character",
 
     <listitem>
       <para>
-        Finally, access to the <classname>InputHandler</classname> object used
+        Finally, access to the <ulink url="../api/org/gjt/sp/jedit/gui/InputHandler.html">InputHandler</ulink> object used
         by jEdit is available by calling
         <function>getInputHandler()</function> on the current view.
       </para>
@@ -769,31 +769,30 @@ bottom</screen>
 
 </sect2>
 
-<sect2 id="macro-tips-BeanShell-interface">
-<title>Implementing Interfaces</title>
+<sect2 id="macro-tips-BeanShell-class">
+<title>Implementing Classes and Interfaces</title>
 
 <para>
   As discussed in the macro example in <xref
-  linkend="dialog-macro"/>, scripted objects can implement Java
-  interfaces such as <classname>ActionListener</classname>.  Which
-  interfaces may be implemented varies depending upon the
-  version of the Java runtime environment being used. If running under
-  Java 1.1 or 1.2, BeanShell objects can only implement the AWT or
-  Swing event listener interfaces contained in the
-  <literal>java.awt.event</literal> and <literal>javax.swing.event</literal>
-  packages, along with the <classname>java.lang.Runnable</classname> interface.
-  If BeanShell is running under Java 1.3 or 1.4, which jEdit 4.0 requires, any
-  interface can be implemented.
+  linkend="dialog-macro"/>, scripted objects can implicitly implement Java
+  interfaces such as <classname>ActionListener</classname>. For example:
 </para>
+
+<programlisting><![CDATA[myRunnable() {
+    run() {
+        System.out.println("Hello world!");
+    }
+    
+    return this;
+}
+
+Runnable r = myRunnable();
+new Thread(r).start();]]></programlisting>
 
 <para>
   Frequently it will not be necessary to implement all of the methods of
   a particular interface in order to specify the behavior of a scripted
-  object. Under Java 1.3 and above, the virtual machine's reflection
-  mechanism will throw an exception for any
-  missing interface methods.  This will bring macro execution to a
-  halt unless the exception is trapped and handled.  The solution
-  is to implement the <function>invoke()</function> method,
+  object. To prevent BeanShell from throwing exceptions for missing interface methods, implement the <function>invoke()</function> method,
   which is called when an undefined method is invoked on a scripted
   object. Typically, the implementation of this method will do nothing,
   as in the following example:
@@ -801,6 +800,25 @@ bottom</screen>
 
 <informalexample><programlisting>invoke(method, args) {}</programlisting>
 </informalexample>
+
+<para>
+  In addition to the implicit interface definitions described above,
+  BeanShell permits full-blown classes to be defined. Indeed, almost any Java class definition should work in BeanShell:
+</para>
+
+<programlisting><![CDATA[class Cons {
+    // Long-live LISP!
+    Object car;
+    Object cdr;
+
+    rplaca(Object car) {
+        this.car = car;
+    }
+
+    rplacd(Object cdr) {
+        this.cdr = cdr;
+    }
+}]]></programlisting>
 
 </sect2>
 
@@ -881,7 +899,7 @@ bottom</screen>
 
   <para>
    To write a message to the activity log,
-   use the following method of the <classname>Log</classname>
+   use the following method of the <ulink url="../api/org/gjt/sp/util/Log.html">Log</ulink>
    class:
   </para>
 
@@ -899,29 +917,7 @@ bottom</screen>
   </itemizedlist>
 
   <para>
-   The parameter <varname>urgency</varname> can take one of the
-   following constant values:
-  </para>
-
-  <itemizedlist>
-   <listitem><para><constant>Log.DEBUG</constant></para></listitem>
-   <listitem><para><constant>Log.MESSAGE</constant></para></listitem>
-   <listitem><para><constant>Log.NOTICE</constant></para></listitem>
-   <listitem><para><constant>Log.WARNING</constant></para></listitem>
-   <listitem><para><constant>Log.ERROR</constant></para></listitem>
-  </itemizedlist>
-
-  <para>
-   Note that the <varname>urgency</varname> parameter merely changes
-   the string prefixed to the log message; it does not change the logging
-   behavior in any other way.
-  </para>
-
-  <para>
-   The parameter <varname>source</varname> can be either an object or a
-   class instance. When writing log messages from macros, set
-   this parameter to <literal>BeanShell.class</literal> to make macro
-   errors easier to spot in the activity log.
+   See the documentation for the <ulink url="../api/org/gjt/sp/util/Log.html">Log</ulink> class for information about the method's parameters.
   </para>
 
   <para>

@@ -30,7 +30,13 @@ public class IntegerArray
 	//{{{ IntegerArray constructor
 	public IntegerArray()
 	{
-		array = new int[1000];
+		this(2000);
+	} //}}}
+
+	//{{{ IntegerArray constructor
+	public IntegerArray(int initialSize)
+	{
+		array = new int[initialSize];
 	} //}}}
 
 	//{{{ add() method
@@ -68,6 +74,12 @@ public class IntegerArray
 	public final void clear()
 	{
 		len = 0;
+	} //}}}
+
+	//{{{ getArray() method
+	public int[] getArray()
+	{
+		return array;
 	} //}}}
 
 	//{{{ Private members

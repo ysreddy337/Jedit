@@ -1,15 +1,16 @@
 <?xml version="1.0" ?>
 
 <!-- jEdit user's guide -->
-<!-- (C) 1999, 2003 Slava Pestov -->
+<!-- (C) 1999, 2004 Slava Pestov -->
 <!-- (C) 2001, 2002 John Gellene -->
 
 <!-- jEdit buffer-local properties: -->
 <!-- :indentSize=1:noTabs=true: -->
 
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
-  "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+  "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd" [
 
+<!ENTITY conventions SYSTEM "conventions.xml">
 <!ENTITY starting SYSTEM "starting.xml">
 <!ENTITY basics SYSTEM "basics.xml">
 <!ENTITY files SYSTEM "files.xml">
@@ -44,9 +45,9 @@
 <book>
 
 <bookinfo>
- <title>jEdit 4.1 User's Guide</title>
+ <title>jEdit 4.2 User's Guide</title>
 
- <copyright><year>1999</year><year>2003</year><holder>Slava Pestov</holder></copyright>
+ <copyright><year>1999</year><year>2004</year><holder>Slava Pestov</holder></copyright>
  <copyright><year>2001</year><year>2002</year><holder>John Gellene</holder></copyright>
  <legalnotice><title>Legal Notice</title>
   <para>
@@ -74,6 +75,7 @@
   </para>
  </partintro>
 
+ &conventions;
  &starting;
  &basics;
  &files;
@@ -88,7 +90,7 @@
  &globs;
  &regexps;
  &macro-index;
- &launcher-guide;
+<!--  &launcher-guide; -->
 </part>
 
 <part id="writing-modes-part"><title>Writing Edit Modes</title>

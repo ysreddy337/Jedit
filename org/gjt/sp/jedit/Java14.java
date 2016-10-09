@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 2001, 2002 Slava Pestov
+ * Copyright (C) 2001, 2004 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,13 +23,18 @@
 package org.gjt.sp.jedit;
 
 //{{{ Imports
+import javax.swing.event.*;
 import javax.swing.*;
 import java.awt.datatransfer.*;
+import java.awt.dnd.*;
 import java.awt.event.*;
 import java.awt.*;
+import java.io.File;
+import java.util.Iterator;
+import java.util.List;
+import org.gjt.sp.jedit.gui.*;
 import org.gjt.sp.jedit.msg.*;
-import org.gjt.sp.jedit.textarea.JEditTextArea;
-import org.gjt.sp.jedit.EditBus;
+import org.gjt.sp.jedit.textarea.*;
 import org.gjt.sp.util.Log;
 //}}}
 
@@ -39,9 +44,9 @@ import org.gjt.sp.util.Log;
  * this file out.
  * @since jEdit 4.0pre4
  * @author Slava Pestov
- * @version $Id: Java14.java,v 1.16 2003/01/31 04:49:30 spestov Exp $
+ * @version $Id: Java14.java,v 1.36 2004/07/12 19:25:07 spestov Exp $
  */
-class Java14
+public class Java14
 {
 	//{{{ init() method
 	public static void init()
@@ -72,9 +77,8 @@ class Java14
 					EditPaneUpdate eu = (EditPaneUpdate)msg;
 					if(eu.getWhat() == EditPaneUpdate.CREATED)
 					{
-						eu.getEditPane().getTextArea()
-							.addMouseWheelListener(
-							new MouseWheelHandler());
+						initTextArea(eu.getEditPane()
+							.getTextArea());
 					}
 				}
 			}
@@ -87,6 +91,70 @@ class Java14
 				+ " to system selection");
 			Registers.setRegister('%',new Registers.ClipboardRegister(selection));
 		}
+	} //}}}
+
+	//{{{ dragAndDropCallback() method
+	/**
+	 * Called by the text area via reflection to initiate a text drag and
+	 * drop operation using the JDK 1.4 API.
+	 * @since jEdit 4.2pre5
+	 */
+	public static void dragAndDropCallback(JEditTextArea textArea,
+		InputEvent evt, boolean copy)
+	{
+		Log.log(Log.DEBUG,Java14.class,"Drag and drop callback");
+		TransferHandler handler = textArea.getTransferHandler();
+		handler.exportAsDrag(textArea,evt,
+			copy ? TransferHandler.COPY
+			: TransferHandler.MOVE);
+	} //}}}
+
+	//{{{ initTextArea() method
+	static void initTextArea(JEditTextArea textArea)
+	{
+		textArea.addMouseWheelListener(new MouseWheelHandler());
+
+		// drag and drop support
+		// I'd just move the code to
+		// JEditTextArea but it
+		// depends on JDK 1.4 APIs
+		textArea.setTransferHandler(new TextAreaTransferHandler());
+
+		try
+		{
+			textArea.getDropTarget().addDropTargetListener(
+				new DropHandler(textArea));
+			textArea.setDragAndDropCallback(
+				Java14.class.getMethod("dragAndDropCallback",
+				new Class[] { JEditTextArea.class,
+				InputEvent.class, boolean.class }));
+		}
+		catch(Exception e)
+		{
+			Log.log(Log.ERROR,Java14.class,e);
+		}
+	} //}}}
+
+	//{{{ initBufferSwitcher() method
+	public static void initBufferSwitcher(final EditPane pane,
+		BufferSwitcher switcher)
+	{
+		switcher.addPopupMenuListener(new PopupMenuListener()
+		{
+			public void popupMenuWillBecomeVisible(
+				PopupMenuEvent e) {}
+
+			public void popupMenuWillBecomeInvisible(
+				PopupMenuEvent e)
+			{
+				pane.getTextArea().requestFocus();
+			}
+
+			public void popupMenuCanceled(PopupMenuEvent e)
+			{
+				pane.getTextArea().requestFocus();
+			}
+		});
 	} //}}}
 
 	//{{{ MyFocusManager class
@@ -109,7 +177,8 @@ class Java14
 				{
 					if(comp instanceof View)
 					{
-						((View)comp).processKeyEvent(evt);
+						((View)comp).processKeyEvent(evt,
+							View.VIEW);
 						return true;
 					}
 					else if(comp == null || comp instanceof Window
@@ -135,7 +204,7 @@ class Java14
 		}
 	} //}}}
 
-	//{{{ WheelScrollListener class
+	//{{{ MouseWheelHandler class
 	static class MouseWheelHandler implements MouseWheelListener
 	{
 		public void mouseWheelMoved(MouseWheelEvent e)
@@ -167,10 +236,7 @@ class Java14
 
 		private void scrollLine(JEditTextArea textArea, int amt)
 		{
-			int newpos = textArea.getFirstLine() + amt;
-			newpos = Math.max(newpos, 0);
-			newpos = Math.min(newpos, textArea.getVirtualLineCount());
-			textArea.setFirstLine(newpos);
+			textArea.setFirstLine(textArea.getFirstLine() + amt);
 		}
 
 		private void scrollPage(JEditTextArea textArea, int amt)
@@ -187,6 +253,272 @@ class Java14
 				textArea.goToPrevLine(select);
 			else
 				textArea.goToNextLine(select);
+		}
+	} //}}}
+
+	//{{{ TextAreaTransferHandler class
+	static class TextAreaTransferHandler extends TransferHandler
+	{
+		/* I assume that there can be only one drag operation at the time */
+		private static JEditTextArea dragSource;
+		private static boolean compoundEdit;
+
+		protected Transferable createTransferable(JComponent c)
+		{
+			Log.log(Log.DEBUG,this,"createTransferable()");
+			JEditTextArea textArea = (JEditTextArea)c;
+			if(textArea.getSelectionCount() == 0)
+				return null;
+			else
+			{
+				dragSource = textArea;
+				return new TextAreaSelection(textArea);
+			}
+		}
+
+		public int getSourceActions(JComponent c)
+		{
+			return COPY_OR_MOVE;
+		}
+
+		public boolean importData(JComponent c, Transferable t)
+		{
+			Log.log(Log.DEBUG,this,"Import data");
+			if(!canImport(c,t.getTransferDataFlavors()))
+				return false;
+
+			boolean returnValue;
+
+			try
+			{
+				if(t.isDataFlavorSupported(
+					DataFlavor.javaFileListFlavor))
+				{
+					returnValue = importFile(c,t);
+				}
+				else
+				{
+					returnValue = importText(c,t);
+				}
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,this,e);
+				returnValue = false;
+			}
+
+			GUIUtilities.getView(c).toFront();
+			GUIUtilities.getView(c).requestFocus();
+			c.requestFocus();
+
+			return returnValue;
+		}
+
+		private boolean importFile(JComponent c, Transferable t)
+			throws Exception
+		{
+			Log.log(Log.DEBUG,this,"=> File list");
+			EditPane editPane = (EditPane)
+				GUIUtilities.getComponentParent(
+				c,EditPane.class);
+
+			Buffer buffer = null;
+
+			Object data = t.getTransferData(
+				DataFlavor.javaFileListFlavor);
+
+			Iterator iterator = ((List)data)
+				.iterator();
+
+			while(iterator.hasNext())
+			{
+				File file = (File)
+					iterator.next();
+				Buffer _buffer = jEdit.openFile(null,
+					file.getPath());
+				if(_buffer != null)
+					buffer = _buffer;
+			}
+
+			if(buffer != null)
+				editPane.setBuffer(buffer);
+			editPane.getView().toFront();
+			editPane.getView().requestFocus();
+			editPane.requestFocus();
+
+			return true;
+		}
+
+		private boolean importText(JComponent c, Transferable t)
+			throws Exception
+		{
+			Log.log(Log.DEBUG,this,"=> String");
+			String str = (String)t.getTransferData(
+				DataFlavor.stringFlavor);
+
+			JEditTextArea textArea = (JEditTextArea)c;
+
+			if(dragSource != null
+				&& textArea.getBuffer()
+				== dragSource.getBuffer())
+			{
+				compoundEdit = true;
+				textArea.getBuffer().beginCompoundEdit();
+			}
+
+			int caret = textArea.getCaretPosition();
+			Selection s = textArea.getSelectionAtOffset(caret);
+
+			/* if user drops into the same
+			selection where they started, do
+			nothing. */
+			if(s != null)
+			{
+				if(textArea == dragSource)
+					return false;
+				/* if user drops into a selection,
+				replace selection */
+				textArea.setSelectedText(s,str);
+			}
+			/* otherwise just insert the text */
+			else
+				textArea.getBuffer().insert(caret,str);
+			textArea.scrollToCaret(true);
+
+			return true;
+		}
+
+		protected void exportDone(JComponent c, Transferable t,
+			int action)
+		{
+			Log.log(Log.DEBUG,this,"Export done");
+
+			JEditTextArea textArea = (JEditTextArea)c;
+
+			try
+			{
+				if(t == null)
+				{
+					Log.log(Log.DEBUG,this,"=> Null transferrable");
+					textArea.selectNone();
+				}
+				else if(t.isDataFlavorSupported(
+					DataFlavor.stringFlavor))
+				{
+					Log.log(Log.DEBUG,this,"=> String");
+					if(action == MOVE)
+						textArea.setSelectedText(null,false);
+					else
+						textArea.selectNone();
+				}
+			}
+			finally
+			{
+				if(compoundEdit)
+				{
+					compoundEdit = false;
+					textArea.getBuffer().endCompoundEdit();
+				}
+			}
+
+			dragSource = null;
+		}
+
+		public boolean canImport(JComponent c, DataFlavor[] flavors)
+		{
+			JEditTextArea textArea = (JEditTextArea)c;
+
+			// correctly handle text flavor + file list flavor
+			// + text area read only, do an or of all flags
+			boolean returnValue = false;
+
+			for(int i = 0; i < flavors.length; i++)
+			{
+				if(flavors[i].equals(
+					DataFlavor.javaFileListFlavor))
+				{
+					returnValue = true;
+				}
+				else if(flavors[i].equals(
+					DataFlavor.stringFlavor))
+				{
+					if(textArea.isEditable())
+						returnValue = true;
+				}
+			}
+
+			Log.log(Log.DEBUG,this,"canImport() returning "
+				+ returnValue);
+			return returnValue;
+		}
+	} //}}}
+
+	//{{{ DropHandler class
+	static class DropHandler extends DropTargetAdapter
+	{
+		JEditTextArea textArea;
+		Buffer savedBuffer;
+		int savedCaret;
+
+		DropHandler(JEditTextArea textArea)
+		{
+			this.textArea = textArea;
+		}
+
+		public void dragEnter(DropTargetDragEvent dtde)
+		{
+			Log.log(Log.DEBUG,this,"Drag enter");
+			savedBuffer = textArea.getBuffer();
+			textArea.setDragInProgress(true);
+			//textArea.getBuffer().beginCompoundEdit();
+			savedCaret = textArea.getCaretPosition();
+		}
+
+		public void dragOver(DropTargetDragEvent dtde)
+		{
+			Point p = dtde.getLocation();
+			p = SwingUtilities.convertPoint(textArea,p,
+				textArea.getPainter());
+			int pos = textArea.xyToOffset(p.x,p.y,
+				!(textArea.getPainter().isBlockCaretEnabled()
+				|| textArea.isOverwriteEnabled()));
+			if(pos != -1)
+			{
+				textArea.moveCaretPosition(pos,
+					JEditTextArea.ELECTRIC_SCROLL);
+			}
+		}
+
+		public void dragExit(DropTargetEvent dtde)
+		{
+			Log.log(Log.DEBUG,this,"Drag exit");
+			textArea.setDragInProgress(false);
+			//textArea.getBuffer().endCompoundEdit();
+			if(textArea.getBuffer() == savedBuffer)
+			{
+				textArea.moveCaretPosition(savedCaret,
+					JEditTextArea.ELECTRIC_SCROLL);
+			}
+			savedBuffer = null;
+		}
+
+		public void drop(DropTargetDropEvent dtde)
+		{
+			Log.log(Log.DEBUG,this,"Drop");
+			textArea.setDragInProgress(false);
+			//textArea.getBuffer().endCompoundEdit();
+		}
+	} //}}}
+
+	//{{{ TextAreaSelection class
+	static class TextAreaSelection extends StringSelection
+	{
+		JEditTextArea textArea;
+
+		TextAreaSelection(JEditTextArea textArea)
+		{
+			super(textArea.getSelectedText());
+			this.textArea = textArea;
 		}
 	} //}}}
 }

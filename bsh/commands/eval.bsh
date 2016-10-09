@@ -7,11 +7,11 @@
 	with side effects in the current scope.
 	<p>
 	e.g.
-	<code><pre>
-		a=5;
-		eval("b=a*2");
-		print(b); // 10
-	</pre></code>
+    <code><pre>
+    a=5;
+    eval("b=a*2");
+    print(b); // 10
+    </pre></code>
 	<p>
 
 	eval() acts just like invoked text except that any exceptions generated
@@ -20,33 +20,42 @@
 	code.
 	<p>
 	e.g.
-	<pre>
-		try {
-			eval("foo>>><>M>JK$LJLK$");
-		} catch ( EvalError e ) {
-			// ParseException caught here
-		}
+    <pre>
+    try {
+        eval("foo>>><>M>JK$LJLK$");
+    } catch ( EvalError e ) {
+        // ParseException caught here
+    }
 
-		try {
-			eval("(Integer)true");  // illegal cast
-		} catch ( EvalError e ) {
-			// TargetException caught here
-			print( e.getTarget() )  // prints ClassCastException
-		}
-	</pre>
+    try {
+        eval("(Integer)true");  // illegal cast
+    } catch ( EvalError e ) {
+        // TargetException caught here
+        print( e.getTarget() )  // prints ClassCastException
+    }
+    </pre>
 	<p>
 	
 	If you want eval() to throw target exceptions directly, without wrapping
 	them, you can simply redefine own eval like so:
 
+    <pre>
+    myEval( String expression ) {
+        try {
+            return eval( expression );
+        } catch ( TargetError e ) {
+            throw e.getTarget();
+        }
+    }
+    </pre>
+	<p/>
+
+	Here is a cute example of how to use eval to implement a dynamic cast.  
+	i.e. to cast a script to an arbitrary type by name at run-time where the
+	type is not known when you are writing the script.  In this case the type
+	is in the variable interfaceType.
 	<pre>
-		myeval( String expression ) {
-			try {
-				return eval( expression );
-			} catch ( TargetError e ) {
-				throw e.getTarget();
-			}
-		}
+    reference = eval( "("+interfaceType+")this" );
 	</pre>
 
 	<p>

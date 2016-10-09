@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1998, 2003 Slava Pestov
+ * Copyright (C) 1998, 2004 Slava Pestov
  * Portions copyright (C) 1999, 2000 mike dillon
  *
  * This program is free software; you can redistribute it and/or
@@ -29,6 +29,8 @@ import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.Toolkit;
 import java.io.File;
+import java.io.IOException;
+import java.net.Socket;
 import java.util.*;
 import org.gjt.sp.jedit.browser.VFSBrowser;
 import org.gjt.sp.jedit.buffer.*;
@@ -64,9 +66,9 @@ import org.gjt.sp.util.*;
  * </ul>
  *
  * @author Slava Pestov
- * @version $Id: Buffer.java,v 1.126 2003/02/23 04:05:21 spestov Exp $
+ * @version $Id: Buffer.java,v 1.218 2004/06/04 00:18:34 spestov Exp $
  */
-public class Buffer implements EBComponent
+public class Buffer
 {
 	//{{{ Some constants
 	/**
@@ -102,6 +104,12 @@ public class Buffer implements EBComponent
 	public static final String ENCODING = "encoding";
 
 	/**
+	 * Should jEdit try to set the encoding based on a UTF8, UTF16 or
+	 * XML signature at the beginning of the file?
+	 */
+	public static final String ENCODING_AUTODETECT = "encodingAutodetect";
+
+	/**
 	 * This property is set to 'true' if the file has a trailing newline.
 	 * @since jEdit 4.0pre1
 	 */
@@ -116,22 +124,6 @@ public class Buffer implements EBComponent
 
 	//{{{ Input/output methods
 
-	//{{{ showInsertFileDialog() method
-	/**
-	 * Displays the 'insert file' dialog box and inserts the selected file
-	 * into the buffer.
-	 * @param view The view
-	 * @since jEdit 2.7pre2
-	 */
-	public void showInsertFileDialog(View view)
-	{
-		String[] files = GUIUtilities.showVFSFileDialog(view,null,
-			VFSBrowser.OPEN_DIALOG,false);
-
-		if(files != null)
-			insertFile(view,files[0]);
-	} //}}}
-
 	//{{{ reload() method
 	/**
 	 * Reloads the buffer from disk, asking for confirmation if the buffer
@@ -143,7 +135,7 @@ public class Buffer implements EBComponent
 	{
 		if(getFlag(DIRTY))
 		{
-			String[] args = { name };
+			String[] args = { path };
 			int result = GUIUtilities.confirm(view,"changedreload",
 				args,JOptionPane.YES_NO_OPTION,
 				JOptionPane.WARNING_MESSAGE);
@@ -201,13 +193,23 @@ public class Buffer implements EBComponent
 
 			if(!loadAutosave)
 			{
-				// this returns false if initial sanity
-				// checks (if the file is a directory, etc)
-				// fail
-				if(!vfs.load(view,this,path))
+				VFS vfs = VFSManager.getVFSForPath(path);
+
+				if(!checkFileForLoad(view,vfs,path))
 				{
 					setFlag(LOADING,false);
 					return false;
+				}
+
+				// have to check again since above might set
+				// NEW_FILE flag
+				if(reload || !getFlag(NEW_FILE))
+				{
+					if(!vfs.load(view,this,path))
+					{
+						setFlag(LOADING,false);
+						return false;
+					}
 				}
 			}
 		}
@@ -226,40 +228,45 @@ public class Buffer implements EBComponent
 				IntegerArray endOffsets = (IntegerArray)
 					getProperty(BufferIORequest.END_OFFSETS);
 
-				// below remove() call only works if read only
-				// is false. this is a slightly silly workaround.
-				boolean readOnly = isReadOnly();
-				setFlag(READ_ONLY,false);
-
-				// For `reload' command
-				remove(0,getLength());
-
-				if(seg != null && endOffsets != null)
+				if(seg == null)
+					seg = new Segment(new char[1024],0,0);
+				if(endOffsets == null)
 				{
-					// This is faster than Buffer.insert()
-					try
-					{
-						writeLock();
-
-						// theoretically a segment could
-						// have seg.offset != 0 but
-						// SegmentBuffer never does that
-						contentMgr._setContent(seg.array,seg.count);
-
-						contentInserted(0,seg.count,endOffsets);
-					}
-					catch(OutOfMemoryError oom)
-					{
-						Log.log(Log.ERROR,this,oom);
-						VFSManager.error(view,path,"out-of-memory-error",null);
-					}
-					finally
-					{
-						writeUnlock();
-					}
+					endOffsets = new IntegerArray();
+					endOffsets.add(1);
 				}
 
-				setFlag(READ_ONLY,readOnly);
+				try
+				{
+					writeLock();
+
+					// For `reload' command
+					firePreContentRemoved(0,0,getLineCount()
+						- 1,getLength());
+
+					contentMgr.remove(0,getLength());
+					lineMgr.contentRemoved(0,0,getLineCount()
+						- 1,getLength());
+					positionMgr.contentRemoved(0,getLength());
+					fireContentRemoved(0,0,getLineCount()
+						- 1,getLength());
+
+					// theoretically a segment could
+					// have seg.offset != 0 but
+					// SegmentBuffer never does that
+					contentMgr._setContent(seg.array,seg.count);
+
+					lineMgr._contentInserted(endOffsets);
+					positionMgr.contentInserted(0,seg.count);
+
+					fireContentInserted(0,0,
+						endOffsets.getSize() - 1,
+						seg.count - 1);
+				}
+				finally
+				{
+					writeUnlock();
+				}
 
 				unsetProperty(BufferIORequest.LOAD_DATA);
 				unsetProperty(BufferIORequest.END_OFFSETS);
@@ -272,24 +279,13 @@ public class Buffer implements EBComponent
 				if(!getFlag(TEMPORARY))
 					finishLoading();
 
-				/* Ultra-obscure: we have to fire this event
-				 * after the buffer might have been collapsed
-				 * by finishLoading(), since finishLoading(),
-				 * unlike "official" fold APIs, does not notify
-				 * the text area to invalidate its cached
-				 * virtual to physical information. Note that
-				 * the text area's contentInserted() handler
-				 * updates 'lastPhysLine' even if the LOADING
-				 * flag is set. */
-				fireContentInserted(0,0,getLineCount(),getLength() - 1);
-
 				setFlag(LOADING,false);
 
 				// if reloading a file, clear dirty flag
 				if(reload)
 					setDirty(false);
 
-				if(!loadAutosave && newPath != null && !path.equals(newPath))
+				if(!loadAutosave && newPath != null)
 					setPath(newPath);
 
 				// if loadAutosave is false, we loaded an
@@ -352,36 +348,10 @@ public class Buffer implements EBComponent
 
 		VFS vfs = VFSManager.getVFSForPath(path);
 
-		setFlag(IO,true);
-
 		// this returns false if initial sanity
 		// checks (if the file is a directory, etc)
 		// fail
-		if(!vfs.insert(view,this,path))
-		{
-			setFlag(IO,false);
-			return false;
-		}
-
-		// Do some stuff once loading is finished
-		VFSManager.runInAWTThread(new Runnable()
-		{
-			public void run()
-			{
-				setFlag(IO,false);
-
-				SegmentBuffer sbuf = (SegmentBuffer)getProperty(
-					BufferIORequest.LOAD_DATA);
-				if(sbuf != null)
-				{
-					unsetProperty(BufferIORequest.LOAD_DATA);
-
-					view.getTextArea().setSelectedText(sbuf.toString());
-				}
-			}
-		});
-
-		return true;
+		return vfs.insert(view,this,path);
 	} //}}}
 
 	//{{{ autosave() method
@@ -478,13 +448,21 @@ public class Buffer implements EBComponent
 			}
 		}
 
-		setFlag(IO,true);
 		EditBus.send(new BufferUpdate(this,view,BufferUpdate.SAVING));
 
+		setFlag(IO,true);
+
 		final String oldPath = this.path;
+		final String oldSymlinkPath = this.symlinkPath;
 		final String newPath = (path == null ? this.path : path);
 
 		VFS vfs = VFSManager.getVFSForPath(newPath);
+
+		if(!checkFileForSave(view,vfs,newPath))
+		{
+			setFlag(IO,false);
+			return false;
+		}
 
 		if(!vfs.save(view,this,newPath))
 		{
@@ -498,9 +476,9 @@ public class Buffer implements EBComponent
 			public void run()
 			{
 				setFlag(IO,false);
-				finishSaving(view,oldPath,newPath,rename,
-					getBooleanProperty(BufferIORequest
-					.ERROR_OCCURRED));
+				finishSaving(view,oldPath,oldSymlinkPath,
+					newPath,rename,getBooleanProperty(
+					BufferIORequest.ERROR_OCCURRED));
 			}
 		});
 
@@ -516,9 +494,9 @@ public class Buffer implements EBComponent
 	 * @return One of <code>NOT_CHANGED</code>, <code>CHANGED</code>, or
 	 * <code>DELETED</code>.
 	 *
-	 * @since jEdit 4.1pre3
+	 * @since jEdit 4.2pre1
 	 */
-	public int checkFileStatus()
+	public int checkFileStatus(View view)
 	{
 		// - don't do these checks while a save is in progress,
 		// because for a moment newModTime will be greater than
@@ -545,53 +523,17 @@ public class Buffer implements EBComponent
 				if(!file.exists())
 				{
 					setFlag(NEW_FILE,true);
-					EditBus.send(new BufferUpdate(this,null,
-						BufferUpdate.DIRTY_CHANGED));
+					setDirty(true);
 					return FILE_DELETED;
 				}
 				else
+				{
 					return FILE_CHANGED;
+				}
 			}
 		}
 
 		return FILE_NOT_CHANGED;
-	} //}}}
-
-	//{{{ checkModTime() method
-	/**
-	 * Check if the buffer has changed on disk.
-	 * @since jEdit 4.1pre8
-	 */
-	public void checkModTime(EditPane editPane)
-	{
-		View view = editPane.getView();
-		int status = checkFileStatus();
-
-		// still need to call the status check even if this option is off,
-		// so that the write protection is updated if it changes on disk
-		if(!jEdit.getBooleanProperty("view.checkModStatus"))
-			return;
-
-		if(status == FILE_DELETED)
-		{
-			Object[] args = { path };
-			GUIUtilities.message(view,"filedeleted",args);
-		}
-		else if(status == FILE_CHANGED)
-		{
-			String prop = (isDirty() ? "filechanged-dirty"
-				: "filechanged-focus");
-
-			Object[] args = { path };
-			int result = GUIUtilities.confirm(view,
-				prop,args,JOptionPane.YES_NO_OPTION,
-				JOptionPane.WARNING_MESSAGE);
-			if(result == JOptionPane.YES_OPTION)
-			{
-				editPane.saveCaretInfo();
-				load(view,true);
-			}
-		}
 	} //}}}
 
 	//}}}
@@ -625,7 +567,7 @@ public class Buffer implements EBComponent
 	 */
 	public VFS getVFS()
 	{
-		return vfs;
+		return VFSManager.getVFSForPath(path);
 	} //}}}
 
 	//{{{ getAutosaveFile() method
@@ -633,7 +575,7 @@ public class Buffer implements EBComponent
 	 * Returns the autosave file for this buffer. This may be null if
 	 * the file is non-local.
 	 */
-	public final File getAutosaveFile()
+	public File getAutosaveFile()
 	{
 		return autosaveFile;
 	} //}}}
@@ -642,7 +584,7 @@ public class Buffer implements EBComponent
 	/**
 	 * Returns the name of this buffer. This method is thread-safe.
 	 */
-	public final String getName()
+	public String getName()
 	{
 		return name;
 	} //}}}
@@ -651,9 +593,20 @@ public class Buffer implements EBComponent
 	/**
 	 * Returns the path name of this buffer. This method is thread-safe.
 	 */
-	public final String getPath()
+	public String getPath()
 	{
 		return path;
+	} //}}}
+
+	//{{{ getSymlinkPath() method
+	/**
+	 * If this file is a symbolic link, returns the link destination.
+	 * Otherwise returns the file's path. This method is thread-safe.
+	 * @since jEdit 4.2pre1
+	 */
+	public String getSymlinkPath()
+	{
+		return symlinkPath;
 	} //}}}
 
 	//{{{ getDirectory() method
@@ -672,7 +625,7 @@ public class Buffer implements EBComponent
 	 * {@link org.gjt.sp.jedit.jEdit#closeBuffer(View,Buffer)}.
 	 * This method is thread-safe.
 	 */
-	public final boolean isClosed()
+	public boolean isClosed()
 	{
 		return getFlag(CLOSED);
 	} //}}}
@@ -681,7 +634,7 @@ public class Buffer implements EBComponent
 	/**
 	 * Returns true if the buffer is loaded. This method is thread-safe.
 	 */
-	public final boolean isLoaded()
+	public boolean isLoaded()
 	{
 		return !getFlag(LOADING);
 	} //}}}
@@ -692,7 +645,7 @@ public class Buffer implements EBComponent
 	 * This method is thread-safe.
 	 * @since jEdit 2.7pre1
 	 */
-	public final boolean isPerformingIO()
+	public boolean isPerformingIO()
 	{
 		return getFlag(LOADING) || getFlag(IO);
 	} //}}}
@@ -702,7 +655,7 @@ public class Buffer implements EBComponent
 	 * Returns whether this buffer lacks a corresponding version on disk.
 	 * This method is thread-safe.
 	 */
-	public final boolean isNewFile()
+	public boolean isNewFile()
 	{
 		return getFlag(NEW_FILE);
 	} //}}}
@@ -712,7 +665,7 @@ public class Buffer implements EBComponent
 	 * Sets the new file flag.
 	 * @param newFile The new file flag
 	 */
-	public final void setNewFile(boolean newFile)
+	public void setNewFile(boolean newFile)
 	{
 		setFlag(NEW_FILE,newFile);
 		if(!newFile)
@@ -723,7 +676,7 @@ public class Buffer implements EBComponent
 	/**
 	 * Returns true if this file is 'untitled'. This method is thread-safe.
 	 */
-	public final boolean isUntitled()
+	public boolean isUntitled()
 	{
 		return getFlag(UNTITLED);
 	} //}}}
@@ -733,7 +686,7 @@ public class Buffer implements EBComponent
 	 * Returns whether there have been unsaved changes to this buffer.
 	 * This method is thread-safe.
 	 */
-	public final boolean isDirty()
+	public boolean isDirty()
 	{
 		return getFlag(DIRTY);
 	} //}}}
@@ -743,30 +696,32 @@ public class Buffer implements EBComponent
 	 * Returns true if this file is read only, false otherwise.
 	 * This method is thread-safe.
 	 */
-	public final boolean isReadOnly()
+	public boolean isReadOnly()
 	{
-		return getFlag(READ_ONLY);
+		return getFlag(READ_ONLY) || getFlag(READ_ONLY_OVERRIDE);
 	} //}}}
 
 	//{{{ isEditable() method
 	/**
-	 * Returns true if this file is editable, false otherwise.
+	 * Returns true if this file is editable, false otherwise. A file may
+	 * become uneditable if it is read only, or if I/O is in progress.
 	 * This method is thread-safe.
 	 * @since jEdit 2.7pre1
 	 */
-	public final boolean isEditable()
+	public boolean isEditable()
 	{
-		return !(getFlag(READ_ONLY) || getFlag(IO) || getFlag(LOADING));
+		return !(getFlag(READ_ONLY) || getFlag(READ_ONLY_OVERRIDE)
+			|| getFlag(IO) || getFlag(LOADING));
 	} //}}}
 
-	//{{{ isReadOnly() method
+	//{{{ setReadOnly() method
 	/**
 	 * Sets the read only flag.
 	 * @param readOnly The read only flag
 	 */
-	public final void setReadOnly(boolean readOnly)
+	public void setReadOnly(boolean readOnly)
 	{
-		setFlag(READ_ONLY,readOnly);
+		setFlag(READ_ONLY_OVERRIDE,readOnly);
 	} //}}}
 
 	//{{{ setDirty() method
@@ -776,15 +731,15 @@ public class Buffer implements EBComponent
 	public void setDirty(boolean d)
 	{
 		boolean old_d = getFlag(DIRTY);
+		boolean editable = isEditable();
 
 		if(d)
 		{
-			if(getFlag(LOADING) || getFlag(READ_ONLY))
-				return;
-			if(getFlag(DIRTY) && getFlag(AUTOSAVE_DIRTY))
-				return;
-			setFlag(DIRTY,true);
-			setFlag(AUTOSAVE_DIRTY,true);
+			if(editable)
+			{
+				setFlag(DIRTY,true);
+				setFlag(AUTOSAVE_DIRTY,true);
+			}
 		}
 		else
 		{
@@ -794,12 +749,17 @@ public class Buffer implements EBComponent
 			if(autosaveFile != null)
 				autosaveFile.delete();
 
-			// this ensures that undo can clear the dirty flag properly
-			// when all edits up to a save are undone
-			undoMgr.bufferSaved();
+			// fixes dirty flag not being reset on
+			// save/insert/undo/redo/undo
+			if(!getFlag(UNDO_IN_PROGRESS))
+			{
+				// this ensures that undo can clear the dirty flag properly
+				// when all edits up to a save are undone
+				undoMgr.bufferSaved();
+			}
 		}
 
-		if(d != old_d)
+		if(d != old_d && editable)
 		{
 			EditBus.send(new BufferUpdate(this,null,
 				BufferUpdate.DIRTY_CHANGED));
@@ -826,13 +786,13 @@ public class Buffer implements EBComponent
 	public Icon getIcon()
 	{
 		if(getFlag(DIRTY))
-			return GUIUtilities.DIRTY_BUFFER_ICON;
-		else if(getFlag(READ_ONLY))
-			return GUIUtilities.READ_ONLY_BUFFER_ICON;
+			return GUIUtilities.loadIcon("dirty.gif");
+		else if(getFlag(READ_ONLY) || getFlag(READ_ONLY_OVERRIDE))
+			return GUIUtilities.loadIcon("readonly.gif");
 		else if(getFlag(NEW_FILE))
-			return GUIUtilities.NEW_BUFFER_ICON;
+			return GUIUtilities.loadIcon("new.gif");
 		else
-			return GUIUtilities.NORMAL_BUFFER_ICON;
+			return GUIUtilities.loadIcon("normal.gif");
 	} //}}}
 
 	//}}}
@@ -844,7 +804,7 @@ public class Buffer implements EBComponent
 	 * The buffer is guaranteed not to change between calls to
 	 * {@link #readLock()} and {@link #readUnlock()}.
 	 */
-	public final void readLock()
+	public void readLock()
 	{
 		lock.readLock();
 	} //}}}
@@ -854,7 +814,7 @@ public class Buffer implements EBComponent
 	 * The buffer is guaranteed not to change between calls to
 	 * {@link #readLock()} and {@link #readUnlock()}.
 	 */
-	public final void readUnlock()
+	public void readUnlock()
 	{
 		lock.readUnlock();
 	} //}}}
@@ -864,7 +824,7 @@ public class Buffer implements EBComponent
 	 * Attempting to obtain read lock will block between calls to
 	 * {@link #writeLock()} and {@link #writeUnlock()}.
 	 */
-	public final void writeLock()
+	public void writeLock()
 	{
 		lock.writeLock();
 	} //}}}
@@ -874,7 +834,7 @@ public class Buffer implements EBComponent
 	 * Attempting to obtain read lock will block between calls to
 	 * {@link #writeLock()} and {@link #writeUnlock()}.
 	 */
-	public final void writeUnlock()
+	public void writeUnlock()
 	{
 		lock.writeUnlock();
 	} //}}}
@@ -902,7 +862,7 @@ public class Buffer implements EBComponent
 	public int getLineCount()
 	{
 		// no need to lock since this just returns a value and that's it
-		return offsetMgr.getLineCount();
+		return lineMgr.getLineCount();
 	} //}}}
 
 	//{{{ getLineOfOffset() method
@@ -912,7 +872,7 @@ public class Buffer implements EBComponent
 	 * @param offset The offset
 	 * @since jEdit 4.0pre1
 	 */
-	public final int getLineOfOffset(int offset)
+	public int getLineOfOffset(int offset)
 	{
 		try
 		{
@@ -921,7 +881,7 @@ public class Buffer implements EBComponent
 			if(offset < 0 || offset > getLength())
 				throw new ArrayIndexOutOfBoundsException(offset);
 
-			return offsetMgr.getLineOfOffset(offset);
+			return lineMgr.getLineOfOffset(offset);
 		}
 		finally
 		{
@@ -943,12 +903,12 @@ public class Buffer implements EBComponent
 		{
 			readLock();
 
-			if(line < 0 || line >= offsetMgr.getLineCount())
+			if(line < 0 || line >= lineMgr.getLineCount())
 				throw new ArrayIndexOutOfBoundsException(line);
 			else if(line == 0)
 				return 0;
 
-			return offsetMgr.getLineEndOffset(line - 1);
+			return lineMgr.getLineEndOffset(line - 1);
 		}
 		finally
 		{
@@ -971,10 +931,10 @@ public class Buffer implements EBComponent
 		{
 			readLock();
 
-			if(line < 0 || line >= offsetMgr.getLineCount())
+			if(line < 0 || line >= lineMgr.getLineCount())
 				throw new ArrayIndexOutOfBoundsException(line);
 
-			return offsetMgr.getLineEndOffset(line);
+			return lineMgr.getLineEndOffset(line);
 		}
 		finally
 		{
@@ -1004,26 +964,42 @@ public class Buffer implements EBComponent
 		}
 	} //}}}
 
+	//{{{ invalidateCachedScreenLineCounts() method
+	/**
+	 * Invalidates all cached screen line count information.
+	 * @since jEdit 4.2pre7.
+	 */
+	public void invalidateCachedScreenLineCounts()
+	{
+		lineMgr.invalidateScreenLineCounts();
+	} //}}}
+
 	//}}}
 
-	//{{{ Text getters are setters
+	//{{{ Text getters and setters
 
 	//{{{ getLineText() method
 	/**
 	 * Returns the text on the specified line.
 	 * This method is thread-safe.
-	 * @param lineIndex The line
+	 * @param line The line
 	 * @return The text, or null if the line is invalid
 	 * @since jEdit 4.0pre1
 	 */
-	public String getLineText(int lineIndex)
+	public String getLineText(int line)
 	{
+		if(line < 0 || line >= lineMgr.getLineCount())
+			throw new ArrayIndexOutOfBoundsException(line);
+
 		try
 		{
 			readLock();
 
-			return getText(getLineStartOffset(lineIndex),
-				getLineLength(lineIndex));
+			int start = (line == 0 ? 0
+				: lineMgr.getLineEndOffset(line - 1));
+			int end = lineMgr.getLineEndOffset(line);
+
+			return getText(start,end - start - 1);
 		}
 		finally
 		{
@@ -1041,17 +1017,23 @@ public class Buffer implements EBComponent
 	 *
 	 * This method is thread-safe.
 	 *
-	 * @param lineIndex The line
+	 * @param line The line
 	 * @since jEdit 4.0pre1
 	 */
-	public void getLineText(int lineIndex, Segment segment)
+	public void getLineText(int line, Segment segment)
 	{
+		if(line < 0 || line >= lineMgr.getLineCount())
+			throw new ArrayIndexOutOfBoundsException(line);
+
 		try
 		{
 			readLock();
 
-			getText(getLineStartOffset(lineIndex),
-				getLineLength(lineIndex),segment);
+			int start = (line == 0 ? 0
+				: lineMgr.getLineEndOffset(line - 1));
+			int end = lineMgr.getLineEndOffset(line);
+
+			getText(start,end - start - 1,segment);
 		}
 		finally
 		{
@@ -1149,7 +1131,7 @@ public class Buffer implements EBComponent
 			for(int i = 0; i < len; i++)
 			{
 				if(str.charAt(i) == '\n')
-					integerArray.add(i);
+					integerArray.add(i + 1);
 			}
 
 			if(!getFlag(UNDO_IN_PROGRESS))
@@ -1195,7 +1177,7 @@ public class Buffer implements EBComponent
 			for(int i = 0; i < seg.count; i++)
 			{
 				if(seg.array[seg.offset + i] == '\n')
-					integerArray.add(i);
+					integerArray.add(i + 1);
 			}
 
 			if(!getFlag(UNDO_IN_PROGRESS))
@@ -1228,47 +1210,42 @@ public class Buffer implements EBComponent
 
 		try
 		{
+			setFlag(TRANSACTION,true);
 			writeLock();
 
 			if(offset < 0 || length < 0
 				|| offset + length > contentMgr.getLength())
 				throw new ArrayIndexOutOfBoundsException(offset + ":" + length);
 
-			int startLine = offsetMgr.getLineOfOffset(offset);
+			int startLine = lineMgr.getLineOfOffset(offset);
+			int endLine = lineMgr.getLineOfOffset(offset + length);
 
-			contentMgr.getText(offset,length,seg);
-			int numLines = 0;
-			for(int i = 0; i < seg.count; i++)
-			{
-				if(seg.array[seg.offset + i] == '\n')
-					numLines++;
-			}
+			int numLines = endLine - startLine;
 
-			if(!getFlag(UNDO_IN_PROGRESS))
+			if(!getFlag(UNDO_IN_PROGRESS) && !getFlag(LOADING))
 			{
 				undoMgr.contentRemoved(offset,length,
-					seg.toString(),!getFlag(DIRTY));
+					getText(offset,length),
+					!getFlag(DIRTY));
 			}
+
+			firePreContentRemoved(startLine,offset,numLines,length);
 
 			contentMgr.remove(offset,length);
-
-			offsetMgr.contentRemoved(startLine,offset,numLines,length);
-
-			if(numLines > 0)
-			{
-				for(int i = 0; i < inUseFVMs.length; i++)
-				{
-					if(inUseFVMs[i] != null)
-						inUseFVMs[i]._invalidate(startLine);
-				}
-			}
+			lineMgr.contentRemoved(startLine,offset,numLines,length);
+			positionMgr.contentRemoved(offset,length);
 
 			fireContentRemoved(startLine,offset,numLines,length);
+
+			/* otherwise it will be delivered later */
+			if(!getFlag(UNDO_IN_PROGRESS) && !insideCompoundEdit())
+				fireTransactionComplete();
 
 			setDirty(true);
 		}
 		finally
 		{
+			setFlag(TRANSACTION,false);
 			writeUnlock();
 		}
 	} //}}}
@@ -1299,8 +1276,12 @@ public class Buffer implements EBComponent
 			writeLock();
 
 			setFlag(UNDO_IN_PROGRESS,true);
-			if(!undoMgr.undo(textArea))
+			int caret = undoMgr.undo();
+
+			if(caret == -1)
 				textArea.getToolkit().beep();
+			else
+				textArea.setCaretPosition(caret);
 
 			fireTransactionComplete();
 		}
@@ -1314,8 +1295,7 @@ public class Buffer implements EBComponent
 
 	//{{{ redo() method
 	/**
-	 * Redoes the most recently undone edit. Returns true if the redo was
-	 * successful.
+	 * Redoes the most recently undone edit.
 	 *
 	 * @since jEdit 2.7pre2
 	 */
@@ -1335,8 +1315,11 @@ public class Buffer implements EBComponent
 			writeLock();
 
 			setFlag(UNDO_IN_PROGRESS,true);
-			if(!undoMgr.redo(textArea))
+			int caret = undoMgr.redo();
+			if(caret == -1)
 				textArea.getToolkit().beep();
+			else
+				textArea.setCaretPosition(caret);
 
 			fireTransactionComplete();
 		}
@@ -1358,7 +1341,9 @@ public class Buffer implements EBComponent
 	 */
 	public boolean isTransactionInProgress()
 	{
-		return getFlag(UNDO_IN_PROGRESS) || insideCompoundEdit();
+		return getFlag(TRANSACTION)
+			|| getFlag(UNDO_IN_PROGRESS)
+			|| insideCompoundEdit();
 	} //}}}
 
 	//{{{ beginCompoundEdit() method
@@ -1431,6 +1416,43 @@ public class Buffer implements EBComponent
 	//}}}
 
 	//{{{ Buffer events
+	public static final int NORMAL_PRIORITY = 0;
+	public static final int HIGH_PRIORITY = 1;
+	static class Listener
+	{
+		BufferChangeListener listener;
+		int priority;
+
+		Listener(BufferChangeListener listener, int priority)
+		{
+			this.listener = listener;
+			this.priority = priority;
+		}
+	}
+
+	//{{{ addBufferChangeListener() method
+	/**
+	 * Adds a buffer change listener.
+	 * @param listener The listener
+	 * @param priority Listeners with HIGH_PRIORITY get the event before
+	 * listeners with NORMAL_PRIORITY
+	 * @since jEdit 4.2pre2
+	 */
+	public void addBufferChangeListener(BufferChangeListener listener,
+		int priority)
+	{
+		Listener l = new Listener(listener,priority);
+		for(int i = 0; i < bufferListeners.size(); i++)
+		{
+			Listener _l = (Listener)bufferListeners.get(i);
+			if(_l.priority < priority)
+			{
+				bufferListeners.insertElementAt(l,i);
+				return;
+			}
+		}
+		bufferListeners.addElement(l);
+	} //}}}
 
 	//{{{ addBufferChangeListener() method
 	/**
@@ -1440,7 +1462,7 @@ public class Buffer implements EBComponent
 	 */
 	public void addBufferChangeListener(BufferChangeListener listener)
 	{
-		bufferListeners.addElement(listener);
+		addBufferChangeListener(listener,NORMAL_PRIORITY);
 	} //}}}
 
 	//{{{ removeBufferChangeListener() method
@@ -1451,20 +1473,32 @@ public class Buffer implements EBComponent
 	 */
 	public void removeBufferChangeListener(BufferChangeListener listener)
 	{
-		bufferListeners.removeElement(listener);
+		for(int i = 0; i < bufferListeners.size(); i++)
+		{
+			if(((Listener)bufferListeners.get(i)).listener == listener)
+			{
+				bufferListeners.removeElementAt(i);
+				return;
+			}
+		}
 	} //}}}
 
 	//{{{ getBufferChangeListeners() method
 	/**
 	 * Returns an array of registered buffer change listeners.
-	 * @param listener The listener
 	 * @since jEdit 4.1pre3
 	 */
 	public BufferChangeListener[] getBufferChangeListeners()
 	{
-		return (BufferChangeListener[])bufferListeners
-			.toArray(new BufferChangeListener[
-			bufferListeners.size()]);
+		BufferChangeListener[] returnValue
+			= new BufferChangeListener[
+			bufferListeners.size()];
+		for(int i = 0; i < returnValue.length; i++)
+		{
+			returnValue[i] = ((Listener)bufferListeners.get(i))
+				.listener;
+		}
+		return returnValue;
 	} //}}}
 
 	//}}}
@@ -1479,20 +1513,6 @@ public class Buffer implements EBComponent
 	 */
 	public void propertiesChanged()
 	{
-		// Need to reset properties that were cached defaults,
-		// since the defaults might have changed.
-		Iterator iter = properties.values().iterator();
-		while(iter.hasNext())
-		{
-			PropValue value = (PropValue)iter.next();
-			if(value.defaultValue)
-				iter.remove();
-		}
-
-		textMode = "text".equals(mode.getName());
-
-		setTokenMarker(mode.getTokenMarker());
-
 		String folding = getStringProperty("folding");
 		FoldHandler handler = FoldHandler.getFoldHandler(folding);
 
@@ -1503,14 +1523,11 @@ public class Buffer implements EBComponent
 		else
 		{
 			if (folding != null)
-				Log.log(Log.WARNING, this, path + ": invalid 'folding' property: " + folding); 
+				Log.log(Log.WARNING, this, path + ": invalid 'folding' property: " + folding);
 			setFoldHandler(new DummyFoldHandler());
 		}
 
-		if(!isTemporary() && firstTimeDone)
-			EditBus.send(new BufferUpdate(this,null,BufferUpdate.PROPERTIES_CHANGED));
-
-		firstTimeDone = true;
+		EditBus.send(new BufferUpdate(this,null,BufferUpdate.PROPERTIES_CHANGED));
 	} //}}}
 
 	//{{{ getTabSize() method
@@ -1521,7 +1538,11 @@ public class Buffer implements EBComponent
 	 */
 	public int getTabSize()
 	{
-		return getIntegerProperty("tabSize",8);
+		int tabSize = getIntegerProperty("tabSize",8);
+		if(tabSize <= 0)
+			return 8;
+		else
+			return tabSize;
 	} //}}}
 
 	//{{{ getIndentSize() method
@@ -1531,9 +1552,13 @@ public class Buffer implements EBComponent
 	 * This method is thread-safe.
 	 * @since jEdit 2.7pre1
 	 */
-	public final int getIndentSize()
+	public int getIndentSize()
 	{
-		return getIntegerProperty("indentSize",8);
+		int indentSize = getIntegerProperty("indentSize",8);
+		if(indentSize <= 0)
+			return 8;
+		else
+			return indentSize;
 	} //}}}
 
 	//{{{ getProperty() method
@@ -1558,46 +1583,49 @@ public class Buffer implements EBComponent
 	 * @param name The property name. For backwards compatibility, this
 	 * is an <code>Object</code>, not a <code>String</code>.
 	 */
-	public synchronized Object getProperty(Object name)
+	public Object getProperty(Object name)
 	{
-		// First try the buffer-local properties
-		PropValue o = (PropValue)properties.get(name);
-		if(o != null)
-			return o.value;
-
-		// For backwards compatibility
-		if(!(name instanceof String))
-			return null;
-
-		// Now try mode.<mode>.<property>
-		if(mode != null)
+		synchronized(propertyLock)
 		{
-			Object retVal = mode.getProperty((String)name);
-			if(retVal == null)
+			// First try the buffer-local properties
+			PropValue o = (PropValue)properties.get(name);
+			if(o != null)
+				return o.value;
+
+			// For backwards compatibility
+			if(!(name instanceof String))
 				return null;
 
-			properties.put(name,new PropValue(retVal,true));
-			return retVal;
-		}
-		else
-		{
-			// Now try buffer.<property>
-			String value = jEdit.getProperty("buffer." + name);
-			if(value == null)
-				return null;
+			// Now try mode.<mode>.<property>
+			if(mode != null)
+			{
+				Object retVal = mode.getProperty((String)name);
+				if(retVal == null)
+					return null;
 
-			// Try returning it as an integer first
-			Object retVal;
-			try
-			{
-				retVal = new Integer(value);
+				properties.put(name,new PropValue(retVal,true));
+				return retVal;
 			}
-			catch(NumberFormatException nf)
+			else
 			{
-				retVal = value;
+				// Now try buffer.<property>
+				String value = jEdit.getProperty("buffer." + name);
+				if(value == null)
+					return null;
+
+				// Try returning it as an integer first
+				Object retVal;
+				try
+				{
+					retVal = new Integer(value);
+				}
+				catch(NumberFormatException nf)
+				{
+					retVal = value;
+				}
+				properties.put(name,new PropValue(retVal,true));
+				return retVal;
 			}
-			properties.put(name,new PropValue(retVal,true));
-			return retVal;
 		}
 	} //}}}
 
@@ -1762,34 +1790,37 @@ public class Buffer implements EBComponent
 	 * @param syntax Regular expression syntax
 	 * @since jEdit 4.1pre9
 	 */
-	public synchronized RE getRegexpProperty(String name, int cflags,
+	public RE getRegexpProperty(String name, int cflags,
 		RESyntax syntax) throws REException
 	{
-		boolean defaultValueFlag;
-		Object obj;
-		PropValue value = (PropValue)properties.get(name);
-		if(value != null)
+		synchronized(propertyLock)
 		{
-			obj = value.value;
-			defaultValueFlag = value.defaultValue;
-		}
-		else
-		{
-			obj = getProperty(name);
-			// will be cached from now on...
-			defaultValueFlag = true;
-		}
+			boolean defaultValueFlag;
+			Object obj;
+			PropValue value = (PropValue)properties.get(name);
+			if(value != null)
+			{
+				obj = value.value;
+				defaultValueFlag = value.defaultValue;
+			}
+			else
+			{
+				obj = getProperty(name);
+				// will be cached from now on...
+				defaultValueFlag = true;
+			}
 
-		if(obj == null)
-			return null;
-		else if(obj instanceof RE)
-			return (RE)obj;
-		else
-		{
-			RE re = new RE(obj.toString(),cflags,syntax);
-			properties.put(name,new PropValue(re,
-				defaultValueFlag));
-			return re;
+			if(obj == null)
+				return null;
+			else if(obj instanceof RE)
+				return (RE)obj;
+			else
+			{
+				RE re = new RE(obj.toString(),cflags,syntax);
+				properties.put(name,new PropValue(re,
+					defaultValueFlag));
+				return re;
+			}
 		}
 	} //}}}
 
@@ -1845,7 +1876,8 @@ public class Buffer implements EBComponent
 
 		if(value == null)
 		{
-			value = rules.getMode().getProperty(name);
+			value = jEdit.getMode(rules.getModeName())
+				.getProperty(name);
 
 			if(value == null)
 				value = mode.getProperty(name);
@@ -1951,9 +1983,22 @@ public class Buffer implements EBComponent
 	/**
 	 * Returns this buffer's edit mode. This method is thread-safe.
 	 */
-	public final Mode getMode()
+	public Mode getMode()
 	{
 		return mode;
+	} //}}}
+
+	//{{{ setMode() method
+	/**
+	 * Sets this buffer's edit mode. Note that calling this before a buffer
+	 * is loaded will have no effect; in that case, set the "mode" property
+	 * to the name of the mode. A bit inelegant, I know...
+	 * @param mode The mode name
+	 * @since jEdit 4.2pre1
+	 */
+	public void setMode(String mode)
+	{
+		setMode(jEdit.getMode(mode));
 	} //}}}
 
 	//{{{ setMode() method
@@ -1972,7 +2017,12 @@ public class Buffer implements EBComponent
 
 		this.mode = mode;
 
-		propertiesChanged(); // sets up token marker
+		textMode = "text".equals(mode.getName());
+
+		setTokenMarker(mode.getTokenMarker());
+
+		resetCachedProperties();
+		propertiesChanged();
 	} //}}}
 
 	//{{{ setMode() method
@@ -1999,7 +2049,9 @@ public class Buffer implements EBComponent
 
 		String firstLine = getLineText(0);
 
-		for(int i = 0; i < modes.length; i++)
+		// this must be in reverse order so that modes from the user
+		// catalog get checked first!
+		for(int i = modes.length - 1; i >= 0; i--)
 		{
 			if(modes[i].accept(nogzName,firstLine))
 			{
@@ -2030,122 +2082,54 @@ public class Buffer implements EBComponent
 		else
 			seg = new Segment();
 
-		try
+		if(lineIndex < 0 || lineIndex >= lineMgr.getLineCount())
+			throw new ArrayIndexOutOfBoundsException(lineIndex);
+
+		int firstInvalidLineContext = lineMgr.getFirstInvalidLineContext();
+		int start;
+		if(textMode || firstInvalidLineContext == -1)
 		{
-			writeLock();
-
-			if(lineIndex < 0 || lineIndex >= offsetMgr.getLineCount())
-				throw new ArrayIndexOutOfBoundsException(lineIndex);
-
-			/*
-			 * Scan backwards, looking for a line with
-			 * a valid line context.
-			 */
-			int start;
-			if(textMode)
-			{
-				start = lineIndex;
-			}
-			else
-			{
-				start = 0;
-
-				for(int i = lineIndex - 1; i >= 0; i--)
-				{
-					if(offsetMgr.isLineContextValid(i))
-					{
-						start = i;
-						break;
-					}
-				}
-			}
-
-			//System.err.println("tokenize from " + start + " to " + lineIndex);
-			for(int i = start; i <= lineIndex; i++)
-			{
-				getLineText(i,seg);
-
-				TokenMarker.LineContext context = offsetMgr.getLineContext(i);
-				ParserRule oldRule;
-				ParserRuleSet oldRules;
-				if(context == null)
-				{
-					//System.err.println(i + ": null context");
-					oldRule = null;
-					oldRules = null;
-				}
-				else
-				{
-					oldRule = context.inRule;
-					oldRules = context.rules;
-				}
-
-				// this should be null if the line in question does
-				// not have a valid context because we don't want
-				// to inherit the inRule and rules attributes from
-				// an invalid line.
-				TokenMarker.LineContext prevContext = (
-					(i == 0 || !offsetMgr.isLineContextValid(i - 1))
-					? null
-					: offsetMgr.getLineContext(i - 1)
-				);
-
-				context = tokenMarker.markTokens(prevContext,
-					(i == lineIndex ? tokenHandler
-					: DummyTokenHandler.INSTANCE),seg);
-				offsetMgr.setLineContext(i,context);
-
-				// Could incorrectly be set to 'false' with
-				// recursive delegates, where the chaining might
-				// have changed but not the rule set in question (?)
-				if(oldRule != context.inRule)
-				{
-					//System.err.println(i + ": rules don't match" + oldRule + "," + context.inRule);
-					nextLineRequested = true;
-				}
-				else if(oldRules != context.rules)
-				{
-					//System.err.println(i + ": rule sets don't match: " + oldRules + "," + context.rules);
-					nextLineRequested = true;
-				}
-				//else if(i != lastTokenizedLine)
-				//	nextLineRequested = false;
-			}
-
-			int lineCount = offsetMgr.getLineCount();
-			if(nextLineRequested && lineCount - lineIndex > 1)
-			{
-				offsetMgr.lineInfoChangedFrom(lineIndex + 1);
-			}
+			start = lineIndex;
 		}
-		finally
+		else
 		{
-			writeUnlock();
+			start = Math.min(firstInvalidLineContext,
+				lineIndex);
 		}
-	} //}}}
 
-	//{{{ isNextLineRequested() method
-	/**
-	 * Returns true if the next line should be repainted. This
-	 * will return true after a line has been tokenized that starts
-	 * a multiline token that continues onto the next line.
-	 */
-	public boolean isNextLineRequested()
-	{
-		boolean retVal = nextLineRequested;
-		nextLineRequested = false;
-		return retVal;
-	} //}}}
+		if(Debug.TOKEN_MARKER_DEBUG)
+			Log.log(Log.DEBUG,this,"tokenize from " + start + " to " + lineIndex);
+		TokenMarker.LineContext oldContext = null;
+		TokenMarker.LineContext context = null;
+		for(int i = start; i <= lineIndex; i++)
+		{
+			getLineText(i,seg);
 
-	//{{{ getTokenMarker() method
-	/**
-	 * This method is only public so that the <code>OffsetManager</code>
-	 * class can use it.
-	 * @since jEdit 4.0pre1
-	 */
-	public TokenMarker getTokenMarker()
-	{
-		return tokenMarker;
+			oldContext = lineMgr.getLineContext(i);
+
+			TokenMarker.LineContext prevContext = (
+				(i == 0 || textMode) ? null
+				: lineMgr.getLineContext(i - 1)
+			);
+
+			context = tokenMarker.markTokens(prevContext,
+				(i == lineIndex ? tokenHandler
+				: DummyTokenHandler.INSTANCE),seg);
+			lineMgr.setLineContext(i,context);
+		}
+
+		int lineCount = lineMgr.getLineCount();
+		if(lineCount - 1 == lineIndex)
+			lineMgr.setFirstInvalidLineContext(-1);
+		else if(oldContext != context)
+			lineMgr.setFirstInvalidLineContext(lineIndex + 1);
+		else if(firstInvalidLineContext == -1)
+			/* do nothing */;
+		else
+		{
+			lineMgr.setFirstInvalidLineContext(Math.max(
+				firstInvalidLineContext,lineIndex + 1));
+		}
 	} //}}}
 
 	//}}}
@@ -2223,7 +2207,7 @@ public class Buffer implements EBComponent
 				int whiteSpaceWidth = Math.max(0,MiscUtilities
 					.getLeadingWhiteSpaceWidth(line,tabSize)
 					- indentSize);
-	
+
 				insert(lineStart + whiteSpace,MiscUtilities
 					.createWhiteSpace(whiteSpaceWidth,
 					(noTabs ? 0 : tabSize)));
@@ -2278,77 +2262,6 @@ public class Buffer implements EBComponent
 		}
 	} //}}}
 
-	//{{{ indentLine() method
-	/**
-	 * If auto indent is enabled, this method is called when the `Tab'
-	 * or `Enter' key is pressed to perform mode-specific indentation
-	 * and return true, or return false if a normal tab is to be inserted.
-	 * @param line The line number to indent
-	 * @param canIncreaseIndent If false, nothing will be done if the
-	 * calculated indent is greater than the current
-	 * @param canDecreaseIndent If false, nothing will be done if the
-	 * calculated indent is less than the current
-	 * @return true if the tab key event should be swallowed (ignored)
-	 * false if a real tab should be inserted
-	 */
-	public boolean indentLine(int lineIndex, boolean canIncreaseIndent,
-		boolean canDecreaseIndent)
-	{
-		getLineText(lineIndex,seg);
-
-		int tabSize = getTabSize();
-
-		int whitespaceChars = 0;
-		int currentIndent = 0;
-loop:		for(int i = 0; i < seg.count; i++)
-		{
-			char c = seg.array[seg.offset + i];
-			switch(c)
-			{
-			case ' ':
-				currentIndent++;
-				whitespaceChars++;
-				break;
-			case '\t':
-				currentIndent += (tabSize - (currentIndent
-					% tabSize));
-				whitespaceChars++;
-				break;
-			default:
-				break loop;
-			}
-		}
-
-		int idealIndent = getIndentForLine(lineIndex);
-		if(idealIndent == -1)
-			return false;
-
-		if(!canDecreaseIndent && idealIndent <= currentIndent)
-			return false;
-
-		if(!canIncreaseIndent && idealIndent >= currentIndent)
-			return false;
-
-		// Do it
-		try
-		{
-			beginCompoundEdit();
-
-			int start = getLineStartOffset(lineIndex);
-
-			remove(start,whitespaceChars);
-			insert(start,MiscUtilities.createWhiteSpace(
-				idealIndent,(getBooleanProperty("noTabs")
-				? 0 : tabSize)));
-		}
-		finally
-		{
-			endCompoundEdit();
-		}
-
-		return true;
-	} //}}}
-
 	//{{{ indentLines() method
 	/**
 	 * Indents all specified lines.
@@ -2362,7 +2275,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 		{
 			beginCompoundEdit();
 			for(int i = start; i <= end; i++)
-				indentLine(i,true,true);
+				indentLine(i,true);
 		}
 		finally
 		{
@@ -2382,7 +2295,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 		{
 			beginCompoundEdit();
 			for(int i = 0; i < lines.length; i++)
-				indentLine(lines[i],true,true);
+				indentLine(lines[i],true);
 		}
 		finally
 		{
@@ -2390,13 +2303,102 @@ loop:		for(int i = 0; i < seg.count; i++)
 		}
 	} //}}}
 
-	//{{{ getIndentForLine() method
+	//{{{ indentLine() method
+	/**
+	 * @deprecated Use {@link #indentLine(int,boolean)} instead.
+	 */
+	public boolean indentLine(int lineIndex, boolean canIncreaseIndent,
+		boolean canDecreaseIndent)
+	{
+		return indentLine(lineIndex,canDecreaseIndent);
+	} //}}}
+
+	//{{{ indentLine() method
+	/**
+	 * Indents the specified line.
+	 * @param lineIndex The line number to indent
+	 * @param canDecreaseIndent If true, the indent can be decreased as a
+	 * result of this. Set this to false for Tab key.
+	 * @return true If indentation took place, false otherwise.
+	 * @since jEdit 4.2pre2
+	 */
+	public boolean indentLine(int lineIndex, boolean canDecreaseIndent)
+	{
+		int[] whitespaceChars = new int[1];
+		int currentIndent = getCurrentIndentForLine(lineIndex,
+			whitespaceChars);
+		int idealIndent = getIdealIndentForLine(lineIndex);
+
+		if(idealIndent == -1 || idealIndent == currentIndent
+			|| (!canDecreaseIndent && idealIndent < currentIndent))
+			return false;
+
+		// Do it
+		try
+		{
+			beginCompoundEdit();
+
+			int start = getLineStartOffset(lineIndex);
+
+			remove(start,whitespaceChars[0]);
+			insert(start,MiscUtilities.createWhiteSpace(
+				idealIndent,(getBooleanProperty("noTabs")
+				? 0 : getTabSize())));
+		}
+		finally
+		{
+			endCompoundEdit();
+		}
+
+		return true;
+	} //}}}
+
+	//{{{ getCurrentIndentForLine() method
+	/**
+	 * Returns the line's current leading indent.
+	 * @param lineIndex The line number
+	 * @param whitespaceChars If this is non-null, the number of whitespace
+	 * characters is stored at the 0 index
+	 * @since jEdit 4.2pre2
+	 */
+	public int getCurrentIndentForLine(int lineIndex, int[] whitespaceChars)
+	{
+		getLineText(lineIndex,seg);
+
+		int tabSize = getTabSize();
+
+		int currentIndent = 0;
+loop:		for(int i = 0; i < seg.count; i++)
+		{
+			char c = seg.array[seg.offset + i];
+			switch(c)
+			{
+			case ' ':
+				currentIndent++;
+				if(whitespaceChars != null)
+					whitespaceChars[0]++;
+				break;
+			case '\t':
+				currentIndent += (tabSize - (currentIndent
+					% tabSize));
+				if(whitespaceChars != null)
+					whitespaceChars[0]++;
+				break;
+			default:
+				break loop;
+			}
+		}
+
+		return currentIndent;
+	} //}}}
+
+	//{{{ getIdealIndentForLine() method
 	/**
 	 * Returns the ideal leading indent for the specified line.
 	 * This will apply the various auto-indent rules.
 	 * @param lineIndex The line number
 	 */
-	public int getIndentForLine(int lineIndex)
+	public int getIdealIndentForLine(int lineIndex)
 	{
 		final String EXPLICIT_START = "{{{";
 		final String EXPLICIT_END = "}}}";
@@ -2463,13 +2465,16 @@ loop:		for(int i = 0; i < seg.count; i++)
 		int indent = 0; // Indent width (tab expanded)
 		int prevLineBrackets = 0; // Additional bracket indent
 		int prevLineCloseBracketIndex = -1; // For finding whether we're in
-		                                    // this kind of construct:
-		                                    // if (cond1)
-		                                    //   while (cond2)
-		                                    //     if (cond3){
-		                                    //
-		                                    //     }
-		                                    // So we know to indent the next line under the 1st if.
+						    // this kind of construct:
+						    // if (cond1)
+						    //   while (cond2)
+						    //     if (cond3){
+						    //
+						    //     }
+						    // So we know to indent the next line under the 1st if.
+		int prevLineUnclosedParenIndex = -1; // Index of the last unclosed parenthesis
+		int prevLineParenWeight = 0; // (openParens - closeParens)
+		Stack openParens = new Stack();
 
 		for(int i = 0; i < prevLine.length(); i++)
 		{
@@ -2514,16 +2519,40 @@ loop:		for(int i = 0; i < seg.count; i++)
 						i += 2;
 					else
 						prevLineBrackets++;
+				} 
+				else if (c == '(')
+				{
+					openParens.push(new Integer(i));
+					prevLineParenWeight++;
 				}
-
+				else if (c == ')')
+				{
+					if(openParens.size() > 0)
+						openParens.pop();
+					prevLineParenWeight--;
+				}
+						 
 				break;
 			}
 		}
 
-		String line = getLineText(lineIndex);
-		//}}}
+		if(openParens.size() > 0)
+		{
+			prevLineUnclosedParenIndex = ((Integer) openParens.pop()).intValue();
+		} //}}}
+
+		if(Debug.INDENT_DEBUG)
+		{
+			Log.log(Log.DEBUG,this,"Determined previous line");
+			Log.log(Log.DEBUG,this,"indent=" + indent
+				+ ",prevLineBrackets=" + prevLineBrackets
+				+ ",prevLineCloseBracketIndex="
+				+ prevLineCloseBracketIndex);
+		}
 
 		//{{{ Get indent attributes for current line
+		String line = getLineText(lineIndex);
+
 		/*
 		 * On the current line,
 		 * } --> -1
@@ -2557,6 +2586,43 @@ loop:		for(int i = 0; i < seg.count; i++)
 			}
 		} //}}}
 
+		if(Debug.INDENT_DEBUG)
+		{
+			Log.log(Log.DEBUG,this,"Determined current line");
+			Log.log(Log.DEBUG,this,"lineBrackets=" + lineBrackets
+				+ ",closeBracketIndex=" + closeBracketIndex);
+		}
+
+		//{{{ Deep indenting
+		if(getBooleanProperty("deepIndent"))
+		{
+			if(prevLineParenWeight > 0)
+			{
+				indent = prevLineUnclosedParenIndex+1;
+				for (int i = 0; i < prevLine.length(); i++) {
+					if (prevLine.charAt(i) == '\t')
+						indent += tabSize-1;
+				}
+				return indent;
+			}
+			else if(prevLineParenWeight < 0)
+			{
+				int openParenOffset = TextUtilities.findMatchingBracket(this,prevLineIndex,prevLine.lastIndexOf(")"));
+				if(openParenOffset >= 0)
+				{
+					int startLine = getLineOfOffset(openParenOffset);
+					int startLineParenWeight = getLineParenWeight(startLine);
+					
+					if(startLineParenWeight == 1)
+						indent = getCurrentIndentForLine(startLine,null);
+					else
+						indent = getOpenParenIndent(startLine,lineIndex);
+				}
+			}
+			// no parenthesis on previous line (prevLineParenWeight == 0) so the normal indenting rules are used
+		}
+		//}}}
+		
 		//{{{ Handle brackets
 		if(prevLineBrackets > 0)
 			indent += (indentSize * prevLineBrackets);
@@ -2565,13 +2631,23 @@ loop:		for(int i = 0; i < seg.count; i++)
 		{
 			if(lineBrackets < 0)
 			{
-				int offset = TextUtilities.findMatchingBracket(
+				int openBracketIndex = TextUtilities.findMatchingBracket(
 					this,lineIndex,closeBracketIndex);
-				if(offset != -1)
+				if(openBracketIndex != -1)
 				{
-					String closeLine = getLineText(getLineOfOffset(offset));
+					int openLineIndex = getLineOfOffset(openBracketIndex);
+					String openLine = getLineText(openLineIndex);
+					Log.log(Log.DEBUG,this,"parenWeight of "+openLine+" is "+getLineParenWeight(openLineIndex));
+					if (getLineParenWeight(openLineIndex) < 0)
+					{
+						openBracketIndex = TextUtilities.findMatchingBracket(this,openLineIndex,openLine.indexOf(")"));
+						Log.log(Log.DEBUG,this,"openBracketIndex: "+openBracketIndex);
+					}
+					openLine = getLineText(getLineOfOffset(openBracketIndex));
+					Log.log(Log.DEBUG,this,"openLine: "+openLine);
 					indent = MiscUtilities.getLeadingWhiteSpaceWidth(
-						closeLine,tabSize);
+						openLine,tabSize);
+					Log.log(Log.DEBUG,this,"indent: "+indent);
 				}
 				else
 					return -1;
@@ -2595,15 +2671,24 @@ loop:		for(int i = 0; i < seg.count; i++)
 		}//}}}
 
 		//{{{ Handle regexps
-		if(lineBrackets == 0 || (doubleBracketIndent && lineBrackets > 0))
+		if(lineBrackets >= 0)
 		{
 			// If the previous line matches indentNextLine or indentNextLines,
 			// add a level of indent
-			if(indentNextLinesRE != null && indentNextLinesRE.isMatch(prevLine))
+			if((lineBrackets == 0 || doubleBracketIndent)
+				&& indentNextLinesRE != null
+				&& indentNextLinesRE.isMatch(prevLine))
+			{
+				if(Debug.INDENT_DEBUG)
+				{
+					Log.log(Log.DEBUG,this,"Matches indentNextLines");
+				}
 				indent += indentSize;
+			}
 			else if(indentNextLineRE != null)
 			{
-				if(indentNextLineRE.isMatch(prevLine))
+				if((lineBrackets == 0 || doubleBracketIndent)
+					&& indentNextLineRE.isMatch(prevLine))
 					indent += indentSize;
 
 				// we don't want
@@ -2633,9 +2718,17 @@ loop:		for(int i = 0; i < seg.count; i++)
 					while(prevPrevLineIndex != -1)
 					{
 						if(indentNextLineRE.isMatch(getLineText(prevPrevLineIndex)))
-							indent -= indentSize;
+							indent = getCurrentIndentForLine(prevPrevLineIndex,null);
 						else
 							break;
+
+						if(Debug.INDENT_DEBUG)
+						{
+							Log.log(Log.DEBUG,this,
+								prevPrevLineIndex
+								+ " matches " +
+								"indentNextLine");
+						}
 
 						prevPrevLineIndex = getPriorNonEmptyLine(prevPrevLineIndex);
 					}
@@ -2645,6 +2738,73 @@ loop:		for(int i = 0; i < seg.count; i++)
 
 		return indent;
 	} //}}}
+
+	//{{{ getLineParenWeight() method
+	/**
+	 * Returns the number of open parenthesis minus the number of close parenthesis.
+	 * @param line The line number
+	 * @since jEdit 4.2pre9
+	 */
+	private int getLineParenWeight(int line)
+	{
+		String lineText = getLineText(line);
+		int parenWeight = 0;
+		for(int i = 0; i < lineText.length(); i++)
+		{
+			char c = lineText.charAt(i);
+			switch(c)
+			{
+				case '(':
+					parenWeight++;
+					break;
+				case ')':
+					parenWeight--;
+					break;
+				default:
+			}
+		}
+		return parenWeight;
+	} //}}}
+
+	//{{{ getOpenParenIndent() method
+	/**
+	 * Returns the appropriate indent based on open parenthesis on previous lines.
+	 *
+	 * @param startLine The line where parens were last balanced
+	 * @param targetLine The line we're finding the indent for
+	 */
+	private int getOpenParenIndent(int startLine, int targetLine)
+	{
+		Stack openParens = new Stack();
+		String lineText;
+
+		for(int lineIndex = startLine; lineIndex < targetLine; lineIndex++)
+		{
+			lineText = getLineText(lineIndex);
+			for(int i = 0; i < lineText.length(); i++)
+			{
+				char c = lineText.charAt(i);
+				switch(c)
+				{
+					case '(':
+						openParens.push(new Integer(i));
+						break;
+					case ')':
+						if(openParens.size() > 0)
+							openParens.pop();
+						break;
+					default:
+				}
+			}
+		}
+		int indent = getCurrentIndentForLine(startLine,null);
+
+		if(openParens.size() > 0)
+			indent += ((Integer) openParens.pop()).intValue();
+
+		return indent;
+	}
+	//}}}
 
 	//{{{ getVirtualWidth() method
 	/**
@@ -2674,8 +2834,8 @@ loop:		for(int i = 0; i < seg.count; i++)
 
 	//{{{ getOffsetOfVirtualColumn() method
 	/**
-	 * Returns the array offset of a virtual column number (taking tabs
-	 * into account) in the segment.
+	 * Returns the offset of a virtual column number (taking tabs
+	 * into account) relative to the start of the line in question.
 	 *
 	 * @param line The line number
 	 * @param column The virtual column number
@@ -2705,7 +2865,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 		}
 	} //}}}
 
-	//{{{ insertAtColumn()
+	//{{{ insertAtColumn() method
 	/**
 	 * Like the {@link #insert(int,String)} method, but inserts the string at
 	 * the specified virtual column. Inserts spaces as appropriate if
@@ -2735,6 +2895,55 @@ loop:		for(int i = 0; i < seg.count; i++)
 		finally
 		{
 			writeUnlock();
+		}
+	} //}}}
+
+	//{{{ insertIndented() method
+	/**
+	 * Inserts a string into the buffer, indenting each line of the string
+	 * to match the indent of the first line.
+	 *
+	 * @param offset The offset
+	 * @param text The text
+	 *
+	 * @return The number of characters of indent inserted on each new
+	 * line. This is used by the abbreviations code.
+	 *
+	 * @since jEdit 4.2pre14
+	 */
+	public int insertIndented(int offset, String text)
+	{
+		try
+		{
+			beginCompoundEdit();
+
+			// obtain the leading indent for later use
+			int firstLine = getLineOfOffset(offset);
+			String lineText = getLineText(firstLine);
+			int leadingIndent
+				= MiscUtilities.getLeadingWhiteSpaceWidth(
+				lineText,getTabSize());
+
+			String whiteSpace = MiscUtilities.createWhiteSpace(
+				leadingIndent,getBooleanProperty("noTabs")
+				? 0 : getTabSize());
+
+			insert(offset,text);
+
+			int lastLine = getLineOfOffset(offset + text.length());
+
+			// note that if firstLine == lastLine, loop does not
+			// execute
+			for(int i = firstLine + 1; i <= lastLine; i++)
+			{
+				insert(getLineStartOffset(i),whiteSpace);
+			}
+
+			return whiteSpace.length();
+		}
+		finally
+		{
+			endCompoundEdit();
 		}
 	} //}}}
 
@@ -2829,10 +3038,18 @@ loop:		for(int i = 0; i < seg.count; i++)
 	 * @deprecated Do not call this method, use {@link #getPath()}
 	 * instead.
 	 */
-	public final File getFile()
+	public File getFile()
 	{
 		return file;
 	} //}}}
+
+	//{{{ getCurrentIdentForLine() method
+	/**
+	 * @deprecated Use the correctly spelled getCurrentIndentForLine() instead.
+	 */
+	public int getCurrentIdentForLine(int lineIndex, int[] whitespaceChars) {
+		return getCurrentIndentForLine(lineIndex,whitespaceChars);
+	}//}}}
 
 	//}}}
 
@@ -2849,6 +3066,17 @@ loop:		for(int i = 0; i < seg.count; i++)
 			&& getFoldLevel(line) < getFoldLevel(line + 1));
 	} //}}}
 
+	//{{{ isFoldEnd() method
+	/**
+	 * Returns if the specified line ends a fold.
+	 * @since jEdit 4.2pre5
+	 */
+	public boolean isFoldEnd(int line)
+	{
+		return (line != getLineCount() - 1
+			&& getFoldLevel(line) > getFoldLevel(line + 1));
+	} //}}}
+
 	//{{{ invalidateCachedFoldLevels() method
 	/**
 	 * Invalidates all cached fold level information.
@@ -2856,13 +3084,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 	 */
 	public void invalidateCachedFoldLevels()
 	{
-		offsetMgr.lineInfoChangedFrom(0);
-		for(int i = 0; i < inUseFVMs.length; i++)
-		{
-			if(inUseFVMs[i] != null)
-				inUseFVMs[i]._invalidate(0);
-		}
-
+		lineMgr.setFirstInvalidFoldLevel(0);
 		fireFoldLevelChanged(0,getLineCount());
 	} //}}}
 
@@ -2874,55 +3096,50 @@ loop:		for(int i = 0; i < seg.count; i++)
 	 */
 	public int getFoldLevel(int line)
 	{
-		try
+		if(line < 0 || line >= lineMgr.getLineCount())
+			throw new ArrayIndexOutOfBoundsException(line);
+
+		if(foldHandler instanceof DummyFoldHandler)
+			return 0;
+
+		int firstInvalidFoldLevel = lineMgr.getFirstInvalidFoldLevel();
+		if(firstInvalidFoldLevel == -1 || line < firstInvalidFoldLevel)
 		{
-			writeLock();
-
-			if(line < 0 || line >= offsetMgr.getLineCount())
-				throw new ArrayIndexOutOfBoundsException(line);
-
-			if(offsetMgr.isFoldLevelValid(line))
-			{
-				return offsetMgr.getFoldLevel(line);
-			}
-			else
-			{
-				//System.err.println("level invalid: " + line + ":"
-				//	+ offsetMgr.getFoldLevel(line));
-
-				int start = 0;
-				for(int i = line - 1; i >= 0; i--)
-				{
-					if(offsetMgr.isFoldLevelValid(i))
-					{
-						start = i + 1;
-						break;
-					}
-				}
-
-				int newFoldLevel = 0;
-				boolean changed = false;
-
-				for(int i = start; i <= line; i++)
-				{
-					newFoldLevel = foldHandler.getFoldLevel(this,i,seg);
-					if(newFoldLevel != offsetMgr.getFoldLevel(i))
-						changed = true;
-					offsetMgr.setFoldLevel(i,newFoldLevel);
-				}
-
-				if(changed && !getFlag(INSIDE_INSERT))
-				{
-					//System.err.println("fold level changed: " + start + ":" + line);
-					fireFoldLevelChanged(start,line);
-				}
-
-				return newFoldLevel;
-			}
+			return lineMgr.getFoldLevel(line);
 		}
-		finally
+		else
 		{
-			writeUnlock();
+			if(Debug.FOLD_DEBUG)
+				Log.log(Log.DEBUG,this,"Invalid fold levels from " + firstInvalidFoldLevel + " to " + line);
+
+			int newFoldLevel = 0;
+			boolean changed = false;
+
+			for(int i = firstInvalidFoldLevel; i <= line; i++)
+			{
+				newFoldLevel = foldHandler.getFoldLevel(this,i,seg);
+				if(newFoldLevel != lineMgr.getFoldLevel(i))
+				{
+					if(Debug.FOLD_DEBUG)
+						Log.log(Log.DEBUG,this,i + " fold level changed");
+					changed = true;
+				}
+				lineMgr.setFoldLevel(i,newFoldLevel);
+			}
+
+			if(line == lineMgr.getLineCount() - 1)
+				lineMgr.setFirstInvalidFoldLevel(-1);
+			else
+				lineMgr.setFirstInvalidFoldLevel(line + 1);
+
+			if(changed)
+			{
+				if(Debug.FOLD_DEBUG)
+					Log.log(Log.DEBUG,this,"fold level changed: " + firstInvalidFoldLevel + "," + line);
+				fireFoldLevelChanged(firstInvalidFoldLevel,line);
+			}
+
+			return newFoldLevel;
 		}
 	} //}}}
 
@@ -2985,6 +3202,35 @@ loop:		for(int i = 0; i < seg.count; i++)
 		return new int[] { start, end };
 	} //}}}
 
+	//{{{ getFoldHandler() method
+	/**
+	 * Returns the current buffer's fold handler.
+	 * @since jEdit 4.2pre1
+	 */
+	public FoldHandler getFoldHandler()
+	{
+		return foldHandler;
+	} //}}}
+
+	//{{{ setFoldHandler() method
+	/**
+	 * Sets the buffer's fold handler.
+	 * @since jEdit 4.2pre2
+	 */
+	public void setFoldHandler(FoldHandler foldHandler)
+	{
+		FoldHandler oldFoldHandler = this.foldHandler;
+
+		if(foldHandler.equals(oldFoldHandler))
+			return;
+
+		this.foldHandler = foldHandler;
+
+		lineMgr.setFirstInvalidFoldLevel(0);
+
+		fireFoldHandlerChanged();
+	} //}}}
+
 	//}}}
 
 	//{{{ Position methods
@@ -3003,7 +3249,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 			if(offset < 0 || offset > contentMgr.getLength())
 				throw new ArrayIndexOutOfBoundsException(offset);
 
-			return offsetMgr.createPosition(offset);
+			return positionMgr.createPosition(offset);
 		}
 		finally
 		{
@@ -3020,9 +3266,47 @@ loop:		for(int i = 0; i < seg.count; i++)
 	 * Returns a vector of markers.
 	 * @since jEdit 3.2pre1
 	 */
-	public final Vector getMarkers()
+	public Vector getMarkers()
 	{
 		return markers;
+	} //}}}
+
+	//{{{ getMarkerStatusPrompt() method
+	/**
+	 * Returns the status prompt for the given marker action. Only
+	 * intended to be called from <code>actions.xml</code>.
+	 * @since jEdit 4.2pre2
+	 */
+	public String getMarkerStatusPrompt(String action)
+	{
+		return jEdit.getProperty("view.status." + action,
+			new String[] { getMarkerNameString() });
+	} //}}}
+
+	//{{{ getMarkerNameString() method
+	/**
+	 * Returns a string of all set markers, used by the status bar
+	 * (eg, "a b $ % ^").
+	 * @since jEdit 4.2pre2
+	 */
+	public String getMarkerNameString()
+	{
+		StringBuffer buf = new StringBuffer();
+		for(int i = 0; i < markers.size(); i++)
+		{
+			Marker marker = (Marker)markers.elementAt(i);
+			if(marker.getShortcut() != '\0')
+			{
+				if(buf.length() != 0)
+					buf.append(' ');
+				buf.append(marker.getShortcut());
+			}
+		}
+
+		if(buf.length() == 0)
+			return jEdit.getProperty("view.status.no-markers");
+		else
+			return buf.toString();
 	} //}}}
 
 	//{{{ addOrRemoveMarker() method
@@ -3051,15 +3335,15 @@ loop:		for(int i = 0; i < seg.count; i++)
 	 */
 	public void addMarker(char shortcut, int pos)
 	{
-		if(!getFlag(READ_ONLY) && jEdit.getBooleanProperty("persistentMarkers"))
-			setDirty(true);
-
 		Marker markerN = new Marker(this,shortcut,pos);
 		boolean added = false;
 
 		// don't sort markers while buffer is being loaded
 		if(!getFlag(LOADING))
 		{
+			if(jEdit.getBooleanProperty("persistentMarkers"))
+				setDirty(true);
+
 			markerN.createPosition();
 
 			for(int i = 0; i < markers.size(); i++)
@@ -3149,7 +3433,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 			Marker marker = (Marker)markers.elementAt(i);
 			if(getLineOfOffset(marker.getPosition()) == line)
 			{
-				if(!getFlag(READ_ONLY) && jEdit.getBooleanProperty("persistentMarkers"))
+				if(jEdit.getBooleanProperty("persistentMarkers"))
 					setDirty(true);
 
 				marker.removePosition();
@@ -3169,7 +3453,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 	 */
 	public void removeAllMarkers()
 	{
-		if(!getFlag(READ_ONLY) && jEdit.getBooleanProperty("persistentMarkers"))
+		if(jEdit.getBooleanProperty("persistentMarkers"))
 			setDirty(true);
 
 		for(int i = 0; i < markers.size(); i++)
@@ -3192,10 +3476,10 @@ loop:		for(int i = 0; i < seg.count; i++)
 	 */
 	public Marker getMarker(char shortcut)
 	{
-		Enumeration enum = markers.elements();
-		while(enum.hasMoreElements())
+		Enumeration e = markers.elements();
+		while(e.hasMoreElements())
 		{
-			Marker marker = (Marker)enum.nextElement();
+			Marker marker = (Marker)e.nextElement();
 			if(marker.getShortcut() == shortcut)
 				return marker;
 		}
@@ -3206,11 +3490,20 @@ loop:		for(int i = 0; i < seg.count; i++)
 
 	//{{{ Miscellaneous methods
 
+	//{{{ setWaitSocket() method
+	/**
+	 * This socket is closed when the buffer is closed.
+	 */
+	public void setWaitSocket(Socket waitSocket)
+	{
+		this.waitSocket = waitSocket;
+	} //}}}
+
 	//{{{ getNext() method
 	/**
 	 * Returns the next buffer in the list.
 	 */
-	public final Buffer getNext()
+	public Buffer getNext()
 	{
 		return next;
 	} //}}}
@@ -3219,7 +3512,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 	/**
 	 * Returns the previous buffer in the list.
 	 */
-	public final Buffer getPrev()
+	public Buffer getPrev()
 	{
 		return prev;
 	} //}}}
@@ -3228,7 +3521,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 	/**
 	 * Returns the position of this buffer in the buffer list.
 	 */
-	public final int getIndex()
+	public int getIndex()
 	{
 		int count = 0;
 		Buffer buffer = prev;
@@ -3252,84 +3545,18 @@ loop:		for(int i = 0; i < seg.count; i++)
 		return name + " (" + directory + ")";
 	} //}}}
 
-	//{{{ handleMessage() method
-	public void handleMessage(EBMessage msg)
-	{
-		if(msg instanceof PropertiesChanged)
-			propertiesChanged();
-		else if(msg instanceof EditPaneUpdate)
-		{
-			EditPaneUpdate emsg = (EditPaneUpdate)msg;
-			if(emsg.getWhat() == EditPaneUpdate.CREATED)
-			{
-				// see getFoldVisibilityManager()
-			}
-			else if(emsg.getWhat() == EditPaneUpdate.DESTROYED)
-			{
-				JEditTextArea textArea = emsg.getEditPane()
-					.getTextArea();
-				FoldVisibilityManager mgr = textArea
-					.getFoldVisibilityManager();
-
-				for(int i = 0; i < inUseFVMs.length; i++)
-				{
-					if(mgr == inUseFVMs[i])
-					{
-						mgr._release();
-						inUseFVMs[i] = null;
-						break;
-					}
-				}
-			}
-		}
-	} //}}}
-
 	//}}}
 
 	//{{{ Methods that really shouldn't be public...
 
-	//{{{ _getFoldVisibilityManager() method
-	/**
-	 * Plugins and macros should not call this method. Call
-	 * {@link org.gjt.sp.jedit.textarea.JEditTextArea#getFoldVisibilityManager()}
-	 * instead.
-	 * @param textArea The text area
-	 * @since jEdit 4.0pre1
-	 */
-	public FoldVisibilityManager _getFoldVisibilityManager(
-		JEditTextArea textArea)
-	{
-		//System.err.println("_getFoldVisibilityManager() called for "
-		//	+ this);
-
-		FoldVisibilityManager mgr = new FoldVisibilityManager(this,
-			offsetMgr,textArea);
-
-		// find it a bit that it can set in line's 'visible' flag sets
-		for(int i = 0; i < inUseFVMs.length; i++)
-		{
-			if(inUseFVMs[i] == null)
-			{
-				inUseFVMs[i] = mgr;
-				mgr._grab(i);
-				return mgr;
-			}
-		}
-
-		//XXX
-		throw new InternalError("Too many text areas editing this buffer");
-	} //}}}
-
-	//{{{ _releaseFoldVisibilityManager() method
+	//{{{ _getLineManager() method
 	/**
 	 * Plugins and macros should not call this method.
-	 * @param mgr The fold visibility manager
-	 * @since jEdit 4.0pre1
+	 * @since jEdit 4.2pre3
 	 */
-	public void _releaseFoldVisibilityManager(FoldVisibilityManager mgr)
+	public LineManager _getLineManager()
 	{
-		inUseFVMs[mgr._getIndex()] = null;
-		mgr._release();
+		return lineMgr;
 	} //}}}
 
 	//}}}
@@ -3341,13 +3568,23 @@ loop:		for(int i = 0; i < seg.count; i++)
 	//{{{ Buffer constructor
 	Buffer(String path, boolean newFile, boolean temp, Hashtable props)
 	{
-		properties = new Hashtable();
+		lock = new ReadWriteLock();
+		propertyLock = new Object();
+		contentMgr = new ContentManager();
+		lineMgr = new LineManager();
+		positionMgr = new PositionManager();
+		integerArray = new IntegerArray();
+		undoMgr = new UndoManager(this);
+		bufferListeners = new Vector();
+		seg = new Segment();
+		markers = new Vector();
+		properties = new HashMap();
 
 		//{{{ need to convert entries of 'props' to PropValue instances
-		Enumeration enum = props.keys();
-		while(enum.hasMoreElements())
+		Enumeration e = props.keys();
+		while(e.hasMoreElements())
 		{
-			Object key = enum.nextElement();
+			Object key = e.nextElement();
 			Object value = props.get(key);
 
 			properties.put(key,new PropValue(value,false));
@@ -3360,28 +3597,10 @@ loop:		for(int i = 0; i < seg.count; i++)
 		if(getProperty(LINESEP) == null)
 			properties.put(LINESEP,new PropValue(System.getProperty("line.separator"),false));
 
-		lock = new ReadWriteLock();
-		contentMgr = new ContentManager();
-		offsetMgr = new OffsetManager(this);
-		integerArray = new IntegerArray();
-		undoMgr = new UndoManager(this);
-		bufferListeners = new Vector();
-
-		seg = new Segment();
-
-		inUseFVMs = new FoldVisibilityManager[8];
-
 		setFlag(TEMPORARY,temp);
-
-		markers = new Vector();
 
 		// this must be called before any EditBus messages are sent
 		setPath(path);
-
-		Mode defaultMode = jEdit.getMode(jEdit.getProperty("buffer.defaultMode"));
-		if(defaultMode == null)
-			defaultMode = jEdit.getMode("text");
-		setMode(defaultMode);
 
 		/* Magic: UNTITLED is only set if newFile param to
 		 * constructor is set, NEW_FILE is also set if file
@@ -3400,18 +3619,28 @@ loop:		for(int i = 0; i < seg.count; i++)
 		 */
 		setFlag(UNTITLED,newFile);
 		setFlag(NEW_FILE,newFile);
-
-		if(!temp)
-			EditBus.addToBus(Buffer.this);
 	} //}}}
 
 	//{{{ commitTemporary() method
 	void commitTemporary()
 	{
 		setFlag(TEMPORARY,false);
-		EditBus.addToBus(this);
 
 		finishLoading();
+	} //}}}
+
+	//{{{ resetCachedProperties() method
+	void resetCachedProperties()
+	{
+		// Need to reset properties that were cached defaults,
+		// since the defaults might have changed.
+		Iterator iter = properties.values().iterator();
+		while(iter.hasNext())
+		{
+			PropValue value = (PropValue)iter.next();
+			if(value.defaultValue)
+				iter.remove();
+		}
 	} //}}}
 
 	//{{{ close() method
@@ -3422,7 +3651,22 @@ loop:		for(int i = 0; i < seg.count; i++)
 		if(autosaveFile != null)
 			autosaveFile.delete();
 
-		EditBus.removeFromBus(this);
+		// notify clients with -wait
+		if(waitSocket != null)
+		{
+			try
+			{
+				waitSocket.getOutputStream().write('\0');
+				waitSocket.getOutputStream().flush();
+				waitSocket.getInputStream().close();
+				waitSocket.getOutputStream().close();
+				waitSocket.close();
+			}
+			catch(IOException io)
+			{
+				//Log.log(Log.ERROR,this,io);
+			}
+		}
 	} //}}}
 
 	//}}}
@@ -3456,9 +3700,10 @@ loop:		for(int i = 0; i < seg.count; i++)
 	private static final int AUTOSAVE_DIRTY = 5;
 	private static final int DIRTY = 6;
 	private static final int READ_ONLY = 7;
-	private static final int UNDO_IN_PROGRESS = 8;
-	private static final int TEMPORARY = 9;
-	private static final int INSIDE_INSERT = 10;
+	private static final int READ_ONLY_OVERRIDE = 8;
+	private static final int UNDO_IN_PROGRESS = 9;
+	private static final int TEMPORARY = 10;
+	private static final int TRANSACTION = 11;
 	//}}}
 
 	private int flags;
@@ -3466,58 +3711,64 @@ loop:		for(int i = 0; i < seg.count; i++)
 	//}}}
 
 	//{{{ Instance variables
-	private VFS vfs;
 	private String path;
+	private String symlinkPath;
 	private String name;
 	private String directory;
 	private File file;
 	private File autosaveFile;
 	private long modTime;
 	private Mode mode;
-	private Hashtable properties;
+	private HashMap properties;
 
 	private ReadWriteLock lock;
+	private Object propertyLock;
 	private ContentManager contentMgr;
-	private OffsetManager offsetMgr;
+	private LineManager lineMgr;
+	private PositionManager positionMgr;
 	private IntegerArray integerArray;
 	private UndoManager undoMgr;
 	private Vector bufferListeners;
 
 	private Vector markers;
 
-	// Syntax highlighting
+	// Display
 	private boolean textMode;
 	private TokenMarker tokenMarker;
 	private Segment seg;
-	private boolean nextLineRequested;
-
-	// Folding
 	private FoldHandler foldHandler;
-	private FoldVisibilityManager[] inUseFVMs;
 
-	// Minimise EditBus message traffic...
-	private boolean firstTimeDone;
+	private Socket waitSocket;
 	//}}}
 
 	//{{{ setPath() method
 	private void setPath(String path)
 	{
 		this.path = path;
-		this.vfs = VFSManager.getVFSForPath(path);
+		VFS vfs = VFSManager.getVFSForPath(path);
 		if((vfs.getCapabilities() & VFS.WRITE_CAP) == 0)
-			setReadOnly(true);
+			setFlag(READ_ONLY,true);
 		this.name = vfs.getFileName(path);
 		this.directory = vfs.getParentOfPath(path);
 
 		if(vfs instanceof FileVFS)
 		{
 			file = new File(path);
+			symlinkPath = MiscUtilities.resolveSymlinks(path);
 
 			// if we don't do this, the autosave file won't be
 			// deleted after a save as
 			if(autosaveFile != null)
 				autosaveFile.delete();
 			autosaveFile = new File(file.getParent(),'#' + name + '#');
+		}
+		else
+		{
+			// I wonder if the lack of this broke anything in the
+			// past?
+			file = null;
+			autosaveFile = null;
+			symlinkPath = path;
 		}
 	} //}}}
 
@@ -3536,7 +3787,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 
 		if(result == JOptionPane.YES_OPTION)
 		{
-			vfs.load(view,this,autosaveFile.getPath());
+			VFSManager.getFileVFS().load(view,this,autosaveFile.getPath());
 
 			// show this message when all I/O requests are
 			// complete
@@ -3554,6 +3805,111 @@ loop:		for(int i = 0; i < seg.count; i++)
 			return false;
 	} //}}}
 
+	//{{{ checkFileForLoad() method
+	private boolean checkFileForLoad(View view, VFS vfs, String path)
+	{
+		if((vfs.getCapabilities() & VFS.LOW_LATENCY_CAP) != 0)
+		{
+			Object session = vfs.createVFSSession(path,view);
+			if(session == null)
+				return false;
+
+			try
+			{
+				VFS.DirectoryEntry file = vfs._getDirectoryEntry(session,path,view);
+				if(file == null)
+				{
+					setNewFile(true);
+					return true;
+				}
+
+				if(!file.canRead)
+				{
+					VFSManager.error(view,path,"ioerror.no-read",null);
+					setNewFile(false);
+					return false;
+				}
+
+				setFlag(READ_ONLY,!file.canWrite);
+
+				if(file.type != VFS.DirectoryEntry.FILE)
+				{
+					VFSManager.error(view,path,
+						"ioerror.open-directory",null);
+					setNewFile(false);
+					return false;
+				}
+			}
+			catch(IOException io)
+			{
+				VFSManager.error(view,path,"ioerror",
+					new String[] { io.toString() });
+				return false;
+			}
+			finally
+			{
+				try
+				{
+					vfs._endVFSSession(session,view);
+				}
+				catch(IOException io)
+				{
+					VFSManager.error(view,path,"ioerror",
+						new String[] { io.toString() });
+					return false;
+				}
+			}
+		}
+
+		return true;
+	} //}}}
+
+	//{{{ checkFileForSave() method
+	private boolean checkFileForSave(View view, VFS vfs, String path)
+	{
+		if((vfs.getCapabilities() & VFS.LOW_LATENCY_CAP) != 0)
+		{
+			Object session = vfs.createVFSSession(path,view);
+			if(session == null)
+				return false;
+
+			try
+			{
+				VFS.DirectoryEntry file = vfs._getDirectoryEntry(session,path,view);
+				if(file == null)
+					return true;
+
+				if(file.type != VFS.DirectoryEntry.FILE)
+				{
+					VFSManager.error(view,path,
+						"ioerror.save-directory",null);
+					return false;
+				}
+			}
+			catch(IOException io)
+			{
+				VFSManager.error(view,path,"ioerror",
+					new String[] { io.toString() });
+				return false;
+			}
+			finally
+			{
+				try
+				{
+					vfs._endVFSSession(session,view);
+				}
+				catch(IOException io)
+				{
+					VFSManager.error(view,path,"ioerror",
+						new String[] { io.toString() });
+					return false;
+				}
+			}
+		}
+
+		return true;
+	} //}}}
+
 	//{{{ finishLoading() method
 	private void finishLoading()
 	{
@@ -3568,15 +3924,28 @@ loop:		for(int i = 0; i < seg.count; i++)
 			// on a reload, the fold handler doesn't change, but
 			// we still need to re-collapse folds.
 			// don't do this on initial fold handler creation
-			offsetMgr.lineInfoChangedFrom(0);
+			lineMgr.setFirstInvalidFoldLevel(0);
 
-			int collapseFolds = getIntegerProperty("collapseFolds",0);
-			offsetMgr.expandFolds(collapseFolds);
+			fireFoldHandlerChanged();
+		}
+
+		// Create marker positions
+		for(int i = 0; i < markers.size(); i++)
+		{
+			Marker marker = (Marker)markers.elementAt(i);
+			marker.removePosition();
+			int pos = marker.getPosition();
+			if(pos > getLength())
+				marker.setPosition(getLength());
+			else if(pos < 0)
+				marker.setPosition(0);
+			marker.createPosition();
 		}
 	} //}}}
 
 	//{{{ finishSaving() method
-	private void finishSaving(View view, String oldPath, String path,
+	private void finishSaving(View view, String oldPath,
+		String oldSymlinkPath, String path,
 		boolean rename, boolean error)
 	{
 		//{{{ Set the buffer's path
@@ -3655,11 +4024,20 @@ loop:		for(int i = 0; i < seg.count; i++)
 
 				if(!getPath().equals(oldPath))
 				{
-					jEdit.updatePosition(Buffer.this);
+					jEdit.updatePosition(oldSymlinkPath,this);
 					setMode();
 				}
 				else
-					propertiesChanged();
+				{
+					// if user adds mode buffer-local property
+					String newMode = getStringProperty("mode");
+					if(newMode != null &&
+						!newMode.equals(getMode()
+						.getName()))
+						setMode();
+					else
+						propertiesChanged();
+				}
 
 				EditBus.send(new BufferUpdate(Buffer.this,
 					view,BufferUpdate.DIRTY_CHANGED));
@@ -3674,20 +4052,6 @@ loop:		for(int i = 0; i < seg.count; i++)
 	//{{{ parseBufferLocalProperties() method
 	private void parseBufferLocalProperties()
 	{
-		//{{{ Reset cached properties
-		if(getProperty("tabSize")
-			.equals(mode.getProperty("tabSize")))
-			unsetProperty("tabSize");
-
-		if(getProperty("indentSize")
-			.equals(mode.getProperty("indentSize")))
-			unsetProperty("indentSize");
-
-		if(getProperty("maxLineLen")
-			.equals(mode.getProperty("maxLineLen")))
-			unsetProperty("maxLineLen");
-		//}}}
-
 		int lastLine = Math.min(9,getLineCount() - 1);
 		parseBufferLocalProperties(getText(0,getLineEndOffset(lastLine) - 1));
 
@@ -3696,22 +4060,9 @@ loop:		for(int i = 0; i < seg.count; i++)
 		int firstLine = Math.max(lastLine + 1, getLineCount() - 10);
 		if(firstLine < getLineCount())
 		{
-			int length = getLineEndOffset(getLineCount() - 1) 
+			int length = getLineEndOffset(getLineCount() - 1)
 				- (getLineStartOffset(firstLine) + 1);
 			parseBufferLocalProperties(getText(getLineStartOffset(firstLine),length));
-		}
-
-		//XXX: Why the fuck is this here???
-
-		// Create marker positions
-		for(int i = 0; i < markers.size(); i++)
-		{
-			Marker marker = (Marker)markers.elementAt(i);
-			int pos = marker.getPosition();
-			if(pos > getLength())
-				marker.setPosition(getLength());
-			marker.removePosition();
-			marker.createPosition();
 		}
 	} //}}}
 
@@ -3735,15 +4086,12 @@ loop:		for(int i = 0; i < seg.count; i++)
 				}
 				if(name != null)
 				{
-					String value = buf.toString();
-					try
-					{
-						setProperty(name,new Integer(value));
-					}
-					catch(NumberFormatException nf)
-					{
-						setProperty(name,value);
-					}
+					// use the low-level property setting code
+					// so that if we have a buffer-local
+					// property with the same value as a default,
+					// later changes in the default don't affect
+					// the buffer-local property
+					properties.put(name,new PropValue(buf.toString(),false));
 					name = null;
 				}
 				buf.setLength(0);
@@ -3799,27 +4147,7 @@ loop:		for(int i = 0; i < seg.count; i++)
 		// don't do this on initial token marker
 		if(oldTokenMarker != null && tokenMarker != oldTokenMarker)
 		{
-			offsetMgr.lineInfoChangedFrom(0);
-		}
-	} //}}}
-
-	//{{{ setFoldHandler() method
-	private void setFoldHandler(FoldHandler foldHandler)
-	{
-		FoldHandler oldFoldHandler = this.foldHandler;
-
-		if(foldHandler.equals(oldFoldHandler))
-			return;
-
-		this.foldHandler = foldHandler;
-
-		// don't do this on initial fold handler creation
-		if(oldFoldHandler != null)
-		{
-			offsetMgr.lineInfoChangedFrom(0);
-
-			int collapseFolds = getIntegerProperty("collapseFolds",0);
-			offsetMgr.expandFolds(collapseFolds);
+			lineMgr.setFirstInvalidLineContext(0);
 		}
 	} //}}}
 
@@ -3829,13 +4157,24 @@ loop:		for(int i = 0; i < seg.count; i++)
 	 */
 	private int getPriorNonEmptyLine(int lineIndex)
 	{
+		int returnValue = -1;
+
 		for(int i = lineIndex - 1; i >= 0; i--)
 		{
-			if(getLineLength(i) != 0)
-				return i;
+			getLineText(i,seg);
+			if(seg.count != 0)
+				returnValue = i;
+			for(int j = 0; j < seg.count; j++)
+			{
+				char ch = seg.array[seg.offset + j];
+				if(!Character.isWhitespace(ch))
+					return i;
+			}
 		}
 
-		return -1;
+		// didn't find a line that contains non-whitespace chars
+		// so return index of prior whitespace line
+		return returnValue;
 	} //}}}
 
 	//{{{ contentInserted() method
@@ -3844,36 +4183,42 @@ loop:		for(int i = 0; i < seg.count; i++)
 	{
 		try
 		{
-			setFlag(INSIDE_INSERT,true);
+			setFlag(TRANSACTION,true);
 
-			int startLine = offsetMgr.getLineOfOffset(offset);
+			int startLine = lineMgr.getLineOfOffset(offset);
 			int numLines = endOffsets.getSize();
 
-			offsetMgr.contentInserted(startLine,offset,numLines,length,
+			lineMgr.contentInserted(startLine,offset,numLines,length,
 				endOffsets);
-
-			if(numLines > 0)
-			{
-				// notify fold visibility managers
-				for(int i = 0; i < inUseFVMs.length; i++)
-				{
-					if(inUseFVMs[i] != null)
-						inUseFVMs[i]._invalidate(startLine);
-				}
-			}
+			positionMgr.contentInserted(offset,length);
 
 			setDirty(true);
 
 			if(!getFlag(LOADING))
+			{
 				fireContentInserted(startLine,offset,numLines,length);
+
+				if(!getFlag(UNDO_IN_PROGRESS)
+					&& !insideCompoundEdit())
+				{
+					fireTransactionComplete();
+				}
+			}
+
 		}
 		finally
 		{
-			setFlag(INSIDE_INSERT,false);
+			setFlag(TRANSACTION,false);
 		}
 	} //}}}
 
 	//{{{ Event firing methods
+
+	//{{{ getListener() method
+	private BufferChangeListener getListener(int index)
+	{
+		return ((Listener)bufferListeners.elementAt(index)).listener;
+	} //}}}
 
 	//{{{ fireFoldLevelChanged() method
 	private void fireFoldLevelChanged(int start, int end)
@@ -3882,12 +4227,11 @@ loop:		for(int i = 0; i < seg.count; i++)
 		{
 			try
 			{
-				((BufferChangeListener)bufferListeners.elementAt(i))
-					.foldLevelChanged(this,start,end);
+				getListener(i).foldLevelChanged(this,start,end);
 			}
 			catch(Throwable t)
 			{
-				Log.log(Log.ERROR,this,"Exception while sending buffer event:");
+				Log.log(Log.ERROR,this,"Exception while sending buffer event to "+getListener(i)+" :");
 				Log.log(Log.ERROR,this,t);
 			}
 		}
@@ -3901,13 +4245,12 @@ loop:		for(int i = 0; i < seg.count; i++)
 		{
 			try
 			{
-				((BufferChangeListener)bufferListeners.elementAt(i))
-					.contentInserted(this,startLine,offset,
-					numLines,length);
+				getListener(i).contentInserted(this,startLine,
+					offset,numLines,length);
 			}
 			catch(Throwable t)
 			{
-				Log.log(Log.ERROR,this,"Exception while sending buffer event:");
+				Log.log(Log.ERROR,this,"Exception while sending buffer event to "+getListener(i)+" :");
 				Log.log(Log.ERROR,this,t);
 			}
 		}
@@ -3921,13 +4264,31 @@ loop:		for(int i = 0; i < seg.count; i++)
 		{
 			try
 			{
-				((BufferChangeListener)bufferListeners.elementAt(i))
-					.contentRemoved(this,startLine,offset,
-					numLines,length);
+				getListener(i).contentRemoved(this,startLine,
+					offset,numLines,length);
 			}
 			catch(Throwable t)
 			{
-				Log.log(Log.ERROR,this,"Exception while sending buffer event:");
+				Log.log(Log.ERROR,this,"Exception while sending buffer event to "+getListener(i)+" :");
+				Log.log(Log.ERROR,this,t);
+			}
+		}
+	} //}}}
+
+	//{{{ firePreContentRemoved() method
+	private void firePreContentRemoved(int startLine, int offset,
+		int numLines, int length)
+	{
+		for(int i = 0; i < bufferListeners.size(); i++)
+		{
+			try
+			{
+				getListener(i).preContentRemoved(this,startLine,
+					offset,numLines,length);
+			}
+			catch(Throwable t)
+			{
+				Log.log(Log.ERROR,this,"Exception while sending buffer event to "+getListener(i)+" :");
 				Log.log(Log.ERROR,this,t);
 			}
 		}
@@ -3940,12 +4301,28 @@ loop:		for(int i = 0; i < seg.count; i++)
 		{
 			try
 			{
-				((BufferChangeListener)bufferListeners.elementAt(i))
-					.transactionComplete(this);
+				getListener(i).transactionComplete(this);
 			}
 			catch(Throwable t)
 			{
-				Log.log(Log.ERROR,this,"Exception while sending buffer event:");
+				Log.log(Log.ERROR,this,"Exception while sending buffer event to "+getListener(i)+" :");
+				Log.log(Log.ERROR,this,t);
+			}
+		}
+	} //}}}
+
+	//{{{ fireFoldHandlerChanged() method
+	private void fireFoldHandlerChanged()
+	{
+		for(int i = 0; i < bufferListeners.size(); i++)
+		{
+			try
+			{
+				getListener(i).foldHandlerChanged(this);
+			}
+			catch(Throwable t)
+			{
+				Log.log(Log.ERROR,this,"Exception while sending buffer event to "+getListener(i)+" :");
 				Log.log(Log.ERROR,this,t);
 			}
 		}

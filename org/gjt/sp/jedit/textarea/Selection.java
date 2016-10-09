@@ -40,7 +40,7 @@ import org.gjt.sp.jedit.MiscUtilities;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: Selection.java,v 1.12 2003/02/07 23:23:41 spestov Exp $
+ * @version $Id: Selection.java,v 1.22 2004/04/06 19:05:31 spestov Exp $
  * @since jEdit 3.2pre1
  */
 public abstract class Selection implements Cloneable
@@ -152,7 +152,7 @@ public abstract class Selection implements Cloneable
 	{
 	} //}}}
 
-	//{{{ Range constructor
+	//{{{ Selection constructor
 	Selection(Selection sel)
 	{
 		this.start = sel.start;
@@ -169,6 +169,11 @@ public abstract class Selection implements Cloneable
 	// should the next two be public, maybe?
 	abstract void getText(Buffer buffer, StringBuffer buf);
 	abstract int setText(Buffer buffer, String text);
+
+	abstract boolean contentInserted(Buffer buffer, int startLine, int start,
+		int numLines, int length);
+	abstract boolean contentRemoved(Buffer buffer, int startLine, int start,
+		int numLines, int length);
 	//}}}
 
 	//{{{ Range class
@@ -213,6 +218,8 @@ public abstract class Selection implements Cloneable
 				return buffer.getLineEndOffset(line) - 1;
 		} //}}}
 
+		//{{{ Package-private members
+
 		//{{{ getText() method
 		void getText(Buffer buffer, StringBuffer buf)
 		{
@@ -231,6 +238,71 @@ public abstract class Selection implements Cloneable
 			else
 				return start;
 		} //}}}
+
+		//{{{ contentInserted() method
+		boolean contentInserted(Buffer buffer, int startLine, int start,
+			int numLines, int length)
+		{
+			boolean changed = false;
+
+			if(this.start >= start)
+			{
+				this.start += length;
+				if(numLines != 0)
+					this.startLine = buffer.getLineOfOffset(this.start);
+				changed = true;
+			}
+
+			if(this.end >= start)
+			{
+				this.end += length;
+				if(numLines != 0)
+					this.endLine = buffer.getLineOfOffset(this.end);
+				changed = true;
+			}
+
+			return changed;
+		} //}}}
+
+		//{{{ contentRemoved() method
+		boolean contentRemoved(Buffer buffer, int startLine, int start,
+			int numLines, int length)
+		{
+			int end = start + length;
+			boolean changed = false;
+
+			if(this.start > start && this.start <= end)
+			{
+				this.start = start;
+				changed = true;
+			}
+			else if(this.start > end)
+			{
+				this.start -= length;
+				changed = true;
+			}
+
+			if(this.end > start && this.end <= end)
+			{
+				this.end = start;
+				changed = true;
+			}
+			else if(this.end > end)
+			{
+				this.end -= length;
+				changed = true;
+			}
+
+			if(changed && numLines != 0)
+			{
+				this.startLine = buffer.getLineOfOffset(this.start);
+				this.endLine = buffer.getLineOfOffset(this.end);
+			}
+
+			return changed;
+		} //}}}
+
+		//}}}
 	} //}}}
 
 	//{{{ Rect class
@@ -320,14 +392,14 @@ public abstract class Selection implements Cloneable
 		//{{{ getStart() method
 		public int getStart(Buffer buffer, int line)
 		{
-			return getColumnOnOtherLine(buffer,startLine,line,
+			return getColumnOnOtherLine(buffer,line,
 				getStartColumn(buffer));
 		} //}}}
 
 		//{{{ getEnd() method
 		public int getEnd(Buffer buffer, int line)
 		{
-			return getColumnOnOtherLine(buffer,startLine,line,
+			return getColumnOnOtherLine(buffer,line,
 				getEndColumn(buffer));
 		} //}}}
 
@@ -443,61 +515,183 @@ public abstract class Selection implements Cloneable
 
 				buffer.remove(rectStart + lineStart,rectEnd - rectStart);
 
-				int index = 2 * (i - startLine);
-
-				int endWhitespace;
-				if(rectEnd == lineLen)
-					endWhitespace = 0;
-				else if(i - startLine >= totalLines)
-					endWhitespace = maxWidth - startColumn;
-				else
-				{
-					endWhitespace = maxWidth
-						- ((Integer)lines.get(index+1))
-						.intValue();
-				}
-
-				String str = (i - startLine >= totalLines
-					? "" : (String)lines.get(index));
 				if(startWhitespace != 0)
 				{
 					buffer.insert(rectStart + lineStart,
 						MiscUtilities.createWhiteSpace(startWhitespace,0));
 				}
 
-				buffer.insert(rectStart + lineStart + startWhitespace,str);
+				int endWhitespace;
+				if(totalLines == 0)
+				{
+					if(rectEnd == lineLen)
+						endWhitespace = 0;
+					else
+						endWhitespace = maxWidth - startColumn;
+				}
+				else
+				{
+					int index = 2 * ((i - startLine) % totalLines);
+					String str = (String)lines.get(index);
+					buffer.insert(rectStart + lineStart + startWhitespace,str);
+					if(rectEnd == lineLen)
+						endWhitespace = 0;
+					else
+					{
+						endWhitespace = maxWidth
+							- ((Integer)lines.get(index+1))
+							.intValue();
+					}
+					startWhitespace += str.length();
+				}
 
 				if(endWhitespace != 0)
 				{
 					buffer.insert(rectStart + lineStart
-						+ startWhitespace + str.length(),
+						+ startWhitespace,
 						MiscUtilities.createWhiteSpace(endWhitespace,0));
 				}
 
 				endOffset = rectStart + lineStart
 					+ startWhitespace
-					+ endWhitespace
-					+ str.length();
+					+ endWhitespace;
 			} //}}}
 
 			//{{{ Move the caret down a line
 			if(text == null || text.length() == 0)
 				return end;
-			if(lastLine != buffer.getLineCount() - 1)
-			{
-				int offset = buffer.getOffsetOfVirtualColumn(
-					lastLine + 1,startColumn,null);
-				if(offset == -1)
-				{
-					buffer.insertAtColumn(lastLine + 1,startColumn,"");
-					return buffer.getLineEndOffset(lastLine + 1) - 1;
-				}
-				else
-					return buffer.getLineStartOffset(lastLine + 1) + offset;
-			}
 			else
 				return endOffset;
 			//}}}
+		} //}}}
+
+		//{{{ contentInserted() method
+		boolean contentInserted(Buffer buffer, int startLine, int start,
+			int numLines, int length)
+		{
+			if(this.end < start)
+				return false;
+
+			this.end += length;
+
+			if(this.startLine > startLine)
+			{
+				this.start += length;
+				if(numLines != 0)
+				{
+					this.startLine = buffer.getLineOfOffset(
+						this.start);
+					this.endLine = buffer.getLineOfOffset(
+						this.end);
+				}
+				return true;
+			}
+
+			int endVirtualColumn = buffer.getVirtualWidth(
+				this.endLine,end
+				- buffer.getLineStartOffset(this.endLine));
+
+			if(this.start == start)
+			{
+				int startVirtualColumn = buffer.getVirtualWidth(
+					this.startLine,start
+					- buffer.getLineStartOffset(
+					this.startLine));
+
+				this.start += length;
+
+				int newStartVirtualColumn
+					= buffer.getVirtualWidth(
+						startLine,start -
+						buffer.getLineStartOffset(
+						this.startLine));
+
+				int[] totalVirtualWidth = new int[1];
+				int newEnd = buffer.getOffsetOfVirtualColumn(
+					this.endLine,endVirtualColumn +
+					newStartVirtualColumn -
+					startVirtualColumn,
+					totalVirtualWidth);
+
+				if(newEnd != -1)
+				{
+					end = buffer.getLineStartOffset(
+						this.endLine) + newEnd;
+				}
+				else
+				{
+					end = buffer.getLineEndOffset(
+						this.endLine) - 1;
+					extraEndVirt = totalVirtualWidth[0]
+						- endVirtualColumn;
+				}
+			}
+			else if(this.start > start)
+			{
+				this.start += length;
+				if(numLines != 0)
+				{
+					this.startLine = buffer.getLineOfOffset(
+						this.start);
+				}
+			}
+
+			if(numLines != 0)
+				this.endLine = buffer.getLineOfOffset(this.end);
+			int newEndVirtualColumn = buffer.getVirtualWidth(
+				endLine,
+				end - buffer.getLineStartOffset(this.endLine));
+			if(startLine == this.endLine && extraEndVirt != 0)
+			{
+				extraEndVirt += (endVirtualColumn
+					- newEndVirtualColumn);
+			}
+			else if(startLine == this.startLine
+				&& extraStartVirt != 0)
+			{
+				extraStartVirt += (endVirtualColumn
+					- newEndVirtualColumn);
+			}
+
+			return true;
+		} //}}}
+
+		//{{{ contentRemoved() method
+		boolean contentRemoved(Buffer buffer, int startLine, int start,
+			int numLines, int length)
+		{
+			int end = start + length;
+			boolean changed = false;
+
+			if(this.start > start && this.start <= end)
+			{
+				this.start = start;
+				changed = true;
+			}
+			else if(this.start > end)
+			{
+				this.start -= length;
+				changed = true;
+			}
+
+			if(this.end > start && this.end <= end)
+			{
+				this.end = start;
+				changed = true;
+			}
+			else if(this.end > end)
+			{
+				this.end -= length;
+				changed = true;
+			}
+
+			if(changed && numLines != 0)
+			{
+				this.startLine = buffer.getLineOfOffset(this.start);
+				this.endLine = buffer.getLineOfOffset(this.end);
+			}
+
+			return changed;
 		} //}}}
 
 		//}}}
@@ -505,15 +699,15 @@ public abstract class Selection implements Cloneable
 		//{{{ Private members
 
 		//{{{ getColumnOnOtherLine() method
-		private int getColumnOnOtherLine(Buffer buffer, int line1,
-			int line2, int col)
+		private int getColumnOnOtherLine(Buffer buffer, int line,
+			int col)
 		{
 			int returnValue = buffer.getOffsetOfVirtualColumn(
-				line2,col,null);
+				line,col,null);
 			if(returnValue == -1)
-				return buffer.getLineEndOffset(line2) - 1;
+				return buffer.getLineEndOffset(line) - 1;
 			else
-				return buffer.getLineStartOffset(line2) + returnValue;
+				return buffer.getLineStartOffset(line) + returnValue;
 		} //}}}
 
 		//}}}

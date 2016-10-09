@@ -13,7 +13,8 @@
 
 package installer;
 
-import javax.swing.plaf.metal.MetalLookAndFeel;
+import javax.swing.plaf.metal.*;
+import javax.swing.*;
 import java.io.*;
 import java.util.Properties;
 
@@ -31,16 +32,11 @@ public class Install
 		}
 
 		if(args.length == 0)
-		{
-			MetalLookAndFeel.setCurrentTheme(new JEditMetalTheme());
 			new SwingInstall();
-		}
 		else if(args.length == 1 && args[0].equals("text"))
 			new ConsoleInstall();
 		else if(args.length >= 2 && args[0].equals("auto"))
-		{
 			new NonInteractiveInstall(args);
-		}
 		else
 		{
 			System.err.println("Usage:");
@@ -58,7 +54,7 @@ public class Install
 		props = new Properties();
 		try
 		{
-			InputStream in = getClass().getResourceAsStream("install.props");
+			InputStream in = getClass().getResourceAsStream("/installer/install.props");
 			props.load(in);
 			in.close();
 		}

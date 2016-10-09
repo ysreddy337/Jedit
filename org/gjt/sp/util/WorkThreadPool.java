@@ -1,5 +1,5 @@
 /*
- * WorkThread.java - Background thread that does stuff
+ * WorkThreadPool.java - Background thread pool that does stuff
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
@@ -30,7 +30,7 @@ import javax.swing.SwingUtilities;
 /**
  * A pool of work threads.
  * @author Slava Pestov
- * @version $Id: WorkThreadPool.java,v 1.5 2002/04/08 13:13:56 spestov Exp $
+ * @version $Id: WorkThreadPool.java,v 1.8 2004/05/29 01:55:26 spestov Exp $
  * @see org.gjt.sp.util.WorkThread
  * @since jEdit 2.6pre1
  */
@@ -66,6 +66,7 @@ public class WorkThreadPool
 	 */
 	public void start()
 	{
+		/* not really needed since threads don't start until after */
 		synchronized(lock)
 		{
 			started = true;
@@ -148,7 +149,7 @@ public class WorkThreadPool
 				requestCount++;
 			} //}}}
 
-			lock.notify();
+			lock.notifyAll();
 		}
 	} //}}}
 
@@ -246,8 +247,8 @@ public class WorkThreadPool
 	} //}}}
 
 	//{{{ Package-private members
-	Object lock = new String("Work thread pool request queue lock");
-	Object waitForAllLock = new String("Work thread pool waitForAll() notifier");
+	Object lock = new Object();
+	Object waitForAllLock = new Object();
 
 	//{{{ fireStatusChanged() method
 	void fireStatusChanged(WorkThread thread)
@@ -371,15 +372,17 @@ public class WorkThreadPool
 	//}}}
 
 	//{{{ doAWTRequests() method
+	/** Must always be called with the lock held. */
 	private void doAWTRequests()
 	{
-		while(firstAWTRequest != null)
+		while(requestCount == 0 && firstAWTRequest != null)
 		{
 			doAWTRequest(getNextAWTRequest());
 		}
 	} //}}}
 
 	//{{{ doAWTRequest() method
+	/** Must always be called with the lock held. */
 	private void doAWTRequest(Request request)
 	{
 //		Log.log(Log.DEBUG,this,"Running in AWT thread: " + request);
@@ -399,6 +402,7 @@ public class WorkThreadPool
 	} //}}}
 
 	//{{{ queueAWTRunner() method
+	/** Must always be called with the lock held. */
 	private void queueAWTRunner()
 	{
 		if(!awtRunnerQueued)

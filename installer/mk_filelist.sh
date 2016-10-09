@@ -14,10 +14,11 @@ echo jars/LatestVersion.jar >> installer/jedit-program
 echo jars/QuickNotepad.jar >> installer/jedit-program
 echo properties/README.txt >> installer/jedit-program
 echo startup/README.txt >> installer/jedit-program
+echo startup/startup.bsh >> installer/jedit-program
 find modes -name \*.xml >> installer/jedit-program
 echo modes/catalog >> installer/jedit-program
 find doc \( -name \*.txt -o -name \*.png \) >> installer/jedit-program
-find doc/users-guide doc/FAQ doc/tips \( -name \*.html -o -name toc.xml \) >> installer/jedit-program
+find doc/users-guide doc/FAQ doc/news42 doc/tips \( -name \*.html -o -name toc.xml \) >> installer/jedit-program
 echo doc/welcome.html >> installer/jedit-program
 
 print_size jedit-program
@@ -30,22 +31,23 @@ print_size jedit-macros
 # jedit-api fileset
 find doc/api \( -name \*.html -o -name toc.xml \) > installer/jedit-api
 echo doc/api/stylesheet.css >> installer/jedit-api
+echo doc/api/resources/inherit.gif >> installer/jedit-api
 
 print_size jedit-api
 
 # jedit-windows fileset
-echo jeshlstb.dl_ > installer/jedit-windows
-echo ltslog.dll >> installer/jedit-windows
-echo jeditsrv.exe >> installer/jedit-windows
-echo jedit.exe >> installer/jedit-windows
-echo jedinit.exe >> installer/jedit-windows
-echo unlaunch.exe >> installer/jedit-windows
-echo jedinstl.dll >> installer/jedit-windows
-echo jeservps.dll >> installer/jedit-windows
-echo jedidiff.exe >> installer/jedit-windows
-echo jEdit_IE.reg.txt >> installer/jedit-windows
-
-print_size jedit-windows
+#echo jeshlstb.dl_ > installer/jedit-windows
+#echo ltslog.dll >> installer/jedit-windows
+#echo jeditsrv.exe >> installer/jedit-windows
+#echo jedit.exe >> installer/jedit-windows
+#echo jedinit.exe >> installer/jedit-windows
+#echo unlaunch.exe >> installer/jedit-windows
+#echo jedinstl.dll >> installer/jedit-windows
+#echo jeservps.dll >> installer/jedit-windows
+#echo jedidiff.exe >> installer/jedit-windows
+#echo jEdit_IE.reg.txt >> installer/jedit-windows
+#
+#print_size jedit-windows
 
 # jedit-mac fileset
 echo jars/MacOS.jar > installer/jedit-mac

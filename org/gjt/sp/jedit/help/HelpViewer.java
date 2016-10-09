@@ -33,7 +33,7 @@ import java.beans.*;
 import java.io.*;
 import java.net.*;
 import org.gjt.sp.jedit.gui.RolloverButton;
-import org.gjt.sp.jedit.msg.PropertiesChanged;
+import org.gjt.sp.jedit.msg.PluginUpdate;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 //}}}
@@ -42,9 +42,9 @@ import org.gjt.sp.util.Log;
  * jEdit's searchable help viewer. It uses a Swing JEditorPane to display the HTML,
  * and implements a URL history.
  * @author Slava Pestov
- * @version $Id: HelpViewer.java,v 1.9 2003/02/21 22:19:19 spestov Exp $
+ * @version $Id: HelpViewer.java,v 1.14 2004/06/28 06:45:27 spestov Exp $
  */
-public class HelpViewer extends JFrame //implements EBComponent
+public class HelpViewer extends JFrame implements EBComponent
 {
 	//{{{ HelpViewer constructor
 	/**
@@ -142,14 +142,14 @@ public class HelpViewer extends JFrame //implements EBComponent
 
 		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
-		getRootPane().setPreferredSize(new Dimension(800,400));
+		getRootPane().setPreferredSize(new Dimension(750,500));
 
 		pack();
 		GUIUtilities.loadGeometry(this,"helpviewer");
 
-		//EditBus.addToBus(this);
+		EditBus.addToBus(this);
 
-		show();
+		setVisible(true);
 
 		SwingUtilities.invokeLater(new Runnable()
 		{
@@ -242,6 +242,8 @@ public class HelpViewer extends JFrame //implements EBComponent
 			return;
 		}
 
+		this.shortURL = shortURL;
+
 		// select the appropriate tree node.
 		if(shortURL != null)
 			toc.selectNode(shortURL);
@@ -250,7 +252,7 @@ public class HelpViewer extends JFrame //implements EBComponent
 	//{{{ dispose() method
 	public void dispose()
 	{
-		//EditBus.removeFromBus(this);
+		EditBus.removeFromBus(this);
 		jEdit.setIntegerProperty("helpviewer.splitter",
 			splitter.getDividerLocation());
 		GUIUtilities.saveGeometry(this,"helpviewer");
@@ -258,11 +260,23 @@ public class HelpViewer extends JFrame //implements EBComponent
 	} //}}}
 
 	//{{{ handleMessage() method
-	/* public void handleMessage(EBMessage msg)
+	public void handleMessage(EBMessage msg)
 	{
-		if(msg instanceof PropertiesChanged)
-			SwingUtilities.updateComponentTreeUI(getRootPane());
-	} */ //}}}
+		if(msg instanceof PluginUpdate)
+		{
+			PluginUpdate pmsg = (PluginUpdate)msg;
+			if(pmsg.getWhat() == PluginUpdate.LOADED
+				|| pmsg.getWhat() == PluginUpdate.UNLOADED)
+			{
+				if(!pmsg.isExiting())
+				{
+					if(!queuedTOCReload)
+						queueTOCReload();
+					queuedTOCReload = true;
+				}
+			}
+		}
+	} //}}}
 
 	//{{{ getBaseURL() method
 	public String getBaseURL()
@@ -270,8 +284,17 @@ public class HelpViewer extends JFrame //implements EBComponent
 		return baseURL;
 	} //}}}
 
+	//{{{ getShortURL() method
+	String getShortURL()
+	{
+		return shortURL;
+	} //}}}
+
 	//{{{ Private members
+
+	//{{{ Instance members
 	private String baseURL;
+	private String shortURL;
 	private JButton back;
 	private JButton forward;
 	private JEditorPane viewer;
@@ -280,6 +303,22 @@ public class HelpViewer extends JFrame //implements EBComponent
 	private String[] history;
 	private int historyPos;
 	private HelpTOCPanel toc;
+	private boolean queuedTOCReload;
+	//}}}
+
+	//{{{ queueTOCReload() method
+	public void queueTOCReload()
+	{
+		SwingUtilities.invokeLater(new Runnable()
+		{
+			public void run()
+			{
+				queuedTOCReload = false;
+				toc.load();
+			}
+		});
+	} //}}}
+
 	//}}}
 
 	//{{{ Inner classes

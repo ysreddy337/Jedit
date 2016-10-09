@@ -25,7 +25,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id: JELInstaller.h,v 1.4 2001/09/07 15:20:23 jgellene Exp $
+ * $Id: JELInstaller.h,v 1.5 2003/11/19 11:16:34 springle Exp $
  */
 
 #if !defined(__JELINSTALLER_H__)
@@ -136,6 +136,7 @@ private:
 
 	/* No copy constructor */
 private:
+	HRESULT SHGetSpecialFolderLocation( HWND hwndOwner, int nFolder, LPITEMIDLIST *ppidl );
 	JELShortcutInstaller(const JELShortcutInstaller&);
 	JELShortcutInstaller& operator=(const JELShortcutInstaller&);
 };

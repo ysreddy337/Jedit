@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001 Slava Pestov
+ * Copyright (C) 1999, 2004 Slava Pestov
  * Portions copyright (C) 2000 Richard S. Hall
  * Portions copyright (C) 2001 Dirk Moebius
  *
@@ -27,7 +27,11 @@ package org.gjt.sp.jedit;
 //{{{ Imports
 import javax.swing.text.Segment;
 import javax.swing.JMenuItem;
+import java.lang.reflect.Method;
 import java.io.*;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.text.DecimalFormat;
 import java.util.*;
 import org.gjt.sp.jedit.io.*;
 import org.gjt.sp.util.Log;
@@ -66,10 +70,16 @@ import org.gjt.sp.util.Log;
  *
  * @author Slava Pestov
  * @author John Gellene (API documentation)
- * @version $Id: MiscUtilities.java,v 1.35 2003/02/20 01:55:12 spestov Exp $
+ * @version $Id: MiscUtilities.java,v 1.77 2004/08/21 01:49:05 spestov Exp $
  */
 public class MiscUtilities
 {
+	/**
+	 * This encoding is not supported by Java, yet it is useful.
+	 * A UTF-8 file that begins with 0xEFBBBF.
+	 */
+	public static final String UTF_8_Y = "UTF-8Y";
+
 	//{{{ Path name methods
 
 	//{{{ canonPath() method
@@ -82,10 +92,30 @@ public class MiscUtilities
 	 */
 	public static String canonPath(String path)
 	{
+		if(path.length() == 0)
+			return path;
+
+		if(path.startsWith("file://"))
+			path = path.substring("file://".length());
+		else if(path.startsWith("file:"))
+			path = path.substring("file:".length());
+		else if(isURL(path))
+			return path;
+
 		if(File.separatorChar == '\\')
 		{
 			// get rid of mixed paths on Windows
 			path = path.replace('/','\\');
+			// also get rid of trailing spaces on Windows
+			int trim = path.length();
+			while(path.charAt(trim - 1) == ' ')
+				trim--;
+			path = path.substring(0,trim);
+		}
+		else if(OperatingSystem.isMacOS())
+		{
+			// do the same on OS X
+			path = path.replace(':','/');
 		}
 
 		if(path.startsWith("~" + File.separator))
@@ -104,7 +134,42 @@ public class MiscUtilities
 			return path;
 	} //}}}
 
-	//{{{ isPathAbsolute() method
+	//{{{ resolveSymlinks() method
+	/**
+	 * Resolves any symbolic links in the path name specified
+	 * using <code>File.getCanonicalPath()</code>. <b>For local path
+	 * names only.</b>
+	 * @since jEdit 4.2pre1
+	 */
+	public static String resolveSymlinks(String path)
+	{
+		if(isURL(path))
+			return path;
+
+		// 2 aug 2003: OS/2 Java has a broken getCanonicalPath()
+		if(OperatingSystem.isOS2())
+			return path;
+		// 18 nov 2003: calling this on a drive letter on Windows causes
+		// drive access
+		if(OperatingSystem.isDOSDerived())
+		{
+			if(path.length() == 2 || path.length() == 3)
+			{
+				if(path.charAt(1) == ':')
+					return path;
+			}
+		}
+		try
+		{
+			return new File(path).getCanonicalPath();
+		}
+		catch(IOException io)
+		{
+			return path;
+		}
+	} //}}}
+
+	//{{{ isAbsolutePath() method
 	/**
 	 * Returns if the specified path name is an absolute path or URL.
 	 * @since jEdit 4.1pre11
@@ -113,14 +178,23 @@ public class MiscUtilities
 	{
 		if(isURL(path))
 			return true;
+		else if(path.startsWith("~/") || path.startsWith("~" + File.separator) || path.equals("~"))
+			return true;
 		else if(OperatingSystem.isDOSDerived())
 		{
-			if(path.length() >= 2 && path.charAt(1) == ':')
+			if(path.length() == 2 && path.charAt(1) == ':')
 				return true;
-			if(path.startsWith("\\\\"))
+			if(path.length() > 2 && path.charAt(1) == ':'
+				&& (path.charAt(2) == '\\'
+				|| path.charAt(2) == '/'))
+				return true;
+			if(path.startsWith("\\\\")
+				|| path.startsWith("//"))
 				return true;
 		}
-		else if(OperatingSystem.isUnix())
+		// not sure if this is correct for OpenVMS.
+		else if(OperatingSystem.isUnix()
+			|| OperatingSystem.isVMS())
 		{
 			// nice and simple
 			if(path.length() > 0 && path.charAt(0) == '/')
@@ -139,46 +213,55 @@ public class MiscUtilities
 	 */
 	public static String constructPath(String parent, String path)
 	{
-		if(MiscUtilities.isURL(path))
-			return path;
-		else if(path.startsWith("~"))
-			return path;
-		else
-		{
-			// have to handle these cases specially on windows.
-			if(OperatingSystem.isDOSDerived())
-			{
-				if(path.length() == 2 && path.charAt(1) == ':')
-					return path;
-				else if(path.length() > 2 && path.charAt(1) == ':')
-				{
-					if(path.charAt(2) != '\\')
-					{
-						path = path.substring(0,2) + '\\'
-							+ path.substring(2);
-					}
+		if(isAbsolutePath(path))
+			return canonPath(path);
 
-					return resolveSymlinks(path);
-				}
-				else if(path.startsWith("\\\\"))
-					return resolveSymlinks(path);
-			}
-			else if(OperatingSystem.isUnix())
+		// have to handle this case specially on windows.
+		// insert \ between, eg A: and myfile.txt.
+		if(OperatingSystem.isDOSDerived())
+		{
+			if(path.length() == 2 && path.charAt(1) == ':')
+				return path;
+			else if(path.length() > 2 && path.charAt(1) == ':'
+				&& path.charAt(2) != '\\')
 			{
-				// nice and simple
-				if(path.length() > 0 && path.charAt(0) == '/')
-					return resolveSymlinks(path);
+				path = path.substring(0,2) + '\\'
+					+ path.substring(2);
+				return canonPath(path);
 			}
 		}
+
+		String dd = ".." + File.separator;
+		String d = "." + File.separator;
 
 		if(parent == null)
 			parent = System.getProperty("user.dir");
 
-		if(OperatingSystem.isDOSDerived() && path.startsWith("\\"))
+		for(;;)
+		{
+			if(path.equals("."))
+				return parent;
+			else if(path.equals(".."))
+				return getParentOfPath(parent);
+			else if(path.startsWith(dd) || path.startsWith("../"))
+			{
+				parent = getParentOfPath(parent);
+				path = path.substring(3);
+			}
+			else if(path.startsWith(d) || path.startsWith("./"))
+				path = path.substring(2);
+			else
+				break;
+		}
+
+		if(OperatingSystem.isDOSDerived()
+			&& !isURL(parent)
+			&& path.startsWith("\\"))
 			parent = parent.substring(0,2);
 
 		VFS vfs = VFSManager.getVFSForPath(parent);
-		return vfs.constructPath(parent,path);
+
+		return canonPath(vfs.constructPath(parent,path));
 	} //}}}
 
 	//{{{ constructPath() method
@@ -199,6 +282,8 @@ public class MiscUtilities
 	/**
 	 * Like {@link #constructPath}, except <code>path</code> will be
 	 * appended to <code>parent</code> even if it is absolute.
+	 * <b>For local path names only.</b>.
+	 *
 	 * @param path
 	 * @param parent
 	 */
@@ -226,11 +311,13 @@ public class MiscUtilities
 	/**
 	 * Returns the extension of the specified filename, or an empty
 	 * string if there is none.
-	 * @param name The file name
+	 * @param name The file name or path
 	 */
 	public static String getFileExtension(String name)
 	{
-		int index = name.indexOf('.');
+		int fsIndex = Math.max(name.indexOf('/'),
+			name.indexOf(File.separatorChar));
+		int index = name.indexOf('.',fsIndex);
 		if(index == -1)
 			return "";
 		else
@@ -258,7 +345,7 @@ public class MiscUtilities
 	public static String getFileNameNoExtension(String path)
 	{
 		String name = getFileName(path);
-		int index = name.lastIndexOf('.');
+		int index = name.indexOf('.');
 		if(index == -1)
 			return name;
 		else
@@ -321,12 +408,23 @@ public class MiscUtilities
 			return false;
 
 		int cIndex = str.indexOf(':');
-		if(cIndex <= 1) // D:\WINDOWS
-			return false;
-		else if(fsIndex != -1 && cIndex > fsIndex) // /tmp/RTF::read.pm
+		if(cIndex <= 1) // D:\WINDOWS, or doesn't contain : at all
 			return false;
 
-		return true;
+		String protocol = str.substring(0,cIndex);
+		VFS vfs = VFSManager.getVFSForProtocol(protocol);
+		if(vfs != null && !(vfs instanceof UrlVFS))
+			return true;
+
+		try
+		{
+			new URL(str);
+			return true;
+		}
+		catch(MalformedURLException mf)
+		{
+			return false;
+		}
 	} //}}}
 
 	//{{{ saveBackup() method
@@ -345,6 +443,28 @@ public class MiscUtilities
 		String backupPrefix, String backupSuffix,
 		String backupDirectory)
 	{
+		saveBackup(file,backups,backupPrefix,backupSuffix,backupDirectory,0);
+	} //}}}
+
+	//{{{ saveBackup() method
+	/**
+	 * Saves a backup (optionally numbered) of a file.
+	 * @param file A local file
+	 * @param backups The number of backups. Must be >= 1. If > 1, backup
+	 * files will be numbered.
+	 * @param backupPrefix The backup file name prefix
+	 * @param backupSuffix The backup file name suffix
+	 * @param backupDirectory The directory where to save backups; if null,
+	 * they will be saved in the same directory as the file itself.
+	 * @param backupTimeDistance The minimum time in minutes when a backup
+	 * version 1 shall be moved into version 2; if 0, backups are always
+	 * moved.
+	 * @since jEdit 4.2pre5
+	 */
+	public static void saveBackup(File file, int backups,
+		String backupPrefix, String backupSuffix,
+		String backupDirectory, int backupTimeDistance)
+	{
 		if(backupPrefix == null)
 			backupPrefix = "";
 		if(backupSuffix == null)
@@ -357,30 +477,53 @@ public class MiscUtilities
 		{
 			File backupFile = new File(backupDirectory,
 				backupPrefix + name + backupSuffix);
-			backupFile.delete();
-			file.renameTo(backupFile);
+			long modTime = backupFile.lastModified();
+			/* if backup file was created less than
+			 * 'backupTimeDistance' ago, we do not
+			 * create the backup */
+			if(System.currentTimeMillis() - modTime
+				>= backupTimeDistance)
+			{
+				backupFile.delete();
+				file.renameTo(backupFile);
+			}
 		}
 		// If backups > 1, move old ~n~ files, create ~1~ file
 		else
 		{
+			/* delete a backup created using above method */
 			new File(backupDirectory,
 				backupPrefix + name + backupSuffix
 				+ backups + backupSuffix).delete();
 
-			for(int i = backups - 1; i > 0; i--)
-			{
-				File backup = new File(backupDirectory,
-					backupPrefix + name + backupSuffix
-					+ i + backupSuffix);
-
-				backup.renameTo(new File(backupDirectory,
-					backupPrefix + name + backupSuffix
-					+ (i+1) + backupSuffix));
-			}
-
-			file.renameTo(new File(backupDirectory,
+			File firstBackup = new File(backupDirectory,
 				backupPrefix + name + backupSuffix
-				+ "1" + backupSuffix));
+				+ "1" + backupSuffix);
+			long modTime = firstBackup.lastModified();
+			/* if backup file was created less than
+			 * 'backupTimeDistance' ago, we do not
+			 * create the backup */
+			if(System.currentTimeMillis() - modTime
+				>= backupTimeDistance)
+			{
+				for(int i = backups - 1; i > 0; i--)
+				{
+					File backup = new File(backupDirectory,
+						backupPrefix + name
+						+ backupSuffix + i
+						+ backupSuffix);
+
+					backup.renameTo(
+						new File(backupDirectory,
+						backupPrefix + name
+						+ backupSuffix + (i+1)
+						+ backupSuffix));
+				}
+
+				file.renameTo(new File(backupDirectory,
+					backupPrefix + name + backupSuffix
+					+ "1" + backupSuffix));
+			}
 		}
 	} //}}}
 
@@ -583,15 +726,40 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 */
 	public static String createWhiteSpace(int len, int tabSize)
 	{
+		return createWhiteSpace(len,tabSize,0);
+	} //}}}
+
+	//{{{ createWhiteSpace() method
+	/**
+	 * Creates a string of white space with the specified length.<p>
+	 *
+	 * To get a whitespace string tuned to the current buffer's
+	 * settings, call this method as follows:
+	 *
+	 * <pre>myWhitespace = MiscUtilities.createWhiteSpace(myLength,
+	 *     (buffer.getBooleanProperty("noTabs") ? 0
+	 *     : buffer.getTabSize()));</pre>
+	 *
+	 * @param len The length
+	 * @param tabSize The tab size, or 0 if tabs are not to be used
+	 * @param start The start offset, for tab alignment
+	 * @since jEdit 4.2pre1
+	 */
+	public static String createWhiteSpace(int len, int tabSize, int start)
+	{
 		StringBuffer buf = new StringBuffer();
 		if(tabSize == 0)
 		{
 			while(len-- > 0)
 				buf.append(' ');
 		}
+		else if(len == 1)
+			buf.append(' ');
 		else
 		{
-			int count = len / tabSize;
+			int count = (len + start % tabSize) / tabSize;
+			if(count != 0)
+				len += start;
 			while(count-- > 0)
 				buf.append('\t');
 			count = len % tabSize;
@@ -610,10 +778,12 @@ loop:		for(int i = 0; i < str.length(); i++)
 	 */
 	public static String globToRE(String glob)
 	{
+		final Object NEG = new Object();
+		final Object GROUP = new Object();
+		Stack state = new Stack();
+
 		StringBuffer buf = new StringBuffer();
 		boolean backslash = false;
-		boolean insideGroup = false;
-		boolean insideNegativeLookahead = false;
 
 		for(int i = 0; i < glob.length(); i++)
 		{
@@ -635,44 +805,43 @@ loop:		for(int i = 0; i < str.length(); i++)
 				buf.append('.');
 				break;
 			case '.':
-				buf.append("\\.");
+			case '+':
+			case '(':
+			case ')':
+				buf.append('\\');
+				buf.append(c);
 				break;
 			case '*':
 				buf.append(".*");
+				break;
+			case '|':
+				if(backslash)
+					buf.append("\\|");
+				else
+					buf.append('|');
 				break;
 			case '{':
 				buf.append('(');
 				if(i + 1 != glob.length() && glob.charAt(i + 1) == '!')
 				{
 					buf.append('?');
-					insideNegativeLookahead = true;
+					state.push(NEG);
 				}
 				else
-					insideGroup = true;
+					state.push(GROUP);
 				break;
 			case ',':
-				if(insideGroup)
-				{
-					if(insideNegativeLookahead)
-					{
-						buf.append(").*");
-						insideNegativeLookahead = false;
-					}
+				if(!state.isEmpty() && state.peek() == GROUP)
 					buf.append('|');
-				}
 				else
 					buf.append(',');
 				break;
 			case '}':
-				if(insideNegativeLookahead)
+				if(!state.isEmpty())
 				{
-					buf.append(").*");
-					insideNegativeLookahead = false;
-				}
-				else if(insideGroup)
-				{
-					buf.append(')');
-					insideGroup = false;
+					buf.append(")");
+					if(state.pop() == NEG)
+						buf.append(".*");
 				}
 				else
 					buf.append('}');
@@ -743,7 +912,7 @@ loop:		for(int i = 0; i < str.length(); i++)
 	/**
 	 * Escapes the specified characters in the specified string.
 	 * @param str The string
-	 * @param extra Any characters that require escaping
+	 * @param toEscape Any characters that require escaping
 	 * @since jEdit 4.1pre3
 	 */
 	public static String charsToEscapes(String str, String toEscape)
@@ -867,23 +1036,165 @@ loop:		for(int i = 0; i < str.length(); i++)
 
 	//{{{ stringsEqual() method
 	/**
-	 * Returns if two strings are equal. This correctly handles null pointers,
-	 * as opposed to calling <code>s1.equals(s2)</code>.
-	 * @since jEdit 4.1pre5
+	 * @deprecated Call <code>objectsEqual()</code> instead.
 	 */
 	public static boolean stringsEqual(String s1, String s2)
 	{
-		if(s1 == null)
+		return objectsEqual(s1,s2);
+	} //}}}
+
+	//{{{ objectsEqual() method
+	/**
+	 * Returns if two strings are equal. This correctly handles null pointers,
+	 * as opposed to calling <code>o1.equals(o2)</code>.
+	 * @since jEdit 4.2pre1
+	 */
+	public static boolean objectsEqual(Object o1, Object o2)
+	{
+		if(o1 == null)
 		{
-			if(s2 == null)
+			if(o2 == null)
 				return true;
 			else
 				return false;
 		}
-		else if(s2 == null)
+		else if(o2 == null)
 			return false;
 		else
-			return s1.equals(s2);
+			return o1.equals(o2);
+	} //}}}
+
+	//{{{ charsToEntities() method
+	/**
+	 * Converts &lt;, &gt;, &amp; in the string to their HTML entity
+	 * equivalents.
+	 * @param str The string
+	 * @since jEdit 4.2pre1
+	 */
+	public static String charsToEntities(String str)
+	{
+		StringBuffer buf = new StringBuffer(str.length());
+		for(int i = 0; i < str.length(); i++)
+		{
+			char ch = str.charAt(i);
+			switch(ch)
+			{
+			case '<':
+				buf.append("&lt;");
+				break;
+			case '>':
+				buf.append("&gt;");
+				break;
+			case '&':
+				buf.append("&amp;");
+				break;
+			default:
+				buf.append(ch);
+				break;
+			}
+		}
+		return buf.toString();
+	} //}}}
+
+	//{{{ formatFileSize() method
+	public static final DecimalFormat KB_FORMAT = new DecimalFormat("#.# KB");
+	public static final DecimalFormat MB_FORMAT = new DecimalFormat("#.# MB");
+
+	/**
+	 * Formats the given file size into a nice string (123 bytes, 10.6 KB,
+	 * 1.2 MB).
+	 * @param length The size
+	 * @since jEdit 4.2pre1
+	 */
+	public static String formatFileSize(long length)
+	{
+		if(length < 1024)
+			return length + " bytes";
+		else if(length < 1024*1024)
+			return KB_FORMAT.format((double)length / 1024);
+		else
+			return MB_FORMAT.format((double)length / 1024 / 1024);
+	} //}}}
+
+	//{{{ getLongestPrefix() method
+	/**
+	 * Returns the longest common prefix in the given set of strings.
+	 * @param str The strings
+	 * @param ignoreCase If true, case insensitive
+	 * @since jEdit 4.2pre2
+	 */
+	public static String getLongestPrefix(List str, boolean ignoreCase)
+	{
+		if(str.size() == 0)
+			return "";
+
+		int prefixLength = 0;
+
+loop:		for(;;)
+		{
+			String s = str.get(0).toString();
+			if(prefixLength >= s.length())
+				break loop;
+			char ch = s.charAt(prefixLength);
+			for(int i = 1; i < str.size(); i++)
+			{
+				s = str.get(i).toString();
+				if(prefixLength >= s.length())
+					break loop;
+				if(!compareChars(s.charAt(prefixLength),ch,ignoreCase))
+					break loop;
+			}
+			prefixLength++;
+		}
+
+		return str.get(0).toString().substring(0,prefixLength);
+	} //}}}
+
+	//{{{ getLongestPrefix() method
+	/**
+	 * Returns the longest common prefix in the given set of strings.
+	 * @param str The strings
+	 * @param ignoreCase If true, case insensitive
+	 * @since jEdit 4.2pre2
+	 */
+	public static String getLongestPrefix(String[] str, boolean ignoreCase)
+	{
+		return getLongestPrefix((Object[])str,ignoreCase);
+	} //}}}
+
+	//{{{ getLongestPrefix() method
+	/**
+	 * Returns the longest common prefix in the given set of strings.
+	 * @param str The strings (calls <code>toString()</code> on each object)
+	 * @param ignoreCase If true, case insensitive
+	 * @since jEdit 4.2pre6
+	 */
+	public static String getLongestPrefix(Object[] str, boolean ignoreCase)
+	{
+		if(str.length == 0)
+			return "";
+
+		int prefixLength = 0;
+
+		String first = str[0].toString();
+
+loop:		for(;;)
+		{
+			if(prefixLength >= first.length())
+				break loop;
+			char ch = first.charAt(prefixLength);
+			for(int i = 1; i < str.length; i++)
+			{
+				String s = str[i].toString();
+				if(prefixLength >= s.length())
+					break loop;
+				if(!compareChars(s.charAt(prefixLength),ch,ignoreCase))
+					break loop;
+			}
+			prefixLength++;
+		}
+
+		return first.substring(0,prefixLength);
 	} //}}}
 
 	//}}}
@@ -1022,7 +1333,7 @@ loop:		for(int i = 0; i < str.length(); i++)
 		// Finally the bug fix release
 		int bugfix = Integer.parseInt(build.substring(9,11));
 
-		return "" + major + "." + minor
+		return major + "." + minor
 			+ (beta != 99 ? "pre" + beta :
 			(bugfix != 0 ? "." + bugfix : "final"));
 	} //}}}
@@ -1131,23 +1442,12 @@ loop:		for(int i = 0; i < str.length(); i++)
 		} //}}}
 
 		//{{{ Load it, if not yet done:
-		EditPlugin.JAR jar = jEdit.getPluginJAR(toolsPath);
+		PluginJAR jar = jEdit.getPluginJAR(toolsPath);
 		if(jar == null)
 		{
 			Log.log(Log.DEBUG, MiscUtilities.class,
 				"- adding " + toolsPath + " to jEdit plugins.");
-			try
-			{
-				jEdit.addPluginJAR(new EditPlugin.JAR(toolsPath,
-					new JARClassLoader(toolsPath)));
-			}
-			catch(IOException ioex)
-			{
-				Log.log(Log.ERROR, MiscUtilities.class,
-					"- I/O error loading " + toolsPath);
-				Log.log(Log.ERROR, MiscUtilities.class, ioex);
-				return false;
-			}
+			jEdit.addPluginJAR(toolsPath);
 		}
 		else
 			Log.log(Log.DEBUG, MiscUtilities.class,
@@ -1160,7 +1460,7 @@ loop:		for(int i = 0; i < str.length(); i++)
 	//{{{ parsePermissions() method
 	/**
 	 * Parse a Unix-style permission string (rwxrwxrwx).
-	 * @param str The string (must be 9 characters long).
+	 * @param s The string (must be 9 characters long).
 	 * @since jEdit 4.1pre8
 	 */
 	public static int parsePermissions(String s)
@@ -1204,20 +1504,110 @@ loop:		for(int i = 0; i < str.length(); i++)
 		return permissions;
 	} //}}}
 
+	//{{{ getEncodings() method
+	/**
+	 * Returns a list of supported character encodings.
+	 * On Java 1.3, returns a fixed list.
+	 * On Java 1.4, uses reflection to call an NIO API.
+	 * @since jEdit 4.2pre5
+	 */
+	public static String[] getEncodings()
+	{
+		List returnValue = new ArrayList();
+
+		if(OperatingSystem.hasJava14())
+		{
+			try
+			{
+				Class clazz = Class.forName(
+					"java.nio.charset.Charset");
+				Method method = clazz.getMethod(
+					"availableCharsets",
+					new Class[0]);
+				Map map = (Map)method.invoke(null,
+					new Object[0]);
+				Iterator iter = map.keySet().iterator();
+
+				returnValue.add(UTF_8_Y);
+
+				while(iter.hasNext())
+				{
+					returnValue.add(iter.next());
+				}
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,MiscUtilities.class,e);
+			}
+		}
+		else
+		{
+			StringTokenizer st = new StringTokenizer(
+				jEdit.getProperty("encodings"));
+			while(st.hasMoreTokens())
+			{
+				returnValue.add(st.nextToken());
+			}
+		}
+
+		return (String[])returnValue.toArray(
+			new String[returnValue.size()]);
+	} //}}}
+
+	//{{{ isSupportedEncoding() method
+	/**
+	 * Returns if the given character encoding is supported.
+	 * Uses reflection to call a Java 1.4 API on Java 1.4, and always
+	 * returns true on Java 1.3.
+	 * @since jEdit 4.2pre7
+	 */
+	public static boolean isSupportedEncoding(String encoding)
+	{
+		if(OperatingSystem.hasJava14())
+		{
+			try
+			{
+				Class clazz = Class.forName(
+					"java.nio.charset.Charset");
+				Method method = clazz.getMethod(
+					"isSupported",
+					new Class[] { String.class });
+				return ((Boolean)method.invoke(null,
+					new Object[] { encoding }))
+					.booleanValue();
+			}
+			catch(Exception e)
+			{
+				Log.log(Log.ERROR,MiscUtilities.class,e);
+			}
+		}
+
+		return true;
+	} //}}}
+
+	//{{{ throwableToString() method
+	/**
+	 * Returns a string containing the stack trace of the given throwable.
+	 * @since jEdit 4.2pre6
+	 */
+	public static String throwableToString(Throwable t)
+	{
+		StringWriter s = new StringWriter();
+		t.printStackTrace(new PrintWriter(s));
+		return s.toString();
+	} //}}}
+
 	//{{{ Private members
 	private MiscUtilities() {}
 
-	//{{{ resolveSymlinks() method
-	private static String resolveSymlinks(String path)
+	//{{{ compareChars()
+	/** should this be public? */
+	private static boolean compareChars(char ch1, char ch2, boolean ignoreCase)
 	{
-		try
-		{
-			return new File(path).getCanonicalPath();
-		}
-		catch(IOException io)
-		{
-			return path;
-		}
+		if(ignoreCase)
+			return Character.toUpperCase(ch1) == Character.toUpperCase(ch2);
+		else
+			return ch1 == ch2;
 	} //}}}
 
 	//}}}

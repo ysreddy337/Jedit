@@ -10,7 +10,7 @@ You will need:
 - A Java compiler, such as Sun's javac or IBM's jikes.
 
 - Jakarta Ant. I use version 1.5; older versions might or might not
-  work. Get it from <http://jakarta.apache.org>.
+  work. Get it from <http://ant.apache.org>.
 
 Once you have all the necessary tools installed, run Ant with the 'dist'
 target in the build.xml file to compile jEdit:
@@ -22,7 +22,7 @@ $ ant dist
 
 You will need:
 
-- DocBook-XML 4.1.2 DTD and DocBook-XSL 1.60.1 (or later) stylesheets
+- DocBook-XML 4.2 DTD and DocBook-XSL 1.60.1 (or later) stylesheets
   (<http://docbook.sourceforge.net>).
 - An XSLT processor, such as Xalan (<http://xml.apache.org>) or
   xsltproc (<http://xmlsoft.org/XSLT/>).
@@ -69,3 +69,25 @@ this problem.
 
 If plan on running jEdit under both 1.3 and 1.4, I recommend you compile
 it using javac.
+
+* Interesting algorithms and tricks
+
+- org.gjt.sp.jedit.browser.VFSDirectoryEntryTable: a tree table control.
+
+- org.gjt.sp.jedit.buffer.LineManager: the "gap" optimization allows
+  update operations to be performed in O(1) time in certain
+  circumstances.
+
+- org.gjt.sp.jedit.buffer.KillRing: uses a hash to speed up comparisons
+  with sets of strings.
+
+- org.gjt.sp.jedit.search.BoyerMooreSearchMatcher: fast text search.
+
+- org.gjt.sp.jedit.syntax.TokenMarker: generic tokenizer driven by rules
+  defined in an XML file.
+
+- org.gjt.sp.jedit.textarea.DisplayManager: the fold visibility map
+  looks like an RLE-compressed bit set but does lookups in O(log n).
+
+- org.gjt.sp.util.WorkThreadPool: a pool of threads executing requests
+  from a queue, enforcing various concurrency requirements.

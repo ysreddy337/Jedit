@@ -1,11 +1,12 @@
 /**
-	Remove the file (like Unix rm)
+	Remove a file (like Unix rm).
 */
 
 bsh.help.rm = "usage: cd( path )";
 
-void rm( String pathname ) {
-    file = pathToFile( pathname );
+boolean rm( String pathname ) 
+{
+    this.file = pathToFile( pathname );
 
 	if ( file == null )
 		throw new java.io.FileNotFoundException("pathname");

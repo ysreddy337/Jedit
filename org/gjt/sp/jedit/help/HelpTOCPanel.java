@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999, 2000, 2001, 2002 Slava Pestov
+ * Copyright (C) 1999, 2004 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -33,6 +33,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import org.gjt.sp.jedit.browser.FileCellRenderer; // for icons
+import org.gjt.sp.jedit.io.VFSManager;
 import org.gjt.sp.jedit.*;
 import org.gjt.sp.util.Log;
 //}}}
@@ -40,16 +41,14 @@ import org.gjt.sp.util.Log;
 class HelpTOCPanel extends JPanel
 {
 	//{{{ HelpTOCPanel constructor
-	public HelpTOCPanel(HelpViewer helpViewer)
+	HelpTOCPanel(HelpViewer helpViewer)
 	{
 		super(new BorderLayout());
 
 		this.helpViewer = helpViewer;
 		nodes = new Hashtable();
 
-		createTOC();
-
-		toc = new TOCTree(tocModel);
+		toc = new TOCTree();
 
 		// looks bad with the OS X L&F, apparently...
 		if(!OperatingSystem.isMacOSLF())
@@ -57,22 +56,19 @@ class HelpTOCPanel extends JPanel
 
 		toc.setCellRenderer(new TOCCellRenderer());
 		toc.setEditable(false);
-		toc.setRootVisible(false);
 		toc.setShowsRootHandles(true);
 
-		for(int i = 0; i <tocRoot.getChildCount(); i++)
-		{
-			DefaultMutableTreeNode node = (DefaultMutableTreeNode)
-				tocRoot.getChildAt(i);
-			toc.expandPath(new TreePath(node.getPath()));
-		}
-
 		add(BorderLayout.CENTER,new JScrollPane(toc));
+
+		load();
 	} //}}}
 
 	//{{{ selectNode() method
-	public void selectNode(String shortURL)
+	void selectNode(String shortURL)
 	{
+		if(tocModel == null)
+			return;
+
 		DefaultMutableTreeNode node = (DefaultMutableTreeNode)nodes.get(shortURL);
 
 		if(node == null)
@@ -82,6 +78,37 @@ class HelpTOCPanel extends JPanel
 		toc.expandPath(path);
 		toc.setSelectionPath(path);
 		toc.scrollPathToVisible(path);
+	} //}}}
+
+	//{{{ load() method
+	void load()
+	{
+		DefaultTreeModel empty = new DefaultTreeModel(
+			new DefaultMutableTreeNode(
+			jEdit.getProperty("helpviewer.toc.loading")));
+		toc.setModel(empty);
+		toc.setRootVisible(true);
+
+		VFSManager.runInWorkThread(new Runnable()
+		{
+			public void run()
+			{
+				createTOC();
+				tocModel.reload(tocRoot);
+				toc.setModel(tocModel);
+				toc.setRootVisible(false);
+				for(int i = 0; i <tocRoot.getChildCount(); i++)
+				{
+					DefaultMutableTreeNode node =
+						(DefaultMutableTreeNode)
+						tocRoot.getChildAt(i);
+					toc.expandPath(new TreePath(
+						node.getPath()));
+				}
+				if(helpViewer.getShortURL() != null)
+					selectNode(helpViewer.getShortURL());
+			}
+		});
 	} //}}}
 
 	//{{{ Private members
@@ -103,6 +130,8 @@ class HelpTOCPanel extends JPanel
 	//{{{ createTOC() method
 	private void createTOC()
 	{
+		EditPlugin[] plugins = jEdit.getPlugins();
+		Arrays.sort(plugins,new PluginCompare());
 		tocRoot = new DefaultMutableTreeNode();
 
 		tocRoot.add(createNode("welcome.html",
@@ -110,8 +139,6 @@ class HelpTOCPanel extends JPanel
 
 		tocRoot.add(createNode("README.txt",
 			jEdit.getProperty("helpviewer.toc.readme")));
-		tocRoot.add(createNode("NEWS.txt",
-			jEdit.getProperty("helpviewer.toc.news")));
 		tocRoot.add(createNode("CHANGES.txt",
 			jEdit.getProperty("helpviewer.toc.changes")));
 		tocRoot.add(createNode("TODO.txt",
@@ -120,7 +147,12 @@ class HelpTOCPanel extends JPanel
 			jEdit.getProperty("helpviewer.toc.copying")));
 		tocRoot.add(createNode("COPYING.DOC.txt",
 			jEdit.getProperty("helpviewer.toc.copying-doc")));
+		tocRoot.add(createNode("Apache.LICENSE.txt",
+			jEdit.getProperty("helpviewer.toc.copying-apache")));
+		tocRoot.add(createNode("COPYING.PLUGINS.txt",
+			jEdit.getProperty("helpviewer.toc.copying-plugins")));
 
+		loadTOC(tocRoot,"news42/toc.xml");
 		loadTOC(tocRoot,"users-guide/toc.xml");
 		loadTOC(tocRoot,"FAQ/toc.xml");
 		loadTOC(tocRoot,"api/toc.xml");
@@ -128,13 +160,9 @@ class HelpTOCPanel extends JPanel
 		DefaultMutableTreeNode pluginTree = new DefaultMutableTreeNode(
 			jEdit.getProperty("helpviewer.toc.plugins"),true);
 
-		EditPlugin[] plugins = jEdit.getPlugins();
 		for(int i = 0; i < plugins.length; i++)
 		{
 			EditPlugin plugin = plugins[i];
-			EditPlugin.JAR jar = plugin.getJAR();
-			if(jar == null)
-				continue;
 
 			String name = plugin.getClassName();
 
@@ -144,13 +172,11 @@ class HelpTOCPanel extends JPanel
 			{
 				if(label != null && docs != null)
 				{
-					URL url = jar.getClassLoader()
-						.getResource(docs);
-					if(url != null)
-					{
-						pluginTree.add(createNode(
-							url.toString(),label));
-					}
+					String path = plugin.getPluginJAR()
+						.getClassLoader()
+						.getResourceAsPath(docs);
+					pluginTree.add(createNode(
+						path,label));
 				}
 			}
 		}
@@ -171,13 +197,15 @@ class HelpTOCPanel extends JPanel
 	{
 		TOCHandler h = new TOCHandler(root,MiscUtilities.getParentOfPath(path));
 		XmlParser parser = new XmlParser();
+		Reader in = null;
 		parser.setHandler(h);
 
 		try
 		{
-			parser.parse(null, null, new InputStreamReader(
+			in = new InputStreamReader(
 				new URL(helpViewer.getBaseURL()
-				+ '/' + path).openStream()));
+				+ '/' + path).openStream());
+			parser.parse(null, null, in);
 		}
 		catch(XmlException xe)
 		{
@@ -188,7 +216,19 @@ class HelpTOCPanel extends JPanel
 		}
 		catch(Exception e)
 		{
-			Log.log(Log.NOTICE,this,e);
+			Log.log(Log.ERROR,this,e);
+		}
+		finally
+		{
+			try
+			{
+				if(in != null)
+					in.close();
+			}
+			catch(IOException io)
+			{
+				Log.log(Log.ERROR,this,io);
+			}
 		}
 	} //}}}
 
@@ -286,9 +326,8 @@ class HelpTOCPanel extends JPanel
 	class TOCTree extends JTree
 	{
 		//{{{ TOCTree constructor
-		TOCTree(TreeModel model)
+		TOCTree()
 		{
-			super(model);
 			ToolTipManager.sharedInstance().registerComponent(this);
 		} //}}}
 
@@ -368,10 +407,6 @@ class HelpTOCPanel extends JPanel
 			}
 		} //}}}
 
-		//{{{ Private members
-		private int toolTipInitialDelay = -1;
-		private int toolTipReshowDelay = -1;
-
 		//{{{ cellRectIsVisible() method
 		private boolean cellRectIsVisible(Rectangle cellRect)
 		{
@@ -380,8 +415,6 @@ class HelpTOCPanel extends JPanel
 				vr.contains(cellRect.x + cellRect.width,
 				cellRect.y + cellRect.height);
 		} //}}}
-
-		//}}}
 	} //}}}
 
 	//{{{ TOCCellRenderer class
@@ -401,6 +434,20 @@ class HelpTOCPanel extends JPanel
 			setBorder(border);
 
 			return this;
+		}
+	} //}}}
+
+	//{{{ PluginCompare class
+	static class PluginCompare implements Comparator
+	{
+		public int compare(Object o1, Object o2)
+		{
+			EditPlugin p1 = (EditPlugin)o1;
+			EditPlugin p2 = (EditPlugin)o2;
+			return MiscUtilities.compareStrings(
+				jEdit.getProperty("plugin." + p1.getClassName() + ".name"),
+				jEdit.getProperty("plugin." + p2.getClassName() + ".name"),
+				true);
 		}
 	} //}}}
 }

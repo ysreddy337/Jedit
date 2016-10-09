@@ -40,7 +40,7 @@ import org.gjt.sp.util.Log;
 /**
  * Tool bar editor.
  * @author Slava Pestov
- * @version $Id: ToolBarOptionPane.java,v 1.11 2003/01/12 03:08:24 spestov Exp $
+ * @version $Id: ToolBarOptionPane.java,v 1.14 2004/06/28 06:45:27 spestov Exp $
  */
 public class ToolBarOptionPane extends AbstractOptionPane
 {
@@ -330,6 +330,13 @@ public class ToolBarOptionPane extends AbstractOptionPane
 			{
 				int index = list.getSelectedIndex();
 				listModel.removeElementAt(index);
+				if(listModel.getSize() != 0)
+				{
+					if(listModel.getSize() == index)
+						list.setSelectedIndex(index-1);
+					else
+						list.setSelectedIndex(index);
+				}
 				updateButtons();
 			}
 			else if(source == moveUp)
@@ -500,7 +507,7 @@ class ToolBarEditDialog extends EnhancedDialog
 			{
 				action.setSelected(true);
 				ActionSet set = jEdit.getActionSetForAction(
-					jEdit.getAction(current.actionName));
+					current.actionName);
 				combo.setSelectedItem(set);
 				updateList();
 				list.setSelectedValue(current,true);
@@ -544,7 +551,7 @@ class ToolBarEditDialog extends EnhancedDialog
 
 		pack();
 		setLocationRelativeTo(GUIUtilities.getParentDialog(comp));
-		show();
+		setVisible(true);
 	} //}}}
 
 	//{{{ ok() method

@@ -3,7 +3,7 @@
  * :tabSize=8:indentSize=8:noTabs=false:
  * :folding=explicit:collapseFolds=1:
  *
- * Copyright (C) 1999 Slava Pestov
+ * Copyright (C) 1999, 2003 Slava Pestov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,6 +23,7 @@
 package org.gjt.sp.jedit.gui;
 
 //{{{ Imports
+import javax.swing.AbstractListModel;
 import java.io.*;
 import java.util.*;
 import org.gjt.sp.jedit.jEdit;
@@ -32,11 +33,12 @@ import org.gjt.sp.util.Log;
 
 /**
  * A history list. One history list can be used by several history text
- * fields.
+ * fields. Note that the list model implementation is incomplete; no events
+ * are fired when the history model changes.
  * @author Slava Pestov
- * @version $Id: HistoryModel.java,v 1.7 2003/01/31 04:49:30 spestov Exp $
+ * @version $Id: HistoryModel.java,v 1.17 2004/05/29 01:55:25 spestov Exp $
  */
-public class HistoryModel
+public class HistoryModel extends AbstractListModel
 {
 	//{{{ HistoryModel constructor
 	/**
@@ -47,7 +49,6 @@ public class HistoryModel
 	{
 		this.name = name;
 
-		max = jEdit.getIntegerProperty("history",25);
 		data = new Vector(max);
 	} //}}}
 
@@ -61,6 +62,8 @@ public class HistoryModel
 	{
 		if(text == null || text.length() == 0)
 			return;
+
+		modified = true;
 
 		int index = data.indexOf(text);
 		if(index != -1)
@@ -80,6 +83,30 @@ public class HistoryModel
 	public String getItem(int index)
 	{
 		return (String)data.elementAt(index);
+	} //}}}
+
+	//{{{ getElementAt() method
+	/**
+	 * Returns an item from the history list. This method returns the
+	 * same thing as {@link #getItem(int)} and only exists so that
+	 * <code>HistoryModel</code> instances can be used as list models.
+	 * @param index The index
+	 * @since jEdit 4.2pre2
+	 */
+	public Object getElementAt(int index)
+	{
+		return getItem(index);
+	} //}}}
+
+	//{{{ clear() method
+	/**
+	 * Removes all entries from this history model.
+	 * @since jEdit 4.2pre2
+	 */
+	public void clear()
+	{
+		modified = true;
+		data.removeAllElements();
 	} //}}}
 
 	//{{{ getSize() method
@@ -123,20 +150,29 @@ public class HistoryModel
 	} //}}}
 
 	//{{{ loadHistory() method
-	/**
-	 * Loads the history from the specified file.
-	 *
-	 * jEdit calls this method on startup.
-	 * @param The file
-	 */
-	public static void loadHistory(File file)
+	public static void loadHistory()
 	{
+		String settingsDirectory = jEdit.getSettingsDirectory();
+		if(settingsDirectory == null)
+			return;
+
+		history = new File(MiscUtilities.constructPath(
+			settingsDirectory,"history"));
+		if(!history.exists())
+			return;
+
+		historyModTime = history.lastModified();
+
+		Log.log(Log.MESSAGE,HistoryModel.class,"Loading history");
+
 		if(models == null)
 			models = new Hashtable();
 
+		BufferedReader in = null;
+
 		try
 		{
-			BufferedReader in = new BufferedReader(new FileReader(file));
+			in = new BufferedReader(new FileReader(history));
 
 			HistoryModel currentModel = null;
 			String line;
@@ -150,8 +186,12 @@ public class HistoryModel
 						models.put(currentModel.getName(),
 							currentModel);
 					}
-					currentModel = new HistoryModel(line
-						.substring(1,line.length() - 1));
+
+					String modelName = MiscUtilities
+						.escapesToChars(line.substring(
+						1,line.length() - 1));
+					currentModel = new HistoryModel(
+						modelName);
 				}
 				else if(currentModel == null)
 				{
@@ -169,73 +209,125 @@ public class HistoryModel
 			{
 				models.put(currentModel.getName(),currentModel);
 			}
-
-			in.close();
 		}
 		catch(FileNotFoundException fnf)
 		{
-			Log.log(Log.DEBUG,HistoryModel.class,fnf);
+			//Log.log(Log.DEBUG,HistoryModel.class,fnf);
 		}
 		catch(IOException io)
 		{
 			Log.log(Log.ERROR,HistoryModel.class,io);
+		}
+		finally
+		{
+			try
+			{
+				if(in != null)
+					in.close();
+			}
+			catch(IOException io)
+			{
+			}
 		}
 	} //}}}
 
 	//{{{ saveHistory() method
-	/**
-	 * Saves the history to the specified file.
-	 *
-	 * jEdit calls this method when it is exiting.
-	 * @param file The file
-	 */
-	public static void saveHistory(File file)
+	public static void saveHistory()
 	{
+		if(!modified)
+			return;
+
+		Log.log(Log.MESSAGE,HistoryModel.class,"Saving history");
+		File file1 = new File(MiscUtilities.constructPath(
+			jEdit.getSettingsDirectory(), "#history#save#"));
+		File file2 = new File(MiscUtilities.constructPath(
+			jEdit.getSettingsDirectory(), "history"));
+		if(file2.exists() && file2.lastModified() != historyModTime)
+		{
+			Log.log(Log.WARNING,HistoryModel.class,file2
+				+ " changed on disk; will not save history");
+			return;
+		}
+
+		jEdit.backupSettingsFile(file2);
+
 		String lineSep = System.getProperty("line.separator");
+
+		BufferedWriter out = null;
+
 		try
 		{
-			BufferedWriter out = new BufferedWriter(
-				new FileWriter(file));
+			out = new BufferedWriter(new FileWriter(file1));
 
-			if(models == null)
+			if(models != null)
 			{
-				out.close();
-				return;
-			}
-
-			Enumeration modelEnum = models.elements();
-			while(modelEnum.hasMoreElements())
-			{
-				HistoryModel model = (HistoryModel)modelEnum
-					.nextElement();
-
-				out.write('[');
-				out.write(model.getName());
-				out.write(']');
-				out.write(lineSep);
-
-				for(int i = 0; i < model.getSize(); i++)
+				Enumeration modelEnum = models.elements();
+				while(modelEnum.hasMoreElements())
 				{
+					HistoryModel model = (HistoryModel)modelEnum
+						.nextElement();
+					if(model.getSize() == 0)
+						continue;
+	
+					out.write('[');
 					out.write(MiscUtilities.charsToEscapes(
-						model.getItem(i),
-						TO_ESCAPE));
+						model.getName(),TO_ESCAPE));
+					out.write(']');
 					out.write(lineSep);
+	
+					for(int i = 0; i < model.getSize(); i++)
+					{
+						out.write(MiscUtilities.charsToEscapes(
+							model.getItem(i),
+							TO_ESCAPE));
+						out.write(lineSep);
+					}
 				}
 			}
 
 			out.close();
+
+			/* to avoid data loss, only do this if the above
+			 * completed successfully */
+			file2.delete();
+			file1.renameTo(file2);
+			modified = false;
 		}
 		catch(IOException io)
 		{
 			Log.log(Log.ERROR,HistoryModel.class,io);
 		}
+		finally
+		{
+			try
+			{
+				if(out != null)
+					out.close();
+			}
+			catch(IOException e)
+			{
+			}
+		}
+
+		historyModTime = file2.lastModified();
+	} //}}}
+
+	//{{{ propertiesChanged() method
+	public static void propertiesChanged()
+	{
+		max = jEdit.getIntegerProperty("history",25);
 	} //}}}
 
 	//{{{ Private members
-	private static final String TO_ESCAPE = "\n\t\\\"'[]";
+	private static final String TO_ESCAPE = "\r\n\t\\\"'[]";
+	private static int max;
+
 	private String name;
-	private int max;
 	private Vector data;
 	private static Hashtable models;
+
+	private static boolean modified;
+	private static File history;
+	private static long historyModTime;
 	//}}}
 }

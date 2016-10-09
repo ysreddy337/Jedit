@@ -1,13 +1,14 @@
 /**
-	Get the Java Runtime and start the external process, display any
-	output to the standard bsh output.
+	Start an external application using the Java Runtime exec() method.
+	Display any output to the standard BeanShell output using print().
 */
 
 bsh.help.exec = "usage: exec( String arg )";
 
-exec( String arg ) {
-	proc = Runtime.getRuntime().exec(arg);
-	din = new DataInputStream( proc.getInputStream() );
+exec( String arg ) 
+{
+	this.proc = Runtime.getRuntime().exec(arg);
+	this.din = new DataInputStream( proc.getInputStream() );
 	while( (line=din.readLine()) != null )
 		print(line);
 }
